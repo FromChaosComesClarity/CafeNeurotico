@@ -5325,6 +5325,32 @@ LOADING...READY.</div>
     </div>
   </div>
 
+  <!-- In-process GOG/Epic install (no GRINDER window) -->
+  <div id="modal-grinder-install" class="modal-overlay" style="z-index:26000;">
+    <div class="modal-box" style="max-width:460px; gap:14px;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Install Game</h3>
+      <p id="gi-title" style="font-size:14px; font-weight:900; color:var(--text_main); margin:0;"></p>
+      <div id="gi-config">
+        <p style="font-size:10px; color:var(--accent); font-weight:900; letter-spacing:1px; margin:0 0 6px; text-transform:uppercase;">Install to</p>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="gi-dir" type="text" readonly style="flex:1; font-family:monospace; font-size:11px;">
+          <button id="gi-change-dir" style="font-size:11px; padding:6px 12px; white-space:nowrap;">Change…</button>
+        </div>
+      </div>
+      <div id="gi-progress" style="display:none;">
+        <p id="gi-step" style="font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin:0 0 6px; color:var(--accent);"></p>
+        <div style="height:10px; background:var(--bg_menu); border:1px solid var(--border_solid); border-radius:5px; overflow:hidden;">
+          <div id="gi-bar" style="height:100%; width:0%; background:var(--accent); transition:width 0.2s;"></div>
+        </div>
+        <p id="gi-msg" style="font-size:11px; color:var(--text_sec); margin:8px 0 0; font-family:monospace; word-break:break-word;"></p>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button id="gi-install" class="primary" style="flex:1;">Install</button>
+        <button id="gi-cancel" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-dialog" class="modal-overlay" style="z-index:30000;">
     <div class="modal-box" style="max-width: 420px; text-align: center;">
       <p id="modal-dialog-body" style="font-size: 13px; color: var(--text_sec); line-height: 1.7; margin: 0 0 22px; white-space: pre-line;"></p>

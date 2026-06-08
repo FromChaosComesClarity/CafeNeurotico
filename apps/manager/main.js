@@ -286,6 +286,8 @@ function getGrinderMap() {
 // prefixes and Proton settings the grinder face uses.
 const grinderEngine = require('../../packages/core/grinder-engine.js');
 let _grinderEngineDb = null;
+let _grinderProgressCb = null;   // set per install/uninstall to route progress to the renderer
+let _grinderBusy = false;        // serialize install/uninstall (one at a time)
 function ensureGrinderEngine() {
     if (_grinderEngineDb) return true;
     const home = os.homedir();
@@ -310,10 +312,75 @@ function ensureGrinderEngine() {
         appImageDir: baseDir,
         homeDir:     home,
         db:          _grinderEngineDb,
-        onProgress:  () => {},
+        onProgress:  (data) => { try { _grinderProgressCb && _grinderProgressCb(data); } catch {} },
     });
     return true;
 }
+
+// Split a GrinderGameId like "gog_2049187585" / "epic_<hex>" into { store, appId }.
+function parseGrinderId(gid) {
+    if (!gid) return null;
+    const m = String(gid).match(/^(gog|epic)_(.+)$/i);
+    if (!m) return null;            // custom (mp...) ids aren't gogdl/legendary-installable
+    return { store: m[1].toLowerCase(), appId: m[2] };
+}
+
+function grinderDefaultDir() {
+    try { return _grinderEngineDb?.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value || ''; }
+    catch { return ''; }
+}
+
+// In-process install of a GOG/Epic game via the shared engine; progress streams
+// to the calling renderer over 'grinder-install-progress'.
+ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, installDir } = {}) => {
+    if (_grinderBusy) return { ok: false, error: 'Another install/uninstall is in progress.' };
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
+    const parsed = parseGrinderId(grinderGameId);
+    if (!parsed) return { ok: false, error: 'This game cannot be installed in-process (not a GOG/Epic title).' };
+    const platform = (() => {
+        try { return _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store)?.platform; }
+        catch { return null; }
+    })();
+    const dir = installDir || grinderDefaultDir() || undefined;
+    _grinderBusy = true;
+    _grinderProgressCb = (data) => { try { event.sender.send('grinder-install-progress', data); } catch {} };
+    try {
+        await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir);
+        if (gameId && db) { try { db.prepare("UPDATE games SET Installed=1 WHERE id=?").run(gameId); } catch {} }
+        if (win) win.webContents.send('install-status-updated');
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    } finally {
+        _grinderBusy = false; _grinderProgressCb = null;
+    }
+});
+
+ipcMain.handle('grinder-uninstall', async (event, { gameId, grinderGameId } = {}) => {
+    if (_grinderBusy) return { ok: false, error: 'Another install/uninstall is in progress.' };
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
+    const parsed = parseGrinderId(grinderGameId);
+    if (!parsed) return { ok: false, error: 'This game cannot be uninstalled in-process (not a GOG/Epic title).' };
+    _grinderBusy = true;
+    _grinderProgressCb = (data) => { try { event.sender.send('grinder-install-progress', data); } catch {} };
+    try {
+        await grinderEngine.headlessUninstall(parsed.store, parsed.appId);
+        if (gameId && db) { try { db.prepare("UPDATE games SET Installed=0 WHERE id=?").run(gameId); } catch {} }
+        if (win) win.webContents.send('install-status-updated');
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    } finally {
+        _grinderBusy = false; _grinderProgressCb = null;
+    }
+});
+
+// Default install dir + a native folder picker for the install dialog.
+ipcMain.handle('grinder-default-dir', () => { ensureGrinderEngine(); return grinderDefaultDir(); });
+ipcMain.handle('grinder-pick-dir', async () => {
+    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
+    return (!r.canceled && r.filePaths[0]) ? r.filePaths[0] : null;
+});
 
 function findCremaPath() {
     try {

@@ -197,8 +197,59 @@ async function _doLaunch(game, cmd) {
     Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
 }
 
+// In-process GOG/Epic install with a progress modal (no GRINDER window).
+let _giProgressBound = false;
+async function openGrinderInstall(game) {
+    const gid = game.GrinderGameId || '';
+    if (!/^(gog|epic)_/i.test(gid)) { window.api.openGrinder(game.Game); return; } // custom → GUI setup
+
+    const modal = document.getElementById('modal-grinder-install');
+    const $ = id => document.getElementById(id);
+    $('gi-title').textContent = game.Game || '';
+    $('gi-dir').value = (await window.api.grinderDefaultDir()) || '';
+    $('gi-config').style.display = '';
+    $('gi-progress').style.display = 'none';
+    $('gi-bar').style.width = '0%';
+    $('gi-step').textContent = ''; $('gi-step').style.color = 'var(--accent)';
+    $('gi-msg').textContent = '';
+    $('gi-install').style.display = ''; $('gi-install').disabled = false; $('gi-install').textContent = 'Install';
+    $('gi-cancel').textContent = 'Cancel';
+    modal.classList.add('active');
+
+    if (!_giProgressBound) {
+        _giProgressBound = true;
+        window.api.onGrinderInstallProgress(d => {
+            if ($('gi-progress').style.display === 'none') return;
+            $('gi-step').textContent = (d.step || '').toUpperCase();
+            if (typeof d.percent === 'number') $('gi-bar').style.width = Math.max(0, Math.min(100, d.percent)) + '%';
+            if (d.message) $('gi-msg').textContent = d.message;
+        });
+    }
+
+    $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) $('gi-dir').value = dir; };
+    $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
+    $('gi-install').onclick = async () => {
+        $('gi-config').style.display = 'none';
+        $('gi-progress').style.display = '';
+        $('gi-install').disabled = true;
+        $('gi-cancel').textContent = 'Hide';   // install keeps running if hidden
+        const res = await window.api.grinderInstall({ gameId: game.id, grinderGameId: gid, installDir: $('gi-dir').value });
+        if (res && res.ok) {
+            $('gi-step').textContent = 'DONE'; $('gi-bar').style.width = '100%'; $('gi-msg').textContent = 'Installation complete!';
+            setTimeout(() => { modal.classList.remove('active'); loadGames(); }, 1200);
+        } else {
+            $('gi-step').textContent = 'ERROR'; $('gi-step').style.color = '#ff6d00';
+            $('gi-msg').textContent = (res && res.error) || 'Install failed.';
+            $('gi-install').style.display = 'none'; $('gi-cancel').textContent = 'Close';
+        }
+    };
+}
+
 function handleInstall(game) {
-    if (_isGrinderGame(game)) { window.api.openGrinder(game.Game); return; }
+    if (_isGrinderGame(game)) {
+        if (/^(gog|epic)_/i.test(game.GrinderGameId || '')) { openGrinderInstall(game); return; }
+        window.api.openGrinder(game.Game); return;
+    }
     const installCmd = getInstallCommand(game);
     if (installCmd) { window.api.openInstallUrl(installCmd); return; }
     if (isManualCategory(game)) openAddCmdDialog(game.id, game.Game);
@@ -1728,7 +1779,7 @@ function renderSplitDetail(game) {
             playBtn.textContent = '⬇ INSTALL';
             playBtn.className = 'btn-install-primary';
             playBtn.style.display = 'inline-flex';
-            playBtn.onclick = () => window.api.openGrinder(game.Game);
+            playBtn.onclick = () => handleInstall(game);
         } else if (installCmd) {
             playBtn.textContent = '⬇ INSTALL';
             playBtn.className = 'btn-install-primary';
@@ -2026,7 +2077,8 @@ _tbody.addEventListener('click', async (e) => {
         if (install.dataset.addcmd) {
             openAddCmdDialog(install.dataset.id, install.dataset.name);
         } else if (install.dataset.grinder) {
-            window.api.openGrinder(install.dataset.name);
+            const g = allGames.find(x => x.id == install.dataset.id);
+            if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
         } else {
             window.api.openInstallUrl(install.dataset.url);
         }
@@ -5811,7 +5863,8 @@ _grid.addEventListener('click', (e) => {
         if (install.dataset.addcmd) {
             openAddCmdDialog(install.dataset.id, install.dataset.name);
         } else if (install.dataset.grinder) {
-            window.api.openGrinder(install.dataset.name);
+            const g = allGames.find(x => x.id == install.dataset.id);
+            if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
         } else {
             window.api.openInstallUrl(install.dataset.url);
         }
@@ -6082,7 +6135,7 @@ function refreshGamepagePlayBtn(game) {
             playBtn.style.display = 'block';
             playBtn.innerText = t('status.install');
             playBtn.className = 'btn-install-primary';
-            playBtn.onclick = () => window.api.openGrinder(game.Game);
+            playBtn.onclick = () => handleInstall(game);
         } else if (installCmd) {
             playBtn.style.display = 'block';
             playBtn.innerText = t('status.install');

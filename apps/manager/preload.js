@@ -115,6 +115,12 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
                                 syncGrinderInstalled: (ids) => ipcRenderer.invoke('sync-grinder-installed', ids),
                                 syncAllGrinderGames: (games, p) => ipcRenderer.invoke('sync-all-grinder-games', games, p),
+                                // --- in-process install (no GRINDER window) ---
+                                grinderInstall:   (payload) => ipcRenderer.invoke('grinder-install', payload),
+                                grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),
+                                grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),
+                                grinderPickDir:    () => ipcRenderer.invoke('grinder-pick-dir'),
+                                onGrinderInstallProgress: (cb) => ipcRenderer.on('grinder-install-progress', (e, d) => cb(d)),
 
                                 // --- PLAYLISTS ---
                                 getPlaylists:           ()           => ipcRenderer.invoke('get-playlists'),
