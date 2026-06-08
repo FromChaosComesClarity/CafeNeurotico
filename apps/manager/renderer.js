@@ -179,15 +179,18 @@ document.getElementById('modal-launcher-pick').addEventListener('click', e => {
 });
 
 async function _doLaunch(game, cmd) {
-    // GOG/Epic: ALWAYS launch via GRINDER — Heroic Games Launcher is never invoked
-    if (_isGrinderGame(game)) {
+    // Route by the actual command so the multi-launcher picker is honoured:
+    //  - a heroic:// (GOG/Epic) command — or a grinder-linked game with no cmd —
+    //    launches via GRINDER's engine in-process (Heroic is never invoked)
+    //  - everything else (steam://, itch://, pico8-cart:, native) launches directly
+    const isHeroic = /heroic:\/\/launch/i.test(cmd || '');
+    if (isHeroic || (!cmd && game?.GrinderGameId)) {
         if (game?.GrinderGameId) {
-            // Launch in-process via the unified engine (no external/self AppImage spawn).
             window.api.launchGame('grinder://launch/' + game.GrinderGameId);
-            Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
-            return;
+        } else {
+            window.api.openGrinder(game.Game);
         }
-        window.api.openGrinder(game.Game);
+        Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
         return;
     }
     window.api.launchGame(cmd);

@@ -1192,7 +1192,7 @@ ipcMain.on('launch-game', (event, cmd) => {
 
     // GOG/Epic via GRINDER, launched IN-PROCESS (cmd carries GRINDER's game id).
     // This is the path used by games with a GrinderGameId (the common case).
-    const gLaunch = cmd.match(/^grinder:\/\/launch\/(.+)$/);
+    const gLaunch = cmd.match(/^grinder:\/\/(?:launch\/)?(.+)$/);
     if (gLaunch) {
         const gid = gLaunch[1];
         if (ensureGrinderEngine()) {
