@@ -304,6 +304,10 @@ ipcMain.handle('update-game', (_, id, data) => {
     const set = entries.map(([k]) => `${k}=?`).join(', ');
     const vals = entries.map(([,v]) => v);
     db.prepare(`UPDATE games SET ${set} WHERE id=?`).run(...vals, id);
+    // Propagate install-state changes (e.g. GUI install completion) to the shared CNGM games.db
+    if (Object.prototype.hasOwnProperty.call(data, 'installed')) {
+        try { const g = db.prepare("SELECT app_id FROM games WHERE id=?").get(id); if (g?.app_id) syncSharedDb(g.app_id, data.installed ? 1 : 0); } catch {}
+    }
     return true;
 });
 
@@ -360,6 +364,7 @@ ipcMain.handle('uninstall-game-files', async (_, id) => {
     }
 
     db.prepare("UPDATE games SET installed=0, install_path=NULL, executable=NULL, version=NULL WHERE id=?").run(id);
+    if (game.app_id) syncSharedDb(game.app_id, false);   // reflect uninstall in the shared CNGM games.db
 
     return errors.length ? { ok: false, error: errors.join('; ') } : { ok: true };
 });

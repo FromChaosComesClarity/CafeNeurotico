@@ -197,8 +197,16 @@ async function _doLaunch(game, cmd) {
     Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
 }
 
+// Live progress for in-process install/uninstall (bound once; acts only while the dialog shows progress).
+window.api.onGrinderInstallProgress(d => {
+    const pr = document.getElementById('gi-progress');
+    if (!pr || pr.style.display === 'none') return;
+    document.getElementById('gi-step').textContent = (d.step || '').toUpperCase();
+    if (typeof d.percent === 'number') document.getElementById('gi-bar').style.width = Math.max(0, Math.min(100, d.percent)) + '%';
+    if (d.message) document.getElementById('gi-msg').textContent = d.message;
+});
+
 // In-process GOG/Epic install with a progress modal (no GRINDER window).
-let _giProgressBound = false;
 async function openGrinderInstall(game) {
     const gid = game.GrinderGameId || '';
     if (!/^(gog|epic)_/i.test(gid)) { window.api.openGrinder(game.Game); return; } // custom → GUI setup
@@ -215,16 +223,6 @@ async function openGrinderInstall(game) {
     $('gi-install').style.display = ''; $('gi-install').disabled = false; $('gi-install').textContent = 'Install';
     $('gi-cancel').textContent = 'Cancel';
     modal.classList.add('active');
-
-    if (!_giProgressBound) {
-        _giProgressBound = true;
-        window.api.onGrinderInstallProgress(d => {
-            if ($('gi-progress').style.display === 'none') return;
-            $('gi-step').textContent = (d.step || '').toUpperCase();
-            if (typeof d.percent === 'number') $('gi-bar').style.width = Math.max(0, Math.min(100, d.percent)) + '%';
-            if (d.message) $('gi-msg').textContent = d.message;
-        });
-    }
 
     $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) $('gi-dir').value = dir; };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
@@ -243,6 +241,35 @@ async function openGrinderInstall(game) {
             $('gi-install').style.display = 'none'; $('gi-cancel').textContent = 'Close';
         }
     };
+}
+
+// In-process GOG/Epic uninstall (reuses the install modal in progress-only mode).
+async function openGrinderUninstall(game) {
+    const gid = game.GrinderGameId || '';
+    if (!/^(gog|epic)_/i.test(gid)) return;
+    const ok = await showConfirm(`Uninstall "${game.Game}"?\nThis removes the game files and its Wine prefix.`);
+    if (!ok) return;
+    const modal = document.getElementById('modal-grinder-install');
+    const $ = id => document.getElementById(id);
+    $('gi-title').textContent = 'Uninstalling: ' + (game.Game || '');
+    $('gi-config').style.display = 'none';
+    $('gi-progress').style.display = '';
+    $('gi-bar').style.width = '0%';
+    $('gi-step').textContent = 'UNINSTALLING'; $('gi-step').style.color = 'var(--accent)';
+    $('gi-msg').textContent = '';
+    $('gi-install').style.display = 'none';
+    $('gi-cancel').textContent = 'Hide';
+    $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
+    modal.classList.add('active');
+    const res = await window.api.grinderUninstall({ gameId: game.id, grinderGameId: gid });
+    if (res && res.ok) {
+        $('gi-step').textContent = 'DONE'; $('gi-bar').style.width = '100%'; $('gi-msg').textContent = 'Game uninstalled.';
+        setTimeout(() => { modal.classList.remove('active'); loadGames(); }, 1000);
+    } else {
+        $('gi-step').textContent = 'ERROR'; $('gi-step').style.color = '#ff6d00';
+        $('gi-msg').textContent = (res && res.error) || 'Uninstall failed.';
+        $('gi-cancel').textContent = 'Close';
+    }
 }
 
 function handleInstall(game) {
@@ -6267,6 +6294,14 @@ function openGamepage(game) {
     } else {
         grinderBtn.style.display = 'none';
         grinderBtn.onclick = null;
+    }
+
+    // Uninstall button — installed GOG/Epic grinder games (in-process uninstall)
+    const uninstallBtn = document.getElementById('btn-gamepage-uninstall');
+    if (uninstallBtn) {
+        const canUninstall = /^(gog|epic)_/i.test(game.GrinderGameId || '') && (game.Installed == 1);
+        uninstallBtn.style.display = canUninstall ? 'block' : 'none';
+        uninstallBtn.onclick = canUninstall ? () => openGrinderUninstall(game) : null;
     }
 
     // SPLORE button — PICO-8 games only
