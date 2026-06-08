@@ -280,6 +280,41 @@ function getGrinderMap() {
     } catch (e) { console.error('[getGrinderMap]', e); return new Map(); }
 }
 
+// In-process GRINDER engine for launching GOG/Epic games WITHOUT spawning a
+// second AppImage process (Electron AppImages relaunching themselves is flaky).
+// Points at GRINDER's own data dir (~/.config/grinder) so it reads the same DB,
+// prefixes and Proton settings the grinder face uses.
+const grinderEngine = require('../../packages/core/grinder-engine.js');
+let _grinderEngineDb = null;
+function ensureGrinderEngine() {
+    if (_grinderEngineDb) return true;
+    const home = os.homedir();
+    const gdbPath = [
+        path.join(home, '.config', 'grinder', 'grinder.db'),
+        path.join(home, '.config', 'GRINDER', 'grinder.db'),
+        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
+    ].find(p => fs.existsSync(p));
+    if (!gdbPath) return false;
+    const gConfigDir  = path.dirname(gdbPath);
+    const engineBinDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'assets', 'bin', 'linux')
+        : path.join(__dirname, 'assets', 'bin', 'linux');
+    try {
+        _grinderEngineDb = new Database(gdbPath, { timeout: 5000 });
+    } catch (e) { console.error('[grinder-engine] DB open failed:', e); _grinderEngineDb = null; return false; }
+    grinderEngine.init({
+        configDir:   gConfigDir,
+        prefixesDir: path.join(gConfigDir, 'prefixes'),
+        logDir:      path.join(gConfigDir, 'game_logs'),
+        binDir:      engineBinDir,
+        appImageDir: baseDir,
+        homeDir:     home,
+        db:          _grinderEngineDb,
+        onProgress:  () => {},
+    });
+    return true;
+}
+
 function findCremaPath() {
     try {
         const f = fs.readdirSync(baseDir).find(n => /^CREMA\.(AppImage|appimage)$/i.test(n));
@@ -1162,7 +1197,14 @@ ipcMain.on('launch-game', (event, cmd) => {
         const gMap  = getGrinderMap();
         const gId   = gMap.get(appId);
         if (gId) {
-            spawnGrinder(['launch', gId]);
+            // Launch in-process via the shared engine (no AppImage self-spawn).
+            if (ensureGrinderEngine()) {
+                grinderEngine.launchGame(gId)
+                    .then(r => console.log('[launch-game] launched via', r?.method))
+                    .catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+            } else {
+                spawnGrinder(['launch', gId]); // fallback if grinder DB not found
+            }
             return;
         }
     }
