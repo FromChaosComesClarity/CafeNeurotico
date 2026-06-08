@@ -1190,7 +1190,22 @@ ipcMain.handle('delete-game', (event, id) => {
 ipcMain.on('launch-game', (event, cmd) => {
     if (!cmd) return;
 
-    // GOG/Epic via GRINDER (headless umu-run)
+    // GOG/Epic via GRINDER, launched IN-PROCESS (cmd carries GRINDER's game id).
+    // This is the path used by games with a GrinderGameId (the common case).
+    const gLaunch = cmd.match(/^grinder:\/\/launch\/(.+)$/);
+    if (gLaunch) {
+        const gid = gLaunch[1];
+        if (ensureGrinderEngine()) {
+            grinderEngine.launchGame(gid)
+                .then(r => console.log('[launch-game] launched via', r?.method))
+                .catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+        } else {
+            spawnGrinder(['launch', gid]); // fallback if grinder DB not found
+        }
+        return;
+    }
+
+    // GOG/Epic via GRINDER (heroic:// cmd → resolve id via getGrinderMap), in-process
     const heroicMatch = cmd.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
     if (heroicMatch) {
         const appId = heroicMatch[2];

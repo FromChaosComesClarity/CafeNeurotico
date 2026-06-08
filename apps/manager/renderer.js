@@ -182,12 +182,10 @@ async function _doLaunch(game, cmd) {
     // GOG/Epic: ALWAYS launch via GRINDER — Heroic Games Launcher is never invoked
     if (_isGrinderGame(game)) {
         if (game?.GrinderGameId) {
-            const s = await window.api.grinderStatus();
-            if (s.found && s.path) {
-                window.api.launchGame(`"${s.path}" launch ${game.GrinderGameId}`);
-                Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
-                return;
-            }
+            // Launch in-process via the unified engine (no external/self AppImage spawn).
+            window.api.launchGame('grinder://launch/' + game.GrinderGameId);
+            Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
+            return;
         }
         window.api.openGrinder(game.Game);
         return;
