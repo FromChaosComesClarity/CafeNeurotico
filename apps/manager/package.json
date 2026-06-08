@@ -1,0 +1,7 @@
+{
+  "name": "@cafeneurotico/manager",
+  "version": "0.1.0",
+  "description": "Manager face (formerly CNGM) — game library hub",
+  "private": true,
+  "main": "main.js"
+}

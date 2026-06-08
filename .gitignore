@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.AppImage
+GameManagerConfig/
+.DS_Store
+*.log
+
+# Prebuilt helper binaries — fetched at build time from a GitHub Release
+# (see scripts/fetch-binaries.mjs). Too large for git; yt-dlp.conf stays tracked.
+assets/bin/linux/ffmpeg
+assets/bin/linux/ffprobe
+assets/bin/linux/yt-dlp
+assets/bin/linux/gogdl
+assets/bin/linux/legendary
+assets/bin/linux/comet

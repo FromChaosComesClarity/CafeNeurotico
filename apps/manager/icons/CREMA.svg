@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base Background -->
+  <rect width="512" height="512" rx="112" fill="#2C1E16"/>
+  
+  <!-- Golden Inner Border -->
+  <rect x="24" y="24" width="464" height="464" rx="88" fill="none" stroke="#8B5A2B" stroke-width="12"/>
+
+  <!-- Coffee Cup Handle -->
+  <path d="M 380 256 C 490 256, 490 150, 380 150" fill="none" stroke="#D4A373" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Espresso Cup Base -->
+  <circle cx="256" cy="256" r="160" fill="#432818" stroke="#D4A373" stroke-width="16"/>
+
+  <!-- Crema / Vinyl Swirls -->
+  <path d="M 256 136 A 120 120 0 0 1 376 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
+  <path d="M 256 376 A 120 120 0 0 1 136 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
+  <path d="M 186 256 A 70 70 0 0 1 256 186" fill="none" stroke="#FFE6A7" stroke-width="12" stroke-linecap="round"/>
+  <path d="M 326 256 A 70 70 0 0 1 256 326" fill="none" stroke="#FFE6A7" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Gamepad ABXY Buttons -->
+  <!-- Top Button (Y/Triangle) -->
+  <circle cx="256" cy="204" r="18" fill="#FFE6A7"/>
+  <!-- Bottom Button (A/Cross) -->
+  <circle cx="256" cy="308" r="18" fill="#FFE6A7"/>
+  <!-- Left Button (X/Square) -->
+  <circle cx="204" cy="256" r="18" fill="#FFE6A7"/>
+  <!-- Right Button (B/Circle) -->
+  <circle cx="308" cy="256" r="18" fill="#FFE6A7"/>
+</svg>

@@ -1,0 +1,59 @@
+{
+  "name": "cafeneurotico",
+  "version": "0.1.0",
+  "description": "Cafe Neurotico — unified suite (Manager + GRINDER + CREMA in one AppImage)",
+  "main": "main.js",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "fetch-bin": "node scripts/fetch-binaries.mjs",
+    "postinstall": "node scripts/fetch-binaries.mjs && electron-builder install-app-deps",
+    "start": "electron .",
+    "start:crema": "electron . --crema",
+    "pack": "electron-builder --dir",
+    "predist": "node scripts/fetch-binaries.mjs",
+    "dist": "electron-builder --linux AppImage",
+    "postdist": "D=/home/jose/Games/CNGM; F=CafeNeurotico.AppImage; [ -f $D/$F ] && mv $D/$F $D/CafeNeurotico_old.AppImage; cp dist/$F $D/$F && echo \"Deployed $F to $D\""
+  },
+  "author": "Shampoo is a Lie",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "howlongtobeat": "^1.8.0"
+  },
+  "devDependencies": {
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.cafeneurotico.suite",
+    "productName": "Cafe Neurotico",
+    "linux": {
+      "target": "AppImage",
+      "icon": "apps/manager/assets/icons/CNGM.svg",
+      "category": "Game"
+    },
+    "appImage": {
+      "artifactName": "CafeNeurotico.AppImage"
+    },
+    "files": [
+      "main.js",
+      "packages/**/*",
+      "apps/manager/**/*",
+      "apps/grinder/**/*",
+      "!**/assets/bin/linux/**"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/bin/linux",
+        "to": "assets/bin/linux",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}
