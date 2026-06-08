@@ -6,6 +6,14 @@ const os   = require('os');
 const { spawn, execSync } = require('child_process');
 const Database = require('better-sqlite3');
 
+// Shared window-free GRINDER engine. Leaf helpers are re-bound here so existing
+// call sites in this file keep working unchanged; engine.init() runs in initDb().
+const grinderEngine = require('../../packages/core/grinder-engine.js');
+const {
+    sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
+    which, findLegendary, findGogdl, findComet, findUmu, findWineCached, findRuntime,
+} = grinderEngine;
+
 // GRINDER face keeps its own 'grinder' identity even inside the unified suite:
 //  - userData stays ~/.config/grinder  → preserves existing data + the CNGM↔GRINDER DB bridge
 //  - independent single-instance lock  → GRINDER GUI can open alongside the Manager window
@@ -19,10 +27,6 @@ const configDir = app.isPackaged
 const prefixesDir = path.join(configDir, 'prefixes');
 const logDir      = path.join(configDir, 'game_logs');
 const dbPath      = path.join(configDir, 'grinder.db');
-
-function sanitizeLogName(title) {
-    return (title || 'unknown').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 80) || 'unknown';
-}
 
 // Directory containing the AppImage (same folder as CNGM.AppImage)
 const appImageDir  = process.env.APPIMAGE ? path.dirname(process.env.APPIMAGE) : configDir;
@@ -215,6 +219,9 @@ function initDb() {
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
 
+    // Wire the shared engine now that paths + DB handle are available.
+    grinderEngine.init({ configDir, prefixesDir, logDir, binDir, appImageDir, homeDir: HOME, db, onProgress: writeProgress });
+
     db.exec(`
         CREATE TABLE IF NOT EXISTS games (
             id           TEXT PRIMARY KEY,
@@ -327,38 +334,6 @@ function scanProtonVersions() {
 }
 
 // Expand ~ to HOME so spawn() (which doesn't use a shell) gets real paths
-function expandTilde(p) {
-    if (!p) return p;
-    if (p === '~') return HOME;
-    if (p.startsWith('~/')) return path.join(HOME, p.slice(2));
-    return p;
-}
-
-// Resolves a file path case-insensitively, segment by segment.
-// Needed because GOG manifests declare Windows-style casing (e.g. DOOM3.exe)
-// while the installer writes different casing on disk (e.g. Doom3.exe).
-function resolvePathCaseInsensitive(filePath) {
-    if (!filePath) return filePath;
-    if (fs.existsSync(filePath)) return filePath;
-    // Split and filter empty strings — leading '/' on absolute paths produces an
-    // empty first element that would cause path.join to build a relative path.
-    const isAbs = path.isAbsolute(filePath);
-    const parts  = filePath.split(path.sep).filter(p => p !== '');
-    let resolved = isAbs ? path.sep : parts[0];
-    const start  = isAbs ? 0 : 1;
-    for (let i = start; i < parts.length; i++) {
-        const segment = parts[i];
-        const exact   = path.join(resolved, segment);
-        if (fs.existsSync(exact)) { resolved = exact; continue; }
-        try {
-            const match = fs.readdirSync(resolved).find(e => e.toLowerCase() === segment.toLowerCase());
-            if (match) { resolved = path.join(resolved, match); }
-            else       { resolved = path.join(resolved, ...parts.slice(i)); break; }
-        } catch     { resolved = path.join(resolved, ...parts.slice(i)); break; }
-    }
-    return resolved;
-}
-
 // ── Bundled binary paths ──────────────────────────────────────────────────────
 // In packaged AppImage, extraResources land in process.resourcesPath/assets/bin/linux.
 // In dev, they live in __dirname/assets/bin/linux.
@@ -366,54 +341,8 @@ const binDir = app.isPackaged
     ? path.join(process.resourcesPath, 'assets', 'bin', 'linux')
     : path.join(__dirname, 'assets', 'bin', 'linux');
 
-const BUNDLED_LEGENDARY = path.join(binDir, 'legendary');
-const BUNDLED_GOGDL     = path.join(binDir, 'gogdl');
-const BUNDLED_COMET     = path.join(binDir, 'comet');
-
-// ── External tool helpers ─────────────────────────────────────────────────────
-function which(bin) {
-    try { return execSync(`which ${bin}`, { stdio: ['ignore','pipe','ignore'] }).toString().trim(); }
-    catch { return null; }
-}
-
-// Tool paths resolved once at startup — avoids repeated execSync('which ...') on every launch/IPC call
-let _legendary = null, _gogdl = null, _comet = null, _umu = null, _wine = null;
-function findLegendary() {
-    if (_legendary !== null) return _legendary;
-    _legendary = fs.existsSync(BUNDLED_LEGENDARY) ? BUNDLED_LEGENDARY : (which('legendary') || '');
-    return _legendary || null;
-}
-function findGogdl() {
-    if (_gogdl !== null) return _gogdl;
-    _gogdl = fs.existsSync(BUNDLED_GOGDL) ? BUNDLED_GOGDL : (which('gogdl') || '');
-    return _gogdl || null;
-}
-function findComet() {
-    if (_comet !== null) return _comet;
-    _comet = fs.existsSync(BUNDLED_COMET) ? BUNDLED_COMET : (which('comet') || '');
-    return _comet || null;
-}
-function findUmu() {
-    if (_umu !== null) return _umu;
-    _umu = which('umu-run') || '';
-    return _umu || null;
-}
-function findWineCached() {
-    if (_wine !== null) return _wine;
-    _wine = which('wine') || '';
-    return _wine || null;
-}
-
-// Locate BattlEye or EAC runtime: GRINDER's own copy first, then common Steam locations
-function findRuntime(name) {
-    const steamName = name === 'battleye_runtime' ? 'Battleye AntiCheat' : 'EasyAntiCheat';
-    return [
-        path.join(configDir, 'runtimes', name),
-        path.join(HOME, '.steam', 'root', 'steamapps', 'common', steamName),
-        path.join(HOME, '.local', 'share', 'Steam', 'steamapps', 'common', steamName),
-        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'common', steamName),
-    ].find(p => fs.existsSync(p)) || null;
-}
+// expandTilde, resolvePathCaseInsensitive, which, find* and findRuntime now live
+// in packages/core/grinder-engine.js (re-bound at the top of this file).
 
 
 // ── Launch engine ─────────────────────────────────────────────────────────────
@@ -826,9 +755,9 @@ ipcMain.handle('check-tools', () => {
     const gogdl = findGogdl();
     return {
         legendary:         leg,
-        legendary_bundled: leg === BUNDLED_LEGENDARY,
+        legendary_bundled: leg === path.join(binDir, 'legendary'),
         gogdl:             gogdl,
-        gogdl_bundled:     gogdl === BUNDLED_GOGDL,
+        gogdl_bundled:     gogdl === path.join(binDir, 'gogdl'),
         umu:               findUmu(),
         wine:              findWineCached(),
     };
