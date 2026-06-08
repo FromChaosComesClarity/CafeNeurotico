@@ -27,7 +27,7 @@ const REQUIRED = ['ffmpeg', 'ffprobe', 'yt-dlp', 'gogdl', 'legendary', 'comet'];
 
 // Pinned release asset + its SHA256. Bump the tag and hash together when the
 // binary set changes.
-const URL    = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v1/cafeneurotico-binaries-linux-x64.tar.gz';
+const URL    = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v1/cafeneurotico-binaries-v1.tar.gz';
 const SHA256 = '15b7eb24f906339bd002e864b35426b7a6bfe966cc8226456553f517f3df39b2';
 
 function allPresent() {
