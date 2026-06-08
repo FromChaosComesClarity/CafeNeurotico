@@ -163,6 +163,11 @@ function createWindow () {
     win.setMenu(null);
     win.loadFile(path.join(__dirname, 'index.html'));
 
+    // When the Manager regains focus (e.g. after using the GRINDER window to
+    // install/uninstall), tell the renderer to re-sync install states from the
+    // shared DB so the Play/Install buttons reflect external changes.
+    win.on('focus', () => { try { win.webContents.send('window-refocused'); } catch {} });
+
     // Save window size/position when closing
     win.on('close', () => {
         if (!win.isMaximized() && !win.isMinimized()) {
@@ -347,7 +352,7 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
     try {
         await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir);
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=1 WHERE id=?").run(gameId); } catch {} }
-        if (win) win.webContents.send('install-status-updated');
+        try { event.sender.send('install-status-updated'); } catch {}
         return { ok: true };
     } catch (e) {
         return { ok: false, error: e.message };
@@ -366,7 +371,7 @@ ipcMain.handle('grinder-uninstall', async (event, { gameId, grinderGameId } = {}
     try {
         await grinderEngine.headlessUninstall(parsed.store, parsed.appId);
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=0 WHERE id=?").run(gameId); } catch {} }
-        if (win) win.webContents.send('install-status-updated');
+        try { event.sender.send('install-status-updated'); } catch {}
         return { ok: true };
     } catch (e) {
         return { ok: false, error: e.message };

@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),
                                 grinderPickDir:    () => ipcRenderer.invoke('grinder-pick-dir'),
                                 onGrinderInstallProgress: (cb) => ipcRenderer.on('grinder-install-progress', (e, d) => cb(d)),
+                                onWindowRefocused: (cb) => ipcRenderer.on('window-refocused', () => cb()),
 
                                 // --- PLAYLISTS ---
                                 getPlaylists:           ()           => ipcRenderer.invoke('get-playlists'),

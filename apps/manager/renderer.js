@@ -276,6 +276,23 @@ async function verifyAndLaunch(gameId, launchCmd) {
 
 window.api.onInstallStatusUpdated(() => loadGames());
 
+// On window refocus (e.g. returning from the GRINDER install/uninstall window),
+// re-read the shared DB and re-render ONLY if install state actually changed —
+// avoids any re-render jank on ordinary alt-tabbing.
+let _refocusTimer = 0;
+window.api.onWindowRefocused(() => {
+    clearTimeout(_refocusTimer);
+    _refocusTimer = setTimeout(async () => {
+        const res = await window.api.getGames();
+        const fresh = (res.games || []).filter(g => g.Game && g.Game !== 'null');
+        const changed = fresh.length !== allGames.length || fresh.some(g => {
+            const old = allGames.find(o => o.id === g.id);
+            return !old || old.Installed != g.Installed || old.LaunchCommand != g.LaunchCommand;
+        });
+        if (changed) { allGames = fresh; applyFilters(); }
+    }, 500);
+});
+
 // Auto-refresh play button when CNGM regains focus (e.g. after installing via GRINDER)
 let _focusRefreshTimer = null;
 window.addEventListener('focus', () => {
