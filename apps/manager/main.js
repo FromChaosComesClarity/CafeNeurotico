@@ -738,9 +738,12 @@ ipcMain.on('launch-crema', () => {
     // Launch the CREMA face of THIS binary (separate 'crema' process), not an external AppImage.
     const bin  = process.env.APPIMAGE || process.execPath;
     const args = process.env.APPIMAGE ? ['--crema'] : [path.join(__dirname, '..', '..'), '--crema'];
-    spawn(bin, args, { detached: true, stdio: 'ignore' }).unref();
+    const child = spawn(bin, args, { detached: true, stdio: 'ignore' });
+    child.unref();
     const win = BrowserWindow.getAllWindows()[0];
     if (win) win.minimize();
+    // Restore the Manager window when the CREMA face exits.
+    child.on('exit', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
 });
 
 ipcMain.on('launch-emulatte', () => {

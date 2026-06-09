@@ -143,11 +143,11 @@ ipcMain.handle('get-basedir', () => baseDir);
 ipcMain.handle('get-games', async () => { if (!db) return { games: [] }; try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; } catch (err) { return { games: [] }; } });
 
 // ── GRINDER integration ───────────────────────────────────────────────────────
-function findGrinderPath() {
-    try {
-        const f = fs.readdirSync(baseDir).find(n => /^GRINDER\.(AppImage|appimage)$/i.test(n));
-        return f ? path.join(baseDir, f) : null;
-    } catch { return null; }
+// GRINDER is a face of this same binary now: re-invoke self with a leading 'grinder' arg.
+function spawnGrinderFace(subArgs, opts) {
+    const bin  = process.env.APPIMAGE || process.execPath;
+    const args = process.env.APPIMAGE ? ['grinder', ...subArgs] : [path.join(__dirname, '..', '..'), 'grinder', ...subArgs];
+    return spawn(bin, args, opts);
 }
 
 function readGrinderDb() {
@@ -177,10 +177,39 @@ let _grinderPath = null;
 
 function getGrinderMap() {
     if (_grinderMap === null) {
-        _grinderPath = findGrinderPath();
-        _grinderMap  = _grinderPath ? (readGrinderDb() || new Map()) : new Map();
+        _grinderMap = readGrinderDb() || new Map();   // read GRINDER's DB directly (no external AppImage needed)
     }
     return _grinderMap;
+}
+
+// In-process GRINDER engine — launch GOG/Epic games without spawning anything
+// (GRINDER is a face of this same binary now). Points at ~/.config/grinder.
+const grinderEngine = require('../../packages/core/grinder-engine.js');
+let _grinderEngineDb = null;
+function ensureGrinderEngine() {
+    if (_grinderEngineDb) return true;
+    const home = os.homedir();
+    const gdbPath = [
+        path.join(home, '.config', 'grinder', 'grinder.db'),
+        path.join(home, '.config', 'GRINDER', 'grinder.db'),
+        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
+    ].find(p => fs.existsSync(p));
+    if (!gdbPath) return false;
+    const gConfigDir   = path.dirname(gdbPath);
+    const engineBinDir = isPackaged ? path.join(process.resourcesPath, 'assets', 'bin', 'linux') : path.join(__dirname, 'assets', 'bin', 'linux');
+    try { _grinderEngineDb = new Database(gdbPath, { timeout: 5000 }); }
+    catch (e) { console.error('[grinder-engine] DB open failed:', e); _grinderEngineDb = null; return false; }
+    grinderEngine.init({
+        configDir:   gConfigDir,
+        prefixesDir: path.join(gConfigDir, 'prefixes'),
+        logDir:      path.join(gConfigDir, 'game_logs'),
+        binDir:      engineBinDir,
+        appImageDir: baseDir,
+        homeDir:     home,
+        db:          _grinderEngineDb,
+        onProgress:  () => {},
+    });
+    return true;
 }
 
 // Sync installed/uninstalled status from GRINDER's DB into CREMA's games.db
@@ -216,17 +245,22 @@ ipcMain.handle('sync-grinder-installed', () => { syncInstalledFromGrinder(); ret
 ipcMain.on('launch-game', (event, cmd) => {
     if (!cmd) return;
 
-    // 1. GOG/Epic via GRINDER (headless umu-run, same as before)
+    // 1. GOG/Epic via GRINDER's in-process engine — NEVER Heroic Games Launcher.
     const heroicMatch = cmd.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
     if (heroicMatch) {
-        const appId = heroicMatch[2];
-        const gMap  = getGrinderMap();
-        const gId   = gMap.get(appId);
-        const gPath = _grinderPath || findGrinderPath();
-        if (gId && gPath) {
-            spawn(gPath, ['launch', gId], { detached: true, stdio: 'ignore' }).unref();
-            return;
+        const gId = getGrinderMap().get(heroicMatch[2]);
+        if (gId && ensureGrinderEngine()) {
+            grinderEngine.launchGame(gId).catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+        } else {
+            console.error('[launch-game] no GRINDER mapping/engine for', heroicMatch[2]);
         }
+        return; // GOG/Epic must go through GRINDER — do not fall through to a Heroic shell command
+    }
+    // grinder://launch/<id> (direct GRINDER id)
+    const gLaunch = cmd.match(/^grinder:\/\/(?:launch\/)?(.+)$/);
+    if (gLaunch) {
+        if (ensureGrinderEngine()) grinderEngine.launchGame(gLaunch[1]).catch(e => console.error('[launch-game]', e.message));
+        return;
     }
 
     // 2. itch.io — delegate to itch app via xdg-open (shell.openExternal rejects custom schemes)
@@ -941,30 +975,23 @@ ipcMain.handle('grinder-get-default-install-dir', () => {
 });
 
 ipcMain.handle('open-grinder-gui', (_, searchTerm) => {
-    const gPath = findGrinderPath();
-    if (!gPath) return { ok: false };
-    const args = searchTerm ? ['search', searchTerm] : [];
-    spawn(gPath, args, { detached: true, stdio: 'ignore' }).unref();
+    spawnGrinderFace(searchTerm ? ['search', searchTerm] : [], { detached: true, stdio: 'ignore' }).unref();
     return { ok: true };
 });
 
 ipcMain.handle('grinder-headless-install', (_, store, appId, platform, installDir) => {
     if (_headlessProc) return { ok: false, error: 'Install already in progress.' };
-    const gPath = findGrinderPath();
-    if (!gPath) return { ok: false, error: 'GRINDER not found.' };
     const args = ['install', store, appId];
     if (platform) args.push(platform);
     if (installDir) args.push(installDir);
-    _headlessProc = spawn(gPath, args, { detached: false, stdio: 'ignore' });
+    _headlessProc = spawnGrinderFace(args, { detached: false, stdio: 'ignore' });
     _headlessProc.on('close', () => { _headlessProc = null; _grinderMap = null; }); // refresh map on completion
     return { ok: true };
 });
 
 ipcMain.handle('grinder-headless-uninstall', (_, store, appId) => {
     if (_headlessProc) return { ok: false, error: 'Operation already in progress.' };
-    const gPath = findGrinderPath();
-    if (!gPath) return { ok: false, error: 'GRINDER not found.' };
-    _headlessProc = spawn(gPath, ['uninstall-headless', store, appId], { detached: false, stdio: 'ignore' });
+    _headlessProc = spawnGrinderFace(['uninstall-headless', store, appId], { detached: false, stdio: 'ignore' });
     _headlessProc.on('close', () => { _headlessProc = null; _grinderMap = null; });
     return { ok: true };
 });
