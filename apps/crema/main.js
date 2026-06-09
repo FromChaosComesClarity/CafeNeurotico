@@ -83,6 +83,20 @@ const playlistsPath = path.join(configDir, 'playlists.json');
 const imagesDir = path.join(configDir, 'images');
 const trailersDir = path.join(configDir, 'videos');
 const musicDir = path.join(baseDir, 'CREMA_CUSTOM_MUSIC');
+// Wallpapers (272M) are NOT bundled in the AppImage — fetched on first run to this writable dir.
+const wallpapersDir = path.join(configDir, 'CREMA_wallpapers');
+const WALLPAPERS_URL = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/wallpapers-v1/cafeneurotico-wallpapers-v1.tar.gz';
+function ensureWallpapers() {
+    try { if (fs.existsSync(wallpapersDir) && fs.readdirSync(wallpapersDir).some(f => /\.(png|jpe?g|webp)$/i.test(f))) return; } catch {}
+    try { fs.mkdirSync(wallpapersDir, { recursive: true }); } catch {}
+    const tmp = path.join(os.tmpdir(), 'crema-wallpapers.tar.gz');
+    const dl = spawn('curl', ['-fL', '--retry', '3', '-o', tmp, WALLPAPERS_URL], { stdio: 'ignore' });
+    dl.on('close', code => {
+        if (code !== 0) return;
+        spawn('tar', ['-xzf', tmp, '-C', wallpapersDir], { stdio: 'ignore' }).on('close', () => { try { fs.unlinkSync(tmp); } catch {} });
+    });
+    dl.on('error', () => {});
+}
 
 // App Assets (INTERNAL - Uses __dirname so it stays packed inside the AppImage)
 const soundsDir = path.join(__dirname, 'assets', 'sounds');
@@ -121,6 +135,7 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN IGDBTrailer TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Installed INTEGER DEFAULT 1").run(); } catch(e) {}
     } catch (err) {}
+    ensureWallpapers();   // background download on first run (renderer re-fetches when ready)
     createWindow();
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -830,8 +845,8 @@ ipcMain.handle('get-standard-bgm', (event, mode) => { const safeName = mode.toLo
 ipcMain.handle('get-wallpapers', () => {
     let wallpapers = [];
     try {
-        // INTERNAL ASSET DIRECTORY
-        const wpDir = path.join(__dirname, 'assets', 'wallpapers');
+        // Writable wallpapers dir (downloaded on first run; see ensureWallpapers)
+        const wpDir = wallpapersDir;
         if (fs.existsSync(wpDir)) {
             const files = fs.readdirSync(wpDir);
             for (let f of files) {

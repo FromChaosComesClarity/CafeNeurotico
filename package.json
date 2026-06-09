@@ -47,7 +47,8 @@
       "apps/manager/**/*",
       "apps/grinder/**/*",
       "apps/crema/**/*",
-      "!**/assets/bin/linux/**"
+      "!**/assets/bin/linux/**",
+      "!apps/crema/assets/wallpapers/**"
     ],
     "extraResources": [
       {
