@@ -3624,7 +3624,14 @@ async function triggerGrinderUninstall(game) {
     _grinderConfirmGame = game;
     const storeL = (game.Store || '').toLowerCase();
     const store = storeL.includes('gog') ? 'gog' : 'epic';
-    const result = await window.api.grinderHeadlessUninstall(store, game.app_id);
+    // app_id may be missing (Heroic-imported / CNGM rows) — extract from the LaunchCommand, same as install.
+    let appId = game.app_id;
+    if (!appId && game.LaunchCommand) {
+        const m = game.LaunchCommand.match(/heroic:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
+        if (m) appId = m[1];
+    }
+    if (!appId) { alert('No store app ID found — open GRINDER directly to uninstall.'); return; }
+    const result = await window.api.grinderHeadlessUninstall(store, appId);
     if (!result.ok) { alert(result.error); return; }
     showGrinderProgress(true);
 }
