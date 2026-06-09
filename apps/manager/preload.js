@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld('api', {
 
                                 // --- SYSTEM ---
                                 installToMenu: () => ipcRenderer.invoke('install-to-menu'),
+                                getCremaAutostart: () => ipcRenderer.invoke('get-crema-autostart'),
+                                setCremaAutostart: (en) => ipcRenderer.invoke('set-crema-autostart', en),
 
                                 // --- CREMA COMPANION ---
                                 checkCrema: () => ipcRenderer.invoke('check-crema'),

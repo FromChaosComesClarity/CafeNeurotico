@@ -794,6 +794,25 @@ ipcMain.handle('install-to-menu', () => {
     } catch(err) { return { success: false, message: err.message }; }
 });
 
+// Opt-in: auto-start the CREMA (fullscreen) face on login (living-room / HTPC). Off by default.
+// State = presence of the XDG autostart entry; no separate setting to drift.
+const cremaAutostartPath = () => path.join(os.homedir(), '.config', 'autostart', 'cafe-neurotico-crema.desktop');
+ipcMain.handle('get-crema-autostart', () => { try { return fs.existsSync(cremaAutostartPath()); } catch { return false; } });
+ipcMain.handle('set-crema-autostart', (_, enabled) => {
+    try {
+        const file = cremaAutostartPath();
+        if (!enabled) { try { fs.unlinkSync(file); } catch {} return { ok: true, enabled: false }; }
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        const sf = (() => { try { return fs.readdirSync(baseDir).find(f => /^CafeNeurotico.*\.AppImage$/i.test(f)); } catch { return null; } })();
+        const suitePath = sf ? path.join(baseDir, sf) : (process.env.APPIMAGE || process.execPath);
+        const iconsDir = path.join(baseDir, 'icons');
+        try { fs.mkdirSync(iconsDir, { recursive: true }); fs.writeFileSync(path.join(iconsDir, 'CREMA.svg'), Buffer.from(CREMA_SVG_B64, 'base64')); } catch {}
+        fs.writeFileSync(file,
+            `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico — auto-start in fullscreen / gamepad mode on login.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir, 'CREMA.svg')}\nTerminal=false\nCategories=Game;\nStartupWMClass=crema\nX-GNOME-Autostart-enabled=true\n`);
+        return { ok: true, enabled: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
 let manualWin = null;
 ipcMain.on('open-manual', () => {
     if (manualWin && !manualWin.isDestroyed()) { manualWin.focus(); return; }

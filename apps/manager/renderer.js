@@ -7713,6 +7713,17 @@ document.getElementById('btn-install-menu').addEventListener('click', async () =
     status.style.color = result.success ? '#66bb6a' : '#ef5350';
     status.innerText = result.message;
 });
+
+// Opt-in: auto-start CREMA (fullscreen) on login — reflects the autostart entry's presence.
+(() => {
+    const chk = document.getElementById('chk-crema-autostart');
+    if (!chk) return;
+    window.api.getCremaAutostart().then(on => { chk.checked = !!on; }).catch(() => {});
+    chk.addEventListener('change', async () => {
+        const res = await window.api.setCremaAutostart(chk.checked);
+        if (!res || !res.ok) { chk.checked = !chk.checked; }   // revert on failure
+    });
+})();
 // ── GRINDER tool card ──────────────────────────────────────────────────────────
 checkGrinderConnect();
 
