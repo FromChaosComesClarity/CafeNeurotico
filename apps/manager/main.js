@@ -779,7 +779,7 @@ ipcMain.handle('install-to-menu', () => {
                 `[Desktop Entry]\nVersion=1.0\nType=Application\nName=Cafe Neurotico\nComment=Your game library — Manager, GRINDER and CREMA in one.\nExec="${suitePath}"\nIcon=${path.join(iconsDir,'CNGM.svg')}\nTerminal=false\nCategories=Game;Utility;\nStartupWMClass=cafeneurotico\n`);
             // CREMA fullscreen face
             fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-crema.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico fullscreen / gamepad interface.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir,'CREMA.svg')}\nTerminal=false\nCategories=Game;\nStartupWMClass=crema\n`);
+                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico in fullscreen, gamepad-first mode — made for the living room / TV.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir,'CREMA.svg')}\nTerminal=false\nCategories=Game;\nKeywords=couch;tv;living room;gamepad;controller;fullscreen;big picture;bigpicture;cafe neurotico;crema;\nStartupWMClass=crema\n`);
             installed.push('Cafe Neurotico', 'CREMA');
         }
         if (emulatteFile) {
