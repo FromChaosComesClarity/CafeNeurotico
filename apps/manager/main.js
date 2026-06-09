@@ -762,28 +762,25 @@ ipcMain.handle('install-to-menu', () => {
         fs.writeFileSync(path.join(iconsDir, 'EmuLatte.svg'), Buffer.from(EMULATTE_SVG_B64, 'base64'));
         if (!fs.existsSync(appsDir)) fs.mkdirSync(appsDir, { recursive: true });
         const files = fs.readdirSync(baseDir);
-        const cngmFile     = files.find(f => /^CNGM.*\.AppImage$/i.test(f));
-        const cremaFile    = files.find(f => /^CREMA.*\.AppImage$/i.test(f));
-        const grinderFile  = files.find(f => /^GRINDER.*\.AppImage$/i.test(f));
+        const suiteFile    = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
+        const suitePath    = suiteFile ? path.join(baseDir, suiteFile) : (process.env.APPIMAGE || null);
         const emulatteFile = files.find(f => /^EmuLatte.*\.AppImage$/i.test(f));
+
+        // Remove stale pre-merge launchers (separate CNGM/GRINDER AppImages are gone).
+        for (const stale of ['cafe-neurotico-game-manager.desktop', 'cafe-neurotico-grinder.desktop']) {
+            try { fs.unlinkSync(path.join(appsDir, stale)); } catch {}
+        }
+
         const installed = [];
-        if (cngmFile) {
-            const p = path.join(baseDir, cngmFile); fs.chmodSync(p, '755');
-            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-game-manager.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=Cafe Neurotico Game Manager\nComment=The neurotic manager for your gaming library.\nExec="${p}"\nIcon=${path.join(iconsDir,'CNGM.svg')}\nTerminal=false\nCategories=Game;Utility;\n`);
-            installed.push('CNGM');
-        }
-        if (cremaFile) {
-            const p = path.join(baseDir, cremaFile); fs.chmodSync(p, '755');
+        if (suitePath) {
+            fs.chmodSync(suitePath, '755');
+            // Manager (default face)
+            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico.desktop'),
+                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=Cafe Neurotico\nComment=Your game library — Manager, GRINDER and CREMA in one.\nExec="${suitePath}"\nIcon=${path.join(iconsDir,'CNGM.svg')}\nTerminal=false\nCategories=Game;Utility;\nStartupWMClass=cafeneurotico\n`);
+            // CREMA fullscreen face
             fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-crema.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA\nComment=The Bon Vivant Fullscreen Gamepad-Centered Interface.\nExec="${p}"\nIcon=${path.join(iconsDir,'CREMA.svg')}\nTerminal=false\nCategories=Game;\n`);
-            installed.push('CREMA');
-        }
-        if (grinderFile) {
-            const p = path.join(baseDir, grinderFile); fs.chmodSync(p, '755');
-            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-grinder.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=GRINDER\nComment=Cafe Neurotico GRINDER — Epic game launcher and install engine.\nExec="${p}"\nIcon=${path.join(iconsDir,'GRINDER.svg')}\nTerminal=false\nCategories=Game;\n`);
-            installed.push('GRINDER');
+                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico fullscreen / gamepad interface.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir,'CREMA.svg')}\nTerminal=false\nCategories=Game;\nStartupWMClass=crema\n`);
+            installed.push('Cafe Neurotico', 'CREMA');
         }
         if (emulatteFile) {
             const p = path.join(baseDir, emulatteFile); fs.chmodSync(p, '755');
@@ -792,7 +789,7 @@ ipcMain.handle('install-to-menu', () => {
             installed.push('EmuLatte');
         }
         execFile('update-desktop-database', [appsDir], () => {});
-        if (installed.length === 0) return { success: false, message: 'No AppImages found in the app folder.' };
+        if (installed.length === 0) return { success: false, message: 'CafeNeurotico.AppImage not found in the app folder.' };
         return { success: true, message: `Installed to menu: ${installed.join(' + ')}` };
     } catch(err) { return { success: false, message: err.message }; }
 });

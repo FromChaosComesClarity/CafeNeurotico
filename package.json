@@ -36,7 +36,14 @@
     "linux": {
       "target": "AppImage",
       "icon": "apps/manager/assets/icons/CNGM.svg",
-      "category": "Game"
+      "category": "Game",
+      "executableName": "cafeneurotico",
+      "desktop": {
+        "entry": {
+          "Name": "Cafe Neurotico",
+          "StartupWMClass": "cafeneurotico"
+        }
+      }
     },
     "appImage": {
       "artifactName": "CafeNeurotico.AppImage"
