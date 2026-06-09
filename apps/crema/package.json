@@ -1,0 +1,7 @@
+{
+  "name": "@cafeneurotico/crema",
+  "version": "0.1.0",
+  "description": "CREMA face — fullscreen / gamepad interface",
+  "private": true,
+  "main": "main.js"
+}

@@ -21,8 +21,7 @@ const wantsCrema   = args.includes('--crema') || args.includes('--fullscreen');
 if (wantsGrinder) {
     require('./apps/grinder/main.js');
 } else if (wantsCrema) {
-    // require('./apps/crema/main.js');      // Phase 3
-    require('./apps/manager/main.js');
+    require('./apps/crema/main.js');
 } else {
     require('./apps/manager/main.js');
 }

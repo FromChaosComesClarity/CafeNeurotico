@@ -13,3 +13,6 @@ assets/bin/linux/yt-dlp
 assets/bin/linux/gogdl
 assets/bin/linux/legendary
 assets/bin/linux/comet
+
+# CREMA wallpapers (272M) — too large for git; become a first-run download pack (Phase 3b)
+apps/crema/assets/wallpapers/

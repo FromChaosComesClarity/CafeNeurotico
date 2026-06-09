@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CREMA - Official User Manual</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #141414; --bg_panel: rgba(0,0,0,0.5); --bg_menu: #222222;
+      --accent: #ffffff; --accent_menu: #00e5ff; --text_main: #ffffff;
+      --text_sec: #bbbbbb; --text_dim: #777777; --border: rgba(255,255,255,0.1);
+      --border_solid: #555555;
+    }
+
+    body {
+        margin: 0; background-color: var(--bg); color: var(--text_main);
+        font-family: 'Raleway', sans-serif; transition: background-color 0.3s ease;
+        display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    }
+
+    /* Title Bar */
+    #titlebar {
+        height: 50px; flex-shrink: 0; background: var(--bg_menu);
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 2px solid var(--border_solid); padding: 0 20px;
+    }
+    .titlebar-brand { font-size: 16px; font-weight: 900; color: var(--accent); letter-spacing: 2px; }
+
+    .theme-selector-container { display: flex; align-items: center; gap: 10px; }
+    .theme-selector-container label { font-size: 12px; font-weight: bold; color: var(--text_sec); text-transform: uppercase; }
+    select {
+        background: var(--bg_panel); color: var(--text_main); border: 1px solid var(--border_solid);
+        padding: 5px 10px; font-family: 'Raleway', sans-serif; font-weight: bold; border-radius: 4px;
+        outline: none; cursor: pointer;
+    }
+    select:focus { border-color: var(--accent); }
+
+    /* Layout */
+    #main-container { display: flex; flex: 1; overflow: hidden; }
+    #sidebar { width: 250px; background: var(--bg_panel); border-right: 2px solid var(--border_solid); overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+
+    .nav-btn { background: transparent; border: 1px solid transparent; color: var(--text_sec); text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s; font-family: 'Raleway', sans-serif; }
+    .nav-btn:hover, .nav-btn.active { background: var(--border_solid); color: var(--text_main); border-color: var(--accent); }
+
+    #content { flex: 1; padding: 40px 60px; overflow-y: auto; scroll-behavior: smooth; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    /* Typography inside content */
+    h1 { color: var(--accent); font-weight: 900; font-size: 32px; letter-spacing: 2px; border-bottom: 2px solid var(--border_solid); padding-bottom: 10px; margin-top: 0;}
+    h2 { color: var(--accent); border-bottom: 2px solid var(--border_solid); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; margin-top: 50px; font-size: 24px; }
+    h3 { color: var(--text_sec); font-weight: bold; text-transform: uppercase; margin-top: 30px; font-size: 18px; }
+    p, li { font-size: 15px; line-height: 1.6; color: var(--text_sec); }
+    strong { color: var(--text_main); }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; }
+
+    .manual-box { border: 2px dashed var(--accent); padding: 25px; margin: 25px 0; background-color: var(--bg_panel); border-radius: 8px; }
+    .manual-box-title { color: var(--accent); font-weight: 900; font-size: 16px; margin-top: 0; text-transform: uppercase; letter-spacing: 1px; }
+    .warning-box { border: 2px solid #ff4d4d; background-color: rgba(255, 77, 77, 0.1); }
+    .warning-box .manual-box-title { color: #ff4d4d; }
+
+    ::-webkit-scrollbar { width: 12px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border_solid); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="titlebar-brand">CAFE NEUROTICO: CREMA - User Manual</div>
+    <div class="theme-selector-container">
+        <label for="theme-select">Theme:</label>
+        <select id="theme-select"></select>
+    </div>
+  </div>
+
+  <div id="main-container">
+      <div id="sidebar">
+        <button class="nav-btn active" data-target="man-1">1. Introduction</button>
+        <button class="nav-btn" data-target="man-2">2. Library Integration</button>
+        <button class="nav-btn" data-target="man-3">3. Controls & Navigation</button>
+        <button class="nav-btn" data-target="man-4">4. Media & Scraping</button>
+        <button class="nav-btn" data-target="man-5">5. The Jukebox</button>
+        <button class="nav-btn" data-target="man-6">6. Screensaver & Sleep</button>
+        <button class="nav-btn" data-target="man-7">7. Settings & Audio</button>
+        <button class="nav-btn" data-target="man-8">8. System Origin</button>
+      </div>
+
+      <div id="content">
+          <div class="container">
+              <h1 id="man-1">CAFE NEUROTICO: CREMA</h1>
+
+              <h2>1. INTRODUCTION: THE SWEET FOAM ON TOP</h2>
+              <div class="manual-box">
+                  <p class="manual-box-title">YOUR LIBRARY. ELEVATED. FULLSCREEN. CONTROLLER-READY.</p>
+                  <p><em>Crema is the reddish-brown, frothy foam layer that sits on top of a freshly brewed espresso. It consists of water, coffee oils, and pressurized CO2 bubbles created during high-pressure extraction. It signifies freshness and proper pressure.</em></p>
+                  <p>If <strong>CNGM (Cafe Neurotico Game Manager)</strong> is the robust espresso machine handling the intense pressure of scraping, managing, and organizing your data, <strong>CREMA</strong> is the beautiful result you actually consume.</p>
+                  <p>CREMA is designed from the ground up to be a <strong>1080p, controller-first, fullscreen interface</strong>. It abandons mouse cursors and complex text entry for a pure console-like experience. You sit back on the couch, grab your gamepad, listen to some lo-fi or your own custom music, and just play.</p>
+              </div>
+
+              <h2 id="man-2">2. LIBRARY INTEGRATION & THE CNGM BOND</h2>
+              <p>CREMA and CNGM are two sides of the exact same coin. They share the same <code>GameManagerConfig</code> folder and the exact same <code>games.db</code> database file.</p>
+
+              <div class="manual-box warning-box">
+                  <p class="manual-box-title">CRITICAL TIP: DATA MANAGEMENT</p>
+                  <p>While CREMA has built-in scraping capabilities to grab covers and trailers, it is <strong>highly recommended</strong> to do your heavy-lifting data entry (importing libraries, syncing Heroic, syncing Steam, typing descriptions) using the <strong>CNGM Desktop App</strong>.</p>
+                  <p>CNGM is built for a mouse and keyboard. CREMA is built for a gamepad. Let each app do what it does best.</p>
+              </div>
+
+              <h3>Heroic Launcher Configuration</h3>
+              <p>To ensure CREMA functions seamlessly like a real console, you don't want the Heroic Games Launcher window popping up every time you launch an Epic or GOG game.</p>
+              <p><strong>To fix this:</strong> Open your Heroic Launcher, go to Settings -> General, and ensure <strong>"Minimize Heroic on Game Launch"</strong> or <strong>"Hide to Tray"</strong> is enabled. This guarantees Heroic stays invisible while your game plays, and CREMA takes the spotlight back when you exit.</p>
+
+              <h2 id="man-3">3. CONTROLS & NAVIGATION</h2>
+              <p>CREMA operates on a unified controller mapping system. You can change the visual icons (Xbox, PlayStation, Nintendo) in the System Menu to match what you are holding.</p>
+
+              <ul>
+                  <li><strong>D-PAD / LEFT STICK:</strong> Navigate menus and game lists.</li>
+                  <li><strong>L1 / R1 (Bumpers):</strong> Page Jump (Skips 10 games at a time).</li>
+                  <li><strong>SOUTH BUTTON (A / Cross / B):</strong> Select / Play Game / Confirm.</li>
+                  <li><strong>EAST BUTTON (B / Circle / A):</strong> Back / Cancel / Exit Menu.</li>
+                  <li><strong>START / OPTIONS:</strong> Open the System Menu.</li>
+                  <li><strong>SELECT / SHARE:</strong> Open Game Options (Scraping, Favorites, Trailers).</li>
+                  <li><strong>NORTH BUTTON (Y / Triangle / X):</strong> Global Search (Opens On-Screen Keyboard).</li>
+                  <li><strong>WEST BUTTON (X / Square / Y):</strong> Toggle between Cover Art and Trailer/Screenshot in the main view.</li>
+                  <li><strong>L3 / R3 (Stick Clicks):</strong> Jukebox Controls (Next Track / Restart Track).</li>
+              </ul>
+
+              <h2 id="man-4">4. MEDIA & SCRAPING ENGINE</h2>
+              <p>If you add a game but it's missing artwork or metadata, press <strong>SELECT</strong> on the game to open the Game Options, and choose <strong>SCRAPING ENGINE</strong>.</p>
+
+              <h3>Available Scraping Tools:</h3>
+              <ul>
+                  <li><strong>SCRAPE ALL (DEFAULT):</strong> The fastest method. Connects to Steam, searches the game title, and automatically downloads the Cover Art, 5 Screenshots, Genre, Release Year, Developer, and Description in seconds.</li>
+                  <li><strong>CUSTOM COVER (STEAMGRIDDB):</strong> Sometimes official art is boring. If you have added your free SteamGridDB API key, this will open a gallery of high-quality custom covers. Use the D-Pad to pick your favorite.</li>
+              </ul>
+              <p><em>Tip: If the automatic scraper grabs the wrong game (e.g., a sequel instead of the original), select <strong>REFINE SEARCH</strong> to manually type the exact title using the on-screen keyboard.</em></p>
+
+              <h2 id="man-5">5. THE JUKEBOX</h2>
+              <p>CREMA features a robust, fully-integrated music player. Access it from the main System Menu.</p>
+
+              <h3>Adding Custom Music</h3>
+              <p>To build your collection, go to the folder where the CREMA app is located and add your audio files (MP3, WAV, OGG, FLAC) to the newly created folder named: <code>CREMA_CUSTOM_MUSIC</code>.</p>
+              <p>Close and reopen the Jukebox for the app to scan the ID3 metadata (Artist, Album, Title, Cover Art) of your files.</p>
+
+              <h3>Jukebox Features:</h3>
+              <ul>
+                  <li><strong>Browse by Categories:</strong> Sort your library by All Songs, Artists, or Albums.</li>
+                  <li><strong>Playlists:</strong> Create custom playlists using the On-Screen Keyboard. Select any song or album to add it directly to a playlist.</li>
+                  <li><strong>Fullscreen Mode:</strong> Press the <strong>WEST BUTTON</strong> (X/Square) while in the Jukebox to enter an immersive, animated fullscreen player.</li>
+                  <li><strong>Background Audio:</strong> Jukebox music continues playing seamlessly while you browse your game library! Use L3/R3 to skip tracks without opening the menu.</li>
+              </ul>
+
+              <h2 id="man-6">6. SCREENSAVER & SLEEP MODE</h2>
+
+              <h3>The Screensaver</h3>
+              <p>If you step away from your controller, CREMA will eventually trigger its dynamic screensaver (configurable between 1 to 30 minutes in Settings). The screensaver has two modes:</p>
+              <ul>
+                  <li><strong>Screenshots:</strong> Slowly pans and zooms across high-res screenshots from your library.</li>
+                  <li><strong>Trailers:</strong> Plays randomized gameplay trailers you have downloaded.</li>
+              </ul>
+              <p>While the screensaver is active, you can press a button to instantly Launch the displayed game, or add it to your Favorites/Want-to-Play list without leaving the screensaver.</p>
+
+              <h3>Sleep Mode & Waking Up</h3>
+              <p>When you launch a game, CREMA fades to black and enters "Sleep Mode," yielding all system resources to your game. Once you are finished playing and close the game, you need to "Wake Up" CREMA.</p>
+              <p>By default, pressing <strong>START + SELECT</strong> simultaneously on your controller will violently yank CREMA back to the absolute front of your screen, burying any lingering launchers (like Steam or Heroic) and restoring the background music.</p>
+              <p><em>(You can change this combo in the System Menu -> Wake Up Method to prevent accidental triggers).</em></p>
+
+              <h2 id="man-7">7. SETTINGS & AUDIO</h2>
+              <p>Press <strong>START</strong> anywhere to access the System Menu.</p>
+              <ul>
+                  <li><strong>Color Scheme:</strong> Instantly switch between dozens of themes ranging from modern gradients to retro console aesthetics.</li>
+                  <li><strong>Sound Settings:</strong> Adjust master volume, toggle UI sound effects, and choose your Background Music (BGM).</li>
+              </ul>
+
+              <h3>BGM Modes</h3>
+              <p>If you don't want to use the Custom Music folder, CREMA comes with built-in, looping background tracks composed by <em>Schwarzenegger Belonio (Migfus20)</em> to set the mood of your console. Choose between Jazz, Lo-Fi, Ambient, or Piano.</p>
+
+              <h2 id="man-8">8. SYSTEM ORIGIN: HUMAN BRAIN + MACHINE</h2>
+              <div class="manual-box" style="border-color: var(--accent); background-color: rgba(0,0,0,0.2);">
+                  <p class="manual-box-title" style="color: var(--text_main);">FULL DISCLOSURE: AI ARCHITECTURE</p>
+                  <p>I am an architect, not a traditional developer. Every single line of code in Cafe Neurotico was generated, assembled, and debugged using advanced AI assistance.</p>
+                  <p>I provided the neurotic vision, the logic, and the UI/UX design. The AI wrote the syntax. If you dig into the source code and find unconventional architecture or weird redundancies, that is the machine learning at work. Feel free to laugh at it :)</p>
+                  <p>This application was 100% conceptualized by a human and 100% coded by AI. Built to solve a personal obsession with library management. Don't mind the playful tone of this manual, it's all for fun, I do it just for fun.</p>
+              </div>
+              <div class="manual-box" style="border-color: var(--accent); background-color: rgba(0,0,0,0.2);">
+                  <p class="manual-box-title" style="color: var(--text_main);">"NO MAN IS BETTER THAN A MACHINE, BUT NO MACHINE IS BETTER THAN A MAN WITH A MACHINE" - Paul Tudor Jones</p>
+                  <p>I would like to address the elephant in the room: AI. Although it would be tempting to think that I gave a prompt like "Make an app like this" or "Make a copy of the whatever software", and it auto-magically just worked, it couldn't be further from the truth. Try it for yourself.</p>
+                  <p>It's a very personal project that started just like a way to manage my own Excel CSV games file (which was huge BTW), it was a just a Python script, then I added a native interface using Qt libraries, it was nice, but then I remembered that I like to distro-hop and Qt can look ugly in different environments, so I moved to Electron, then I've made many incremental changes, as I was having more and more ideas of what I wanted. Changes that sometimes broke the whole thing. Steam integration was incredibly frustrating, I had to try many different approaches, just to give an example. The logical solutions came from me burning my neurons, like using the Steam API, implementing the Heroic Sync or solving ProtonDB and HLTB. AI still needs someone to tell it what to do.</p>
+                  <p>It has been a journey. It's been a couple of months now and I've covered a massive amount of ground, from the initial idea, the UI design, the database logic, and drafting the manual—we are easily looking at hundreds of hours for the entire project. Not to mention more hours of researching for solutions. I've been putting in some serious architectural work to build this. Also keep in mind that I am a 47yo father and husband who works as a teacher from 7am to 9pm on weekdays, so I don't have a ton of time to do it.</p>
+                  <p>I would like to encourage people who have ideas to put them into practice. I know I don't have the time to do thousands of lines of code, I just don't, but this is not going to stop me.</p>
+                  <p>I like to think of AI as an employee, or even a team that I have at my disposal to execute my ideas, so I have more headspace to create them.</p>
+                  <p>If I can conceptualize and architect something, like a building, but I'm not the one laying brick by brick, does it make me less of a creator? I mean, people remember the ones who conceived things, not the ones who actually performed the action of building them. It is what it is.</p>
+                  <p>I've been gaming since the 80's and using Linux since 2002, my first distro was Mandrake Linux, from a CD inserted in a magazine. I've been around and I've seen distros being born and dying. I will keep on using CNGM to manage my library. This is a labor of love, for gaming and for Linux. Cheers!</p>
+                  <p style="text-align: right;">J.R. Azevedo</p>
+              </div>
+
+              <div style="text-align: center; margin-top: 60px; padding: 20px; border: 1px solid var(--border_solid); background-color: var(--bg_panel); border-radius: 8px;">
+                  <p style="color: var(--accent); font-weight: bold;">=========================================</p>
+                  <h3 style="color: var(--text_main); margin: 5px 0;">/// END OF FILE ///</h3>
+                  <p style="color: var(--text_sec); font-family: monospace; font-size: 12px; margin: 2px;">SYSTEM OPERATIONS CONCLUDED.</p>
+                  <p style="color: var(--text_sec); font-family: monospace; font-size: 12px; margin: 2px;">COPYRIGHT &copy; CAFE NEUROTICO SYSTEMS.</p>
+                  <p style="color: var(--accent); font-weight: bold; margin-top: 15px;">NOW GO PLAY SOME GAMES.</p>
+                  <p style="color: var(--accent); font-weight: bold; margin-bottom: 0;">=========================================</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <script>
+    const THEMES = {
+        "CREMA (DEFAULT)": {bg: "#2C1E16", bg_panel: "rgba(67, 40, 24, 0.6)", bg_menu: "#432818", accent: "#D4A373", accent_menu: "#D4A373", text_main: "#FFE6A7", text_sec: "#E6CC98", text_dim: "#A47148", border: "rgba(212, 163, 115, 0.2)", border_solid: "#8B5A2B"},
+        "DARK GRAY": {bg: "#141414", bg_panel: "rgba(0,0,0,0.5)", bg_menu: "#222222", accent: "#ffffff", accent_menu: "#00e5ff", text_main: "#ffffff", text_sec: "#bbbbbb", text_dim: "#777777", border: "rgba(255,255,255,0.1)", border_solid: "#555555"},
+        "CYBERPUNK": {bg: "#09090b", bg_panel: "rgba(26, 26, 46, 0.7)", bg_menu: "#1a1a2e", accent: "#f3e600", accent_menu: "#00ffcc", text_main: "#00ffcc", text_sec: "#e0e0e0", text_dim: "#ff003c", border: "rgba(243, 230, 0, 0.2)", border_solid: "#ff003c"},
+        "VAPOUR OS": {bg: "#171a21", bg_panel: "rgba(27, 40, 56, 0.7)", bg_menu: "#1b2838", accent: "#66c0f4", accent_menu: "#66c0f4", text_main: "#c7d5e0", text_sec: "#8f98a0", text_dim: "#556b82", border: "rgba(102, 192, 244, 0.2)", border_solid: "#2a475e"},
+        "PSIV BLUE": {bg: "#000022", bg_panel: "rgba(0, 67, 156, 0.4)", bg_menu: "#001144", accent: "#ffffff", accent_menu: "#0070cc", text_main: "#ffffff", text_sec: "#aaaaaa", text_dim: "#666666", border: "rgba(0, 112, 204, 0.3)", border_solid: "#00439c"},
+        "GREEN BOX": {bg: "#101010", bg_panel: "rgba(26,26,26,0.8)", bg_menu: "#1a1a1a", accent: "#107C10", accent_menu: "#107C10", text_main: "#ffffff", text_sec: "#D2D2D2", text_dim: "#777777", border: "rgba(16,124,16,0.4)", border_solid: "#333333"},
+        "MOVIESFLIX": {bg: "#141414", bg_panel: "rgba(0,0,0,0.75)", bg_menu: "#000000", accent: "#E50914", accent_menu: "#E50914", text_main: "#ffffff", text_sec: "#B3B3B3", text_dim: "#808080", border: "rgba(229,9,20,0.3)", border_solid: "#333333"},
+        "SNOW": {bg: "#E0E0E0", bg_panel: "rgba(255, 255, 255, 0.7)", bg_menu: "#FFFFFF", accent: "#000000", accent_menu: "#000000", text_main: "#111111", text_sec: "#444444", text_dim: "#777777", border: "rgba(0, 0, 0, 0.1)", border_solid: "#CCCCCC"},
+        "WIN XP": {bg: "#003399", bg_panel: "rgba(236, 233, 216, 0.2)", bg_menu: "#0054E3", accent: "#3CA02B", accent_menu: "#3CA02B", text_main: "#FFFFFF", text_sec: "#ECE9D8", text_dim: "#99B4D1", border: "rgba(236, 233, 216, 0.4)", border_solid: "#ECE9D8"},
+        "PSIII CLASSIC": {bg: "#000000", bg_panel: "rgba(25, 25, 25, 0.7)", bg_menu: "#111111", accent: "#dcdcdc", accent_menu: "#ffffff", text_main: "#ffffff", text_sec: "#aaaaaa", text_dim: "#666666", border: "rgba(255, 255, 255, 0.2)", border_solid: "#444444"},
+        "PSIII RED": {bg: "#2b0000", bg_panel: "rgba(40, 0, 0, 0.7)", bg_menu: "#1a0000", accent: "#ff4d4d", accent_menu: "#ff4d4d", text_main: "#ffffff", text_sec: "#ffcccc", text_dim: "#cc6666", border: "rgba(255, 77, 77, 0.2)", border_solid: "#800000"},
+        "PSIII GREEN": {bg: "#001a00", bg_panel: "rgba(0, 30, 0, 0.7)", bg_menu: "#000d00", accent: "#4dff4d", accent_menu: "#4dff4d", text_main: "#ffffff", text_sec: "#ccffcc", text_dim: "#66cc66", border: "rgba(77, 255, 77, 0.2)", border_solid: "#004d00"},
+        "PSIII BLUE": {bg: "#000a1a", bg_panel: "rgba(0, 15, 30, 0.7)", bg_menu: "#00050d", accent: "#4d94ff", accent_menu: "#4d94ff", text_main: "#ffffff", text_sec: "#cce0ff", text_dim: "#66a3ff", border: "rgba(77, 148, 255, 0.2)", border_solid: "#003380"},
+        "PSIII PURPLE": {bg: "#1a001a", bg_panel: "rgba(30, 0, 30, 0.7)", bg_menu: "#0d000d", accent: "#d24dff", accent_menu: "#d24dff", text_main: "#ffffff", text_sec: "#f0ccff", text_dim: "#c266cc", border: "rgba(210, 77, 255, 0.2)", border_solid: "#800080"},
+        "PSIII GOLD": {bg: "#261a00", bg_panel: "rgba(40, 25, 0, 0.7)", bg_menu: "#130d00", accent: "#ffcc00", accent_menu: "#ffcc00", text_main: "#ffffff", text_sec: "#ffeecc", text_dim: "#cca300", border: "rgba(255, 204, 0, 0.2)", border_solid: "#997300"},
+        "PSIII SILVER": {bg: "#1a1a1a", bg_panel: "rgba(35, 35, 35, 0.7)", bg_menu: "#0d0d0d", accent: "#cccccc", accent_menu: "#cccccc", text_main: "#ffffff", text_sec: "#e6e6e6", text_dim: "#999999", border: "rgba(204, 204, 204, 0.2)", border_solid: "#666666"},
+        "DRACULA": {bg: "#282a36", bg_panel: "rgba(68, 71, 90, 0.7)", bg_menu: "#44475a", accent: "#bd93f9", accent_menu: "#ff79c6", text_main: "#f8f8f2", text_sec: "#8be9fd", text_dim: "#6272a4", border: "rgba(189, 147, 249, 0.2)", border_solid: "#6272a4"},
+        "GRUVBOX": {bg: "#282828", bg_panel: "rgba(60, 56, 54, 0.8)", bg_menu: "#3c3836", accent: "#fabd2f", accent_menu: "#fe8019", text_main: "#ebdbb2", text_sec: "#b8bb26", text_dim: "#a89984", border: "rgba(250, 189, 47, 0.2)", border_solid: "#504945"},
+        "NORD": {bg: "#2e3440", bg_panel: "rgba(59, 66, 82, 0.8)", bg_menu: "#3b4252", accent: "#88c0d0", accent_menu: "#81a1c1", text_main: "#eceff4", text_sec: "#e5e9f0", text_dim: "#4c566a", border: "rgba(136, 192, 208, 0.2)", border_solid: "#434c5e"},
+        "SOLARIZED DARK": {bg: "#002b36", bg_panel: "rgba(7, 54, 66, 0.8)", bg_menu: "#073642", accent: "#2aa198", accent_menu: "#268bd2", text_main: "#839496", text_sec: "#93a1a1", text_dim: "#586e75", border: "rgba(42, 161, 152, 0.2)", border_solid: "#073642"},
+        "SOLARIZED LIGHT": {bg: "#fdf6e3", bg_panel: "rgba(238, 232, 213, 0.8)", bg_menu: "#eee8d5", accent: "#2aa198", accent_menu: "#d33682", text_main: "#657b83", text_sec: "#586e75", text_dim: "#93a1a1", border: "rgba(42, 161, 152, 0.2)", border_solid: "#ccc2a8"},
+        "CATPPUCCIN MOCHA": {bg: "#1e1e2e", bg_panel: "rgba(30, 30, 46, 0.8)", bg_menu: "#181825", accent: "#cba6f7", accent_menu: "#f5c2e7", text_main: "#cdd6f4", text_sec: "#bac2de", text_dim: "#6c7086", border: "rgba(203, 166, 247, 0.2)", border_solid: "#313244"},
+        "CATPPUCCIN MACCHIATO": {bg: "#24273a", bg_panel: "rgba(36, 39, 58, 0.8)", bg_menu: "#1e2030", accent: "#c6a0f6", accent_menu: "#f4b8e4", text_main: "#cad3f5", text_sec: "#b8c0e0", text_dim: "#6e738d", border: "rgba(198, 160, 246, 0.2)", border_solid: "#363a4f"},
+        "CATPPUCCIN FRAPPÉ": {bg: "#303446", bg_panel: "rgba(48, 52, 70, 0.8)", bg_menu: "#292c3c", accent: "#ca9ee6", accent_menu: "#f2d5cf", text_main: "#c6d0f5", text_sec: "#b5bfe2", text_dim: "#737994", border: "rgba(202, 158, 230, 0.2)", border_solid: "#414559"},
+        "CATPPUCCIN LATTE": {bg: "#eff1f5", bg_panel: "rgba(239, 241, 245, 0.8)", bg_menu: "#e6e9ef", accent: "#8839ef", accent_menu: "#1e66f5", text_main: "#4c4f69", text_sec: "#5c5f77", text_dim: "#9ca0b0", border: "rgba(136, 57, 239, 0.2)", border_solid: "#ccd0da"},
+        "TOKYO NIGHT": {bg: "#1a1b26", bg_panel: "rgba(36, 40, 59, 0.8)", bg_menu: "#16161e", accent: "#7aa2f7", accent_menu: "#bb9af7", text_main: "#c0caf5", text_sec: "#a9b1d6", text_dim: "#565f89", border: "rgba(122, 162, 247, 0.2)", border_solid: "#292e42"},
+        "EVERFOREST": {bg: "#2b3339", bg_panel: "rgba(50, 56, 62, 0.8)", bg_menu: "#2f383e", accent: "#a7c080", accent_menu: "#e67e80", text_main: "#d3c6aa", text_sec: "#a7c080", text_dim: "#859289", border: "rgba(167, 192, 128, 0.2)", border_solid: "#4b565c"},
+        "ROSÉ PINE": {bg: "#191724", bg_panel: "rgba(31, 29, 46, 0.8)", bg_menu: "#1f1d2e", accent: "#c4a7e7", accent_menu: "#ebbcba", text_main: "#e0def4", text_sec: "#9ccfd8", text_dim: "#6e6a86", border: "rgba(196, 167, 231, 0.2)", border_solid: "#26233a"},
+        "GAME BOY DMG": {bg: "#8bac0f", bg_panel: "rgba(155, 188, 15, 0.5)", bg_menu: "#8bac0f", accent: "#0f380f", accent_menu: "#0f380f", text_main: "#0f380f", text_sec: "#306230", text_dim: "#306230", border: "rgba(15, 56, 15, 0.2)", border_solid: "#306230"},
+        "PIP BOY": {bg: "#000000", bg_panel: "rgba(0, 20, 0, 0.7)", bg_menu: "#001100", accent: "#14ff00", accent_menu: "#14ff00", text_main: "#14ff00", text_sec: "#0ea000", text_dim: "#0a6000", border: "rgba(20, 255, 0, 0.2)", border_solid: "#0ea000"},
+        "SEVASTOPOL": {bg: "#050d05", bg_panel: "rgba(10, 25, 10, 0.7)", bg_menu: "#081808", accent: "#f5e6b3", accent_menu: "#ff0000", text_main: "#f5e6b3", text_sec: "#a39977", text_dim: "#4d594d", border: "rgba(245, 230, 179, 0.1)", border_solid: "#1a331a"},
+        "RIP AND TEAR CLASSIC": {bg: "#1a0000", bg_panel: "rgba(40, 0, 0, 0.8)", bg_menu: "#2b0000", accent: "#ff0000", accent_menu: "#ff3333", text_main: "#ffcc00", text_sec: "#ff6600", text_dim: "#990000", border: "rgba(255, 0, 0, 0.3)", border_solid: "#800000"},
+        "SUPER BROTHERS": {bg: "#5C94FC", bg_panel: "rgba(200,76,12,0.8)", bg_menu: "#C84C0C", accent: "#F8D820", accent_menu: "#F8D820", text_main: "#ffffff", text_sec: "#FFCE9E", text_dim: "#E8A274", border: "rgba(248,216,32,0.4)", border_solid: "#000000"},
+        "GREEN HILL": {bg: "#2492FF", bg_panel: "rgba(136,68,0,0.8)", bg_menu: "#00A800", accent: "#F8B800", accent_menu: "#F8B800", text_main: "#ffffff", text_sec: "#E0E0E0", text_dim: "#A0A0A0", border: "rgba(248,184,0,0.5)", border_solid: "#000000"},
+        "NES": {bg: "#808080", bg_panel: "rgba(0,0,0,0.85)", bg_menu: "#333333", accent: "#E00000", accent_menu: "#E00000", text_main: "#ffffff", text_sec: "#CCCCCC", text_dim: "#888888", border: "rgba(224,0,0,0.4)", border_solid: "#000000"},
+        "SNES": {bg: "#b5b6b5", bg_panel: "rgba(200, 200, 200, 0.8)", bg_menu: "#e2e2e2", accent: "#524b82", accent_menu: "#827aa5", text_main: "#333333", text_sec: "#555555", text_dim: "#777777", border: "rgba(82, 75, 130, 0.2)", border_solid: "#524b82"},
+        "EARTHY & ORGANIC": {bg: "#3E4E3A", bg_panel: "rgba(91, 107, 85, 0.7)", bg_menu: "#4F5D48", accent: "#D4B28C", accent_menu: "#A9C298", text_main: "#F3EDE4", text_sec: "#D8D3C8", text_dim: "#8E9E88", border: "rgba(212, 178, 140, 0.2)", border_solid: "#6b7d63"},
+        "DOPAMINE BRIGHTS": {bg: "#FF3366", bg_panel: "rgba(20,20,20,0.8)", bg_menu: "#1a1a1a", accent: "#00E5FF", accent_menu: "#FFEB3B", text_main: "#ffffff", text_sec: "#CCCCCC", text_dim: "#888888", border: "rgba(0,229,255,0.4)", border_solid: "#333333"},
+        "RETRO REVIVAL": {bg: "#F2D1C9", bg_panel: "rgba(240, 200, 190, 0.8)", bg_menu: "#E8C0B5", accent: "#E05A47", accent_menu: "#6C8A9B", text_main: "#4A403A", text_sec: "#72655A", text_dim: "#A28E84", border: "rgba(224, 90, 71, 0.2)", border_solid: "#E05A47"}
+    };
+
+    const THEME_CATEGORIES = {
+        "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "WIN XP"],
+        "Gaming Legends": ["GAME BOY DMG", "PIP BOY", "SEVASTOPOL", "RIP AND TEAR CLASSIC", "SUPER BROTHERS", "GREEN HILL", "NES", "SNES"],
+        "Aesthetics": ["EARTHY & ORGANIC", "DOPAMINE BRIGHTS", "RETRO REVIVAL"],
+        "Linux Ricing": ["DRACULA", "GRUVBOX", "NORD", "SOLARIZED DARK", "SOLARIZED LIGHT", "CATPPUCCIN LATTE", "CATPPUCCIN FRAPPÉ", "CATPPUCCIN MACCHIATO", "CATPPUCCIN MOCHA", "TOKYO NIGHT", "EVERFOREST", "ROSÉ PINE"],
+        "PSIII Colors": ["PSIII CLASSIC", "PSIII RED", "PSIII GREEN", "PSIII BLUE", "PSIII PURPLE", "PSIII GOLD", "PSIII SILVER"]
+    };
+
+    const select = document.getElementById('theme-select');
+
+    // Populate select
+    Object.keys(THEME_CATEGORIES).forEach(category => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = category;
+        THEME_CATEGORIES[category].forEach(themeName => {
+            if(THEMES[themeName]) {
+                const opt = document.createElement('option');
+                opt.value = themeName;
+                opt.textContent = themeName;
+                optgroup.appendChild(opt);
+            }
+        });
+        select.appendChild(optgroup);
+    });
+
+    let activeTheme = localStorage.getItem('crema_manual_theme') || "CREMA (DEFAULT)";
+
+    function applyTheme(themeName) {
+        const tConfig = THEMES[themeName];
+        if (!tConfig) return;
+        const root = document.documentElement;
+        Object.keys(tConfig).forEach(key => root.style.setProperty('--' + key, tConfig[key]));
+        localStorage.setItem('crema_manual_theme', themeName);
+        select.value = themeName;
+    }
+
+    select.addEventListener('change', (e) => applyTheme(e.target.value));
+
+    // Apply on load
+    applyTheme(activeTheme);
+
+    // Nav Logic
+    const manualNavBtns = document.querySelectorAll('.nav-btn');
+    const manualContent = document.getElementById('content');
+
+    manualNavBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            manualNavBtns.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            const targetId = e.target.getAttribute('data-target');
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                manualContent.scrollTo({
+                    top: targetEl.offsetTop - manualContent.offsetTop,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+  </script>
+</body>
+</html>
