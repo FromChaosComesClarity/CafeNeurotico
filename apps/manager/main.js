@@ -390,13 +390,8 @@ ipcMain.handle('grinder-pick-dir', async () => {
     return (!r.canceled && r.filePaths[0]) ? r.filePaths[0] : null;
 });
 
-function findCremaPath() {
-    try {
-        const f = fs.readdirSync(baseDir).find(n => /^CREMA\.(AppImage|appimage)$/i.test(n));
-        return f ? path.join(baseDir, f) : null;
-    } catch(e) { return null; }
-}
-ipcMain.handle('check-crema', () => !!findCremaPath());
+// CREMA is now a face of this same binary (launched with --crema), so it's always available.
+ipcMain.handle('check-crema', () => true);
 
 function findEmuLattePath() {
     try {
@@ -740,10 +735,10 @@ ipcMain.handle('sync-all-grinder-games', (_, allGrinderGames, grinderPath) => {
 });
 
 ipcMain.on('launch-crema', () => {
-    const p = findCremaPath();
-    if (!p) return;
-    const child = spawn(p, [], { detached: true, stdio: 'ignore' });
-    child.unref();
+    // Launch the CREMA face of THIS binary (separate 'crema' process), not an external AppImage.
+    const bin  = process.env.APPIMAGE || process.execPath;
+    const args = process.env.APPIMAGE ? ['--crema'] : [path.join(__dirname, '..', '..'), '--crema'];
+    spawn(bin, args, { detached: true, stdio: 'ignore' }).unref();
     const win = BrowserWindow.getAllWindows()[0];
     if (win) win.minimize();
 });
