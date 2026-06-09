@@ -154,8 +154,6 @@ async function fetchDescI18n(appId, enDesc) {
     return JSON.stringify(i18n);
 }
 
-ipcMain.handle('get-games', async () => { if (!db) return { games: [] }; try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; } catch (err) { return { games: [] }; } });
-
 // ── GRINDER integration ───────────────────────────────────────────────────────
 // GRINDER is a face of this same binary now: re-invoke self with a leading 'grinder' arg.
 function spawnGrinderFace(subArgs, opts) {
@@ -374,7 +372,6 @@ ipcMain.handle('verify-install-status', (e, gameId) => {
     if (installed !== null) db.prepare("UPDATE games SET Installed=? WHERE id=?").run(installed, gameId);
     return { installed: installed ?? game.Installed ?? 1 };
 });
-ipcMain.handle('open-install-url', async (e, url) => { if (url) await shell.openExternal(url); });
 
 let steamInstallWatchers = [];
 function startSteamInstallWatcher(win) {
@@ -399,10 +396,6 @@ function startSteamInstallWatcher(win) {
     }
 }
 ipcMain.on('save-db-field', (event, { game, field, value }) => { if (!db || !SAVE_DB_ALLOWED_FIELDS.has(field)) return; try { db.prepare(`UPDATE games SET ${field} = ? WHERE Game = ?`).run(value, game); } catch (e) {} });
-ipcMain.handle('clear-history', () => {
-    if (!db) return false;
-    try { db.prepare("UPDATE games SET LastPlayed = 0").run(); return true; } catch(err) { return false; }
-});
 
 // FIX: New IPC Handler to securely update the LastPlayed timestamp
 ipcMain.handle('update-last-played', (event, gameName) => {
@@ -942,10 +935,6 @@ ipcMain.handle('grinder-cancel-headless', () => {
 });
 
 // ── FLATPAK ────────────────────────────────────────────────────────────────
-
-ipcMain.handle('read-file-base64', (e, filePath) => {
-    try { return fs.readFileSync(filePath).toString('base64'); } catch { return null; }
-});
 
 // ── PICO-8 ────────────────────────────────────────────────────────────────
 

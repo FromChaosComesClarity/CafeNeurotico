@@ -9,7 +9,7 @@
  *     db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
  *     getBeautifulName, getOldCrushedName });
  */
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
@@ -20,6 +20,25 @@ function registerSharedHandlers(ctx) {
             getBeautifulName, getOldCrushedName } = ctx;
 
     ipcMain.handle('get-basedir', () => baseDir);
+
+    ipcMain.handle('get-games', () => {
+        if (!db) return { games: [] };
+        try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; }
+        catch (err) { return { games: [] }; }
+    });
+
+    ipcMain.handle('clear-history', () => {
+        if (!db) return false;
+        try { db.prepare("UPDATE games SET LastPlayed = 0").run(); return true; } catch(err) { return false; }
+    });
+
+    ipcMain.handle('read-file-base64', (e, filePath) => {
+        try { return fs.readFileSync(filePath).toString('base64'); } catch { return null; }
+    });
+
+    ipcMain.handle('open-install-url', async (e, url) => {
+        if (url) await shell.openExternal(url);
+    });
 
     ipcMain.handle('get-setting', (e, key) => { try { const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key); return row ? row.value : null; } catch(e) { return null; } });
 

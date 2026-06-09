@@ -512,10 +512,6 @@ function startSteamInstallWatcher(win) {
     }
 }
 
-ipcMain.handle('open-install-url', async (e, url) => {
-    if (url) await shell.openExternal(url);
-});
-
 ipcMain.handle('check-all-install-status', async () => {
     if (!db) return { updated: 0 };
     let updated = 0;
@@ -1147,12 +1143,6 @@ ipcMain.handle('restore-zip', async (event) => {
     });
 });
 
-ipcMain.handle('get-games', () => {
-    if (!db) return { games: [] };
-    try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; }
-    catch (err) { return { games: [] }; }
-});
-
 ipcMain.handle('add-game', (e, name) => {
     try {
         const gameName = (name && name.trim()) ? name.trim() : 'New Game';
@@ -1518,11 +1508,6 @@ ipcMain.handle('update-last-played', (event, id) => {
     try { db.prepare("UPDATE games SET LastPlayed = ? WHERE id = ?").run(Date.now(), id); return true; } catch(err) { return false; }
 });
 
-ipcMain.handle('clear-history', (event) => {
-    if (!db) return false;
-    try { db.prepare("UPDATE games SET LastPlayed = 0").run(); return true; } catch(err) { return false; }
-});
-
 ipcMain.handle('get-strings', (_, lang) => require('./i18n')(lang || 'en'));
 
 // Normalises Heroic installed.json regardless of format:
@@ -1789,10 +1774,6 @@ function stopHeroicWatch() {
 }
 
 // ── FLATPAK ────────────────────────────────────────────────────────────────
-
-ipcMain.handle('read-file-base64', (e, filePath) => {
-    try { return fs.readFileSync(filePath).toString('base64'); } catch { return null; }
-});
 
 ipcMain.handle('save-flatpak-art', (e, gameId, coverB64, heroB64, iconSrcPath) => {
     const imagesDir = path.join(baseDir, 'GameManagerConfig', 'images');
