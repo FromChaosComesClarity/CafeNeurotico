@@ -3,6 +3,7 @@ app.setName('cafeneurotico');
 const path = require('path');
 const os = require('os');
 const Database = require('better-sqlite3');
+const { registerSharedHandlers } = require('../../packages/core/shared-ipc.js');
 const fs = require('fs');
 const { exec, execFile, spawn } = require('child_process');
 
@@ -202,6 +203,8 @@ app.whenReady().then(() => {
     try {
         db = new Database(dbPath);
         db.pragma('journal_mode = WAL');
+    // Shared IPC handlers live in packages/core/shared-ipc.js (single source of truth).
+    registerSharedHandlers({ db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath, getBeautifulName, getOldCrushedName });
         db.prepare(`
         CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT, Store TEXT, FAV TEXT, WANT_TO_PLAY TEXT,
@@ -566,8 +569,6 @@ ipcMain.handle('check-all-install-status', async () => {
             }
         }
     }
-
-
 
     // ── PHYSICAL / OTHERS / EMULATION / APPS: installed = has launch command ──
     const manualResult = db.prepare(`
@@ -973,69 +974,6 @@ ipcMain.handle('fetch-achievements-now', async (_, appId) => {
     } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('get-game-achievements', (_, appId) => {
-    try {
-        // Ensure the table exists (created by GRINDER on first sync)
-        db.exec(`CREATE TABLE IF NOT EXISTS achievements (
-            app_id TEXT NOT NULL, key TEXT NOT NULL, name TEXT,
-            description TEXT, image_locked TEXT, image_unlocked TEXT,
-            date_unlocked TEXT, visible INTEGER DEFAULT 1,
-            PRIMARY KEY (app_id, key)
-        )`);
-        const rows = db.prepare(
-            "SELECT * FROM achievements WHERE app_id = ? ORDER BY date_unlocked DESC, name COLLATE NOCASE"
-        ).all(appId);
-        return { ok: true, achievements: rows };
-    } catch (e) { return { ok: false, achievements: [] }; }
-});
-
-ipcMain.handle('fetch-steam-achievements', async (_, appId) => {
-    const get = k => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
-    const apiKey  = get('steam_api_key');
-    const steamId = get('steam_id');
-    if (!apiKey || !steamId) return { ok: false, error: 'no_credentials' };
-
-    const dbKey = `steam_${appId}`;
-    try {
-        const [playerRes, schemaRes] = await Promise.all([
-            fetch(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${apiKey}&steamid=${steamId}&appid=${appId}&l=english`),
-            fetch(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${appId}`),
-        ]);
-        const playerData = await playerRes.json();
-        const schemaData = await schemaRes.json();
-
-        if (!playerData.playerstats?.success) return { ok: false, error: playerData.playerstats?.error || 'no_stats' };
-
-        const playerAchs = playerData.playerstats.achievements || [];
-        const schemaAchs = schemaData.game?.availableGameStats?.achievements || [];
-        const iconMap = {};
-        for (const s of schemaAchs) iconMap[s.name] = { icon: s.icon || null, icongray: s.icongray || null };
-
-        db.exec(`CREATE TABLE IF NOT EXISTS achievements (
-            app_id TEXT NOT NULL, key TEXT NOT NULL, name TEXT,
-            description TEXT, image_locked TEXT, image_unlocked TEXT,
-            date_unlocked TEXT, visible INTEGER DEFAULT 1,
-            PRIMARY KEY (app_id, key)
-        )`);
-        const upsert = db.prepare(`INSERT OR REPLACE INTO achievements
-            (app_id, key, name, description, image_locked, image_unlocked, date_unlocked, visible)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-        db.transaction(list => {
-            for (const a of list) {
-                const icons = iconMap[a.apiname] || {};
-                const dateUnlocked = (a.achieved && a.unlocktime) ? new Date(a.unlocktime * 1000).toISOString() : null;
-                upsert.run(dbKey, a.apiname, a.name || a.apiname, a.description || null,
-                    icons.icongray || null, icons.icon || null, dateUnlocked, 1);
-            }
-        })(playerAchs);
-
-        const rows = db.prepare(
-            "SELECT * FROM achievements WHERE app_id = ? ORDER BY date_unlocked DESC, name COLLATE NOCASE"
-        ).all(dbKey);
-        return { ok: true, achievements: rows };
-    } catch (e) { return { ok: false, error: e.message }; }
-});
-
 ipcMain.handle('igdb-test', async () => {
     const auth = await getIgdbToken();
     if (!auth) return { success: false, message: 'No credentials saved.' };
@@ -1093,10 +1031,6 @@ ipcMain.handle('igdb-save-screenshot', async (e, gameId, screenshotUrl) => {
     } catch(e) { return null; }
 });
 // ───────────────────────────────────────────────────────────────────────────
-
-ipcMain.handle('get-basedir', () => baseDir);
-ipcMain.handle('get-setting', (e, key) => { try { const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key); return row ? row.value : null; } catch(e) { return null; } });
-ipcMain.handle('set-setting', (e, key, val) => { try { db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, val); return true; } catch(e) { return false; } });
 
 ipcMain.handle('open-web-popup', async (event, url) => {
     const popupWin = new BrowserWindow({
@@ -1845,7 +1779,6 @@ async function doHeroicSync() {
 
 ipcMain.handle('sync-heroic', async () => doHeroicSync());
 
-
 // ── LAUNCH & AUTO-WATCH ────────────────────────────────────────────────────
 let heroicWatchState = null;
 
@@ -1858,78 +1791,6 @@ function stopHeroicWatch() {
 }
 
 // ── FLATPAK ────────────────────────────────────────────────────────────────
-
-ipcMain.handle('scan-flatpak', () => {
-    const GAME_CATS = new Set(['Game','ActionGame','ArcadeGame','BoardGame','CardGame',
-        'KidsGame','LogicGame','RolePlaying','Shooter','Simulation','SportsGame','StrategyGame']);
-    const dirs = [
-        '/var/lib/flatpak/exports/share/applications',
-        path.join(os.homedir(), '.local/share/flatpak/exports/share/applications')
-    ];
-
-    const found = new Set();
-    const iconMap = {}; // gameId → iconName (= appId for Flatpak)
-
-    for (const dir of dirs) {
-        let files;
-        try { files = fs.readdirSync(dir).filter(f => f.endsWith('.desktop')); }
-        catch { continue; }
-        for (const file of files) {
-            let content;
-            try { content = fs.readFileSync(path.join(dir, file), 'utf8'); }
-            catch { continue; }
-            let name = '', cats = '', icon = '';
-            for (const line of content.split('\n')) {
-                if (line.startsWith('Name=')       && !name) name = line.slice(5).trim();
-                if (line.startsWith('Categories=') && !cats) cats = line.slice(11).trim();
-                if (line.startsWith('Icon=')       && !icon) icon = line.slice(5).trim();
-            }
-            if (!cats.split(';').map(c => c.trim()).some(c => GAME_CATS.has(c))) continue;
-            const appId = file.slice(0, -8);
-            if (!name) name = appId;
-            if (!icon) icon = appId;
-            const launchCmd = `flatpak run ${appId}`;
-            found.add(launchCmd);
-            const row = db.prepare('SELECT id, Store, CoverArt FROM games WHERE LaunchCommand = ?').get(launchCmd);
-            if (row) {
-                const stores = (row.Store || '').split(',').map(s => s.trim());
-                if (!stores.some(s => s.toLowerCase() === 'flatpak'))
-                    db.prepare('UPDATE games SET Store=?, Installed=1 WHERE id=?').run([...stores, 'Flatpak'].join(', '), row.id);
-                else
-                    db.prepare('UPDATE games SET Installed=1 WHERE id=?').run(row.id);
-                if (!row.CoverArt) iconMap[row.id] = icon;
-            } else {
-                const info = db.prepare('INSERT INTO games (Game,Store,LaunchCommand,Installed) VALUES (?,?,?,1)').run(name, 'Flatpak', launchCmd);
-                iconMap[info.lastInsertRowid] = icon;
-            }
-        }
-    }
-
-    const existing = db.prepare("SELECT id, LaunchCommand FROM games WHERE Store = 'Flatpak'").all();
-    for (const row of existing) {
-        if (!found.has(row.LaunchCommand))
-            db.prepare('DELETE FROM games WHERE id=?').run(row.id);
-    }
-
-    return { count: found.size, iconMap };
-});
-
-ipcMain.handle('find-flatpak-icon', (e, iconName) => {
-    const bases = [
-        path.join(os.homedir(), '.local/share/flatpak/exports/share/icons/hicolor'),
-        '/var/lib/flatpak/exports/share/icons/hicolor'
-    ];
-    const sizes = ['512x512', '256x256', '192x192', '128x128'];
-    for (const base of bases) {
-        for (const size of sizes) {
-            const p = path.join(base, size, 'apps', iconName + '.png');
-            if (fs.existsSync(p)) return p;
-        }
-        const svg = path.join(base, 'scalable', 'apps', iconName + '.svg');
-        if (fs.existsSync(svg)) return svg;
-    }
-    return null;
-});
 
 ipcMain.handle('read-file-base64', (e, filePath) => {
     try { return fs.readFileSync(filePath).toString('base64'); } catch { return null; }
@@ -2222,14 +2083,6 @@ ipcMain.handle('select-local-image', async (event, gameId, type) => {
 function getBeautifulName(gameName) { return gameName.replace(/[\\/:*?"<>|#]/g, '').trim(); }
 function getOldCrushedName(gameName) { return gameName.replace(/[^a-z0-9]/gi, '_').toLowerCase(); }
 
-ipcMain.handle('check-local-trailer', (event, gameName) => {
-    const beautifulPath = path.join(trailersDir, `${getBeautifulName(gameName)}.mp4`);
-    const oldPath = path.join(trailersDir, `${getOldCrushedName(gameName)}.mp4`);
-    if (fs.existsSync(beautifulPath)) return `file://${beautifulPath}`;
-        if (fs.existsSync(oldPath)) return `file://${oldPath}`;
-            return null;
-});
-
 ipcMain.handle('delete-trailer', (event, gameName) => {
     const beautifulPath = path.join(trailersDir, `${getBeautifulName(gameName)}.mp4`);
     const oldPath = path.join(trailersDir, `${getOldCrushedName(gameName)}.mp4`);
@@ -2256,21 +2109,6 @@ ipcMain.handle('search-youtube', async (event, gameName) => {
     return results;
 });
 
-ipcMain.handle('download-trailer', (event, gameName, videoId) => {
-    const fileName = `${getBeautifulName(gameName)}.mp4`;
-    const filePath = path.join(trailersDir, fileName);
-    const win = BrowserWindow.getFocusedWindow();
-    const args = [ '--config-location', ytDlpConfigPath, '--ffmpeg-location', ffmpegPath, `https://www.youtube.com/watch?v=${videoId}`, '-f', 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best', '-o', filePath, '--no-part', '--newline' ];
-    return new Promise((resolve) => {
-        const ytdlp = spawn(ytDlpPath, args);
-        ytdlp.stdout.on('data', (data) => {
-            const match = data.toString().match(/\[download\]\s+(\d+(\.\d+)?)%/);
-            if (match && match[1]) { if (win) win.webContents.send('download-progress', parseFloat(match[1])); }
-        });
-        ytdlp.on('close', (code) => resolve(code === 0));
-    });
-});
-
 ipcMain.handle('fetch-steam-trailer', async (event, appId) => {
     try {
         if (!appId || appId === 'None') return null;
@@ -2292,7 +2130,6 @@ ipcMain.handle('fetch-steam-trailer', async (event, appId) => {
         return null;
     }
 });
-
 
 // --- OTHER FETCHERS ---
 ipcMain.handle('fetch-hltb', async (event, gameName) => {
