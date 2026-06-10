@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Cafe Neurotico — unified suite (Manager + GRINDER + CREMA in one AppImage)",
   "main": "main.js",
+  "desktopName": "cafeneurotico.desktop",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -38,6 +39,7 @@
       "icon": "apps/manager/assets/icons/CNGM.svg",
       "category": "Game",
       "executableName": "cafeneurotico",
+      "syncDesktopName": true,
       "desktop": {
         "entry": {
           "Name": "Cafe Neurotico",

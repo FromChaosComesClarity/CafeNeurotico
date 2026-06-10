@@ -56,7 +56,7 @@
     "wait_login": "⏳ Aguardando Login...",
     "fetch_gog": "Buscar Biblioteca GOG",
     "searching": "⏳ BUSCANDO...",
-    "auto_fetch": "✨ BUSCA AUTO",
+    "auto_fetch": "BUSCA AUTO",
     "fetching_auto": "⏳ BUSCANDO...",
     "searching_yt": "Buscando no YouTube por \"{name}\"...",
     "select_video": "Selecione um vídeo para baixar:",
@@ -176,7 +176,7 @@
     "btn_watch": "VER TRAILER",
     "btn_play": "▶ JOGAR",
     "btn_watch_trailer": "▶ VER TRAILER",
-    "btn_auto_fetch": "✨ BUSCA AUTO",
+    "btn_auto_fetch": "BUSCA AUTO",
     "btn_clear_meta": "🧹 LIMPAR META",
     "btn_save": "💾 SALVAR E VOLTAR",
     "btn_delete": "🗑️ EXCLUIR JOGO",
@@ -217,8 +217,8 @@
     "lbl_tags": "Tags:",
     "lbl_similar": "Jogos Similares:",
     "lbl_desc": "Descrição:",
-    "chk_fav": "★ Favorito",
-    "chk_want": "⚑ Quero Jogar",
+    "chk_fav": "Favorito",
+    "chk_want": "Quero Jogar",
     "close": "Fechar"
   },
   "language": {

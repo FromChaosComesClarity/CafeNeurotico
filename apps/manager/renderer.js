@@ -643,6 +643,7 @@ document.querySelectorAll('.pico8-vis-btn').forEach(btn =>
 // ── LAYOUT MODE ───────────────────────────────────────────────────────────
 function applyLayoutMode(mode) {
     if (mode === 'cp') mode = 'rail'; // Navigator removed
+    if (mode === 'htop') mode = 'ranger'; // htop layout retired — migrate to ranger
     const c = document.getElementById('app-container');
     c.classList.remove('layout-sidebar', 'layout-rail', 'layout-cp', 'layout-topnav', 'layout-split', 'layout-commander', 'layout-catalog', 'layout-newspaper', 'layout-timeline', 'layout-kanban', 'layout-htop', 'layout-ranger', 'layout-bbs', 'layout-vi', 'layout-adventure', 'layout-mc', 'layout-nethack', 'layout-grub', 'layout-mac', 'layout-xp', 'layout-kde', 'layout-c64', 'layout-amiga', 'layout-beos', 'layout-w95', 'layout-nextstep');
     c.classList.add('layout-' + mode);
@@ -650,7 +651,7 @@ function applyLayoutMode(mode) {
     const _themedModes = ['mac', 'xp', 'kde', 'c64', 'amiga', 'beos', 'w95', 'nextstep', 'htop', 'ranger', 'bbs', 'vi', 'adventure', 'mc', 'nethack', 'grub'];
     _themedModes.forEach(m => document.body.classList.remove('layout-' + m));
     if (_themedModes.includes(mode)) document.body.classList.add('layout-' + mode);
-    document.querySelectorAll('#layout-segmented-control .segmented-btn').forEach(b =>
+    document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(b =>
         b.classList.toggle('active', b.dataset.val === mode));
     updateLayoutCatTab(mode);
     localStorage.setItem('cngm_layout_mode', mode);
@@ -688,7 +689,7 @@ function applyLayoutMode(mode) {
         document.getElementById('main-content')?.classList.remove('split-edit');
     }
 }
-document.querySelectorAll('#layout-segmented-control .segmented-btn').forEach(btn =>
+document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(btn =>
     btn.addEventListener('click', () => applyLayoutMode(btn.dataset.val)));
 
 const _layoutCats = {
@@ -702,14 +703,14 @@ function updateLayoutCatTab(mode) {
     const cat = _layoutCats[mode] || 'classic';
     document.querySelectorAll('.lsc-cat').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
     document.querySelectorAll('#layout-segmented-control .lsc-group').forEach(g =>
-        g.style.display = g.dataset.cat === cat ? 'contents' : 'none');
+        g.style.display = g.dataset.cat === cat ? '' : 'none');
 }
 document.querySelectorAll('.lsc-cat').forEach(tab =>
     tab.addEventListener('click', () => {
         const cat = tab.dataset.cat;
         document.querySelectorAll('.lsc-cat').forEach(t => t.classList.toggle('active', t === tab));
         document.querySelectorAll('#layout-segmented-control .lsc-group').forEach(g =>
-            g.style.display = g.dataset.cat === cat ? 'contents' : 'none');
+            g.style.display = g.dataset.cat === cat ? '' : 'none');
     }));
 
 (async () => {
@@ -1849,17 +1850,17 @@ function renderSplitDetail(game) {
     } else {
         const installCmd = getInstallCommand(game);
         if (_isGrinderGame(game)) {
-            playBtn.textContent = '⬇ INSTALL';
+            playBtn.textContent = 'INSTALL';
             playBtn.className = 'btn-install-primary';
             playBtn.style.display = 'inline-flex';
             playBtn.onclick = () => handleInstall(game);
         } else if (installCmd) {
-            playBtn.textContent = '⬇ INSTALL';
+            playBtn.textContent = 'INSTALL';
             playBtn.className = 'btn-install-primary';
             playBtn.style.display = 'inline-flex';
             playBtn.onclick = () => window.api.openInstallUrl(installCmd);
         } else if (isManualCategory(game)) {
-            playBtn.textContent = '⬇ INSTALL';
+            playBtn.textContent = 'INSTALL';
             playBtn.className = 'btn-install-primary';
             playBtn.style.display = 'inline-flex';
             playBtn.onclick = () => openAddCmdDialog(game.id, game.Game);
@@ -6946,7 +6947,7 @@ function triggerAutoFetchSearch(gameId, gameName) {
         if (results.length === 0) {
             document.getElementById('modal-refine-search').classList.add('active');
             document.getElementById('refine-search-input').value = gameName;
-            btn.innerText = _fetchMode === 'text' ? '🔍 SCRAPE TEXT' : t('status.auto_fetch');
+            btn.innerText = _fetchMode === 'text' ? 'SCRAPE TEXT' : t('status.auto_fetch');
             btn.disabled = false; return;
         }
         if (results.length === 1) {
@@ -6954,7 +6955,7 @@ function triggerAutoFetchSearch(gameId, gameName) {
             executeAutoFetch(gameId, gameName, results[0].id);
         } else {
             openSteamResultsModal(gameId, gameName, results);
-            btn.innerText = _fetchMode === 'text' ? '🔍 SCRAPE TEXT' : t('status.auto_fetch');
+            btn.innerText = _fetchMode === 'text' ? 'SCRAPE TEXT' : t('status.auto_fetch');
             btn.disabled = false;
         }
     });
@@ -7013,7 +7014,7 @@ async function executeAutoFetch(gameId, gameName, appId) {
         const updatedGame = allGames.find(g => g.id === gameId);
         if (updatedGame) openDetails(updatedGame);
     }
-    btn.textContent = isText ? '🔍 SCRAPE TEXT' : t('status.auto_fetch');
+    btn.textContent = isText ? 'SCRAPE TEXT' : t('status.auto_fetch');
     btn.disabled = false;
     _fetchMode = 'full';
 }
@@ -7022,10 +7023,10 @@ async function executeAutoFetch(gameId, gameName, appId) {
 document.getElementById('btn-fetch-hltb').addEventListener('click', async () => {
     const gameName = document.getElementById('edit-name').value;
     if (!gameName) return;
-    document.getElementById('btn-fetch-hltb').innerText = "⏳";
+    document.getElementById('btn-fetch-hltb').textContent = '…';
     const result = await window.api.fetchHltb(gameName);
     document.getElementById('edit-hltb').value = result;
-    document.getElementById('btn-fetch-hltb').innerText = "🔍";
+    document.getElementById('btn-fetch-hltb').innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
     if (result === "API Offline" || result === "Error" || result === "Unknown") {
         window.api.openWebPopup(`https://howlongtobeat.com/?q=${encodeURIComponent(gameName)}`);
     }
@@ -7034,10 +7035,10 @@ document.getElementById('btn-fetch-hltb').addEventListener('click', async () => 
 document.getElementById('btn-fetch-proton').addEventListener('click', async () => {
     const appId = document.getElementById('edit-appid').value;
     if (!appId) { await showAlert(t('alert.proton_id_required')); return; }
-    document.getElementById('btn-fetch-proton').innerText = "⏳";
+    document.getElementById('btn-fetch-proton').textContent = '…';
     const result = await window.api.fetchProton(appId);
     document.getElementById('edit-proton').value = result.toUpperCase();
-    document.getElementById('btn-fetch-proton').innerText = "🔍";
+    document.getElementById('btn-fetch-proton').innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
     if (result === "ERROR" || result === "UNKNOWN") {
         window.api.openWebPopup(`https://www.protondb.com/app/${appId}`);
     }

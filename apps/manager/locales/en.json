@@ -56,7 +56,7 @@
     "wait_login": "⏳ Waiting for Login...",
     "fetch_gog": "Fetch GOG Library",
     "searching": "⏳ SEARCHING...",
-    "auto_fetch": "✨ AUTO-FETCH",
+    "auto_fetch": "AUTO-FETCH",
     "fetching_auto": "⏳ FETCHING...",
     "searching_yt": "Searching YouTube for \"{name}\"...",
     "select_video": "Select a video to download:",
@@ -176,7 +176,7 @@
     "btn_watch": "WATCH TRAILER",
     "btn_play": "▶ PLAY",
     "btn_watch_trailer": "▶ WATCH TRAILER",
-    "btn_auto_fetch": "✨ AUTO-FETCH",
+    "btn_auto_fetch": "AUTO-FETCH",
     "btn_clear_meta": "🧹 CLEAR META",
     "btn_save": "💾 SAVE & RETURN",
     "btn_delete": "🗑️ DELETE GAME",
@@ -217,8 +217,8 @@
     "lbl_tags": "Tags:",
     "lbl_similar": "Similar Games:",
     "lbl_desc": "Description:",
-    "chk_fav": "★ Favorite",
-    "chk_want": "⚑ Want to Play",
+    "chk_fav": "Favorite",
+    "chk_want": "Want to Play",
     "close": "Close"
   },
   "language": {

@@ -2529,6 +2529,20 @@
     .cp-taskbar-stop { font-size: 10px; padding: 4px 12px; background: transparent; border: 1px solid #e57373; color: #e57373; border-radius: 6px; cursor: pointer; }
     .cp-footer-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
     .cp-footer-actions button { font-size: 11px; padding: 8px 16px; }
+
+    /* ── Control Panel rail — per-layout polish ──────────────────────────────
+       Layout palettes cascade via CSS vars, so rail colours already adapt; these
+       only fix structure (square + mono on the TTY skins) and hover contrast on
+       the light "ancient OS" skins where a white hover is invisible. */
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-rail,
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-rail-item,
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-close,
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-taskbar-track,
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-taskbar-stop { border-radius:0 !important; }
+    :is(body.layout-htop,body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .cp-rail-item { font-family:var(--tty-font),'Fira Code','Courier New',monospace !important; letter-spacing:0 !important; }
+    /* Light ancient-OS skins: darken hover so it reads on pale backgrounds */
+    :is(body.layout-mac,body.layout-xp,body.layout-kde,body.layout-beos,body.layout-w95,body.layout-amiga,body.layout-nextstep) #modal-tools .cp-rail { background:var(--bg_menu); }
+    :is(body.layout-mac,body.layout-xp,body.layout-kde,body.layout-beos,body.layout-w95,body.layout-amiga,body.layout-nextstep) #modal-tools .cp-rail-item:hover { background:rgba(0,0,0,0.08); color:var(--text_main); }
     .tool-card-title { color: var(--accent); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid var(--border_solid); padding-bottom: 5px; margin-bottom: 2px; }
 
     fieldset { border: 2px solid var(--border); border-radius: 12px; padding: 20px 15px 15px 15px; margin: 5px 0; background: var(--bg_panel); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -2647,13 +2661,20 @@
     /* ── LAYOUT PICKER: category tabs + 2-col grid ──────────────────────────── */
     #layout-cat-tabs { display:flex; gap:4px; margin-top:6px; margin-bottom:4px; }
     .lsc-cat { flex:1; padding:5px 0; font-size:9px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; background:transparent; border:1px solid var(--border_solid); border-radius:4px; color:var(--text_dim); cursor:pointer; font-family:inherit; transition:all 0.15s; }
-    .lsc-cat:hover { border-color:var(--accent); color:var(--text_main); }
+    .lsc-cat:hover { border-color:var(--accent); background:transparent; color:var(--accent); }
     .lsc-cat.active { background:var(--accent); color:var(--bg); border-color:var(--accent); }
-    .lsc-group { display:contents; }
-    #layout-segmented-control { display:grid !important; grid-template-columns:1fr 1fr; border:none !important; border-radius:0 !important; overflow:visible !important; gap:5px; margin-top:0 !important; }
-    #layout-segmented-control .segmented-btn { border-right:none !important; border:1px solid var(--border_solid) !important; border-radius:6px !important; padding:10px 6px !important; font-size:10px !important; text-align:center; line-height:1.3; }
-    #layout-segmented-control .segmented-btn.active { background:var(--accent) !important; color:var(--bg) !important; border-color:var(--accent) !important; }
-    #layout-segmented-control .segmented-btn.lsc-full { grid-column:1 / -1 !important; }
+    .lsc-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+    .lsc-layout { display:flex; flex-direction:column; gap:3px; text-align:left; padding:9px 11px; background:var(--bg_panel); border:1px solid var(--border_solid); border-radius:8px; color:var(--text_sec); cursor:pointer; font-family:inherit; transition:border-color 0.15s, color 0.15s; }
+    .lsc-layout:hover { border-color:var(--accent); background:var(--bg_panel); color:var(--text_main); }
+    .lsc-layout:hover .lsc-name { color:var(--accent); }
+    .lsc-layout.active { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+    .lsc-name { font-size:12px; font-weight:800; letter-spacing:0.3px; }
+    .lsc-layout.active .lsc-name { color:var(--accent); }
+    .lsc-desc { font-size:9.5px; line-height:1.35; color:var(--text_dim); font-weight:400; letter-spacing:0; }
+    /* TTY skins: square + monospace the layout cards to match */
+    :is(body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .lsc-layout,
+    :is(body.layout-ranger,body.layout-bbs,body.layout-vi,body.layout-adventure,body.layout-mc,body.layout-nethack,body.layout-grub) #modal-tools .lsc-cat { border-radius:0 !important; font-family:var(--tty-font),'Fira Code','Courier New',monospace !important; }
+    #layout-segmented-control { display:block; margin-top:0; }
 
     /* ── GAMEPAGE: floating PLAY/INSTALL button ─────────────────────────────── */
     #btn-gamepage-play { position:fixed !important; bottom:28px; right:28px; font-size:18px !important; padding:14px 36px !important; border-radius:50px !important; box-shadow:0 8px 28px rgba(0,0,0,0.7) !important; letter-spacing:2px !important; z-index:50; }
@@ -3149,51 +3170,51 @@
                 <div class="row" style="margin-top: -10px; gap: 5px; flex-shrink: 0;">
                   <button id="btn-sgdb-cover" style="flex:1; background-color: var(--bg_menu); color: var(--accent); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">SGDB</button>
                   <button id="btn-local-cover" style="flex:1; background-color: var(--bg_menu); color: var(--text_sec); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">LOCAL</button>
-                  <button id="btn-delete-cover" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-delete-cover" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
 
                 <div id="ui-hero" style="width: 100%; aspect-ratio: 16/9; background: var(--bg_menu); border: 2px solid var(--border_solid); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text_dim); overflow: hidden; font-weight: bold; flex-shrink: 0;">Hero Art</div>
                 <div class="row" style="margin-top: -10px; gap: 5px; flex-shrink: 0;">
                   <button id="btn-sgdb-hero" style="flex:1; background-color: var(--bg_menu); color: var(--accent); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">SGDB</button>
                   <button id="btn-local-hero" style="flex:1; background-color: var(--bg_menu); color: var(--text_sec); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">LOCAL</button>
-                  <button id="btn-delete-hero" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-delete-hero" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
 
                 <div id="ui-logo" style="width: 100%; aspect-ratio: 21/9; background: var(--bg_menu); border: 2px solid var(--border_solid); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text_dim); overflow: hidden; font-weight: bold; flex-shrink: 0;">Logo</div>
                 <div class="row" style="margin-top: -10px; gap: 5px; flex-shrink: 0;">
                   <button id="btn-sgdb-logo" style="flex:1; background-color: var(--bg_menu); color: var(--accent); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">SGDB</button>
                   <button id="btn-local-logo" style="flex:1; background-color: var(--bg_menu); color: var(--text_sec); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">LOCAL</button>
-                  <button id="btn-delete-logo" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-delete-logo" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
 
                 <div id="ui-icon" style="width: 100%; aspect-ratio: 1/1; background: var(--bg_menu); border: 2px solid var(--border_solid); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text_dim); overflow: hidden; font-weight: bold; flex-shrink: 0;">Icon</div>
                 <div class="row" style="margin-top: -10px; gap: 5px; flex-shrink: 0;">
                   <button id="btn-sgdb-icon" style="flex:1; background-color: var(--bg_menu); color: var(--accent); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">SGDB</button>
                   <button id="btn-local-icon" style="flex:1; background-color: var(--bg_menu); color: var(--text_sec); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">LOCAL</button>
-                  <button id="btn-delete-icon" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-delete-icon" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
 
                 <div id="ui-screenshot" style="width: 100%; aspect-ratio: 16/9; background: var(--bg_menu); border: 2px solid var(--border_solid); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text_dim); overflow: hidden; font-weight: bold; flex-shrink: 0;">Screenshot</div>
                 <div class="row" style="margin-top: -10px; gap: 5px; flex-shrink: 0;">
                   <button id="btn-igdb-screenshots" style="flex:1; background-color: var(--bg_menu); color: var(--accent); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">IGDB</button>
                   <button id="btn-local-screenshot" style="flex:1; background-color: var(--bg_menu); color: var(--text_sec); border: 1px solid var(--border_solid); font-size: 11px; padding: 8px;">LOCAL</button>
-                  <button id="btn-delete-screenshot" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-delete-screenshot" style="background-color: #d32f2f; color: white; border: none; font-size: 11px; padding: 8px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
 
                 <div class="row" style="margin-top: 5px; gap: 5px; flex-shrink: 0; padding-bottom: 20px;">
-                  <button id="btn-watch-trailer" style="flex: 1; background-color: var(--accent); color: var(--bg); font-weight: 900; border: none; font-size: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">⬇ DOWNLOAD TRAILER</button>
-                  <button id="btn-delete-trailer" style="background-color: #d32f2f; color: white; border: none; font-size: 12px; padding: 10px; border-radius: 6px;">🗑️</button>
+                  <button id="btn-watch-trailer" style="flex: 1; background-color: var(--accent); color: var(--bg); font-weight: 900; border: none; font-size: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>DOWNLOAD TRAILER</button>
+                  <button id="btn-delete-trailer" style="background-color: #d32f2f; color: white; border: none; font-size: 12px; padding: 10px; border-radius: 6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
                 </div>
               </div>
 
               <fieldset style="display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; margin-bottom: 0;">
                 <legend style="display:flex; align-items:center; justify-content:space-between; width:calc(100% - 4px); margin:0 2px; background:transparent; padding:0; box-shadow:none;">
                   <span data-i18n="html.legend_metadata" style="font-weight:900; padding:4px 12px; color:var(--bg); background:var(--accent); border-radius:6px; font-size:11px; letter-spacing:2px; text-transform:uppercase; box-shadow:0 2px 5px rgba(0,0,0,0.3);">Metadata &amp; Launch</span>
-                  <button id="btn-fetch-text-meta" style="font-size:10px; font-weight:900; padding:4px 10px; border-radius:5px; border:1px solid var(--border_solid); background:var(--bg_menu); color:var(--text_dim); cursor:pointer; font-family:Raleway,sans-serif; letter-spacing:0.5px; white-space:nowrap; transition:color 0.15s, border-color 0.15s;" title="Scrape text metadata only — preserves existing artwork">🔍 SCRAPE TEXT</button>
+                  <button id="btn-fetch-text-meta" style="font-size:10px; font-weight:900; padding:4px 10px; border-radius:5px; border:1px solid var(--border_solid); background:var(--bg_menu); color:var(--text_dim); cursor:pointer; font-family:Raleway,sans-serif; letter-spacing:0.5px; white-space:nowrap; transition:color 0.15s, border-color 0.15s;" title="Scrape text metadata only — preserves existing artwork">SCRAPE TEXT</button>
                 </legend>
                 <div class="row" style="margin-top: 5px; margin-bottom: 5px; padding-bottom: 12px; border-bottom: 1px solid var(--border_solid); flex-shrink: 0;">
-                  <label style="color: var(--accent); font-weight: bold; cursor: pointer;"><input type="checkbox" id="edit-fav"> <span data-i18n="html.chk_fav">★ Favorite</span></label>
-                  <label style="margin-left: 20px; color: var(--text_main); font-weight: bold; cursor: pointer;"><input type="checkbox" id="edit-want"> <span data-i18n="html.chk_want">⚑ Want to Play</span></label>
+                  <label style="color: var(--accent); font-weight: bold; cursor: pointer;"><input type="checkbox" id="edit-fav"> <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-2px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span data-i18n="html.chk_fav">Favorite</span></label>
+                  <label style="margin-left: 20px; color: var(--text_main); font-weight: bold; cursor: pointer;"><input type="checkbox" id="edit-want"> <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-2px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg><span data-i18n="html.chk_want">Want to Play</span></label>
                 </div>
                 <div class="row" style="flex-shrink: 0;">
                     <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_title">Game Title:</span> <input type="text" id="edit-name" style="margin-top: 5px;"></label>
@@ -3219,13 +3240,13 @@
                 <div class="row" style="flex-shrink: 0;">
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_steam_id">Steam App ID:</span> <input type="text" id="edit-appid" style="margin-top: 5px;"></label>
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_proton">ProtonDB Tier:</span>
-                    <div style="display: flex; gap: 5px; margin-top: 5px;"><input type="text" id="edit-proton"><button id="btn-fetch-proton" style="padding: 10px; min-width: 40px; margin: 0;">🔍</button></div>
+                    <div style="display: flex; gap: 5px; margin-top: 5px;"><input type="text" id="edit-proton"><button id="btn-fetch-proton" style="padding: 10px; min-width: 40px; margin: 0;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></div>
                   </label>
                 </div>
                 <div class="row" style="flex-shrink: 0;">
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_metacritic">Metacritic Score:</span> <input type="text" id="edit-meta" style="margin-top: 5px;"></label>
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_hltb">HLTB (Hours):</span>
-                    <div style="display: flex; gap: 5px; margin-top: 5px;"><input type="text" id="edit-hltb"><button id="btn-fetch-hltb" style="padding: 10px; min-width: 40px; margin: 0;">🔍</button></div>
+                    <div style="display: flex; gap: 5px; margin-top: 5px;"><input type="text" id="edit-hltb"><button id="btn-fetch-hltb" style="padding: 10px; min-width: 40px; margin: 0;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></div>
                   </label>
                 </div>
                 <div class="row" style="flex-shrink: 0;">
@@ -3246,10 +3267,10 @@
             </div>
 
             <div class="row" style="margin-top: auto; padding-top: 10px; flex-shrink: 0;">
-              <button id="btn-auto-fetch" style="flex: 1; background-color: var(--bg_menu); color: var(--accent); padding: 12px; font-weight: bold; border-color: var(--accent);" data-i18n="html.btn_auto_fetch">✨ AUTO-FETCH</button>
-              <button id="btn-clear-meta" style="flex: 1; background-color: var(--bg_menu); color: #f57c00; padding: 12px; border-color: #f57c00; font-weight: bold;" data-i18n="html.btn_clear_meta">🧹 CLEAR META</button>
-              <button id="btn-save-game" class="primary" style="flex: 1; padding: 12px; font-size: 14px;" data-i18n="html.btn_save">💾 SAVE & RETURN</button>
-              <button id="btn-delete-game" style="flex: 1; background-color: #d32f2f; color: white; padding: 12px; border: none; border-radius: 4px; font-weight: bold;" data-i18n="html.btn_delete">🗑️ DELETE GAME</button>
+              <button id="btn-auto-fetch" style="flex: 1; background-color: var(--bg_menu); color: var(--accent); padding: 12px; font-weight: bold; border-color: var(--accent);" data-i18n="html.btn_auto_fetch">AUTO-FETCH</button>
+              <button id="btn-clear-meta" style="flex: 1; background-color: var(--bg_menu); color: #f57c00; padding: 12px; border-color: #f57c00; font-weight: bold;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span data-i18n="html.btn_clear_meta">CLEAR META</span></button>
+              <button id="btn-save-game" class="primary" style="flex: 1; padding: 12px; font-size: 14px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span data-i18n="html.btn_save">SAVE & RETURN</span></button>
+              <button id="btn-delete-game" style="flex: 1; background-color: #d32f2f; color: white; padding: 12px; border: none; border-radius: 4px; font-weight: bold;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg><span data-i18n="html.btn_delete">DELETE GAME</span></button>
             </div>
           </div>
         </div>
@@ -4820,7 +4841,7 @@ LOADING...READY.</div>
       <button id="btn-fdo-back" class="fl-btn fl-btn-ghost">← BACK</button>
       <span id="fdo-store-tag"></span>
       <div id="fdo-spacer"></div>
-      <button id="btn-fdo-fav" class="fl-btn fl-btn-ghost">★ FAV</button>
+      <button id="btn-fdo-fav" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>FAV</button>
       <button id="btn-fdo-want" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>WANT</button>
       <button id="btn-fdo-playlist" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="22" y1="6" x2="16" y2="6"/></svg>PLAYLIST</button>
       <button id="btn-fdo-trailer" class="fl-btn fl-btn-ghost">▶ TRAILER</button>
@@ -5234,39 +5255,38 @@ LOADING...READY.</div>
             <button class="lsc-cat" data-cat="tty">TTY</button>
             <button class="lsc-cat" data-cat="ancient">Ancient OS</button>
           </div>
-          <div class="segmented-control" id="layout-segmented-control">
+          <div id="layout-segmented-control">
             <div class="lsc-group" data-cat="classic" style="display:none">
-              <button class="segmented-btn" data-val="rail">Minimal Sidebar</button>
-              <button class="segmented-btn" data-val="sidebar">Classic Sidebar</button>
-              <button class="segmented-btn" data-val="topnav">Top Nav</button>
-              <button class="segmented-btn" data-val="split">Split Pane</button>
-              <button class="segmented-btn lsc-full" data-val="commander">Commander</button>
+              <button class="lsc-layout" data-val="rail"><span class="lsc-name">Minimal Sidebar</span><span class="lsc-desc">A slim icon rail — out of the way, always in reach.</span></button>
+              <button class="lsc-layout" data-val="sidebar"><span class="lsc-name">Classic Sidebar</span><span class="lsc-desc">The full menu down the side. Everything one click away.</span></button>
+              <button class="lsc-layout" data-val="topnav"><span class="lsc-name">Top Nav</span><span class="lsc-desc">Menus up top, library front and centre.</span></button>
+              <button class="lsc-layout" data-val="split"><span class="lsc-name">Split Pane</span><span class="lsc-desc">List on the left, details on the right. Power-user heaven.</span></button>
+              <button class="lsc-layout" data-val="commander"><span class="lsc-name">Commander</span><span class="lsc-desc">For the true Linux nerd — one command prompt, up and centre. Believe it or not, it opens your TTY Linux apps too (try btop or fastfetch). Small taskbar on the right.</span></button>
             </div>
             <div class="lsc-group" data-cat="flat" style="display:none">
-              <button class="segmented-btn" data-val="catalog">Catalog</button>
-              <button class="segmented-btn" data-val="newspaper">Newspaper</button>
-              <button class="segmented-btn" data-val="timeline">Timeline</button>
-              <button class="segmented-btn" data-val="kanban">Kanban</button>
+              <button class="lsc-layout" data-val="catalog"><span class="lsc-name">Catalog</span><span class="lsc-desc">A clean grid of covers. Window-shopping mode.</span></button>
+              <button class="lsc-layout" data-val="newspaper"><span class="lsc-name">Newspaper</span><span class="lsc-desc">Your backlog as the morning edition. Extra! Extra!</span></button>
+              <button class="lsc-layout" data-val="timeline"><span class="lsc-name">Timeline</span><span class="lsc-desc">Games by release date — scroll through history.</span></button>
+              <button class="lsc-layout" data-val="kanban"><span class="lsc-name">Kanban</span><span class="lsc-desc">Drag your backlog around like a to-do board.</span></button>
             </div>
             <div class="lsc-group" data-cat="tty" style="display:none">
-              <button class="segmented-btn" data-val="htop">HTOP</button>
-              <button class="segmented-btn" data-val="ranger">Ranger</button>
-              <button class="segmented-btn" data-val="bbs">BBS</button>
-              <button class="segmented-btn" data-val="vi">Vi Buffer</button>
-              <button class="segmented-btn lsc-full" data-val="adventure">Adventure</button>
-              <button class="segmented-btn" data-val="mc">Midnight Cmdr</button>
-              <button class="segmented-btn" data-val="nethack">NetHack</button>
-              <button class="segmented-btn lsc-full" data-val="grub">GRUB</button>
+              <button class="lsc-layout" data-val="ranger"><span class="lsc-name">Ranger</span><span class="lsc-desc">Three-column terminal browsing, vim-style.</span></button>
+              <button class="lsc-layout" data-val="bbs"><span class="lsc-name">BBS</span><span class="lsc-desc">Dial-up nostalgia — ANSI art and all.</span></button>
+              <button class="lsc-layout" data-val="vi"><span class="lsc-name">Vi Buffer</span><span class="lsc-desc">Browse in normal mode. :q to rage-quit.</span></button>
+              <button class="lsc-layout" data-val="adventure"><span class="lsc-name">Adventure</span><span class="lsc-desc">A text-adventure prompt. &gt; GO NORTH.</span></button>
+              <button class="lsc-layout" data-val="mc"><span class="lsc-name">Midnight Cmdr</span><span class="lsc-desc">Blue-panel commander, F-keys at the ready.</span></button>
+              <button class="lsc-layout" data-val="nethack"><span class="lsc-name">NetHack</span><span class="lsc-desc">Your library as a dungeon. Mind the @.</span></button>
+              <button class="lsc-layout" data-val="grub"><span class="lsc-name">GRUB</span><span class="lsc-desc">Boot-menu chic. Pick a game, hit Enter.</span></button>
             </div>
             <div class="lsc-group" data-cat="ancient" style="display:none">
-              <button class="segmented-btn lsc-full" data-val="mac">Mac OS 1.0</button>
-              <button class="segmented-btn lsc-full" data-val="xp">Windows XP</button>
-              <button class="segmented-btn lsc-full" data-val="kde">Mandrake Linux 9</button>
-              <button class="segmented-btn lsc-full" data-val="c64">Commodore 64</button>
-              <button class="segmented-btn lsc-full" data-val="amiga">Amiga Workbench</button>
-              <button class="segmented-btn lsc-full" data-val="beos">BeOS / Tracker</button>
-              <button class="segmented-btn lsc-full" data-val="w95">Windows 95</button>
-              <button class="segmented-btn lsc-full" data-val="nextstep">NeXTSTEP</button>
+              <button class="lsc-layout" data-val="mac"><span class="lsc-name">Mac OS 1.0</span><span class="lsc-desc">1984 called. Chunky pixels, Chicago font.</span></button>
+              <button class="lsc-layout" data-val="xp"><span class="lsc-name">Windows XP</span><span class="lsc-desc">Luna blue forever. Bliss wallpaper not included.</span></button>
+              <button class="lsc-layout" data-val="kde"><span class="lsc-name">Mandrake Linux 9</span><span class="lsc-desc">My first Linux. Early-2000s KDE. Konqueror lives.</span></button>
+              <button class="lsc-layout" data-val="c64"><span class="lsc-name">Commodore 64</span><span class="lsc-desc">READY. 8-bit blue, breadbin vibes.</span></button>
+              <button class="lsc-layout" data-val="amiga"><span class="lsc-name">Amiga Workbench</span><span class="lsc-desc">Workbench windows. Guru Meditation optional.</span></button>
+              <button class="lsc-layout" data-val="beos"><span class="lsc-name">BeOS / Tracker</span><span class="lsc-desc">The OS that was ahead of its time.</span></button>
+              <button class="lsc-layout" data-val="w95"><span class="lsc-name">Windows 95</span><span class="lsc-desc">Start me up. Clippy sold separately.</span></button>
+              <button class="lsc-layout" data-val="nextstep"><span class="lsc-name">NeXTSTEP</span><span class="lsc-desc">Where the web was born. Brushed-metal cool.</span></button>
             </div>
           </div>
         </div>
