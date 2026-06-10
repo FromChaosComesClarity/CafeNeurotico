@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "STATIC", browseMode: "LIST", gamepageStyle: "CLASSIC" };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC" };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -51,7 +51,7 @@ let ggpSsBannerInterval = null;
 let ggpTrailerAvailable = false;
 // ── SETUP SCREEN STATE ────────────────────────────────────────────────────
 let setupPhase = 1;        // 1 = start screen, 2 = browse mode
-let setupStartIndex = 0;   // 0=STATIC 1=CAROUSEL 2=GRID
+let setupStartIndex = 0;   // 0=CAROUSEL 1=GRID
 let setupBrowseIndex = 0;  // 0=LIST 1=GALLERY
 // ───────────────────────────────────────────────────────────────────────────
 function tCat(name) { const k = CAT_KEYS[name]; return k ? t(k) : name; }
@@ -80,12 +80,6 @@ let numRecentInList = 0;
 
 let trailerTimeout = null, screenshotInterval = null, bgmFadeInterval = null;
 let screenshotArray = [], currentScreenshotIndex = 0;
-let ssKbIndex = 0;
-const SS_KB = ['ssKB1','ssKB2','ssKB3','ssKB4'];
-function applySsKenBurns(el) {
-    el.style.animation = 'none'; void el.offsetWidth;
-    el.style.animation = `${SS_KB[ssKbIndex++ % 4]} 4.5s ease-in-out forwards`;
-}
 let gameHasTrailer = false, mediaSwapped = false;
 let activeThemeCategory = ""; let activeTheme = "CREMA (DEFAULT)";
 
@@ -108,7 +102,22 @@ let activeScrapeMode = ''; let scrapeSource = 'STEAM';
 let steamSearchResults = []; let selectedAppId = null; let selectedResolvedName = null;
 let igdbSearchResults = []; let selectedIgdbId = null;
 
-const categories = ["ALL GAMES", "INSTALLED", "STEAM", "GOG", "EPIC", "FLATPAK", "ITCH", "PICO-8", "OTHERS", "PHYSICAL", "EMULATION", "APPS", "WANT TO PLAY", "FAVS"];
+// `categories` is the live, navigable filter list. The base entries are fixed;
+// game playlists + a "RECENTLY IMPORTED" auto-category are appended at runtime by
+// rebuildCategories(). It's mutated IN PLACE (never reassigned) so the many
+// closures that captured this reference keep seeing updates.
+const categories = ["ALL GAMES", "INSTALLED", "STEAM", "GOG", "EPIC", "FLATPAK", "ITCH", "PICO-8", "OTHERS", "PHYSICAL", "EMULATION", "APPS", "WANT TO PLAY", "FAVS", "BACKLOG", "PLAYED"];
+const BASE_CATEGORIES = [...categories];
+const RECENTLY_IMPORTED_CAT = "RECENTLY IMPORTED";
+const RECENTLY_IMPORTED_LIMIT = 50;
+// Playlist category labels are prefixed so they can never collide with a base
+// category name (e.g. a playlist literally named "STEAM") or the Recently-Imported
+// entry, and so users can tell playlists apart from stores at a glance.
+const PLAYLIST_CAT_PREFIX = "≡ ";
+let gamePlaylists = [];          // [{id, name}] from the shared games.db
+let playlistMembers = {};        // playlistId -> Set(gameId)
+let playlistCatMap = {};         // category-label -> playlistId
+let recentlyImportedIds = new Set();
 
 const THEMES = {
   "DARK GRAY": {bg: "#141414", bg_panel: "rgba(0,0,0,0.5)", bg_menu: "#222222", accent: "#ffffff", accent_menu: "#00e5ff", text_main: "#ffffff", text_sec: "#bbbbbb", text_dim: "#777777", border: "rgba(255,255,255,0.1)", border_solid: "#555555"},
@@ -185,6 +194,28 @@ function setBlur(enable) { document.querySelectorAll('.blur-target').forEach(el 
 function isVideoActive() { const vid = document.getElementById('video-player'); return vid && !vid.paused && vid.src && vid.src.includes('file://'); }
 function applyTheme(themeName) { activeTheme = THEMES[themeName] ? themeName : "CREMA (DEFAULT)"; const t = THEMES[activeTheme]; const root = document.documentElement; Object.keys(t).forEach(key => root.style.setProperty(`--${key}`, t[key])); }
 
+// ── THEME INHERITANCE (follow The Manager) ─────────────────────────────────────
+// The Manager stores its chosen theme in the shared games.db under the setting key
+// 'cngm_theme'. When audioCfg.themeSource === 'MANAGER' (the default), CREMA mirrors
+// it; picking a theme by hand switches to 'CUSTOM'. Most theme names are identical
+// across both faces; the only special cases are The Manager's "CREMA" (== CREMA's
+// "CREMA (DEFAULT)") and the ~8 light themes CREMA doesn't ship (→ graceful fallback).
+const FOLLOW_MANAGER_LABEL = 'FOLLOW THE MANAGER';
+function mapManagerThemeToCrema(name) {
+  if (!name) return null;
+  if (name === 'CREMA') return 'CREMA (DEFAULT)';
+  return THEMES[name] ? name : null;
+}
+async function resolveAndApplyTheme() {
+  if ((audioCfg.themeSource || 'MANAGER') === 'MANAGER') {
+    try {
+      const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme'));
+      if (mapped) { applyTheme(mapped); return; }
+    } catch (e) {}
+  }
+  applyTheme(audioCfg.theme && THEMES[audioCfg.theme] ? audioCfg.theme : 'CREMA (DEFAULT)');
+}
+
 // App Assets Helper
 function convertSafePath(rawPath) {
   if (!rawPath) return "";
@@ -201,7 +232,62 @@ function convertSafePath(rawPath) {
 let usingKeyboard = false;
 function getBtn(icon) { const iconPath = convertSafePath('assets/gamepad_icons/' + icon + '.png'); return `<span class="gp-btn-masked" style="-webkit-mask-image: url('${iconPath}');"></span>`; }
 function getKey(label) { return `<span class="kb-key">${label}</span>`; }
-function logoPath(name) { const safe = name.toLowerCase().replace(/ /g, '_'); const file = safe === 'pico-8' ? 'pico8' : safe; return convertSafePath(`assets/logos/${file}.png`); }
+const KNOWN_LOGOS = new Set(['all_games','amazon','apps','emulation','epic','favs','flatpak','gog','installed','itch','others','physical','pico8','playable','steam','want_to_play']);
+function logoPath(name) { let safe = String(name).toLowerCase().replace(/ /g, '_'); if (safe === 'pico-8') safe = 'pico8'; const file = KNOWN_LOGOS.has(safe) ? safe : 'playable'; return convertSafePath(`assets/logos/${file}.png`); }
+
+// ── GAME PLAYLISTS ────────────────────────────────────────────────────────────
+// A playlist (and the "RECENTLY IMPORTED" auto-collection) is exposed as a regular
+// browse category, so all the existing list/carousel/grid/gallery/hero machinery
+// works unchanged. These helpers tell that machinery how to match a game.
+function isPlaylistCat(catName) { return catName === RECENTLY_IMPORTED_CAT || Object.prototype.hasOwnProperty.call(playlistCatMap, catName); }
+function playlistCatMatch(g, catName) {
+  if (catName === RECENTLY_IMPORTED_CAT) return recentlyImportedIds.has(g.id);
+  const id = playlistCatMap[catName];
+  return id != null && playlistMembers[id] ? playlistMembers[id].has(g.id) : false;
+}
+function computeRecentlyImported() {
+  recentlyImportedIds = new Set(
+    allGames
+      .filter(g => g.date_added && g.date_added > 0)
+      .sort((a, b) => b.date_added - a.date_added)
+      .slice(0, RECENTLY_IMPORTED_LIMIT)
+      .map(g => g.id)
+  );
+}
+// Rebuild the live `categories` array in place: base entries, then Recently
+// Imported (only if there's anything in it), then one entry per game playlist.
+function rebuildCategories() {
+  const labels = [...BASE_CATEGORIES];
+  if (recentlyImportedIds.size > 0) labels.push(RECENTLY_IMPORTED_CAT);
+  for (const pl of gamePlaylists) labels.push(PLAYLIST_CAT_PREFIX + pl.name);
+  categories.length = 0;
+  categories.push(...labels);
+  if (currentCategoryIndex >= categories.length) currentCategoryIndex = 0;
+  if (galleryCatIndex >= categories.length) galleryCatIndex = 0;
+}
+// Load playlists + their membership sets from the shared DB, then rebuild nav.
+async function loadGamePlaylists() {
+  try {
+    gamePlaylists = (await window.api.getGamePlaylists()) || [];
+    playlistMembers = {};
+    playlistCatMap = {};
+    for (const pl of gamePlaylists) {
+      const rows = (await window.api.getPlaylistGames(pl.id)) || [];
+      playlistMembers[pl.id] = new Set(rows.map(r => r.id));
+      playlistCatMap[PLAYLIST_CAT_PREFIX + pl.name] = pl.id;
+    }
+  } catch (e) { gamePlaylists = []; playlistMembers = {}; playlistCatMap = {}; }
+  computeRecentlyImported();
+  rebuildCategories();
+}
+
+// ── KANBAN STATUS (shared `kb_played`, same semantics as The Manager board) ────
+// The Manager buckets each game into exactly one column by priority
+// Played > Want > Playing > Backlog. As couch FILTERS we surface two of them:
+//   PLAYED  = manually marked done (kb_played = 1)
+//   BACKLOG = not played, not currently playing, not flagged Want (the "to-do" pile)
+function isPlayed(g)  { return g.kb_played == 1; }
+function isBacklog(g) { return !(g.kb_played == 1) && !(g.LastPlayed && g.LastPlayed > 0) && g.WANT_TO_PLAY !== 'YES'; }
 
 // ── FLATPAK SCAN + ART GENERATION ────────────────────────────────────────
 
@@ -342,7 +428,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.startScreenMode = rawCfg.startScreenMode || 'STATIC'; audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -431,7 +517,6 @@ function setDebug(msg, show = true) { const dbg = document.getElementById('media
 function setupOptions() {
   return {
     start: [
-      { id: 'STATIC',   img: 'assets/setup/start_static.png',   name: t('start_screen.list'),     desc: 'Navigate your library in a clean, vertical list.' },
       { id: 'CAROUSEL', img: 'assets/setup/start_carousel.png', name: t('start_screen.carousel'), desc: 'Bold, immersive, built for a couch and a controller.' },
       { id: 'GRID',     img: 'assets/setup/start_grid.png',     name: t('start_screen.grid'),     desc: 'Your cover art in a mosaic grid. Your entire collection at a glance.' },
     ],
@@ -501,7 +586,7 @@ function renderSetupScreen() {
 
 function handleSetupInput(action) {
   const isPhase1 = setupPhase === 1;
-  const maxIdx = isPhase1 ? 2 : 1;
+  const maxIdx = 1;  // start: CAROUSEL/GRID (0-1); browse: LIST/GALLERY (0-1)
   if (action === 'LEFT') {
     if (isPhase1) setupStartIndex = Math.max(0, setupStartIndex - 1);
     else setupBrowseIndex = Math.max(0, setupBrowseIndex - 1);
@@ -520,7 +605,7 @@ function handleSetupInput(action) {
 
 async function completeSetup() {
   playSound(sfxSelect);
-  const startModes = ['STATIC', 'CAROUSEL', 'GRID'];
+  const startModes = ['CAROUSEL', 'GRID'];
   const browseModes = ['LIST', 'GALLERY'];
   audioCfg.startScreenMode = startModes[setupStartIndex];
   audioCfg.browseMode = browseModes[setupBrowseIndex];
@@ -535,10 +620,11 @@ async function boot() {
   currentLang = await window.api.getSetting('language') || 'en';
   strings = await window.api.getStrings(currentLang);
   applyI18nToDOM();
-  updateAppScale(); await initAudio(); applyTheme(activeTheme); renderHardwareIcons();
+  updateAppScale(); await initAudio(); await resolveAndApplyTheme(); renderHardwareIcons();
   const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
   await window.api.syncGrinderInstalled().catch(() => {});
   const res = await window.api.getGames(); allGames = (res.games || []).filter(g => g.Game && String(g.Game).trim() !== "");
+  await loadGamePlaylists();
   for (let g of allGames) { if (g.Screenshot && String(g.Screenshot).trim() !== "") { let paths = String(g.Screenshot).split('|').filter(s => s.trim() !== ""); paths.forEach(p => availableScreenshots.push({ path: p, game: g })); } }
   let prog = 0; const bar = document.getElementById('splash-bar'); const txt = document.getElementById('splash-text');
   const l = setInterval(() => { prog += 2; bar.style.width = `${prog}%`; if (prog === 30) txt.innerText = t('status.grinding'); if (prog === 60) txt.innerText = t('status.brewing'); if (prog >= 100) { clearInterval(l); document.querySelector('.splash-logo').classList.add('boot-anim'); setTimeout(async () => { hasBooted = true; const setupDone = await window.api.getSetting('setup_complete'); if (!setupDone) { applyBgmMode(); showSetupScreen(); } else { transitionToStart(); applyBgmMode(); resetIdleTimer(); } }, 800); } }, 30);
@@ -754,7 +840,7 @@ function handleInput(action) {
   if (gameState === 'SPLASH' || gameState === 'PROGRESS') return;
 
   if (gameState === 'START') {
-    const _mode = audioCfg.startScreenMode || 'STATIC'; if (_mode === 'CAROUSEL') { if (action === 'LEFT' || action === 'UP') { playSound(sfxNav); navigateCarousel('left'); } else if (action === 'RIGHT' || action === 'DOWN') { playSound(sfxNav); navigateCarousel('right'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else if (_mode === 'GRID') { if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') { playSound(sfxNav); navigateGrid(action); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else { if (action === 'DOWN') { playSound(sfxNav); navigateList('down'); } else if (action === 'UP') { playSound(sfxNav); navigateList('up'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'BACK') { /* Disabled */ } else if (action === 'START') openOverlay("MAIN_MENU"); }
+    const _mode = audioCfg.startScreenMode; if (_mode === 'GRID') { if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') { playSound(sfxNav); navigateGrid(action); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else { if (action === 'LEFT' || action === 'UP') { playSound(sfxNav); navigateCarousel('left'); } else if (action === 'RIGHT' || action === 'DOWN') { playSound(sfxNav); navigateCarousel('right'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); }
   }
   else if (gameState === 'MAIN') {
     if (filteredGames.length === 0 && action !== 'BACK' && action !== 'LEFT' && action !== 'RIGHT' && action !== 'START' && action !== 'Y_BUTTON') return;
@@ -855,10 +941,10 @@ function handleInput(action) {
     else if ((action === 'R2' || action === 'R3') && Object.keys(_cAchStores).length > 1) { playSound(sfxNav); cAchSwitchStore(1); }
   }
   else if (gameState === 'JUKEBOX' || gameState === 'JUKEBOX_OVERLAY') { handleJukeboxInput(action); }
-  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU'].includes(gameState)) {
+  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
     else if (action === 'BACK') {
-      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU");
+      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') openOverlay("GAME_MENU");
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAME_SCRAPE_MENU' || gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
@@ -918,6 +1004,7 @@ function handleOSKInput(action) {
     else if (oskMode === 'LAUNCH_CMD' || oskMode === 'RENAME_GAME') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openOverlay('GAME_MENU'); }
     else if (oskMode === 'SGDB_API' || oskMode === 'REFINE_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
     else if (oskMode === 'NEW_PLAYLIST' || oskMode === 'NEW_PLAYLIST_ADD' || oskMode === 'JB_SEARCH' || oskMode === 'RENAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); gameState = 'JUKEBOX'; }
+    else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); renderPlaylistAssignMenu(); }
     else if (oskMode === 'GALLERY_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; }
     else if (oskMode === 'INSTALL_DIR') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); showGrinderConfirm(_grinderConfirmGame); }
   }
@@ -945,6 +1032,19 @@ function handleOSKInput(action) {
       else if (oskMode === 'INSTALL_DIR') { _grinderInstallDir = targetStr || _grinderInstallDir; document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('gc-dir').textContent = _grinderInstallDir; showGrinderConfirm(_grinderConfirmGame); return; }
       else if (oskMode === 'SGDB_API') { window.api.setSetting('steamgriddb_api', targetStr).then(() => { document.getElementById('osk-backdrop').classList.add('hidden'); openSgdbOverlay(targetStr, selectedResolvedName, selectedAppId); }); return; }
       else if (oskMode === 'REFINE_SEARCH') { document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('overlay-backdrop').classList.remove('hidden'); triggerSteamSearch(targetStr); return; }
+      else if (oskMode === 'NEW_GAME_PLAYLIST') {
+        document.getElementById('osk-backdrop').classList.add('hidden');
+        const nm = String(targetStr).trim();
+        const gid = _plAssignGame ? _plAssignGame.id : null;
+        if (nm) {
+          window.api.addPlaylist(nm).then(newId => {
+            const after = () => loadGamePlaylists().then(() => renderPlaylistAssignMenu());
+            if (newId && gid != null) window.api.addGameToPlaylist(newId, gid).then(after);
+            else after();
+          });
+        } else { renderPlaylistAssignMenu(); }
+        return;
+      }
       else if (oskMode === 'NEW_PLAYLIST') {
         if (targetStr && !jbPlaylists[targetStr]) {
           jbPlaylists[targetStr] = [];
@@ -999,7 +1099,7 @@ function applyLiveFilters(preserveIndex = false) {
 
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
-    if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES';
+    if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
     if (!matchCat) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
@@ -1033,6 +1133,9 @@ function applyLiveFilters(preserveIndex = false) {
 async function refreshDatabase() {
   const res = await window.api.getGames();
   allGames = res.games || [];
+  await loadGamePlaylists();
+  // Stay in sync if The Manager changed its theme while CREMA is open (no reflow when unchanged).
+  if ((audioCfg.themeSource || 'MANAGER') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
 
   availableScreenshots = [];
   for (let g of allGames) {
@@ -1052,6 +1155,15 @@ async function refreshDatabase() {
       updateGalleryGamepageContent(galleryCurrentGame);
     }
   }
+  // `categories` is dynamic now (playlists / Recently Imported), so if a refresh
+  // changed the set while we're on the start screen, rebuild it — otherwise the
+  // carousel/list DOM desyncs from the category count.
+  if (gameState === 'START') refreshStartScreen();
+}
+function refreshStartScreen() {
+  if (currentCategoryIndex >= categories.length) currentCategoryIndex = 0;
+  if (audioCfg.startScreenMode === 'GRID') renderGridMode();
+  else renderCarouselMode();
 }
 
 let previousGameState = 'START'; let currentOverlayType = 'MAIN_MENU';
@@ -1106,7 +1218,7 @@ async function openOverlay(type) {
   if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
-    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const cmdStr = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? t('game_menu.edit_launch') : t('game_menu.add_launch'); const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
+    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdStr = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? t('game_menu.edit_launch') : t('game_menu.add_launch'); const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
     const storeL = (game.Store || '').toLowerCase();
     const isGrinderStore = ((storeL.includes('gog') || storeL.includes('epic')) && game.app_id) || !!game.GrinderGameId;
     const isInstalled = game.Installed == null || game.Installed == 1;
@@ -1116,7 +1228,7 @@ async function openOverlay(type) {
     if (gogId) { const r = await window.api.getGameAchievements(gogId); if (r.ok && r.achievements.length) hasAchievements = true; }
     if (!hasAchievements && steamRaw) { const r = await window.api.getGameAchievements(`steam_${steamRaw}`); if (r.ok && r.achievements.length) hasAchievements = true; }
     const achItems = hasAchievements ? ['§ACHIEVEMENTS', 'VIEW ACHIEVEMENTS'] : [];
-    renderGenericOverlay(t('menu.game_options'), [trStr, favStr, wantStr, cmdStr, t('game_menu.rename'), t('game_menu.scraping'), ...achItems, ...grinderItems, t('common.close_menu')]);
+    renderGenericOverlay(t('menu.game_options'), [trStr, favStr, wantStr, playedStr, 'ADD TO PLAYLIST', cmdStr, t('game_menu.rename'), t('game_menu.scraping'), ...achItems, ...grinderItems, t('common.close_menu')]);
   }
 }
 
@@ -1141,19 +1253,17 @@ function executeOverlayAction() {
   }
 
   if (gameState === 'START_SCREEN_MENU') {
-    const modeMap = { [t('start_screen.list')]: 'STATIC', [t('start_screen.carousel')]: 'CAROUSEL', [t('start_screen.grid')]: 'GRID' };
+    const modeMap = { [t('start_screen.carousel')]: 'CAROUSEL', [t('start_screen.grid')]: 'GRID' };
     const raw = String(action).replace('★ ', '');
     if (raw === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
     if (modeMap[raw]) {
       audioCfg.startScreenMode = modeMap[raw];
       window.api.saveAudioConfig(audioCfg);
       const m = modeMap[raw];
-      document.getElementById('start-static').style.display = m === 'STATIC' ? 'flex' : 'none';
       document.getElementById('start-carousel').style.display = m === 'CAROUSEL' ? 'flex' : 'none';
       document.getElementById('start-grid').style.display = m === 'GRID' ? 'flex' : 'none';
-      if (m === 'CAROUSEL') renderCarouselMode();
-      else if (m === 'GRID') renderGridMode();
-      else { buildListTrack(); }
+      if (m === 'GRID') renderGridMode();
+      else renderCarouselMode();
       openStartScreenMenu();
     }
     return;
@@ -1222,6 +1332,8 @@ function executeOverlayAction() {
     else if (action === t('menu.quit')) { currentOverlayType = 'CONFIRM_QUIT'; renderGenericOverlay(t('confirm.quit_title'), [t('confirm.yes_quit'), t('common.cancel')]); }
     else if (action === t('game_menu.add_fav') || action === t('game_menu.remove_fav')) { const val = action === t('game_menu.add_fav') ? "YES" : "NO"; filteredGames[currentGameIndex].FAV = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'FAV', value: val}); refreshDatabase(); closeOverlay(); }
     else if (action === t('game_menu.add_want') || action === t('game_menu.remove_want')) { const val = action === t('game_menu.add_want') ? "YES" : "NO"; filteredGames[currentGameIndex].WANT_TO_PLAY = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'WANT_TO_PLAY', value: val}); refreshDatabase(); closeOverlay(); }
+    else if (action === 'MARK AS PLAYED' || action === 'UNMARK PLAYED') { const val = action === 'MARK AS PLAYED' ? 1 : 0; filteredGames[currentGameIndex].kb_played = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'kb_played', value: val}); refreshDatabase(); closeOverlay(); }
+    else if (action === 'ADD TO PLAYLIST') { openPlaylistAssignMenu(); }
     else if (action === t('game_menu.add_launch') || action === t('game_menu.edit_launch')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('LAUNCH_CMD', t('osk.launch_command'), filteredGames[currentGameIndex].LaunchCommand || ""); }
     else if (action === t('game_menu.rename')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('RENAME_GAME', t('osk.rename_game'), filteredGames[currentGameIndex].Game); }
     else if (action === t('game_menu.scraping')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
@@ -1257,8 +1369,8 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
     else if (action === t('common.close_menu')) closeOverlay();
     else closeOverlay();
   }
-  else if (gameState === 'THEME_CATS') { if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); } else { openThemeMenu(action); } }
-  else if (gameState === 'THEMES') { if (action === t('common.back')) { openThemeCategoryMenu(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.theme = raw; window.api.saveAudioConfig(audioCfg); applyTheme(raw); openThemeCategoryMenu(); } }
+  else if (gameState === 'THEME_CATS') { if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); } else if (String(action).replace("★ ", "") === FOLLOW_MANAGER_LABEL) { audioCfg.themeSource = 'MANAGER'; window.api.saveAudioConfig(audioCfg); resolveAndApplyTheme().then(openThemeCategoryMenu); } else { openThemeMenu(action); } }
+  else if (gameState === 'THEMES') { if (action === t('common.back')) { openThemeCategoryMenu(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.theme = raw; audioCfg.themeSource = 'CUSTOM'; window.api.saveAudioConfig(audioCfg); applyTheme(raw); openThemeCategoryMenu(); } }
   else if (gameState === 'MUSIC_STYLE') { if (action === t('common.back')) { openSoundOverlay(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.bgm_mode = raw; window.api.saveAudioConfig(audioCfg); applyBgmMode(); openSoundOverlay(); } }
   else if (gameState === 'GAMEPAD_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); }
@@ -1306,6 +1418,41 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
       gameState = previousGameState;
     }
   }
+  else if (gameState === 'PLAYLIST_ASSIGN') {
+    if (action === t('common.back_to_game_options')) { openOverlay("GAME_MENU"); return; }
+    if (action === '+ NEW PLAYLIST') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', ''); return; }
+    // The first gamePlaylists.length items map 1:1 to gamePlaylists — toggle by index
+    // rather than parsing the (★-prefixed) label.
+    if (currentOverlayIndex < gamePlaylists.length && _plAssignGame) {
+      const pl = gamePlaylists[currentOverlayIndex];
+      const gid = _plAssignGame.id;
+      const set = playlistMembers[pl.id] || (playlistMembers[pl.id] = new Set());
+      if (set.has(gid)) { set.delete(gid); window.api.removeGameFromPlaylist(pl.id, gid); }
+      else { set.add(gid); window.api.addGameToPlaylist(pl.id, gid); }
+      rebuildCategories();
+      renderPlaylistAssignMenu();
+    }
+  }
+}
+
+// Per-game "add to playlist" menu: lists every playlist with a ★ when the current
+// game is a member; selecting one toggles membership. _plAssignGame is the game
+// the GAME_MENU was opened for (always filteredGames[currentGameIndex]).
+let _plAssignGame = null;
+async function openPlaylistAssignMenu() {
+  _plAssignGame = filteredGames[currentGameIndex];
+  await loadGamePlaylists();
+  renderPlaylistAssignMenu();
+}
+function renderPlaylistAssignMenu() {
+  gameState = 'PLAYLIST_ASSIGN';
+  document.getElementById('overlay-backdrop').classList.remove('hidden');
+  const gid = _plAssignGame ? _plAssignGame.id : null;
+  const items = gamePlaylists.map(pl => (playlistMembers[pl.id] && playlistMembers[pl.id].has(gid) ? '★ ' : '   ') + pl.name);
+  if (gamePlaylists.length) items.push('§MANAGE');
+  items.push('+ NEW PLAYLIST', t('common.back_to_game_options'));
+  const title = _plAssignGame ? _plAssignGame.Game : 'PLAYLISTS';
+  renderGenericOverlay(title, items, '★ = in playlist · ACCEPT toggles');
 }
 
 function openKeybindingsOverlay() {
@@ -1478,7 +1625,7 @@ function executeScreensaverMenuAction() {
   }
 }
 
-function openThemeCategoryMenu() { gameState = 'THEME_CATS'; let cats = Object.keys(THEME_CATEGORIES); cats.push(t('common.back_to_menu')); renderGenericOverlay("THEME CATEGORIES", cats); }
+function openThemeCategoryMenu() { gameState = 'THEME_CATS'; const follow = (audioCfg.themeSource === 'MANAGER' ? '★ ' : '') + FOLLOW_MANAGER_LABEL; let cats = [follow, '§BY CATEGORY', ...Object.keys(THEME_CATEGORIES)]; cats.push(t('common.back_to_menu')); renderGenericOverlay("THEME CATEGORIES", cats); }
 function openThemeMenu(category) { gameState = 'THEMES'; activeThemeCategory = category; let themes = THEME_CATEGORIES[category].map(th => th === activeTheme ? "★ " + th : th); themes.push(t('common.back')); renderGenericOverlay(category.toUpperCase(), themes); }
 function openGamepadMenu() {
   gameState = 'GAMEPAD_MENU';
@@ -1519,7 +1666,7 @@ function updateDownloadProgressBar(percentage) { const fillEl = document.getElem
 function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -1542,25 +1689,16 @@ function transitionToStart() {
   document.getElementById('gallery-screen').classList.add('hidden');
   document.getElementById('ggp-screen').classList.add('hidden');
   document.getElementById('start-screen').classList.remove('hidden');
-  const mode = audioCfg.startScreenMode || 'STATIC';
-  document.getElementById('start-static').style.display = mode === 'STATIC' ? 'flex' : 'none';
+  const mode = audioCfg.startScreenMode === 'GRID' ? 'GRID' : 'CAROUSEL';
   document.getElementById('start-carousel').style.display = mode === 'CAROUSEL' ? 'flex' : 'none';
   document.getElementById('start-grid').style.display = mode === 'GRID' ? 'flex' : 'none';
-  if (mode === 'STATIC') {
-    buildListTrack();
-  } else if (mode === 'CAROUSEL') {
-    renderCarouselMode();
-  } else if (mode === 'GRID') {
-    renderGridMode();
-  }
+  if (mode === 'GRID') renderGridMode();
+  else renderCarouselMode();
 }
 function updateCategorySelection() {
-  const mode = audioCfg.startScreenMode || 'STATIC';
-  if (mode === 'CAROUSEL') { updateCarouselClasses(); fillMosaicIn(categories[currentCategoryIndex], 'carousel-hero-icon', 'carousel-hero-mosaic'); return; }
-  if (mode === 'GRID') { updateGridSelection(); return; }
-  updateListClasses();
-  updateListTransform(true);
-  updateHeroMosaic(categories[currentCategoryIndex]);
+  if (audioCfg.startScreenMode === 'GRID') { updateGridSelection(); return; }
+  updateCarouselClasses();
+  fillMosaicIn(categories[currentCategoryIndex], 'carousel-hero-icon', 'carousel-hero-mosaic');
 }
 function transitionToMain() {
   if ((audioCfg.browseMode || 'LIST') === 'GALLERY') { transitionToGallery(); return; }
@@ -1576,66 +1714,6 @@ function transitionToMain() {
   searchQuery = ""; applyLiveFilters(false);
   maybeRunFlatpakScan(catName);
   maybeRunPico8Scan(catName);
-}
-
-// === LIST MENU (VERTICAL CAROUSEL) ===
-const LIST_PHANTOMS = 4;
-let listRawPos = LIST_PHANTOMS;
-let listAnimating = false;
-function buildListTrack() {
-  const catList = document.getElementById('cat-list'); if (!catList) return;
-  catList.innerHTML = '';
-  const track = document.createElement('div'); track.id = 'cat-track'; catList.appendChild(track);
-  const all = [...categories.slice(-LIST_PHANTOMS), ...categories, ...categories.slice(0, LIST_PHANTOMS)];
-  all.forEach(cat => {
-    const d = document.createElement('div'); d.className = 'cat-item';
-    const icon = logoPath(cat);
-    d.innerHTML = `<div class="cat-icon" style="-webkit-mask-image: url('${icon}');"></div><div>${tCat(cat)}</div>`;
-    track.appendChild(d);
-  });
-  listRawPos = currentCategoryIndex + LIST_PHANTOMS;
-  updateListTransform(false); updateListClasses();
-  updateHeroMosaic(categories[currentCategoryIndex]);
-}
-function updateListTransform(animated) {
-  const track = document.getElementById('cat-track'); const catList = document.getElementById('cat-list');
-  if (!track || !catList) return;
-  const item = track.querySelector('.cat-item');
-  const itemH = item ? item.offsetHeight : 64;
-  const slot = itemH + 15;
-  const centerY = catList.clientHeight / 2;
-  if (!animated) { track.style.transition = 'none'; void track.offsetWidth; }
-  track.style.transform = `translateY(${centerY - listRawPos * slot - itemH / 2}px)`;
-  if (!animated) { void track.offsetWidth; track.style.transition = ''; }
-}
-function updateListClasses() {
-  document.querySelectorAll('#cat-track .cat-item').forEach((item, i) => {
-    item.classList.remove('selected', 'far');
-    const dist = Math.abs(i - listRawPos);
-    if (i === listRawPos) item.classList.add('selected');
-    else if (dist >= 4) item.classList.add('far');
-  });
-}
-function navigateList(dir) {
-  if (listAnimating) return;
-  const N = categories.length;
-  if (dir === 'down') { currentCategoryIndex = (currentCategoryIndex + 1) % N; listRawPos++; }
-  else { currentCategoryIndex = (currentCategoryIndex - 1 + N) % N; listRawPos--; }
-  updateListTransform(true); updateListClasses();
-  updateHeroMosaic(categories[currentCategoryIndex]);
-  if (listRawPos < LIST_PHANTOMS || listRawPos >= LIST_PHANTOMS + N) {
-    listAnimating = true;
-    setTimeout(() => {
-      const track = document.getElementById('cat-track'); if (!track) { listAnimating = false; return; }
-      track.classList.add('no-anim');
-      void track.offsetWidth;
-      listRawPos = currentCategoryIndex + LIST_PHANTOMS;
-      updateListTransform(false); updateListClasses();
-      void track.offsetWidth;
-      track.classList.remove('no-anim');
-      listAnimating = false;
-    }, 320);
-  }
 }
 
 // === CAROUSEL MODE ===
@@ -1713,9 +1791,9 @@ function navigateGrid(action) {
 // === START SCREEN MENU ===
 function openStartScreenMenu() {
   gameState = 'START_SCREEN_MENU';
-  const current = audioCfg.startScreenMode || 'STATIC';
-  const opts = [t('start_screen.list'), t('start_screen.carousel'), t('start_screen.grid')].map(m => {
-    const key = m === t('start_screen.list') ? 'STATIC' : m === t('start_screen.carousel') ? 'CAROUSEL' : 'GRID';
+  const current = audioCfg.startScreenMode === 'GRID' ? 'GRID' : 'CAROUSEL';
+  const opts = [t('start_screen.carousel'), t('start_screen.grid')].map(m => {
+    const key = m === t('start_screen.carousel') ? 'CAROUSEL' : 'GRID';
     return key === current ? `★ ${m}` : m;
   });
   opts.push(t('common.back_to_menu'));
@@ -1867,7 +1945,7 @@ function updateGameSelection() {
 
       trailerTimeout = setTimeout(() => {
         let hasScreenshots = false;
-        if (hasScreenshotsTemp) { screenshotArray = String(game.Screenshot).split('|').filter(s => String(s).trim() !== ""); if (screenshotArray.length > 0) { hasScreenshots = true; currentScreenshotIndex = 0; const ss = document.getElementById('screenshot-player'); ss.src = convertSafePath(screenshotArray[0]); applySsKenBurns(ss); screenshotInterval = setInterval(() => { currentScreenshotIndex = (currentScreenshotIndex + 1) % screenshotArray.length; ss.src = convertSafePath(screenshotArray[currentScreenshotIndex]); applySsKenBurns(ss); }, 4000); } }
+        if (hasScreenshotsTemp) { screenshotArray = String(game.Screenshot).split('|').filter(s => String(s).trim() !== ""); if (screenshotArray.length > 0) { hasScreenshots = true; currentScreenshotIndex = 0; const ss = document.getElementById('screenshot-player'); ss.src = convertSafePath(screenshotArray[0]); screenshotInterval = setInterval(() => { currentScreenshotIndex = (currentScreenshotIndex + 1) % screenshotArray.length; ss.src = convertSafePath(screenshotArray[currentScreenshotIndex]); }, 4000); } }
         window.api.checkLocalTrailer(game.Game).then(localUrl => {
 
           // FIX: Guard against late promise resolution playing video in the background while game is launching
@@ -2418,6 +2496,7 @@ function getGalleryStoreLogo(store) {
 
 function matchCatForGallery(g, catName) {
   const store = g.Store ? String(g.Store).toLowerCase() : '';
+  if (isPlaylistCat(catName)) return playlistCatMatch(g, catName);
   if (catName === "ALL GAMES") return true;
   if (catName === "STEAM") return store.includes("steam");
   if (catName === "GOG") return store.includes("gog");
@@ -2432,6 +2511,8 @@ function matchCatForGallery(g, catName) {
   if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; }
   if (catName === "FAVS") return g.FAV === 'YES';
   if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES';
+  if (catName === "BACKLOG") return isBacklog(g);
+  if (catName === "PLAYED") return isPlayed(g);
   return true;
 }
 
@@ -2534,7 +2615,7 @@ function renderGalleryGrid() {
     const _gcellBadges = (game.Store ? String(game.Store).split(',') : []).map(s => s.trim()).filter(Boolean).map(s => { const l = getGalleryStoreLogo(s); return l ? `<div class="gcell-store-badge" style="-webkit-mask-image:url('${l}');"></div>` : ''; }).join('');
     const storeBadgeGroup = _gcellBadges ? `<div style="display:flex;gap:3px;flex-shrink:0;">${_gcellBadges}</div>` : '';
     const coverArea = imgSrc
-      ? `<div class="gcell-cover-area"><img src="${imgSrc}" alt=""></div>`
+      ? `<div class="gcell-cover-area"><img src="${imgSrc}" alt="" loading="lazy" decoding="async"></div>`
       : `<div class="gcell-cover-area"><div class="gcell-noart">${game.Game}</div></div>`;
     if (!actionBtn && isManualCategory(game)) {
       actionBtn = `<button class="gcell-play-btn gcell-install-btn">⬇ ${t('status.install')}</button>`;
@@ -2904,6 +2985,15 @@ function openGalleryGamepage(game) {
 function closeGalleryGamepage() {
   ggpSlideshowOpen = false;
   clearGalleryMedia();
+  // Re-render the grid so changes made on the gamepage (install→play, fav/want/played,
+  // playlist membership) are reflected immediately — keep the user on the same game.
+  const keepId = galleryCurrentGame ? galleryCurrentGame.id : null;
+  applyGalleryFilter();
+  if (keepId != null) {
+    const i = galleryGames.findIndex(g => g.id === keepId);
+    if (i >= 0) { galleryIndex = i; galleryCurrentGame = galleryGames[i]; currentGameIndex = i; }
+  }
+  renderGalleryGrid();
   document.getElementById('ggp-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.remove('hidden');
   gameState = 'GALLERY';
@@ -3269,12 +3359,6 @@ let _cfgpKbIdx   = 0;
 let _cfgpBtns    = [];
 let _cfgpBtnIdx  = 0;
 
-const _cfgpKbPans = [
-  { tx:'-2%', ty:'-1%' }, { tx:'2%',  ty:'1%'  },
-  { tx:'-1%', ty:'2%'  }, { tx:'1%',  ty:'-2%' },
-  { tx:'0%',  ty:'-2%' }, { tx:'-2%', ty:'0%'  },
-];
-
 function _cfgpStartKenBurns(slides) {
   clearInterval(_cfgpKbTimer);
   document.querySelectorAll('#cfgp-bg .kb-slide').forEach(s => s.remove());
@@ -3298,19 +3382,9 @@ function _cfgpStartKenBurns(slides) {
 
 function _cfgpActivateKbSlide(idx) {
   const slides = document.querySelectorAll('#cfgp-bg .kb-slide');
-  const pan = _cfgpKbPans[idx % _cfgpKbPans.length];
   slides.forEach((s, i) => {
-    if (i === idx) {
-      s.style.setProperty('--kb-tx', pan.tx);
-      s.style.setProperty('--kb-ty', pan.ty);
-      s.classList.remove('kb-anim');
-      void s.offsetWidth;
-      s.classList.add('kb-anim');
-      requestAnimationFrame(() => s.classList.add('kb-active'));
-    } else if (s.classList.contains('kb-active')) {
-      s.classList.remove('kb-active');
-      setTimeout(() => s.classList.remove('kb-anim'), 2000);
-    }
+    if (i === idx) requestAnimationFrame(() => s.classList.add('kb-active'));
+    else s.classList.remove('kb-active');
   });
 }
 
@@ -3635,5 +3709,22 @@ async function triggerGrinderUninstall(game) {
     if (!result.ok) { alert(result.error); return; }
     showGrinderProgress(true);
 }
+
+// ── GPU IDLE SUSPEND ──────────────────────────────────────────────────────────
+// Freeze all CSS animations + videos when CREMA is hidden or unfocused (e.g. while a
+// launched game is in the foreground, or when backgrounded) so the Ken Burns / screensaver
+// compositor stops burning GPU. The gamepad poll keeps running (it must, to detect the
+// wake combo while a game is focused); Chromium throttles it automatically when truly hidden.
+(function () {
+  let _suspended = null;
+  function setGpuSuspended(s) {
+    if (s === _suspended) return; _suspended = s;
+    if (document.body) document.body.classList.toggle('gpu-suspended', s);
+    if (s) { try { document.querySelectorAll('video').forEach(v => { if (!v.paused) v.pause(); }); } catch (e) {} }
+  }
+  document.addEventListener('visibilitychange', () => setGpuSuspended(document.hidden));
+  window.addEventListener('blur',  () => setGpuSuspended(true));
+  window.addEventListener('focus', () => setGpuSuspended(false));
+})();
 
 boot();

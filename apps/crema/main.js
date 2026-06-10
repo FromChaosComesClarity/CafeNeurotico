@@ -134,6 +134,21 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN Franchise TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN IGDBTrailer TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Installed INTEGER DEFAULT 1").run(); } catch(e) {}
+        // Game playlists + Recently-Imported support — schema MUST match The Manager
+        // (apps/manager/main.js) since both faces share this games.db. Whichever face
+        // opens first creates the tables; the other is a no-op.
+        try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
+        try {
+            db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_date_added
+                AFTER INSERT ON games
+                WHEN NEW.date_added IS NULL OR NEW.date_added = 0
+                BEGIN UPDATE games SET date_added = CAST(strftime('%s','now') AS INTEGER) WHERE id = NEW.id; END`).run();
+        } catch(e) {}
+        try {
+            db.prepare(`CREATE TABLE IF NOT EXISTS playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`).run();
+            db.prepare(`CREATE TABLE IF NOT EXISTS playlist_games (playlist_id INTEGER NOT NULL, game_id INTEGER NOT NULL, sort_order INTEGER DEFAULT 0, PRIMARY KEY (playlist_id, game_id), FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE, FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE)`).run();
+        } catch(e) {}
     } catch (err) {}
     ensureWallpapers();   // background download on first run (renderer re-fetches when ready)
     createWindow();
@@ -294,7 +309,7 @@ ipcMain.on('launch-game', (event, cmd) => {
 });
 
 ipcMain.on('quit-app', () => app.quit());
-const SAVE_DB_ALLOWED_FIELDS = new Set(['FAV', 'WANT_TO_PLAY', 'LaunchCommand', 'Game', 'CoverArt', 'Screenshot', 'DEV', 'PUB', 'RELEASED', 'GENRE', 'METACRITIC', 'Description', 'Description_i18n', 'ProtonTier', 'SteamAppID', 'HLTB_Main', 'Installed']);
+const SAVE_DB_ALLOWED_FIELDS = new Set(['FAV', 'WANT_TO_PLAY', 'LaunchCommand', 'Game', 'CoverArt', 'Screenshot', 'DEV', 'PUB', 'RELEASED', 'GENRE', 'METACRITIC', 'Description', 'Description_i18n', 'ProtonTier', 'SteamAppID', 'HLTB_Main', 'Installed', 'kb_played']);
 
 function getSteamLibraryPaths() {
     const home = os.homedir();
@@ -886,6 +901,45 @@ ipcMain.handle('get-music-library', async () => {
 
 ipcMain.handle('get-playlists', () => { try { if (fs.existsSync(playlistsPath)) return JSON.parse(fs.readFileSync(playlistsPath, 'utf8')); } catch(e){} return {}; });
 ipcMain.on('save-playlists', (e, pl) => { try { fs.writeFileSync(playlistsPath, JSON.stringify(pl)); } catch(err){} });
+
+// ── GAME PLAYLISTS (shared games.db, same tables as The Manager) ───────────────
+// NOTE: the channel above (get-playlists) belongs to the JUKEBOX's music playlists.
+// Game playlists are a different feature stored in games.db, so they use their own
+// channel names that mirror The Manager's handlers — except the list-all channel,
+// renamed to 'get-game-playlist-list' to avoid colliding with the jukebox one.
+ipcMain.handle('get-game-playlist-list', () => {
+    if (!db) return [];
+    try { return db.prepare('SELECT * FROM playlists ORDER BY name').all(); } catch(e) { return []; }
+});
+ipcMain.handle('get-playlist-games', (_, playlistId) => {
+    if (!db) return [];
+    try { return db.prepare('SELECT g.* FROM playlist_games pg JOIN games g ON g.id=pg.game_id WHERE pg.playlist_id=? ORDER BY pg.sort_order, g.Game').all(playlistId); } catch(e) { return []; }
+});
+ipcMain.handle('get-game-playlists', (_, gameId) => {
+    if (!db) return [];
+    try { return db.prepare('SELECT playlist_id FROM playlist_games WHERE game_id=?').all(gameId).map(r => r.playlist_id); } catch(e) { return []; }
+});
+ipcMain.handle('add-playlist', (_, name) => {
+    if (!db || !name || !String(name).trim()) return null;
+    try { return db.prepare('INSERT INTO playlists (name) VALUES (?)').run(String(name).trim()).lastInsertRowid; } catch(e) { return null; }
+});
+ipcMain.handle('delete-playlist', (_, id) => {
+    if (!db) return false;
+    try { db.prepare('DELETE FROM playlist_games WHERE playlist_id=?').run(id); db.prepare('DELETE FROM playlists WHERE id=?').run(id); return true; } catch(e) { return false; }
+});
+ipcMain.handle('add-game-to-playlist', (_, playlistId, gameId) => {
+    if (!db) return { ok: false };
+    try {
+        const max = db.prepare('SELECT MAX(sort_order) AS m FROM playlist_games WHERE playlist_id=?').get(playlistId);
+        const order = (max && max.m != null ? max.m : -1) + 1;
+        db.prepare('INSERT INTO playlist_games (playlist_id, game_id, sort_order) VALUES (?, ?, ?)').run(playlistId, gameId, order);
+        return { ok: true };
+    } catch { return { ok: false, error: 'Already in playlist' }; }
+});
+ipcMain.handle('remove-game-from-playlist', (_, playlistId, gameId) => {
+    if (!db) return false;
+    try { db.prepare('DELETE FROM playlist_games WHERE playlist_id=? AND game_id=?').run(playlistId, gameId); return true; } catch(e) { return false; }
+});
 
 // ── GRINDER headless install/uninstall ────────────────────────────────────────
 const grinderProgressFile = path.join(configDir, 'grinder-progress.json');

@@ -33,6 +33,15 @@ contextBridge.exposeInMainWorld('api', {
                                 getPlaylists: () => ipcRenderer.invoke('get-playlists'),
                                 savePlaylists: (pl) => ipcRenderer.send('save-playlists', pl),
 
+                                // --- GAME PLAYLISTS (shared games.db, see The Manager) ---
+                                getGamePlaylists: () => ipcRenderer.invoke('get-game-playlist-list'),
+                                getPlaylistGames: (id) => ipcRenderer.invoke('get-playlist-games', id),
+                                getPlaylistsForGame: (gameId) => ipcRenderer.invoke('get-game-playlists', gameId),
+                                addPlaylist: (name) => ipcRenderer.invoke('add-playlist', name),
+                                deletePlaylist: (id) => ipcRenderer.invoke('delete-playlist', id),
+                                addGameToPlaylist: (plId, gameId) => ipcRenderer.invoke('add-game-to-playlist', plId, gameId),
+                                removeGameFromPlaylist: (plId, gameId) => ipcRenderer.invoke('remove-game-from-playlist', plId, gameId),
+
                                 // NEW: Force Focus
                                 forceFocus: () => ipcRenderer.send('force-focus'),
 

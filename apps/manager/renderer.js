@@ -317,8 +317,37 @@ window.api.onWindowRefocused(() => {
             return !old || old.Installed != g.Installed || old.LaunchCommand != g.LaunchCommand;
         });
         if (changed) { allGames = fresh; applyFilters(); }
+        // Playlists can be created/edited from CREMA (shared games.db) — re-read the
+        // list so a playlist made on the couch shows up without restarting The Manager.
+        try {
+            const freshPl = await window.api.getPlaylists();
+            const plChanged = !allPlaylists || freshPl.length !== allPlaylists.length
+                || freshPl.some((p, i) => !allPlaylists[i] || allPlaylists[i].id !== p.id || allPlaylists[i].name !== p.name);
+            if (plChanged) { allPlaylists = freshPl; renderPlaylistPanels(); }
+        } catch {}
     }, 500);
 });
+
+// ── GPU IDLE SUSPEND ──────────────────────────────────────────────────────────
+// Chromium keeps compositing CSS animations (the Ken Burns hero, spinners, etc.) on
+// a window that is merely unfocused or occluded — which burned 30-40% GPU while the
+// app sat idle in the background. Pause ALL animations + videos when the window is
+// hidden or loses focus; resume on focus. animation-play-state only affects @keyframes
+// animations (not transitions), so interactions stay snappy on resume.
+(function () {
+    let _suspended = null;
+    function setGpuSuspended(s) {
+        if (s === _suspended) return; _suspended = s;
+        if (document.body) document.body.classList.toggle('gpu-suspended', s);
+        if (s) { try { document.querySelectorAll('video').forEach(v => { if (!v.paused) v.pause(); }); } catch (e) {} }
+    }
+    document.addEventListener('visibilitychange', () => setGpuSuspended(document.hidden));
+    window.addEventListener('blur',  () => setGpuSuspended(true));
+    window.addEventListener('focus', () => setGpuSuspended(false));
+    // Apply initial state once the DOM is ready.
+    if (document.readyState !== 'loading') setGpuSuspended(document.hidden);
+    else document.addEventListener('DOMContentLoaded', () => setGpuSuspended(document.hidden));
+})();
 
 // Auto-refresh play button when CNGM regains focus (e.g. after installing via GRINDER)
 let _focusRefreshTimer = null;
@@ -2283,12 +2312,6 @@ let _fdoEditReturn  = null;
 let _fdoKbTimer     = null;
 let _fdoKbIdx       = 0;
 
-const _fdoKbPans = [
-    { tx: '-2%', ty: '-1%' }, { tx: '2%',  ty: '1%'  },
-    { tx: '-1%', ty: '2%'  }, { tx: '1%',  ty: '-2%' },
-    { tx: '0%',  ty: '-2%' }, { tx: '-2%', ty: '0%'  },
-];
-
 function _fdoStartKenBurns(slides) {
     clearInterval(_fdoKbTimer);
     const bg = document.getElementById('fdo-bg');
@@ -2313,20 +2336,9 @@ function _fdoStartKenBurns(slides) {
 
 function _fdoActivateKbSlide(idx, total) {
     const slides = document.querySelectorAll('#fdo-bg .kb-slide');
-    const pan = _fdoKbPans[idx % _fdoKbPans.length];
     slides.forEach((s, i) => {
-        if (i === idx) {
-            s.style.setProperty('--kb-tx', pan.tx);
-            s.style.setProperty('--kb-ty', pan.ty);
-            s.classList.remove('kb-anim');
-            void s.offsetWidth; // resets to base scale(1.05) — matches animation 0%
-            s.classList.add('kb-anim');
-            requestAnimationFrame(() => s.classList.add('kb-active'));
-        } else if (s.classList.contains('kb-active')) {
-            // Fade out while keeping kb-anim so transform holds during crossfade
-            s.classList.remove('kb-active');
-            setTimeout(() => s.classList.remove('kb-anim'), 2000);
-        }
+        if (i === idx) requestAnimationFrame(() => s.classList.add('kb-active'));
+        else s.classList.remove('kb-active');
     });
 }
 

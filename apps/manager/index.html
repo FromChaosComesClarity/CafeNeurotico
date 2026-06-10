@@ -950,10 +950,8 @@
     #flat-detail-overlay { display:none; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9998; flex-direction:column; background:#080808; }
     #flat-detail-overlay.open { display:flex; }
     #fdo-bg { position:absolute; inset:0; overflow:hidden; }
-    #fdo-bg .kb-slide { position:absolute; inset:-8%; background-size:cover; background-position:center; opacity:0; transition:opacity 1.8s ease; transform:scale(1.05) translate(0,0); will-change:transform,opacity; }
-    #fdo-bg .kb-slide.kb-anim { animation:fdo-kb 12s ease-in-out forwards; }
+    #fdo-bg .kb-slide { position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; transition:opacity 1.8s ease; }
     #fdo-bg .kb-slide.kb-active { opacity:1; }
-    @keyframes fdo-kb { 0%{transform:scale(1.05) translate(0,0)} 100%{transform:scale(1.15) translate(var(--kb-tx,-2%),var(--kb-ty,-1%))} }
     #fdo-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
     #fdo-grad { position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 28%), linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.55) 50%, transparent 100%); }
     #fdo-bar { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); flex-shrink:0; }
@@ -2523,13 +2521,10 @@
     ::-webkit-scrollbar-thumb { background: var(--border_solid); border-radius: 5px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-    @keyframes panZoom {
-        0% { transform: scale(1) translate(0, 0); }
-        100% { transform: scale(1.15) translate(2%, 2%); }
-    }
-    .hero-kb-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; animation: panZoom 8s infinite alternate ease-in-out; opacity: 0; transition: opacity 0.5s ease; }
-    /* Pause Ken Burns animation when the gallery view is not active */
-    .view:not(.active) .hero-kb-img { animation-play-state: paused; }
+    .hero-kb-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease; }
+    /* GPU idle suspend: freeze ALL CSS animations when the window is hidden/unfocused
+       (toggled from renderer.js) so the compositor stops burning GPU while idle. */
+    body.gpu-suspended *, body.gpu-suspended *::before, body.gpu-suspended *::after { animation-play-state: paused !important; }
 
     /* GAMEPAGE SPECIFIC CSS */
     .gamepage-stat { display: flex; flex-direction: column; gap: 2px; }
