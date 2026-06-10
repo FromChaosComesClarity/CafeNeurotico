@@ -3139,7 +3139,7 @@ function closeXpGamepage() {
     // Start menu — left column
     document.getElementById('xp-sm-connect')?.addEventListener('click', () => {
         document.getElementById('xp-start-menu').classList.remove('open');
-        document.getElementById('modal-connect').classList.add('active');
+        document.getElementById('btn-open-connect')?.click();
     });
     document.getElementById('xp-sm-tools')?.addEventListener('click', () => {
         document.getElementById('xp-start-menu').classList.remove('open');
@@ -3164,7 +3164,7 @@ function closeXpGamepage() {
 
     // Menu bar items
     document.getElementById('xp-mi-connect')?.addEventListener('click', () =>
-        document.getElementById('modal-connect').classList.add('active'));
+        document.getElementById('btn-open-connect')?.click());
     document.getElementById('xp-mi-tools')?.addEventListener('click', openToolsModal);
     document.getElementById('xp-mi-help')?.addEventListener('click', () =>
         document.getElementById('modal-about').classList.add('active'));
@@ -7134,45 +7134,20 @@ document.getElementById('btn-delete-player').addEventListener('click', async () 
 
 
 // --- ADMIN TOOLS ---
-const modalConnect = document.getElementById('modal-connect');
-document.getElementById('btn-open-connect').addEventListener('click', async () => {
-    const savedSteamId = await window.api.getSetting('steam_id'); const savedApiKey = await window.api.getSetting('steam_api_key');
-    if (savedSteamId) document.getElementById('steam-id').value = savedSteamId;
-    if (savedApiKey) document.getElementById('steam-api-key').value = savedApiKey;
-    const savedIgdbId = await window.api.getSetting('igdb_client_id'); const savedIgdbSecret = await window.api.getSetting('igdb_client_secret');
-    if (savedIgdbId) document.getElementById('igdb-client-id').value = savedIgdbId;
-    if (savedIgdbSecret) document.getElementById('igdb-client-secret').value = '••••••••';
-    const savedSgdbKey = await window.api.getSetting('steamgriddb_api');
-    if (savedSgdbKey) document.getElementById('connect-sgdb-key').value = '••••••••';
-    document.getElementById('connect-sgdb-status').innerText = '';
-    modalConnect.classList.add('active');
-    document.getElementById('igdb-status').innerText = '';
-    document.getElementById('connect-search').value = '';
-    document.querySelectorAll('.connect-section').forEach(c => c.style.display = '');
-    document.getElementById('connect-no-results').style.display = 'none';
-    setTimeout(() => document.getElementById('connect-search').focus(), 150);
-});
-
-function closeConnect() {
-    modalConnect.classList.remove('active');
-    document.getElementById('connect-search').value = '';
-    document.querySelectorAll('.connect-section').forEach(c => c.style.display = '');
-    document.getElementById('connect-no-results').style.display = 'none';
+// Connections now live inside the Control Panel (Connections pane); the old
+// #modal-connect is folded in by cpInit(). Every layout's "Connect" button
+// clicks #btn-open-connect, so repointing this one handler reroutes them all.
+async function _cpPrefillConnections() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    set('steam-id', await window.api.getSetting('steam_id'));
+    set('steam-api-key', await window.api.getSetting('steam_api_key'));
+    set('igdb-client-id', await window.api.getSetting('igdb_client_id'));
+    if (await window.api.getSetting('igdb_client_secret')) set('igdb-client-secret', '••••••••');
+    if (await window.api.getSetting('steamgriddb_api')) set('connect-sgdb-key', '••••••••');
+    const cs = document.getElementById('connect-sgdb-status'); if (cs) cs.innerText = '';
+    const is = document.getElementById('igdb-status'); if (is) is.innerText = '';
 }
-document.getElementById('btn-close-modal').addEventListener('click', closeConnect);
-modalConnect.addEventListener('click', e => { if (e.target === modalConnect) closeConnect(); });
-
-document.getElementById('connect-search').addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    let visible = 0;
-    document.querySelectorAll('.connect-section').forEach(card => {
-        const haystack = (card.dataset.search || '') + ' ' + card.textContent.toLowerCase();
-        const show = !q || haystack.includes(q);
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
-    });
-    document.getElementById('connect-no-results').style.display = visible === 0 ? 'block' : 'none';
-});
+document.getElementById('btn-open-connect')?.addEventListener('click', () => openToolsModal('connections'));
 
 document.getElementById('btn-connect-save-sgdb').addEventListener('click', async () => {
     const key    = document.getElementById('connect-sgdb-key').value.trim();
@@ -7219,7 +7194,7 @@ document.getElementById('btn-pico8-splore')?.addEventListener('click', async () 
 });
 
 document.getElementById('btn-pico8-open-bbs')?.addEventListener('click', () => {
-    document.getElementById('modal-connect')?.classList.remove('active');
+    closeTools();
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff77a8';
     window.api.launchPico8Bbs(accent);
 });
@@ -7596,8 +7571,10 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
     const btn = document.getElementById('btn-update-library');
     const statusEl = document.getElementById('update-library-status');
     btn.disabled = true;
-    btn.innerText = t('status.updating_library');
+    btn.querySelector('span').innerText = t('status.updating_library');
     statusEl.innerHTML = '';
+    cpTaskStart('Updating library…');
+    cpTaskProgress(20);
 
     const line = (html) => { statusEl.innerHTML += (statusEl.innerHTML ? '<br>' : '') + html; };
 
@@ -7627,6 +7604,7 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
     }
 
     // GRINDER sync — always attempt if GRINDER is present
+    cpTaskProgress(60);
     line('🔄 Syncing GRINDER...');
     const gs = await window.api.grinderStatus();
     if (!gs.found) {
@@ -7649,7 +7627,8 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
     }
 
     btn.disabled = false;
-    btn.innerText = t('html.btn_update_library');
+    btn.querySelector('span').innerText = t('html.btn_update_library');
+    cpTaskEnd('Library updated');
 
     if (anySuccess) {
         await loadGames();
@@ -7704,14 +7683,18 @@ document.getElementById('btn-restore-zip').addEventListener('click', async () =>
 });
 
 const modalTools = document.getElementById('modal-tools');
-function openToolsModal() {
+function openToolsModal(pane = 'library') {
     modalTools.classList.add('active');
     document.getElementById('batch-status').innerText = '';
     document.getElementById('install-menu-status').innerText = '';
-    document.getElementById('tools-search').value = '';
+    const search = document.getElementById('tools-search');
+    search.value = '';
+    document.getElementById('tools-cards-container').classList.remove('searching');
     document.querySelectorAll('.tools-section').forEach(c => c.style.display = '');
     document.getElementById('tools-no-results').style.display = 'none';
-    setTimeout(() => document.getElementById('tools-search').focus(), 150);
+    _cpSelectPane(pane);
+    _cpPrefillConnections();
+    setTimeout(() => search.focus(), 150);
 }
 ['btn-open-tools', 'btn-open-tools-sb'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', openToolsModal));
@@ -7719,9 +7702,9 @@ function openToolsModal() {
 document.getElementById('btn-install-menu').addEventListener('click', async () => {
     const btn = document.getElementById('btn-install-menu');
     const status = document.getElementById('install-menu-status');
-    btn.disabled = true; btn.innerText = t('status.installing'); status.style.color = 'var(--text_dim)'; status.innerText = '';
+    btn.disabled = true; btn.querySelector('span').innerText = t('status.installing'); status.style.color = 'var(--text_dim)'; status.innerText = '';
     const result = await window.api.installToMenu();
-    btn.disabled = false; btn.innerText = t('status.add_to_menu');
+    btn.disabled = false; btn.querySelector('span').innerText = t('status.add_to_menu');
     status.style.color = result.success ? '#66bb6a' : '#ef5350';
     status.innerText = result.message;
 });
@@ -7830,11 +7813,88 @@ async function updateGrinderRow(game) {
 function closeTools() {
     modalTools.classList.remove('active');
     document.getElementById('tools-search').value = '';
+    document.getElementById('tools-cards-container').classList.remove('searching');
     document.querySelectorAll('.tools-section').forEach(c => c.style.display = '');
     document.getElementById('tools-no-results').style.display = 'none';
 }
 document.getElementById('btn-close-tools').addEventListener('click', closeTools);
 modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTools(); });
+
+// ── CONTROL PANEL: fold Connections in + reparent cards into category panes ──
+// The 9 tool cards and the former #modal-connect cards may sit anywhere in the
+// DOM; move each into its rail category so every id, handler and per-layout
+// theme survives untouched. Runs once at load (before the haystack pre-cache).
+(function cpInit() {
+    const pane = (p) => document.querySelector(`#tools-cards-container .cp-pane[data-pane="${p}"]`);
+    const card = (childId) => document.getElementById(childId)?.closest('.tool-card');
+    [
+        ['btn-update-library', 'library'],
+        ['btn-tools-add-game', 'library'],
+        ['layout-cat-tabs', 'appearance'],
+        ['btn-theme-switch', 'appearance'],
+        ['history-segmented-control', 'behavior'],
+        ['recently-imported-segmented-control', 'behavior'],
+        ['pico8-vis-control', 'behavior'],
+        ['btn-backup-zip', 'system'],
+        ['btn-clean-images', 'danger'],
+    ].forEach(([id, p]) => { const c = card(id), pn = pane(p); if (c && pn) pn.appendChild(c); });
+    const connPane = pane('connections');
+    if (connPane) document.querySelectorAll('#modal-connect .connect-section').forEach(c => {
+        c.classList.add('tools-section'); connPane.appendChild(c);
+    });
+    document.getElementById('modal-connect')?.remove();
+    const nr = document.getElementById('tools-no-results');
+    if (nr) document.getElementById('tools-cards-container').appendChild(nr); // keep "no results" last
+})();
+
+function _cpSelectPane(pane) {
+    document.querySelectorAll('#cp-rail .cp-rail-item').forEach(b => b.classList.toggle('active', b.dataset.pane === pane));
+    document.querySelectorAll('#tools-cards-container .cp-pane').forEach(s => s.classList.toggle('active', s.dataset.pane === pane));
+}
+
+document.querySelectorAll('#cp-rail .cp-rail-item').forEach(btn =>
+    btn.addEventListener('click', () => {
+        const s = document.getElementById('tools-search');
+        if (s.value) { s.value = ''; s.dispatchEvent(new Event('input')); }
+        _cpSelectPane(btn.dataset.pane);
+    }));
+
+// Keyboard: ↑/↓ move the rail, Esc closes (ignored while typing in a field)
+document.addEventListener('keydown', e => {
+    if (!modalTools.classList.contains('active')) return;
+    if (e.key === 'Escape') { closeTools(); return; }
+    const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+    if (inField || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const items = [...document.querySelectorAll('#cp-rail .cp-rail-item')];
+    const cur = items.findIndex(i => i.classList.contains('active'));
+    if (cur === -1) return;
+    const next = e.key === 'ArrowDown' ? Math.min(cur + 1, items.length - 1) : Math.max(cur - 1, 0);
+    _cpSelectPane(items[next].dataset.pane);
+    e.preventDefault();
+});
+
+// ── Operations task bar (footer): progress that follows you across panes ────
+let _cpBatchCancel = false;
+let _cpTaskTimer = null;
+function cpTaskStart(label, stoppable = false) {
+    const tb = document.getElementById('cp-taskbar'); if (!tb) return;
+    clearTimeout(_cpTaskTimer);
+    tb.classList.add('active');
+    document.getElementById('cp-taskbar-label').innerText = label;
+    document.getElementById('cp-taskbar-fill').style.width = '0%';
+    document.getElementById('cp-taskbar-stop').style.display = stoppable ? '' : 'none';
+}
+function cpTaskProgress(pct, label) {
+    const fill = document.getElementById('cp-taskbar-fill'); if (fill) fill.style.width = pct + '%';
+    if (label != null) document.getElementById('cp-taskbar-label').innerText = label;
+}
+function cpTaskEnd(label) {
+    const tb = document.getElementById('cp-taskbar'); if (!tb) return;
+    if (label != null) document.getElementById('cp-taskbar-label').innerText = label;
+    document.getElementById('cp-taskbar-fill').style.width = '100%';
+    _cpTaskTimer = setTimeout(() => tb.classList.remove('active'), 2500);
+}
+document.getElementById('cp-taskbar-stop')?.addEventListener('click', () => { _cpBatchCancel = true; });
 
 // Pre-cache tool card haystacks once (content is static) so textContent isn't
 // re-traversed on every keypress.
@@ -7843,18 +7903,20 @@ _toolsCards.forEach(card => {
     card._haystack = ((card.dataset.search || '') + ' ' + card.textContent).toLowerCase();
 });
 const _toolsNoResults = document.getElementById('tools-no-results');
+const _toolsContent = document.getElementById('tools-cards-container');
 let _toolsSearchTimer = null;
 document.getElementById('tools-search').addEventListener('input', (e) => {
     clearTimeout(_toolsSearchTimer);
     _toolsSearchTimer = setTimeout(() => {
         const q = e.target.value.trim().toLowerCase();
+        _toolsContent.classList.toggle('searching', !!q);   // flatten across panes while searching
         let visible = 0;
         _toolsCards.forEach(card => {
             const show = !q || card._haystack.includes(q);
             card.style.display = show ? '' : 'none';
             if (show) visible++;
         });
-        _toolsNoResults.style.display = visible === 0 ? 'block' : 'none';
+        _toolsNoResults.style.display = (q && visible === 0) ? 'block' : 'none';
     }, 120);
 });
 
@@ -7881,17 +7943,24 @@ document.getElementById('btn-batch-fetch').addEventListener('click', async () =>
     btn.disabled = true;
     progressWrap.style.display = 'block';
     progressFill.style.width = '0%';
+    _cpBatchCancel = false;
+    cpTaskStart('Batch Scrape', true);
 
     for (let i = 0; i < gamesToFetch.length; i++) {
+        if (_cpBatchCancel) break;
         const game = gamesToFetch[i];
+        const pct = Math.round(((i + 1) / gamesToFetch.length) * 100);
         statusText.innerText = t('status.fetching_progress', {i: i + 1, total: gamesToFetch.length, name: game.Game});
-        progressFill.style.width = `${Math.round(((i + 1) / gamesToFetch.length) * 100)}%`;
+        progressFill.style.width = `${pct}%`;
+        cpTaskProgress(pct, `Scraping ${i + 1}/${gamesToFetch.length} · ${game.Game}`);
         await window.api.autoFetch(game.id, game.Game, game.SteamAppID);
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 
+    const _scrapeStopped = _cpBatchCancel;
     progressFill.style.width = '100%';
-    statusText.innerText = t('status.batch_done', {n: gamesToFetch.length});
+    statusText.innerText = _scrapeStopped ? 'Scrape stopped' : t('status.batch_done', {n: gamesToFetch.length});
+    cpTaskEnd(_scrapeStopped ? 'Scrape stopped' : 'Scrape complete');
     setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width = '0%'; }, 2000);
     btn.disabled = false;
     loadGames();
@@ -7901,11 +7970,11 @@ document.getElementById('btn-check-install').addEventListener('click', async () 
     const btn = document.getElementById('btn-check-install');
     const statusEl = document.getElementById('check-install-status');
     btn.disabled = true;
-    btn.innerText = t('status.checking');
+    btn.querySelector('span').innerText = t('status.checking');
     statusEl.innerText = '';
     const result = await window.api.checkAllInstallStatus();
     btn.disabled = false;
-    btn.innerText = t('html.btn_check_install');
+    btn.querySelector('span').innerText = t('html.btn_check_install');
     statusEl.style.color = '#66bb6a';
     statusEl.innerText = `✅ ${t('status.install_check_done', { n: result.updated })}`;
     setTimeout(() => { statusEl.innerText = ''; }, 5000);
@@ -7918,10 +7987,10 @@ document.getElementById('btn-template-csv').addEventListener('click', async () =
 document.getElementById('btn-export-csv').addEventListener('click', async () => { const result = await window.api.exportCsv(); if (result?.message) await showAlert(result.message); });
 document.getElementById('btn-import-csv').addEventListener('click', async () => {
     const btn = document.getElementById('btn-import-csv');
-    btn.innerText = t('status.importing'); btn.disabled = true;
+    btn.querySelector('span').innerText = t('status.importing'); btn.disabled = true;
     const result = await window.api.importCsv();
     if (result?.message) { await showAlert(result.message); if (result.success) loadGames(); }
-    btn.innerText = t('status.import_csv'); btn.disabled = false;
+    btn.querySelector('span').innerText = t('status.import_csv'); btn.disabled = false;
 });
 
 // --- THEME ENGINE ---
