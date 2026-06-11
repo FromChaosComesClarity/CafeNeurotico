@@ -220,6 +220,9 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN LastPlayed INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Playtime INTEGER DEFAULT 0").run(); } catch(e) {}       // minutes (Steam playtime_forever)
         try { db.prepare("ALTER TABLE games ADD COLUMN Playtime2wk INTEGER DEFAULT 0").run(); } catch(e) {}    // minutes (Steam playtime_2weeks)
+        try { db.prepare("ALTER TABLE games ADD COLUMN DiskSize INTEGER DEFAULT 0").run(); } catch(e) {}       // bytes (on-disk install size)
+        try { db.prepare("ALTER TABLE games ADD COLUMN AchUnlocked INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN AchTotal INTEGER DEFAULT 0").run(); } catch(e) {}
 
         try { db.prepare("ALTER TABLE games ADD COLUMN HeroArt TEXT").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Logo TEXT").run(); } catch(e) {}
@@ -462,6 +465,87 @@ function isSteamGameInstalled(appId) {
     const id = String(appId).replace(/\.0+$/, '');
     return getSteamLibraryPaths().some(dir => fs.existsSync(path.join(dir, `appmanifest_${id}.acf`)));
 }
+
+// ── Disk footprint scan ──────────────────────────────────────────────────────
+function _dirSizeBytes(dir) {
+    let total = 0, guard = 0; const stack = [dir];
+    while (stack.length && guard < 400000) {
+        const d = stack.pop();
+        let entries; try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { continue; }
+        for (const e of entries) {
+            guard++;
+            if (e.isSymbolicLink()) continue;
+            const p = path.join(d, e.name);
+            if (e.isDirectory()) stack.push(p);
+            else { try { total += fs.statSync(p).size; } catch {} }
+        }
+    }
+    return total;
+}
+function _diskStoreBucket(s) {
+    s = (s || '').toLowerCase();
+    if (s.includes('steam')) return 'Steam'; if (s.includes('gog')) return 'GOG'; if (s.includes('epic')) return 'Epic';
+    if (s.includes('itch')) return 'itch.io'; if (s.includes('flatpak')) return 'Flatpak'; if (s.includes('pico')) return 'PICO-8';
+    if (s.includes('emulation')) return 'Emulation'; if (s.includes('physical')) return 'Physical'; if (s.includes('apps')) return 'Apps';
+    if (s.includes('others')) return 'Others'; return 'Other';
+}
+ipcMain.handle('disk-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='disk_usage'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });
+ipcMain.handle('disk-scan', async () => {
+    if (!db) return null;
+    const home = os.homedir();
+    // Steam: read SizeOnDisk straight from each appmanifest (cheap + exact).
+    const steamSizes = new Map();
+    for (const dir of getSteamLibraryPaths()) {
+        let files; try { files = fs.readdirSync(dir); } catch { continue; }
+        for (const f of files) {
+            const idm = f.match(/^appmanifest_(\d+)\.acf$/); if (!idm) continue;
+            try { const sm = fs.readFileSync(path.join(dir, f), 'utf8').match(/"SizeOnDisk"\s+"(\d+)"/i); if (sm) steamSizes.set(idm[1], parseInt(sm[1], 10)); } catch {}
+        }
+    }
+    // GRINDER (GOG/Epic): install_path → directory size.
+    const grinderPaths = new Map();
+    const gcands = [path.join(home, '.config', 'grinder', 'grinder.db'), path.join(home, '.config', 'GRINDER', 'grinder.db'), path.join(baseDir, 'GRINDERConfig', 'grinder.db')];
+    const gpath = gcands.find(p => fs.existsSync(p));
+    if (gpath) { try { const gdb = new Database(gpath, { readonly: true, timeout: 5000 }); for (const r of gdb.prepare("SELECT id, install_path FROM games WHERE installed=1 AND install_path IS NOT NULL AND install_path != ''").all()) grinderPaths.set(String(r.id), r.install_path); gdb.close(); } catch {} }
+
+    const expand = p => (p && p.startsWith('~')) ? path.join(home, p.slice(1)) : p;
+    for (const g of db.prepare("SELECT id, SteamAppID, GrinderGameId FROM games").all()) {
+        let size = 0;
+        const appid = g.SteamAppID ? String(g.SteamAppID).replace(/\.0+$/, '') : '';
+        if (appid && steamSizes.has(appid)) size = steamSizes.get(appid);
+        else if (g.GrinderGameId && grinderPaths.has(String(g.GrinderGameId))) { const ip = expand(grinderPaths.get(String(g.GrinderGameId))); if (ip && fs.existsSync(ip)) size = _dirSizeBytes(ip); }
+        try { db.prepare("UPDATE games SET DiskSize=? WHERE id=?").run(size, g.id); } catch {}
+    }
+    const rows = db.prepare("SELECT Game, Store, DiskSize FROM games WHERE DiskSize > 0").all();
+    let total = 0; const byStore = new Map();
+    for (const r of rows) { total += r.DiskSize; const b = _diskStoreBucket(r.Store); byStore.set(b, (byStore.get(b) || 0) + r.DiskSize); }
+    const result = {
+        ts: Date.now(), totalBytes: total, scanned: rows.length,
+        byStore: [...byStore.entries()].map(([store, bytes]) => ({ store, bytes })).sort((a, b) => b.bytes - a.bytes),
+        biggest: rows.sort((a, b) => b.DiskSize - a.DiskSize).slice(0, 8).map(r => ({ game: r.Game, bytes: r.DiskSize })),
+    };
+    try { db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('disk_usage', ?)").run(JSON.stringify(result)); } catch {}
+    return result;
+});
+
+// ── Achievement completion scan (Steam) ──────────────────────────────────────
+const _achEngine = require('../../packages/core/achievements.js');
+ipcMain.handle('ach-scan', async () => {
+    if (!db) return null;
+    const key = db.prepare("SELECT value FROM settings WHERE key='steam_api_key'").get()?.value;
+    const steamid = db.prepare("SELECT value FROM settings WHERE key='steam_id'").get()?.value;
+    if (!key || !steamid) return { error: 'Steam API key + SteamID required (set them in Connect & Sync).' };
+    const targets = db.prepare("SELECT id, SteamAppID FROM games WHERE SteamAppID IS NOT NULL AND TRIM(SteamAppID) != '' AND SteamAppID != 'None'").all()
+        .map(g => ({ id: g.id, appid: String(g.SteamAppID).replace(/\.0+$/, '') }));
+    const results = await _achEngine.scanLibrary(targets, key, steamid, { limit: 400 });
+    const upd = db.prepare("UPDATE games SET AchUnlocked=?, AchTotal=? WHERE id=?");
+    db.transaction(() => { for (const r of results) upd.run(r.unlocked, r.total, r.id); })();
+    let withAch = 0, completed = 0, sumPct = 0, totalUnlocked = 0, totalAch = 0;
+    for (const r of results) { withAch++; totalUnlocked += r.unlocked; totalAch += r.total; sumPct += r.unlocked / r.total; if (r.unlocked === r.total) completed++; }
+    const stats = { ts: Date.now(), withAch, completed, avgPct: withAch ? Math.round(sumPct / withAch * 100) : 0, totalUnlocked, totalAch };
+    try { db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('ach_stats', ?)").run(JSON.stringify(stats)); } catch {}
+    return stats;
+});
 
 function resolveInstallState(launchCommand, steamAppId) {
     const cmd = launchCommand || '';

@@ -118,6 +118,9 @@ function registerSharedHandlers(ctx) {
         try { return await steamnews.gameNews(targets, { limit: 24, total: 14 }); } catch { return []; }
     });
 
+    // Achievement completion — cached scan result (the scan itself runs in the Manager).
+    ipcMain.handle('ach-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='ach_stats'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });
+
     // ProtonDB tier watch — last cached result + an on-demand library sweep.
     ipcMain.handle('proton-watch-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='proton_watch'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });
     ipcMain.handle('proton-check', async () => {

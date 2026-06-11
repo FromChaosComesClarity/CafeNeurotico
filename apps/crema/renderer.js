@@ -633,7 +633,7 @@ function _chFmt(amount, currency) { if (amount == null) return ''; const a = Num
 function transitionToHome() {
   gameState = 'HOME';
   clearMediaLoaders(); clearGalleryMedia();
-  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'wrapped-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
   document.getElementById('overlay-backdrop')?.classList.add('hidden');
   document.getElementById('home-screen').classList.remove('hidden');
   setBlur(false);
@@ -644,7 +644,7 @@ async function renderHomeScreen() {
   const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
   const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news'),
         wantProton = enabled.includes('protonwatch'), wantGameNews = enabled.includes('gamenews');
-  const [snap, wlRes, freeRes, newsRes, protonRes, gnRes, itadCurrency, itadClick] = await Promise.all([
+  const [snap, wlRes, freeRes, newsRes, protonRes, gnRes, itadCurrency, itadClick, achRes] = await Promise.all([
     window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}),
     wantWishlist ? window.api.wishlistDeals() : Promise.resolve(null),
     wantFree ? window.api.freeGames() : Promise.resolve(null),
@@ -653,6 +653,7 @@ async function renderHomeScreen() {
     wantGameNews ? window.api.getGameNews() : Promise.resolve(null),
     wantWishlist ? window.api.getSetting('itad_currency') : Promise.resolve(''),
     wantWishlist ? window.api.getSetting('itad_click') : Promise.resolve('store'),
+    window.api.achGet(),
   ]);
   const c = snap.counts || {}, dp = snap.dailyPick;
   const rows = [];
@@ -665,6 +666,7 @@ async function renderHomeScreen() {
     + `<div class="ch-stat"><div class="n">${(snap.backlog && snap.backlog.hours) || 0}h</div><div class="l">To Clear</div></div>`
     + ((snap.playtime && snap.playtime.totalHours) ? `<div class="ch-stat"><div class="n">${snap.playtime.totalHours}h</div><div class="l">Played</div></div>` : '')
     + (c.total ? `<div class="ch-stat"><div class="n">${snap.beatenPct || 0}%</div><div class="l">Beaten</div></div>` : '')
+    + ((achRes && achRes.avgPct) ? `<div class="ch-stat"><div class="n">${achRes.avgPct}%</div><div class="l">Achiev</div></div>` : '')
     + `</div></div>`;
   if (dp) {
     const img = _chImg(dp, true);
@@ -679,6 +681,8 @@ async function renderHomeScreen() {
   aHtml += `<div class="ch-act" id="che-a1"><div class="ai">${_CH_DICE}</div><div><div class="at">Surprise Me</div><div class="asub">Random pick</div></div></div>`;
   aCells.push({ type: 'roulette', id: 'che-a1' });
   if (snap.continuePlaying) { const cg = snap.continuePlaying, cov = _chImg(cg, false); aHtml += `<div class="ch-act" id="che-a2">${cov ? `<img class="cov" src="${cov}">` : `<div class="ai">${_CH_LIB}</div>`}<div><div class="at">Continue</div><div class="asub">${_che(cg.Game)}</div></div></div>`; aCells.push({ type: 'game', game: cg, id: 'che-a2' }); }
+  aHtml += `<div class="ch-act" id="che-aw"><div class="ai">${_CH_STAR}</div><div><div class="at">Your Year</div><div class="asub">Library Wrapped</div></div></div>`;
+  aCells.push({ type: 'wrapped', id: 'che-aw' });
   aHtml += '</div>';
   html += aHtml;
   rows.push({ key: 'actions', cells: aCells });
@@ -791,6 +795,7 @@ function homeHandleInput(action) {
     if (cell.type === 'game') cremaOpenGame(cell.game);
     else if (cell.type === 'library') transitionToStart();
     else if (cell.type === 'roulette') homeSpin();
+    else if (cell.type === 'wrapped') openWrapped();
     else if (cell.type === 'url') { if (cell.url) window.api.openInstallUrl(cell.url); }
   }
 }
@@ -822,6 +827,50 @@ function openHomeMenu() {
     .forEach(([k, l]) => items.push((audioCfg.homeRows.includes(k) ? '★ ' : '') + l));
   items.push(t('common.back_to_menu'));
   renderGenericOverlay('HOME SCREEN', items);
+}
+
+// ── Cinematic "Wrapped" — full-screen, gamepad-paged library year-in-review ──
+const _CH_STAR = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z"/></svg>`;
+let wrappedSlides = [], wrappedIndex = 0;
+function buildWrappedSlides(w) {
+  const s = [];
+  s.push(`<div class="wr-intro"><div class="wr-kick">Your Library</div><div class="wr-title">WRAPPED</div><div class="wr-year">${w.year || new Date().getFullYear()}</div><div class="wr-hint">A to begin &middot; B to exit</div></div>`);
+  if (w.totalHours) s.push(`<div class="wr-slide"><div class="wr-kick">Time well spent</div><div class="wr-num">${w.totalHours}<span>h</span></div><div class="wr-lbl">hours played</div><div class="wr-sub">on Steam</div></div>`);
+  if (w.topPlayed) { const cov = _chImg(w.topPlayed, false); s.push(`<div class="wr-slide"><div class="wr-kick">Your #1</div>${cov ? `<img class="wr-cover" src="${cov}">` : ''}<div class="wr-big2">${_che(w.topPlayed.Game)}</div><div class="wr-lbl">your most played &mdash; ${w.topPlayed.hours || 0}h</div></div>`); }
+  if (w.addedThisYear) s.push(`<div class="wr-slide"><div class="wr-num">${w.addedThisYear}</div><div class="wr-lbl">games added in ${w.year}</div></div>`);
+  if (w.topGenre) s.push(`<div class="wr-slide"><div class="wr-kick">Your vibe</div><div class="wr-big2">${_che(w.topGenre)}</div><div class="wr-lbl">your top genre${w.topDecade ? `, mostly the ${_che(w.topDecade)}` : ''}</div></div>`);
+  if (w.protonReadyPct != null) s.push(`<div class="wr-slide"><div class="wr-kick">Penguin approved</div><div class="wr-num">${w.protonReadyPct}<span>%</span></div><div class="wr-lbl">of your rated library runs Gold+ on Proton</div></div>`);
+  if (w.beaten) s.push(`<div class="wr-slide"><div class="wr-num">${w.beaten}</div><div class="wr-lbl">games beaten</div></div>`);
+  s.push(`<div class="wr-intro"><div class="wr-kick">${w.totalGames || 0} games strong</div><div class="wr-title">THAT'S A WRAP</div><div class="wr-hint">Press B to return</div></div>`);
+  return s;
+}
+async function openWrapped() {
+  playSound(sfxSelect);
+  const snap = (await window.api.getHomeStats({ hidePico8: _cremaHidePico8 })) || {};
+  wrappedSlides = buildWrappedSlides(snap.wrapped || {});
+  wrappedIndex = 0;
+  gameState = 'WRAPPED';
+  document.getElementById('home-screen')?.classList.add('hidden');
+  document.getElementById('wrapped-screen').classList.remove('hidden');
+  renderWrappedSlide();
+}
+function renderWrappedSlide() {
+  document.getElementById('wrapped-content').innerHTML = wrappedSlides[wrappedIndex] || '';
+  document.getElementById('wrapped-dots').innerHTML = wrappedSlides.map((_, i) => `<div class="wr-dot${i === wrappedIndex ? ' on' : ''}"></div>`).join('');
+}
+function wrappedHandleInput(action) {
+  if (action === 'BACK' || action === 'START') { closeWrapped(); return; }
+  if (action === 'RIGHT' || action === 'ACCEPT' || action === 'DOWN') {
+    if (wrappedIndex < wrappedSlides.length - 1) { wrappedIndex++; playSound(sfxNav); renderWrappedSlide(); }
+    else closeWrapped();
+  } else if (action === 'LEFT' || action === 'UP') {
+    if (wrappedIndex > 0) { wrappedIndex--; playSound(sfxNav); renderWrappedSlide(); }
+  }
+}
+function closeWrapped() {
+  playSound(sfxBack);
+  document.getElementById('wrapped-screen').classList.add('hidden');
+  transitionToHome();
 }
 
 async function boot() {
@@ -1053,6 +1102,7 @@ function handleInput(action) {
     const _mode = audioCfg.startScreenMode; if (_mode === 'GRID') { if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') { playSound(sfxNav); navigateGrid(action); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else { if (action === 'LEFT' || action === 'UP') { playSound(sfxNav); navigateCarousel('left'); } else if (action === 'RIGHT' || action === 'DOWN') { playSound(sfxNav); navigateCarousel('right'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); }
   }
   else if (gameState === 'HOME') { homeHandleInput(action); }
+  else if (gameState === 'WRAPPED') { wrappedHandleInput(action); }
   else if (gameState === 'MAIN') {
     if (filteredGames.length === 0 && action !== 'BACK' && action !== 'LEFT' && action !== 'RIGHT' && action !== 'START' && action !== 'Y_BUTTON') return;
     if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); transitionToStart(); } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }

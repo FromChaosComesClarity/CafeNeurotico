@@ -65,6 +65,10 @@ contextBridge.exposeInMainWorld('api', {
                                 getGameNews: () => ipcRenderer.invoke('get-game-news'),
                                 protonCheck: () => ipcRenderer.invoke('proton-check'),
                                 protonWatchGet: () => ipcRenderer.invoke('proton-watch-get'),
+                                diskScan: () => ipcRenderer.invoke('disk-scan'),
+                                diskGet: () => ipcRenderer.invoke('disk-get'),
+                                achScan: () => ipcRenderer.invoke('ach-scan'),
+                                achGet: () => ipcRenderer.invoke('ach-get'),
                                 openWebPopup: (url) => ipcRenderer.invoke('open-web-popup', url),
 
                                 // --- TRAILERS ---

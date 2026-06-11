@@ -785,7 +785,9 @@ const HOME_WIDGETS = [
     { key: 'couchnight', label: 'Couch Night' },
     { key: 'franchise', label: 'Franchise Spotlight' },
     { key: 'beaten',   label: 'Beaten (completion)' },
+    { key: 'completion', label: 'Achievement Completion' },
     { key: 'throwback', label: 'Throwback' },
+    { key: 'disk',     label: 'Disk Footprint' },
     { key: 'wrapped',  label: 'Year in Review' },
     { key: 'wishlist', label: 'Wishlist & Deals' },
     { key: 'freebies', label: 'Free This Week' },
@@ -796,9 +798,9 @@ const HOME_WIDGETS = [
 // Online widgets are excluded from the default set so a fresh Home makes no network calls until opted in.
 const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'gamenews', 'protonwatch']);
 // Local "extras" that are opt-in too (keep the default Home lean).
-const HOME_OPTIN = new Set([...HOME_ONLINE, 'wrapped', 'couchnight', 'franchise', 'beaten', 'throwback']);
+const HOME_OPTIN = new Set([...HOME_ONLINE, 'wrapped', 'couchnight', 'franchise', 'beaten', 'throwback', 'disk', 'completion']);
 const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_OPTIN.has(k));
-const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, mostplayed:12, couchnight:12, franchise:12, beaten:4, throwback:4, wrapped:12, wishlist:12, freebies:12, news:12, gamenews:12, protonwatch:6 };
+const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, mostplayed:12, couchnight:12, franchise:12, beaten:4, completion:6, throwback:4, disk:6, wrapped:12, wishlist:12, freebies:12, news:12, gamenews:12, protonwatch:6 };
 // Theme-derived chart palette — resolves against the active theme's CSS vars
 // (color-mix is evaluated live), so the donut follows whatever theme is applied.
 const HOME_PALETTE = [
@@ -887,6 +889,8 @@ function homeWidgetHtml(key, s) {
             return `<h4>Franchise Spotlight &mdash; ${escHtml(f.name)} <span style="color:var(--text_dim); font-weight:700; letter-spacing:0;">&middot; ${f.count} owned</span></h4>${_homeTileRow(f.games, '')}`;
         }
         case 'throwback': return `<h4>Throwback</h4>${_homeFeatured(s.throwback, 'Blast from the Past')}`;
+        case 'disk': return `<h4>Disk Footprint</h4><div id="home-disk-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'completion': return `<h4>Achievement Completion</h4><div id="home-completion-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'beaten': {
             const pct = s.beatenPct || 0, c = s.counts || {};
             return `<h4>Beaten</h4><div class="beaten-wrap"><div class="beaten-ring" style="background:conic-gradient(var(--accent) ${pct * 3.6}deg, var(--bg) 0deg)"><div class="beaten-ring-c">${pct}%</div></div><div class="beaten-l"><b style="color:var(--text_main); font-size:16px;">${c.played || 0}</b> of ${c.total || 0}<br>games beaten</div></div>`;
@@ -945,6 +949,49 @@ async function renderHome() {
     if (grid.querySelector('#home-news-body')) loadNewsWidget();
     if (grid.querySelector('#home-gamenews-body')) loadGameNewsWidget();
     if (grid.querySelector('#home-proton-body')) loadProtonWatchWidget();
+    if (grid.querySelector('#home-disk-body')) loadDiskWidget();
+    if (grid.querySelector('#home-completion-body')) loadCompletionWidget();
+}
+
+// ── Achievement Completion widget (extras, on-demand Steam scan) ─────────────
+async function loadCompletionWidget() { renderCompletion(await window.api.achGet()); }
+function renderCompletion(data) {
+    const body = document.getElementById('home-completion-body'); if (!body) return;
+    const ts = data && data.ts;
+    let html = `<div class="wl-toolbar"><span style="font-size:11px; color:var(--text_dim); align-self:center; margin-right:auto;">${ts ? ('Scanned ' + _homeAgo(ts)) : 'Not scanned yet'}</span><button id="ach-scan-btn" class="home-ghost">Scan now</button></div>`;
+    if (!ts) html += `<div class="hc-empty">Scan your Steam achievement progress (needs your Steam API key + ID from Connect & Sync).</div>`;
+    else {
+        const pct = data.avgPct || 0;
+        html += `<div class="beaten-wrap"><div class="beaten-ring" style="background:conic-gradient(var(--accent) ${pct * 3.6}deg, var(--bg) 0deg)"><div class="beaten-ring-c">${pct}%</div></div><div class="beaten-l">avg completion across<br><b style="color:var(--text_main);">${data.withAch || 0}</b> games &middot; <b style="color:var(--text_main);">${data.completed || 0}</b> at 100%<br><span style="color:var(--text_dim); font-size:12px;">${(data.totalUnlocked || 0).toLocaleString()} / ${(data.totalAch || 0).toLocaleString()} achievements</span></div></div>`;
+    }
+    body.innerHTML = html;
+    document.getElementById('ach-scan-btn')?.addEventListener('click', async () => {
+        body.innerHTML = `<div class="hc-empty">Scanning Steam achievements&hellip; this can take a moment.</div>`;
+        const res = await window.api.achScan();
+        if (res && res.error) { body.innerHTML = `<div class="hc-empty">${escHtml(res.error)}</div>`; return; }
+        renderCompletion(res);
+    });
+}
+
+// ── Disk Footprint widget (Phase: extras, on-demand scan) ────────────────────
+function _fmtBytes(b) { const n = Number(b) || 0; return n >= 1024 ** 3 ? (n / 1024 ** 3).toFixed(1) + ' GB' : n >= 1024 ** 2 ? Math.round(n / 1024 ** 2) + ' MB' : Math.round(n / 1024) + ' KB'; }
+async function loadDiskWidget() { renderDisk(await window.api.diskGet()); }
+function renderDisk(data) {
+    const body = document.getElementById('home-disk-body'); if (!body) return;
+    const ts = data && data.ts;
+    let html = `<div class="wl-toolbar"><span style="font-size:11px; color:var(--text_dim); align-self:center; margin-right:auto;">${ts ? ('Scanned ' + _homeAgo(ts)) : 'Not scanned yet'}</span><button id="disk-scan-btn" class="home-ghost">Scan now</button></div>`;
+    if (!ts) html += `<div class="hc-empty">Scan your installed games' on-disk size (Steam + GOG/Epic via GRINDER).</div>`;
+    else {
+        const max = (data.byStore[0] && data.byStore[0].bytes) || 1;
+        html += `<div style="font-size:26px; font-weight:900; color:var(--accent); margin:2px 0 12px;">${_fmtBytes(data.totalBytes)} <span style="font-size:12px; color:var(--text_dim); font-weight:700;">across ${data.scanned} games</span></div>`;
+        html += `<div class="hc-bars">` + data.byStore.map(s => `<div class="hc-bar"><span class="bn">${escHtml(s.store)}</span><span class="bt"><span class="bf" style="width:${Math.round(s.bytes / max * 100)}%"></span></span><span class="bc" style="white-space:nowrap; width:auto;">${_fmtBytes(s.bytes)}</span></div>`).join('') + `</div>`;
+        if (data.biggest && data.biggest.length) html += `<div style="margin-top:12px; font-size:11px; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px;">Biggest</div><div class="news-list">` + data.biggest.slice(0, 5).map(g => `<div class="news-item" style="cursor:default; display:flex; justify-content:space-between; gap:10px;"><span class="news-title" style="flex:1;">${escHtml(g.game)}</span><span style="color:var(--accent); font-weight:800; font-size:12px; white-space:nowrap;">${_fmtBytes(g.bytes)}</span></div>`).join('') + `</div>`;
+    }
+    body.innerHTML = html;
+    document.getElementById('disk-scan-btn')?.addEventListener('click', async () => {
+        body.innerHTML = `<div class="hc-empty">Scanning install sizes&hellip; large GOG/Epic games can take a moment.</div>`;
+        renderDisk(await window.api.diskScan());
+    });
 }
 
 async function loadGameNewsWidget() {

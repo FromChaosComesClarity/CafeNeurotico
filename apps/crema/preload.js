@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
                                 getNews: () => ipcRenderer.invoke('get-news'),
                                 getGameNews: () => ipcRenderer.invoke('get-game-news'),
                                 protonWatchGet: () => ipcRenderer.invoke('proton-watch-get'),
+                                achGet: () => ipcRenderer.invoke('ach-get'),
                                 verifyInstallStatus: (id) => ipcRenderer.invoke('verify-install-status', id),
                                 openInstallUrl: (url) => ipcRenderer.invoke('open-install-url', url),
                                 onInstallStatusUpdated: (cb) => ipcRenderer.on('install-status-updated', () => cb()),
