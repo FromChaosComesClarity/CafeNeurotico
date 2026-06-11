@@ -7,7 +7,7 @@ let currentGameId = null;
 function isManualCategory(game) {
     if (game.GrinderGameId) return false;
     const s = (game.Store || '').toLowerCase();
-    return !/steam|epic|gog|heroic|itch|flatpak|pico/.test(s);
+    return !/steam|epic|gog|itch|flatpak|pico/.test(s);
 }
 
 function openAddCmdDialog(gameId, gameName) {
@@ -73,7 +73,7 @@ function openInstallPicker(game, installCmd) {
 
 function _isGrinderGame(game) {
     const store = (game.Store || '').toLowerCase();
-    return store.includes('gog') || store.includes('epic') || /heroic:\/\/launch/i.test(game.LaunchCommand || '');
+    return store.includes('gog') || store.includes('epic') || /grinder:\/\/launch/i.test(game.LaunchCommand || '');
 }
 
 function getInstallCommand(game) {
@@ -140,8 +140,8 @@ document.getElementById('np-close-btn')?.addEventListener('click', closeNowPlayi
 function _guessLabel(cmd) {
     if (!cmd) return 'Custom';
     if (/steam:\/\/rungameid/i.test(cmd))     return 'Steam';
-    if (/heroic:\/\/launch\/gog/i.test(cmd))  return 'GOG via GRINDER';
-    if (/heroic:\/\/launch\/epic/i.test(cmd)) return 'Epic via GRINDER';
+    if (/grinder:\/\/launch\/gog/i.test(cmd))  return 'GOG via GRINDER';
+    if (/grinder:\/\/launch\/epic/i.test(cmd)) return 'Epic via GRINDER';
     if (cmd.startsWith('itch://'))            return 'itch.io';
     if (cmd.startsWith('pico8-cart:'))        return 'PICO-8';
     if (/^flatpak run/i.test(cmd))            return 'Flatpak';
@@ -180,11 +180,11 @@ document.getElementById('modal-launcher-pick').addEventListener('click', e => {
 
 async function _doLaunch(game, cmd) {
     // Route by the actual command so the multi-launcher picker is honoured:
-    //  - a heroic:// (GOG/Epic) command — or a grinder-linked game with no cmd —
-    //    launches via GRINDER's engine in-process (Heroic is never invoked)
+    //  - a grinder:// (GOG/Epic) command — or a grinder-linked game with no cmd —
+    //    launches via GRINDER's engine in-process
     //  - everything else (steam://, itch://, pico8-cart:, native) launches directly
-    const isHeroic = /heroic:\/\/launch/i.test(cmd || '');
-    if (isHeroic || (!cmd && game?.GrinderGameId)) {
+    const isGrinderCmd = /grinder:\/\/launch/i.test(cmd || '');
+    if (isGrinderCmd || (!cmd && game?.GrinderGameId)) {
         if (game?.GrinderGameId) {
             window.api.launchGame('grinder://launch/' + game.GrinderGameId);
         } else {
@@ -197,13 +197,37 @@ async function _doLaunch(game, cmd) {
     Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
 }
 
-// Live progress for in-process install/uninstall (bound once; acts only while the dialog shows progress).
+// ── Global operation toast — keeps install/sync/scrape progress visible even when its modal is hidden ──
+let _opToastTimer = null;
+function opToast(label, pct) {
+    const tEl = document.getElementById('op-toast'); if (!tEl) return;
+    clearTimeout(_opToastTimer);
+    tEl.classList.add('show');
+    if (label != null) document.getElementById('op-toast-label').innerText = label;
+    if (typeof pct === 'number') document.getElementById('op-toast-fill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+function opToastDone(label) {
+    const tEl = document.getElementById('op-toast'); if (!tEl) return;
+    if (label != null) document.getElementById('op-toast-label').innerText = label;
+    document.getElementById('op-toast-fill').style.width = '100%';
+    _opToastTimer = setTimeout(() => tEl.classList.remove('show'), 3000);
+}
+function opToastHide() { const tEl = document.getElementById('op-toast'); if (tEl) { clearTimeout(_opToastTimer); tEl.classList.remove('show'); } }
+let _giInstallName = '';
+
+// Live progress for in-process install/uninstall — drives the global toast always,
+// plus the modal's inline bar while it's still visible (so 'Hide' keeps progress on screen).
 window.api.onGrinderInstallProgress(d => {
+    const step = (d.step || '').toUpperCase();
+    const pct  = typeof d.percent === 'number' ? d.percent : undefined;
+    const label = `${_giInstallName ? _giInstallName + ' — ' : ''}${step}${d.message ? ': ' + d.message : ''}`;
+    if (d.done) opToastDone(label); else opToast(label, pct);   // auto-hide once the engine signals completion/error
     const pr = document.getElementById('gi-progress');
-    if (!pr || pr.style.display === 'none') return;
-    document.getElementById('gi-step').textContent = (d.step || '').toUpperCase();
-    if (typeof d.percent === 'number') document.getElementById('gi-bar').style.width = Math.max(0, Math.min(100, d.percent)) + '%';
-    if (d.message) document.getElementById('gi-msg').textContent = d.message;
+    if (pr && pr.style.display !== 'none') {
+        document.getElementById('gi-step').textContent = step;
+        if (pct != null) document.getElementById('gi-bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+        if (d.message) document.getElementById('gi-msg').textContent = d.message;
+    }
 });
 
 // In-process GOG/Epic install with a progress modal (no GRINDER window).
@@ -224,22 +248,47 @@ async function openGrinderInstall(game) {
     $('gi-cancel').textContent = 'Cancel';
     modal.classList.add('active');
 
-    $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) $('gi-dir').value = dir; };
+    const fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1) + ' GB' : (b/1024**2).toFixed(0) + ' MB');
+    const refreshSizeInfo = async () => {
+        const el = $('gi-sizeinfo'); el.textContent = 'Checking size & free space…';
+        const [info, free] = await Promise.all([
+            window.api.getInstallSize(gid).catch(() => null),
+            window.api.getDiskSpace($('gi-dir').value).catch(() => null),
+        ]);
+        const val = v => `<b style="color:var(--text_main)">${fmtB(v)}</b>`;
+        const parts = [];
+        if (info?.download_size) parts.push(`Download ${val(info.download_size)}`);
+        if (info?.disk_size)     parts.push(`On disk ${val(info.disk_size)}`);
+        const need = info?.disk_size || info?.download_size || 0;
+        if (free != null) {
+            const low = need && free < need;
+            parts.push(`<b style="color:${low ? '#ef5350' : '#66bb6a'}">${fmtB(free)} free</b>${low ? ' — not enough space!' : ''}`);
+        }
+        el.innerHTML = parts.length ? parts.join(' &nbsp;·&nbsp; ') : 'Size info unavailable';
+    };
+    refreshSizeInfo();
+
+    $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); } };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
     $('gi-install').onclick = async () => {
         $('gi-config').style.display = 'none';
         $('gi-progress').style.display = '';
         $('gi-install').disabled = true;
         $('gi-cancel').textContent = 'Hide';   // install keeps running if hidden
+        _giInstallName = game.Game || '';
+        opToast('Installing ' + _giInstallName + '…', 0);
         const res = await window.api.grinderInstall({ gameId: game.id, grinderGameId: gid, installDir: $('gi-dir').value });
         if (res && res.ok) {
             $('gi-step').textContent = 'DONE'; $('gi-bar').style.width = '100%'; $('gi-msg').textContent = 'Installation complete!';
+            opToastDone('✓ Installed: ' + _giInstallName);
             setTimeout(() => { modal.classList.remove('active'); loadGames(); }, 1200);
         } else {
             $('gi-step').textContent = 'ERROR'; $('gi-step').style.color = '#ff6d00';
             $('gi-msg').textContent = (res && res.error) || 'Install failed.';
+            opToast('Install failed: ' + _giInstallName); setTimeout(opToastHide, 5000);
             $('gi-install').style.display = 'none'; $('gi-cancel').textContent = 'Close';
         }
+        _giInstallName = '';
     };
 }
 
@@ -355,12 +404,10 @@ window.addEventListener('focus', () => {
     clearTimeout(_focusRefreshTimer);
     _focusRefreshTimer = setTimeout(async () => {
         const onGamepage = document.getElementById('view-gamepage')?.classList.contains('active');
-        const onSplit = document.getElementById('app-container')?.classList.contains('layout-split');
-        if (!currentGameId) return;
-        await window.api.verifyInstallStatus(currentGameId);
-        await syncGrinderInstalled();
-        await loadGames();
-        if (onGamepage) {
+        if (currentGameId) await window.api.verifyInstallStatus(currentGameId);
+        await syncGrinderInstalled();   // pull GRINDER's installed flags into the shared DB
+        await loadGames();              // always re-render so a game installed via GRINDER flips Install→Play
+        if (onGamepage && currentGameId) {
             const updated = allGames.find(g => g.id === currentGameId);
             if (updated) refreshGamepagePlayBtn(updated);
         }
@@ -458,6 +505,8 @@ window.api.checkEmuLatte().then(exists => {
 });
 ['btn-launch-crema', 'btn-launch-crema-sb'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', () => window.api.launchCrema()));
+// Always-visible floating CREMA call-to-action
+document.getElementById('crema-cta')?.addEventListener('click', () => window.api.launchCrema());
 document.getElementById('btn-topnav-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-launch-emulatte-sb')?.addEventListener('click', () => window.api.launchEmuLatte());
 
@@ -720,17 +769,16 @@ document.querySelectorAll('.lsc-cat').forEach(tab =>
 
 // ── VIEW / REFRESH (all layouts) ──────────────────────────────────────────
 ['btn-view-list', 'btn-view-list-sb'].forEach(id =>
-    document.getElementById(id)?.addEventListener('click', () => switchView('view-list')));
+    document.getElementById(id)?.addEventListener('click', () => { switchView('view-list'); applyFilters(); }));
 ['btn-view-gallery', 'btn-view-gallery-sb'].forEach(id =>
-    document.getElementById(id)?.addEventListener('click', () => switchView('view-gallery')));
+    document.getElementById(id)?.addEventListener('click', () => { switchView('view-gallery'); applyFilters(); }));
 document.getElementById('btn-refresh-library').addEventListener('click', async () => {
     const btn = document.getElementById('btn-refresh-library');
     btn.style.animation = 'spin 0.6s linear';
     setTimeout(() => { btn.style.animation = ''; }, 650);
     const onGamepage = document.getElementById('view-gamepage').classList.contains('active');
     if (onGamepage && currentGameId) await window.api.verifyInstallStatus(currentGameId);
-    await syncGrinderInstalled();
-    await loadGames();
+    await updateLibraryFlow({ quiet: true });   // fetch new from Steam/GRINDER + offer to scrape only the new ones
     if (onGamepage && currentGameId) {
         const updated = allGames.find(g => g.id === currentGameId);
         if (updated) refreshGamepagePlayBtn(updated);
@@ -784,8 +832,11 @@ async function openPlaylistPickerForGame(game) {
         await Promise.all(selected.map(row => window.api.addGameToPlaylist(Number(row.dataset.id), game.id)));
         if (currentPlaylistId !== null) {
             currentPlaylistGames = await window.api.getPlaylistGames(currentPlaylistId);
-            applyFilters();
+        } else {
+            currentPlaylistGames = null;   // not in a playlist → show the full library, never a stale subset
         }
+        applyFilters();   // always re-render the current grid so the gallery isn't left blank on return
+        renderPlaylistPanels();
         document.getElementById('modal-add-to-playlist').classList.remove('active');
     };
     document.getElementById('modal-add-to-playlist').classList.add('active');
@@ -906,7 +957,6 @@ document.querySelectorAll('.wlc-layout-btn').forEach(btn => {
 document.getElementById('btn-welcome-done').addEventListener('click', dismissWelcome);
 document.getElementById('btn-welcome-manual').addEventListener('click', () => { dismissWelcome(); window.api.openManual(); });
 
-// ── Step 1: Heroic sync (inline, no close) ──────────────────────────────────
 // Welcome screen — GRINDER status check
 (async () => {
     const statusEl = document.getElementById('wlc-grinder-status');
@@ -961,14 +1011,7 @@ document.getElementById('btn-welcome-batch').addEventListener('click', async () 
     const statusEl     = document.getElementById('wlc-batch-status');
     const progressWrap = document.getElementById('wlc-batch-progress-wrap');
     const progressFill = document.getElementById('wlc-batch-progress-fill');
-    const hasImg  = v => v && String(v).startsWith('GameManagerConfig');
-    const hasTxt  = v => v && String(v).trim() !== '';
-    const isPico  = g => { const s = (g.store || '').toLowerCase(); return s.includes('pico-8') || s.includes('pico8'); };
-    const toFetch = allGames.filter(g =>
-        !isPico(g) && (
-        !hasImg(g.CoverArt) || !hasImg(g.HeroArt) || !hasImg(g.Logo) ||
-        !hasImg(g.Icon) || !hasImg(g.Screenshot) ||
-        !hasTxt(g.Description) || !hasTxt(g.DEV) || !hasTxt(g.GENRE)));
+    const toFetch = gamesMissingData(allGames); // same 'missing data' criteria as the Control Panel
     if (toFetch.length === 0) { statusEl.style.color = '#66bb6a'; statusEl.textContent = '✓ All games are already up to date!'; return; }
     btn.disabled = true;
     progressWrap.style.display = 'block';
@@ -2087,8 +2130,7 @@ document.getElementById('btn-split-emulatte')?.addEventListener('click', () => w
 document.getElementById('btn-split-refresh')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-split-refresh');
     btn.classList.add('active');
-    await syncGrinderInstalled();
-    await loadGames();
+    await updateLibraryFlow({ quiet: true });
     if (_splitHistoryMode) showSplitHistory(); else applyFilters();
     btn.classList.remove('active');
 });
@@ -3438,7 +3480,7 @@ function openKdeGamepage(game) {
         const btn = document.getElementById('kde-tbtn-refresh');
         btn.style.animation = 'spin 0.6s linear';
         setTimeout(() => btn.style.animation = '', 650);
-        syncGrinderInstalled().then(() => loadGames());
+        document.getElementById('btn-refresh-library').click();
     });
     document.getElementById('kde-tbtn-home')?.addEventListener('click', () => _kdeSetFilter('all'));
     document.getElementById('kde-tbtn-up')?.addEventListener('click',   () => _kdeSetFilter('all'));
@@ -3463,7 +3505,7 @@ function openKdeGamepage(game) {
         const btn = document.getElementById('kde-ql-refresh');
         btn.style.animation = 'spin 0.6s linear';
         setTimeout(() => btn.style.animation = '', 650);
-        syncGrinderInstalled().then(() => loadGames());
+        document.getElementById('btn-refresh-library').click();
     });
     document.getElementById('kde-ql-add')?.addEventListener('click',      () => openAddGameDialog());
     document.getElementById('kde-ql-crema')?.addEventListener('click',    () => window.api.launchCrema());
@@ -3645,7 +3687,7 @@ function openC64Gamepage(game) {
     document.getElementById('c64-act-add')?.addEventListener('click',      () => openAddGameDialog());
     document.getElementById('c64-act-connect')?.addEventListener('click',  () => document.getElementById('btn-open-connect')?.click());
     document.getElementById('c64-act-tools')?.addEventListener('click',    () => openToolsModal());
-    document.getElementById('c64-act-refresh')?.addEventListener('click',  () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('c64-act-refresh')?.addEventListener('click',  () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('c64-act-crema')?.addEventListener('click',    () => window.api.launchCrema?.());
     document.getElementById('c64-act-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
     document.getElementById('c64-act-grinder')?.addEventListener('click',  () => window.api.openGrinder());
@@ -3857,7 +3899,7 @@ function openNxGamepage(game) {
     document.getElementById('nx-am-connect')?.addEventListener('click',   () => document.getElementById('btn-open-connect')?.click());
     document.getElementById('nx-am-tools')?.addEventListener('click',     () => openToolsModal());
     document.getElementById('nx-am-playlists')?.addEventListener('click', () => document.getElementById('modal-playlists-nav')?.classList.add('active'));
-    document.getElementById('nx-am-refresh')?.addEventListener('click',   () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('nx-am-refresh')?.addEventListener('click',   () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('nx-am-crema')?.addEventListener('click',     () => window.api.launchCrema?.());
     document.getElementById('nx-am-grinder')?.addEventListener('click',   () => window.api.openGrinder());
     document.getElementById('nx-am-emulatte')?.addEventListener('click',  () => window.api.launchEmuLatte());
@@ -3866,7 +3908,7 @@ function openNxGamepage(game) {
     document.getElementById('nx-tbtn-close')?.addEventListener('click', () => applyLayoutMode('rail'));
     // Dock buttons
     document.getElementById('nx-dk-add')?.addEventListener('click',      () => openAddGameDialog());
-    document.getElementById('nx-dk-refresh')?.addEventListener('click',  () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('nx-dk-refresh')?.addEventListener('click',  () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('nx-dk-connect')?.addEventListener('click',  () => document.getElementById('btn-open-connect')?.click());
     document.getElementById('nx-dk-tools')?.addEventListener('click',    () => openToolsModal());
     document.getElementById('nx-dk-crema')?.addEventListener('click',    () => window.api.launchCrema?.());
@@ -4041,7 +4083,7 @@ function openW95Gamepage(game) {
     });
     // Toolbar buttons
     document.getElementById('w95-tb-add')?.addEventListener('click',     () => openAddGameDialog());
-    document.getElementById('w95-tb-refresh')?.addEventListener('click', () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('w95-tb-refresh')?.addEventListener('click', () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('w95-tb-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect')?.click());
     document.getElementById('w95-tb-tools')?.addEventListener('click',   () => openToolsModal());
     // Menu items
@@ -4269,7 +4311,7 @@ function openBeosGamepage(game) {
     document.getElementById('beos-db-header')?.addEventListener('click',   () => document.getElementById('modal-about')?.classList.add('active'));
     // Tool strip
     document.getElementById('beos-t-add')?.addEventListener('click',       () => openAddGameDialog());
-    document.getElementById('beos-t-refresh')?.addEventListener('click',   () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('beos-t-refresh')?.addEventListener('click',   () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('beos-t-crema')?.addEventListener('click',     () => window.api.launchCrema?.());
     document.getElementById('beos-t-grinder')?.addEventListener('click',   () => window.api.openGrinder());
     document.getElementById('beos-t-emulatte')?.addEventListener('click',  () => window.api.launchEmuLatte());
@@ -4443,7 +4485,7 @@ function openAmigaGamepage(game) {
     document.getElementById('amiga-close-gadget')?.addEventListener('click', () => applyLayoutMode('rail'));
     // Tool strip
     document.getElementById('amiga-t-add')?.addEventListener('click',       () => openAddGameDialog());
-    document.getElementById('amiga-t-refresh')?.addEventListener('click',   () => { syncGrinderInstalled().then(() => loadGames()); });
+    document.getElementById('amiga-t-refresh')?.addEventListener('click',   () => { document.getElementById('btn-refresh-library').click(); });
     document.getElementById('amiga-t-crema')?.addEventListener('click',     () => window.api.launchCrema?.());
     document.getElementById('amiga-t-grinder')?.addEventListener('click',   () => window.api.openGrinder());
     document.getElementById('amiga-t-emulatte')?.addEventListener('click',  () => window.api.launchEmuLatte());
@@ -5979,7 +6021,7 @@ let _achFilter = 'all';
 let _achStores = {};   // storeLabel → achievements[]
 
 function _gogAppIdFromGame(game) {
-    const m = (game.LaunchCommand || '').match(/heroic:\/\/launch\/gog\/(\d+)/i);
+    const m = (game.LaunchCommand || '').match(/grinder:\/\/launch\/gog\/(\d+)/i);
     return m ? m[1] : null;
 }
 
@@ -6491,8 +6533,8 @@ function _renderLauncherList(game) {
         launchers = [{ label: _guessLabel(game.LaunchCommand), cmd: game.LaunchCommand }];
     }
     if (_isGrinderGame(game)) {
-        // Strip heroic:// commands — GOG/Epic games launch via GRINDER only
-        launchers = launchers.filter(l => !/heroic:\/\/launch/i.test(l.cmd || ''));
+        // Strip grinder:// commands — GOG/Epic games launch via GRINDER only
+        launchers = launchers.filter(l => !/grinder:\/\/launch/i.test(l.cmd || ''));
         if (launchers.length === 0) {
             list.innerHTML = '<p style="font-size:11px; color:var(--text_dim); margin:4px 0; font-style:italic;">Launched via GRINDER. You can add a custom command below if needed.</p>';
             return;
@@ -7325,8 +7367,7 @@ document.getElementById('btn-topnav-refresh')?.addEventListener('click', async (
     btn.style.animation = 'spin 0.6s linear infinite';
     const onGamepage = document.getElementById('view-gamepage').classList.contains('active');
     if (onGamepage && currentGameId) await window.api.verifyInstallStatus(currentGameId);
-    await syncGrinderInstalled();
-    await loadGames();
+    await updateLibraryFlow({ quiet: true });
     btn.style.animation = '';
     if (onGamepage && currentGameId) {
         const updated = allGames.find(g => g.id === currentGameId);
@@ -7539,16 +7580,6 @@ document.getElementById('btn-sync-itch')?.addEventListener('click', async () => 
     if (result.success) { await loadGames(); syncGrinderInstalled(); }
 });
 
-document.getElementById('btn-sync-heroic').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-sync-heroic');
-    btn.innerText = t('status.syncing');
-    const result = await window.api.syncHeroic();
-    await showAlert(result.message);
-    if (result.success) { await loadGames(); syncGrinderInstalled(); }
-    btn.innerText = t('status.sync_heroic');
-});
-
-
 document.getElementById('btn-sync-steam').addEventListener('click', async () => {
     const steamId = document.getElementById('steam-id').value.trim();
     const apiKey = document.getElementById('steam-api-key').value.trim();
@@ -7568,11 +7599,8 @@ document.getElementById('btn-tools-add-game')?.addEventListener('click', () => {
     openAddGameDialog();
 });
 
-document.getElementById('btn-update-library').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-update-library');
+async function updateLibraryFlow({ quiet = false } = {}) {
     const statusEl = document.getElementById('update-library-status');
-    btn.disabled = true;
-    btn.querySelector('span').innerText = t('status.updating_library');
     statusEl.innerHTML = '';
     cpTaskStart('Updating library…');
     cpTaskProgress(20);
@@ -7582,6 +7610,7 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
     const steamId  = await window.api.getSetting('steam_id');
     const steamKey = await window.api.getSetting('steam_api_key');
     let anySuccess = false;
+    const beforeIds = new Set(allGames.map(g => g.id)); // snapshot to detect games added by this sync
 
     // Steam sync — only if credentials are already saved
     if (steamId && steamKey) {
@@ -7593,7 +7622,7 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
         } else {
             statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Syncing Steam...', `⚠️ Steam: ${steamResult.message}`);
         }
-    } else {
+    } else if (!quiet) {
         line('⚠️ Steam: not configured');
         document.getElementById('update-info-body').innerHTML = `<div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #66c0f4;">
             <strong style="color: #66c0f4;">Steam not configured</strong>
@@ -7627,17 +7656,23 @@ document.getElementById('btn-update-library').addEventListener('click', async ()
         }
     }
 
+    cpTaskEnd('Library updated');
+    await loadGames();
+    // Offer to scrape ONLY the games this sync added — never re-scrape the whole library
+    const newGames = gamesMissingData(allGames.filter(g => !beforeIds.has(g.id)));
+    if (newGames.length && await showConfirm(`Fetch artwork & metadata for ${newGames.length} newly-added game${newGames.length !== 1 ? 's' : ''}?`, 'Fetch Now')) {
+        runBatchScrape(newGames, 'Scraping new games');
+    }
+    return anySuccess;
+}
+
+document.getElementById('btn-update-library').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-update-library');
+    btn.disabled = true;
+    btn.querySelector('span').innerText = t('status.updating_library');
+    await updateLibraryFlow({ quiet: false });
     btn.disabled = false;
     btn.querySelector('span').innerText = t('html.btn_update_library');
-    cpTaskEnd('Library updated');
-
-    if (anySuccess) {
-        await loadGames();
-        // Keep the Tools modal open so the user can see batch scrape progress
-        if (await showConfirm(t('status.sync_batch_prompt'), 'Fetch Now')) {
-            document.getElementById('btn-batch-fetch').click();
-        }
-    }
 });
 
 document.getElementById('btn-close-update-info').addEventListener('click', () => {
@@ -7730,15 +7765,13 @@ document.getElementById('btn-check-grinder')?.addEventListener('click', checkGri
 async function syncGrinderInstalled() {
     const s = await window.api.grinderStatus();
     if (!s.found) return;
-    // Full sync: match & import all GRINDER games (not just installed ones)
+    // Match/import all GRINDER games AND reconcile install status from GRINDER (the source of truth).
     if (s.allGames?.length) {
-        const { synced } = await window.api.syncAllGrinderGames(s.allGames, s.path);
-        if (synced > 0) await loadGames();
+        await window.api.syncAllGrinderGames(s.allGames, s.path);
     } else if (s.installedGames?.length) {
-        // Fallback: old-style installed-only sync (if allGames not available yet)
-        const { synced } = await window.api.syncGrinderInstalled(s.installedGames);
-        if (synced > 0) await loadGames();
+        await window.api.syncGrinderInstalled(s.installedGames);
     }
+    await loadGames();   // always re-render so GRINDER-reconciled install state replaces the stored/restored flag
 }
 
 async function checkGrinderConnect() {
@@ -7770,24 +7803,22 @@ document.getElementById('btn-open-grinder-tool')?.addEventListener('click', () =
 async function updateGrinderRow(game) {
     const row       = document.getElementById('grinder-launch-row');
     const statusEl  = document.getElementById('grinder-launch-status');
-    const toggleBtn = document.getElementById('btn-toggle-grinder');
     const openBtn   = document.getElementById('btn-open-grinder-detail');
     if (!row) return;
 
-    const epicMatch = (game.LaunchCommand || '').match(/heroic:\/\/launch\/epic\/([^"\s]+)/i);
-    const gogMatch  = (game.LaunchCommand || '').match(/heroic:\/\/launch\/gog\/([^"\s]+)/i);
+    const epicMatch = (game.LaunchCommand || '').match(/grinder:\/\/launch\/epic\/([^"\s]+)/i);
+    const gogMatch  = (game.LaunchCommand || '').match(/grinder:\/\/launch\/gog\/([^"\s]+)/i);
     const storeMatch = epicMatch || gogMatch;
     const isCustomGrinder = !storeMatch && !!game.GrinderGameId;
     const s = await window.api.grinderStatus();
 
-    // Show for GOG/Epic (Heroic) games AND custom Others games managed by GRINDER
+    // Show for GOG/Epic games AND custom Others games managed by GRINDER
     if ((!storeMatch && !isCustomGrinder) || !s.found) { row.style.display = 'none'; return; }
 
     row.style.display = 'flex';
     openBtn.style.display = 'none';
-    toggleBtn.style.display = 'none';
 
-    // Custom/Others games: always GRINDER-managed, no Heroic toggle
+    // Custom/Others games: always GRINDER-managed
     if (isCustomGrinder) {
         statusEl.textContent = '✓ GRINDER — default launcher';
         statusEl.style.color = '#66bb6a';
@@ -7798,8 +7829,7 @@ async function updateGrinderRow(game) {
 
     const grinderGameId = epicMatch ? `epic_${epicMatch[1]}` : `gog_${gogMatch[1]}`;
     const inGrinder = s.installedGames?.includes(grinderGameId);
-    // GOG/Epic always launch via GRINDER — no Heroic toggle
-    toggleBtn.style.display = 'none';
+    // GOG/Epic always launch via GRINDER
     openBtn.style.display = '';
     openBtn.onclick = () => window.api.openGrinder(game.Game);
     if (game.GrinderGameId || inGrinder) {
@@ -7878,6 +7908,7 @@ document.addEventListener('keydown', e => {
 let _cpBatchCancel = false;
 let _cpTaskTimer = null;
 function cpTaskStart(label, stoppable = false) {
+    opToast(label, 0);   // mirror to the always-visible global toast (visible from any layout)
     const tb = document.getElementById('cp-taskbar'); if (!tb) return;
     clearTimeout(_cpTaskTimer);
     tb.classList.add('active');
@@ -7886,10 +7917,12 @@ function cpTaskStart(label, stoppable = false) {
     document.getElementById('cp-taskbar-stop').style.display = stoppable ? '' : 'none';
 }
 function cpTaskProgress(pct, label) {
+    opToast(label, pct);
     const fill = document.getElementById('cp-taskbar-fill'); if (fill) fill.style.width = pct + '%';
     if (label != null) document.getElementById('cp-taskbar-label').innerText = label;
 }
 function cpTaskEnd(label) {
+    opToastDone(label);
     const tb = document.getElementById('cp-taskbar'); if (!tb) return;
     if (label != null) document.getElementById('cp-taskbar-label').innerText = label;
     document.getElementById('cp-taskbar-fill').style.width = '100%';
@@ -7921,31 +7954,32 @@ document.getElementById('tools-search').addEventListener('input', (e) => {
     }, 120);
 });
 
-// Upgraded Batch Fetcher
-document.getElementById('btn-batch-fetch').addEventListener('click', async () => {
+// Upgraded Batch Fetcher — filter helper + reusable runner
+function gamesMissingData(list) {
     const hasImg = (v) => v && String(v).startsWith('GameManagerConfig');
     const hasText = (v) => v && String(v).trim() !== '';
     const isPico8 = (g) => { const s = (g.store || '').toLowerCase(); return s.includes('pico-8') || s.includes('pico8'); };
-    const gamesToFetch = allGames.filter(g =>
+    return list.filter(g =>
         !isPico8(g) && (
         !hasImg(g.CoverArt) || !hasImg(g.HeroArt) || !hasImg(g.Logo) ||
         !hasImg(g.Icon) || !hasImg(g.Screenshot) ||
         !hasText(g.Description) || !hasText(g.DEV) || !hasText(g.GENRE) ||
-        !hasText(g.SimilarGames) || !hasText(g.Franchise))
-    );
+        !hasText(g.SimilarGames) || !hasText(g.Franchise)));
+}
 
+async function runBatchScrape(gamesToFetch, label) {
     const btn = document.getElementById('btn-batch-fetch');
     const statusText = document.getElementById('batch-status');
     const progressWrap = document.getElementById('batch-progress-wrap');
     const progressFill = document.getElementById('batch-progress-fill');
 
-    if (gamesToFetch.length === 0) { statusText.innerText = t('status.all_up_to_date'); return; }
+    if (!gamesToFetch.length) { statusText.innerText = t('status.all_up_to_date'); return; }
 
     btn.disabled = true;
     progressWrap.style.display = 'block';
     progressFill.style.width = '0%';
     _cpBatchCancel = false;
-    cpTaskStart('Batch Scrape', true);
+    cpTaskStart(label || 'Batch Scrape', true);
 
     for (let i = 0; i < gamesToFetch.length; i++) {
         if (_cpBatchCancel) break;
@@ -7965,7 +7999,10 @@ document.getElementById('btn-batch-fetch').addEventListener('click', async () =>
     setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width = '0%'; }, 2000);
     btn.disabled = false;
     loadGames();
-});
+}
+
+// Standalone button: scrape every game missing data
+document.getElementById('btn-batch-fetch').addEventListener('click', () => runBatchScrape(gamesMissingData(allGames), 'Batch Scrape'));
 
 document.getElementById('btn-check-install').addEventListener('click', async () => {
     const btn = document.getElementById('btn-check-install');
@@ -7974,6 +8011,7 @@ document.getElementById('btn-check-install').addEventListener('click', async () 
     btn.querySelector('span').innerText = t('status.checking');
     statusEl.innerText = '';
     const result = await window.api.checkAllInstallStatus();
+    await syncGrinderInstalled();   // reconcile GOG/Epic install state from GRINDER (the source of truth)
     btn.disabled = false;
     btn.querySelector('span').innerText = t('html.btn_check_install');
     statusEl.style.color = '#66bb6a';

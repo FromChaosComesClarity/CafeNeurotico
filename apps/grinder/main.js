@@ -1451,7 +1451,7 @@ ipcMain.handle('gogdl-install', (event, appId, platform, installDir, isDlc = fal
         activeGogInstallProc = spawn(gogdl, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
             // Point gogdl to GRINDER's own config dir so manifests don't
-            // collide with Heroic's cached manifests causing false "Nothing to do"
+            // collide with another GOG launcher's cached manifests causing false "Nothing to do"
             env: { ...process.env, GOGDL_CONFIG_PATH: configDir },
         });
 

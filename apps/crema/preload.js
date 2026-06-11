@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('api', {
                                 openGrinderGui: (term) => ipcRenderer.invoke('open-grinder-gui', term),
                                 syncGrinderInstalled: () => ipcRenderer.invoke('sync-grinder-installed'),
                                 grinderGetDefaultInstallDir: () => ipcRenderer.invoke('grinder-get-default-install-dir'),
+                                getDiskSpace:   (p)   => ipcRenderer.invoke('get-disk-space', p),
+                                getInstallSize: (gid) => ipcRenderer.invoke('get-install-size', gid),
                                 grinderHeadlessInstall: (store, appId, platform, installDir) => ipcRenderer.invoke('grinder-headless-install', store, appId, platform, installDir),
                                 grinderHeadlessUninstall: (store, appId) => ipcRenderer.invoke('grinder-headless-uninstall', store, appId),
                                 grinderGetProgress: () => ipcRenderer.invoke('grinder-get-progress'),

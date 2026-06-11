@@ -20,13 +20,13 @@ const CAT_KEYS = { "ALL GAMES": "cat.all_games", "OTHERS": "cat.others", "PHYSIC
 function isManualCategory(game) {
     if (game.GrinderGameId) return false;
     const s = (game.Store || '').toLowerCase();
-    return /physical|others|emulation|apps/.test(s) && !/steam|epic|gog|heroic|itch|pico/.test(s);
+    return /physical|others|emulation|apps/.test(s) && !/steam|epic|gog|itch|pico/.test(s);
 }
 
 function getInstallCommand(game) {
     const cmd = game.LaunchCommand || '';
-    if (/heroic:\/\/launch/i.test(cmd)) {
-        const m = cmd.match(/heroic:\/\/launch\/[^"\s]+/i);
+    if (/grinder:\/\/launch/i.test(cmd)) {
+        const m = cmd.match(/grinder:\/\/launch\/[^"\s]+/i);
         return m ? m[0] : null;
     }
     if (/steam:\/\/rungameid/i.test(cmd) && game.SteamAppID && String(game.SteamAppID).trim() !== '' && String(game.SteamAppID) !== 'None') {
@@ -76,6 +76,7 @@ let overlayItems = [], searchResults = [];
 
 // Default to 5 recent games for CREMA
 let recentGamesCount = 9;
+let _cremaHidePico8 = false; // when true, PICO-8 games show only inside the PICO-8 category
 let numRecentInList = 0;
 
 let trailerTimeout = null, screenshotInterval = null, bgmFadeInterval = null;
@@ -622,6 +623,7 @@ async function boot() {
   applyI18nToDOM();
   updateAppScale(); await initAudio(); await resolveAndApplyTheme(); renderHardwareIcons();
   const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
+  _cremaHidePico8 = (await window.api.getSetting('crema_hide_pico8')) === '1';
   await window.api.syncGrinderInstalled().catch(() => {});
   const res = await window.api.getGames(); allGames = (res.games || []).filter(g => g.Game && String(g.Game).trim() !== "");
   await loadGamePlaylists();
@@ -1093,6 +1095,11 @@ function handleOSKInput(action) {
   }
 }
 
+function pico8HiddenFor(g, catName) {
+  if (!_cremaHidePico8 || catName === 'PICO-8') return false;
+  return (g.Store ? String(g.Store).toLowerCase() : '').includes('pico');
+}
+
 function applyLiveFilters(preserveIndex = false) {
   const savedGame = preserveIndex && filteredGames[currentGameIndex] ? filteredGames[currentGameIndex].Game : null;
   const catName = categories[currentCategoryIndex]; const q = searchQuery.toLowerCase();
@@ -1100,7 +1107,7 @@ function applyLiveFilters(preserveIndex = false) {
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
     if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
-    if (!matchCat) return false; if (q !== "" && !title.includes(q)) return false; return true;
+    if (!matchCat) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
     let recentGames = [];
@@ -1211,11 +1218,20 @@ function openHistoryMenu() {
   renderGenericOverlay(t('history.title'), mapped);
 }
 
+function openPico8Menu() {
+  gameState = 'OVERLAY';
+  currentOverlayType = 'PICO8_MENU';
+  playSound(sfxSelect);
+  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _cremaHidePico8) ? '★ ' + o : o);
+  mapped.push(t('common.back_to_menu'));
+  renderGenericOverlay('PICO-8 GAMES', mapped);
+}
+
 async function openOverlay(type) {
   if (gameState === 'START' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
     const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdStr = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? t('game_menu.edit_launch') : t('game_menu.add_launch'); const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
@@ -1327,6 +1343,15 @@ function executeOverlayAction() {
     return;
   }
 
+  if (currentOverlayType === 'PICO8_MENU') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
+    _cremaHidePico8 = (String(action).replace('★ ', '') === 'HIDDEN');
+    window.api.setSetting('crema_hide_pico8', _cremaHidePico8 ? '1' : '');
+    applyLiveFilters();
+    openPico8Menu();
+    return;
+  }
+
   if (gameState === 'OVERLAY') {
     if (action === t('menu.jukebox_mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openJukebox(); }
     else if (action === t('menu.quit')) { currentOverlayType = 'CONFIRM_QUIT'; renderGenericOverlay(t('confirm.quit_title'), [t('confirm.yes_quit'), t('common.cancel')]); }
@@ -1358,6 +1383,7 @@ function executeOverlayAction() {
     else if (action === t('menu.color_scheme')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openThemeCategoryMenu(); }
     else if (action === t('menu.screensaver')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openScreensaverMenu(); }
 else if (action === t('menu.history')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openHistoryMenu(); }
+    else if (action === 'PICO-8 GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openPico8Menu(); }
     else if (action === t('menu.start_screen')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openStartScreenMenu(); }
     else if (action === t('browse.mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openBrowseModeMenu(); }
     else if (action === 'GAMEPAGE STYLE') { document.getElementById('overlay-backdrop').classList.add('hidden'); openGamepageStyleMenu(); }
@@ -1666,7 +1692,7 @@ function updateDownloadProgressBar(percentage) { const fillEl = document.getElem
 function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -2521,6 +2547,7 @@ function applyGalleryFilter() {
   const q = galleryQuery.toLowerCase();
   const base = allGames.filter(g => {
     if (!matchCatForGallery(g, catName)) return false;
+    if (pico8HiddenFor(g, catName)) return false;
     if (q) {
       const title = String(g.Game || '').toLowerCase();
       const dev   = String(g.DEV || '').toLowerCase();
@@ -2749,7 +2776,7 @@ function _cRelDate(iso) {
 }
 
 function _cGogAppId(game) {
-  const m = (game.LaunchCommand || '').match(/heroic:\/\/launch\/gog\/(\d+)/i);
+  const m = (game.LaunchCommand || '').match(/grinder:\/\/launch\/gog\/(\d+)/i);
   return m ? m[1] : null;
 }
 
@@ -3606,6 +3633,19 @@ function showGrinderConfirm(game) {
     document.getElementById('gc-action-title').textContent = 'INSTALL GAME';
     document.getElementById('gc-game-title').textContent = game.Game;
     document.getElementById('gc-dir').textContent = _grinderInstallDir;
+    // Download/disk size + free space (shared GRINDER logic)
+    const _gid = game.GrinderGameId || '';
+    const _fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1)+' GB' : (b/1024**2).toFixed(0)+' MB');
+    const _sz = document.getElementById('gc-sizeinfo'); if (_sz) _sz.textContent = 'Checking size & space…';
+    Promise.all([window.api.getInstallSize(_gid).catch(() => null), window.api.getDiskSpace(_grinderInstallDir).catch(() => null)]).then(([info, free]) => {
+        if (!_sz) return;
+        const parts = [];
+        if (info?.download_size) parts.push(`Download ${_fmtB(info.download_size)}`);
+        if (info?.disk_size) parts.push(`On disk ${_fmtB(info.disk_size)}`);
+        const need = info?.disk_size || info?.download_size || 0;
+        if (free != null) parts.push(`${_fmtB(free)} free${need && free < need ? '  ⚠️ NOT ENOUGH SPACE' : ''}`);
+        _sz.textContent = parts.length ? parts.join('   ·   ') : 'Size info unavailable';
+    });
     document.getElementById('grinder-confirm-backdrop').classList.remove('hidden');
     _grinderConfirmActive = true;
     previousGameState = gameState; gameState = 'GRINDER_CONFIRM';
@@ -3667,10 +3707,10 @@ async function triggerGrinderInstall() {
     const storeL = (game.Store || '').toLowerCase();
     const store = storeL.includes('gog') ? 'gog' : 'epic';
 
-    // app_id may be missing for Heroic-imported games — extract it from the LaunchCommand
+    // app_id may be missing for older/imported rows — extract it from the LaunchCommand
     let appId = game.app_id;
     if (!appId && game.LaunchCommand) {
-        const m = game.LaunchCommand.match(/heroic:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
+        const m = game.LaunchCommand.match(/grinder:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
         if (m) appId = m[1];
     }
 
@@ -3698,10 +3738,10 @@ async function triggerGrinderUninstall(game) {
     _grinderConfirmGame = game;
     const storeL = (game.Store || '').toLowerCase();
     const store = storeL.includes('gog') ? 'gog' : 'epic';
-    // app_id may be missing (Heroic-imported / CNGM rows) — extract from the LaunchCommand, same as install.
+    // app_id may be missing (older/imported / CNGM rows) — extract from the LaunchCommand, same as install.
     let appId = game.app_id;
     if (!appId && game.LaunchCommand) {
-        const m = game.LaunchCommand.match(/heroic:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
+        const m = game.LaunchCommand.match(/grinder:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
         if (m) appId = m[1];
     }
     if (!appId) { alert('No store app ID found — open GRINDER directly to uninstall.'); return; }

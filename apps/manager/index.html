@@ -41,6 +41,25 @@
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .modal-overlay.active { opacity: 1; pointer-events: auto; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
     .modal-box { background: var(--bg_menu); padding: 30px; border-radius: 12px; border: 2px solid var(--border_solid); width: 400px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+
+    /* Global operation toast (install/sync/scrape progress) — always-visible, above modals */
+    .op-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 31000; display: none; flex-direction: column; gap: 7px; min-width: 280px; max-width: 420px; padding: 12px 16px; background: var(--bg_menu); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); font-family: 'Raleway', sans-serif; }
+    .op-toast.show { display: flex; }
+    .op-toast-label { font-size: 11px; font-weight: 800; color: var(--text_main); letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .op-toast-track { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+    .op-toast-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s linear; }
+
+    /* CREMA call-to-action — compact pill inside the titlebar, just before the window controls */
+    #crema-cta { -webkit-app-region: no-drag; align-self: center; display: flex; align-items: center; gap: 7px;
+        height: 25px; margin: 0 10px 0 4px; padding: 0 13px 0 5px;
+        background: linear-gradient(135deg, #2C1E16 0%, #432818 55%, #5a3a22 100%);
+        border: 1px solid #D4A373; border-radius: 50px; cursor: pointer; font-family: 'Raleway', sans-serif;
+        box-shadow: 0 0 10px rgba(212,163,115,0.25);
+        transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease; }
+    #crema-cta:hover { border-color: #FFE6A7; box-shadow: 0 0 16px rgba(212,163,115,0.6); }
+    #crema-cta:active { transform: scale(0.96); }
+    .crema-cta-icon { width: 19px; height: 19px; flex-shrink: 0; }
+    .crema-cta-text { font-size: 10px; font-weight: 900; letter-spacing: 0.4px; color: #FFE6A7; white-space: nowrap; }
     /* Playlist multi-select rows */
     .pl-select-row { padding:10px 14px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:10px; font-size:12px; font-weight:900; color:var(--text_sec); border-bottom:1px solid var(--border); transition:background 0.1s; font-family:inherit; }
     .pl-select-row:last-child { border-bottom:none; }
@@ -2476,6 +2495,25 @@
     .row { display: flex; gap: 10px; }
     button { background-color: var(--bg_panel); color: var(--text_main); border: 1px solid var(--border_solid); padding: 10px 12px; font-family: 'Raleway', sans-serif; font-weight: 900; cursor: pointer; border-radius: 6px; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-transform: uppercase; letter-spacing: 1px; }
     button:hover { background-color: var(--text_main); color: var(--bg); }
+
+    /* ── CREMA launch — the marquee action; stands out in every layout ───────── */
+    #btn-topnav-crema, #btn-launch-crema-sb, #btn-launch-crema, #btn-cmd-crema, #btn-split-crema,
+    #mac-special-crema, #xp-sm-crema, #kde-strip-crema, #kde-km-crema, #w95-icon-crema, #w95-sm-crema,
+    #nx-am-crema, #nx-dk-crema, #beos-t-crema, #beos-db-crema, #amiga-t-crema, #c64-act-crema {
+        color: var(--accent) !important;
+        border-color: var(--accent) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 0 7px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+    /* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
+    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, #btn-split-connect,
+    #mac-special-connect, #xp-mi-connect, #xp-sm-connect, #kde-tbtn-connect, #kde-strip-connect, #kde-km-connect,
+    #w95-tb-connect, #w95-sm-connect, #nx-am-connect, #nx-dk-connect, #beos-mi-connect, #beos-db-connect,
+    #amiga-sm-connect, #c64-act-connect,
+    [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"],
+    [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
+        display: none !important;
+    }
     button.primary { background-color: var(--accent); color: var(--bg); border: none; }
     button.primary:hover { background-color: var(--text_main); color: var(--bg); }
 
@@ -2501,7 +2539,7 @@
     .cp-search-wrap { position: relative; flex: 1; }
     .cp-search-wrap span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text_dim); font-size: 13px; pointer-events: none; display: flex; }
     .cp-rail-item svg { flex-shrink: 0; }
-    .cp-search-wrap input { width: 100%; padding: 8px 10px 8px 32px; background: var(--bg); border: 1px solid var(--border_solid); border-radius: 8px; font-size: 12px; box-sizing: border-box; color: var(--text_main); }
+    .cp-search-wrap input[type="text"] { width: 100%; padding: 8px 10px 8px 34px; background: var(--bg); border: 1px solid var(--border_solid); border-radius: 8px; font-size: 12px; box-sizing: border-box; color: var(--text_main); }
     .cp-close { width: 34px; height: 34px; flex-shrink: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec); border-radius: 8px; cursor: pointer; }
     .cp-close:hover { color: var(--accent); border-color: var(--accent); }
     .cp-body { flex: 1; display: flex; min-height: 0; }
@@ -2656,7 +2694,7 @@
     #modal-tools .tool-card-title                                      { font-size: 14px !important; }
     #modal-tools p                                                     { font-size: 14px !important; }
     #update-library-status, #batch-status, #check-install-status,
-    #heroic-watch-status-text, #install-menu-status, #tools-no-results { font-size: 14px !important; }
+    #install-menu-status, #tools-no-results { font-size: 14px !important; }
 
     /* ── LAYOUT PICKER: category tabs + 2-col grid ──────────────────────────── */
     #layout-cat-tabs { display:flex; gap:4px; margin-top:6px; margin-bottom:4px; }
@@ -2686,6 +2724,23 @@
   <div id="titlebar">
     <div class="titlebar-brand">CAFE NEUROTICO GAME MANAGER</div>
     <div class="titlebar-controls">
+      <button id="crema-cta" title="Go fullscreen with CREMA — couch &amp; gamepad mode">
+        <svg class="crema-cta-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+          <rect width="512" height="512" rx="112" fill="#2C1E16"/>
+          <rect x="24" y="24" width="464" height="464" rx="88" fill="none" stroke="#8B5A2B" stroke-width="12"/>
+          <path d="M 380 256 C 490 256, 490 150, 380 150" fill="none" stroke="#D4A373" stroke-width="24" stroke-linecap="round"/>
+          <circle cx="256" cy="256" r="160" fill="#432818" stroke="#D4A373" stroke-width="16"/>
+          <path d="M 256 136 A 120 120 0 0 1 376 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
+          <path d="M 256 376 A 120 120 0 0 1 136 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
+          <path d="M 186 256 A 70 70 0 0 1 256 186" fill="none" stroke="#FFE6A7" stroke-width="12" stroke-linecap="round"/>
+          <path d="M 326 256 A 70 70 0 0 1 256 326" fill="none" stroke="#FFE6A7" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="256" cy="204" r="18" fill="#FFE6A7"/>
+          <circle cx="256" cy="308" r="18" fill="#FFE6A7"/>
+          <circle cx="204" cy="256" r="18" fill="#FFE6A7"/>
+          <circle cx="308" cy="256" r="18" fill="#FFE6A7"/>
+        </svg>
+        <span class="crema-cta-text">Go Fullscreen with CREMA</span>
+      </button>
       <button id="btn-min" class="win-btn">—</button>
       <button id="btn-max" class="win-btn">□</button>
       <button id="btn-close" class="win-btn win-close">✕</button>
@@ -3231,7 +3286,6 @@
                   <span style="font-size:9px; font-weight:900; letter-spacing:1px; color:var(--accent); text-transform:uppercase; flex-shrink:0;">GRINDER</span>
                   <span id="grinder-launch-status" style="font-size:11px; color:var(--text_sec); flex:1;"></span>
                   <button id="btn-open-grinder-detail" style="font-size:10px; font-weight:900; padding:4px 12px; border-radius:4px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); cursor:pointer; font-family:Raleway,sans-serif; letter-spacing:0.5px; display:none;">Open GRINDER</button>
-                  <button id="btn-toggle-grinder" style="font-size:10px; font-weight:900; padding:4px 12px; border-radius:4px; border:1px solid var(--accent); background:transparent; color:var(--accent); cursor:pointer; font-family:Raleway,sans-serif; letter-spacing:0.5px; display:none;"></button>
                 </div>
                 <div class="row" style="flex-shrink: 0;">
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_genre">Genre:</span> <input type="text" id="edit-genre" style="margin-top: 5px;"></label>
@@ -4925,13 +4979,13 @@ LOADING...READY.</div>
   <div id="modal-about" class="modal-overlay">
     <div class="modal-box" style="text-align: center;">
       <h2 style="margin: 0; color: var(--text_main); font-weight: 900; letter-spacing: 2px;">CAFE NEUROTICO</h2>
-      <h3 style="margin: 0; color: var(--accent); font-weight: 900; letter-spacing: 4px;">GAME MANAGER</h3>
+      <h3 style="margin: 0; color: var(--accent); font-weight: 900; letter-spacing: 4px;">GAMING SUITE</h3>
 
-      <p style="font-size: 13px; color: var(--text_sec); margin: 15px 0 5px 0;" data-i18n="html.about_tagline">CNGM and CREMA work together to satisfy our gaming needs.</p>
+      <p style="font-size: 13px; color: var(--text_sec); margin: 15px 0 5px 0;" data-i18n="html.about_tagline">One app, many faces — a whole gaming ecosystem brewed under one roof.</p>
 
-      <p style="font-size: 12px; color: var(--text_sec); margin: 5px 0; text-align: justify;" data-i18n-html="html.about_cngm"><strong>CAFE NEUROTICO GAME MANAGER</strong> is the desktop app: detail-focused, neurotic about your library, handling all the heavy lifting with automatic and manual importing. It can do a lot of other pretty cool stuff too, check the <span id="btn-open-manual" style="color: var(--accent); cursor: pointer; text-decoration: underline; font-weight: bold;">manual</span>.</p>
+      <p style="font-size: 12px; color: var(--text_sec); margin: 5px 0; text-align: justify;" data-i18n-html="html.about_cngm"><strong>The Manager</strong> is the desktop hub: detail-obsessed, neurotic about your library, doing all the heavy lifting &mdash; automatic and manual importing, artwork and metadata scraping. <strong>GRINDER</strong> works quietly under the hood, installing and launching your GOG and Epic games. Check the <span id="btn-open-manual" style="color: var(--accent); cursor: pointer; text-decoration: underline; font-weight: bold;">manual</span> for everything else.</p>
 
-      <p style="font-size: 12px; color: var(--text_sec); margin: 5px 0 15px 0; text-align: justify;" data-i18n-html="html.about_crema"><strong>CREMA</strong> is the sweet foam on top. It is its fullscreen companion: laidback, easygoing, and focused purely on fun. A true connoisseur of good gaming and good music. Grab a controller and enjoy.</p>
+      <p style="font-size: 12px; color: var(--text_sec); margin: 5px 0 15px 0; text-align: justify;" data-i18n-html="html.about_crema"><strong>CREMA</strong> is the sweet foam on top: a fullscreen, controller-first companion, laidback and focused purely on fun &mdash; a true connoisseur of good games and good music. <strong>EmuLatte</strong> rounds out the suite for your emulators. Grab a controller and enjoy.</p>
 
       <hr style="border: 1px solid var(--border); width: 100%;">
 
@@ -5061,7 +5115,7 @@ LOADING...READY.</div>
             </button>
             <button class="wlc-layout-btn" data-layout="commander" style="grid-column: 1 / -1;">
               <strong>Commander</strong>
-              <span>For the true Linux nerd. No sidebar, no nav bar &mdash; just a floating terminal prompt in the middle of your hero art. Type to search. Press Enter to launch anything on your system.</span>
+              <span>For the true Linux nerd &mdash; one command prompt, up and centre. Believe it or not, it opens your TTY Linux apps too (try btop or fastfetch). Small taskbar on the right.</span>
             </button>
           </div>
         </div>
@@ -5087,8 +5141,6 @@ LOADING...READY.</div>
 
     </div>
   </div>
-  <!-- hidden placeholder preserves wlc-heroic-status for any lingering JS refs -->
-  <div id="wlc-heroic-status" style="display:none;"></div>
 
   <div id="modal-zip-progress" class="modal-overlay">
     <div class="modal-box" style="text-align: center;">
@@ -5169,12 +5221,6 @@ LOADING...READY.</div>
           <button id="btn-sync-itch" style="width:100%; font-size:11px; padding:8px 0; background:transparent; border:1px solid #fa5c5c; color:#fa5c5c;">Sync itch.io Library</button>
         </div>
 
-        <!-- Heroic — secondary/legacy -->
-        <div class="tool-card connect-section" data-search="heroic epic gog amazon sync import games library legacy">
-          <div class="tool-card-title" style="color: var(--text_dim); font-size: 10px;">Heroic Games Launcher <span style="font-weight: normal;">&mdash; Optional</span></div>
-          <p style="font-size: 11px; color: var(--text_dim); margin: 0 0 8px; line-height: 1.6;">If you already use Heroic, CNGM can read your existing Epic and GOG library from it. Not needed if you use GRINDER.</p>
-          <button id="btn-sync-heroic" style="width: 100%; background-color: transparent; border: 1px solid #f57c00; color: #f57c00; font-size: 11px; padding: 8px 0;" data-i18n="html.btn_sync_heroic">Sync Heroic Library</button>
-        </div>
 
         <!-- PICO-8 -->
         <div class="tool-card connect-section" data-search="pico8 pico-8 cartridge cart binary splore bbs lexaloffle">
@@ -5257,10 +5303,10 @@ LOADING...READY.</div>
           </div>
           <div id="layout-segmented-control">
             <div class="lsc-group" data-cat="classic" style="display:none">
-              <button class="lsc-layout" data-val="rail"><span class="lsc-name">Minimal Sidebar</span><span class="lsc-desc">A slim icon rail — out of the way, always in reach.</span></button>
-              <button class="lsc-layout" data-val="sidebar"><span class="lsc-name">Classic Sidebar</span><span class="lsc-desc">The full menu down the side. Everything one click away.</span></button>
-              <button class="lsc-layout" data-val="topnav"><span class="lsc-name">Top Nav</span><span class="lsc-desc">Menus up top, library front and centre.</span></button>
-              <button class="lsc-layout" data-val="split"><span class="lsc-name">Split Pane</span><span class="lsc-desc">List on the left, details on the right. Power-user heaven.</span></button>
+              <button class="lsc-layout" data-val="rail"><span class="lsc-name">Minimal Sidebar</span><span class="lsc-desc">The Espresso. No foam, no frills. Just icons. Pure and focused — you already know what you came for.</span></button>
+              <button class="lsc-layout" data-val="sidebar"><span class="lsc-name">Classic Sidebar</span><span class="lsc-desc">The House Blend. Warm, labeled, always within reach. The regulars' favorite spot at the counter.</span></button>
+              <button class="lsc-layout" data-val="topnav"><span class="lsc-name">Top Nav</span><span class="lsc-desc">The Command Deck. Tabs up top, your whole library spread out below. Wide open. You run this place.</span></button>
+              <button class="lsc-layout" data-val="split"><span class="lsc-name">Split Pane</span><span class="lsc-desc">The Bar Menu. Your full library lined up on the left, every game's profile poured on the right. Two panels, one session, zero switching.</span></button>
               <button class="lsc-layout" data-val="commander"><span class="lsc-name">Commander</span><span class="lsc-desc">For the true Linux nerd — one command prompt, up and centre. Believe it or not, it opens your TTY Linux apps too (try btop or fastfetch). Small taskbar on the right.</span></button>
             </div>
             <div class="lsc-group" data-cat="flat" style="display:none">
@@ -5433,6 +5479,7 @@ LOADING...READY.</div>
           <input id="gi-dir" type="text" readonly style="flex:1; font-family:monospace; font-size:11px;">
           <button id="gi-change-dir" style="font-size:11px; padding:6px 12px; white-space:nowrap;">Change…</button>
         </div>
+        <div id="gi-sizeinfo" style="font-size:13px; font-weight:700; color:var(--text_sec); margin-top:10px; min-height:20px; line-height:1.7; text-align:center; background:rgba(0,0,0,0.25); border:1px solid var(--border_solid); border-radius:8px; padding:10px 12px;"></div>
       </div>
       <div id="gi-progress" style="display:none;">
         <p id="gi-step" style="font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin:0 0 6px; color:var(--accent);"></p>
@@ -5867,6 +5914,12 @@ LOADING...READY.</div>
         <div id="np-title"></div>
       </div>
     </div>
+  </div>
+
+  <!-- Global operation toast — keeps install/sync/scrape progress visible even when the modal is hidden -->
+  <div id="op-toast" class="op-toast">
+    <div class="op-toast-label" id="op-toast-label"></div>
+    <div class="op-toast-track"><div class="op-toast-fill" id="op-toast-fill"></div></div>
   </div>
 
 </body>

@@ -29,10 +29,6 @@ contextBridge.exposeInMainWorld('api', {
                                 readFileBase64: (p) => ipcRenderer.invoke('read-file-base64', p),
                                 saveFlatpakArt: (id, c, h, i) => ipcRenderer.invoke('save-flatpak-art', id, c, h, i),
                                 syncItch: () => ipcRenderer.invoke('sync-itch'),
-                                syncHeroic: () => ipcRenderer.invoke('sync-heroic'),
-                                launchAndWatchHeroic: () => ipcRenderer.invoke('launch-and-watch-heroic'),
-                                cancelHeroicWatch: () => ipcRenderer.invoke('cancel-heroic-watch'),
-                                onHeroicWatchStatus: (cb) => ipcRenderer.on('heroic-watch-status', (e, d) => cb(d)),
                                 syncSteam: (steamId, apiKey) => ipcRenderer.invoke('sync-steam', steamId, apiKey),
                                 autoFetch: (id, name, appId) => ipcRenderer.invoke('auto-fetch', id, name, appId),
                                 autoFetchText: (id, name, appId) => ipcRenderer.invoke('auto-fetch-text', id, name, appId),
@@ -113,7 +109,6 @@ contextBridge.exposeInMainWorld('api', {
                                 // --- GRINDER ---
                                 openGrinder: (name) => ipcRenderer.invoke('open-grinder', name),
                                 openGrinderSetup: (game) => ipcRenderer.invoke('open-grinder-setup', game),
-                                setGrinderGame: (id, gid) => ipcRenderer.invoke('set-grinder-game', id, gid),
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
                                 syncGrinderInstalled: (ids) => ipcRenderer.invoke('sync-grinder-installed', ids),
                                 syncAllGrinderGames: (games, p) => ipcRenderer.invoke('sync-all-grinder-games', games, p),
@@ -122,6 +117,8 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),
                                 grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),
                                 grinderPickDir:    () => ipcRenderer.invoke('grinder-pick-dir'),
+                                getDiskSpace:      (p)   => ipcRenderer.invoke('get-disk-space', p),
+                                getInstallSize:    (gid) => ipcRenderer.invoke('get-install-size', gid),
                                 onGrinderInstallProgress: (cb) => ipcRenderer.on('grinder-install-progress', (e, d) => cb(d)),
                                 onWindowRefocused: (cb) => ipcRenderer.on('window-refocused', () => cb()),
 

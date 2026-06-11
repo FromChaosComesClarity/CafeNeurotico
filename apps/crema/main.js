@@ -134,6 +134,8 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN Franchise TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN IGDBTrailer TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Installed INTEGER DEFAULT 1").run(); } catch(e) {}
+        // One-time migration: rename the legacy launch scheme heroic://launch/… → grinder://launch/… (Heroic-era leftover)
+        try { db.prepare("UPDATE games SET LaunchCommand = REPLACE(LaunchCommand, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommand LIKE '%heroic://launch/%'").run(); } catch(e) {}
         // Game playlists + Recently-Imported support — schema MUST match The Manager
         // (apps/manager/main.js) since both faces share this games.db. Whichever face
         // opens first creates the tables; the other is a no-op.
@@ -272,16 +274,16 @@ ipcMain.handle('sync-grinder-installed', () => { syncInstalledFromGrinder(); ret
 ipcMain.on('launch-game', (event, cmd) => {
     if (!cmd) return;
 
-    // 1. GOG/Epic via GRINDER's in-process engine — NEVER Heroic Games Launcher.
-    const heroicMatch = cmd.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
-    if (heroicMatch) {
-        const gId = getGrinderMap().get(heroicMatch[2]);
+    // 1. GOG/Epic via GRINDER's in-process engine.
+    const grinderMatch = cmd.match(/grinder:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
+    if (grinderMatch) {
+        const gId = getGrinderMap().get(grinderMatch[2]);
         if (gId && ensureGrinderEngine()) {
             grinderEngine.launchGame(gId).catch(e => console.error('[launch-game] grinder launch failed:', e.message));
         } else {
-            console.error('[launch-game] no GRINDER mapping/engine for', heroicMatch[2]);
+            console.error('[launch-game] no GRINDER mapping/engine for', grinderMatch[2]);
         }
-        return; // GOG/Epic must go through GRINDER — do not fall through to a Heroic shell command
+        return; // GOG/Epic must go through GRINDER — never fall through to a shell command
     }
     // grinder://launch/<id> (direct GRINDER id)
     const gLaunch = cmd.match(/^grinder:\/\/(?:launch\/)?(.+)$/);
@@ -341,39 +343,10 @@ function isSteamGameInstalled(appId) {
     const id = String(appId).replace(/\.0+$/, '');
     return getSteamLibraryPaths().some(dir => fs.existsSync(path.join(dir, `appmanifest_${id}.acf`)));
 }
-function parseHeroicInstalledIds(raw) {
-    const items = Array.isArray(raw) ? raw
-        : Array.isArray(raw.installed) ? raw.installed
-        : Object.values(raw);
-    const ids = new Set();
-    for (const item of items) {
-        const id = String(item.app_name || item.appName || item.appID || '');
-        if (id) ids.add(id);
-    }
-    return ids;
-}
-
-function isHeroicGameInstalled(launchCommand) {
-    if (!launchCommand) return null;
-    const match = launchCommand.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
-    if (!match) return null;
-    const [, storeType, appId] = match;
-    const home = os.homedir();
-    const heroicBases = [path.join(home, '.config', 'heroic'), path.join(home, '.var', 'app', 'com.heroicgameslauncher.hgl', 'config', 'heroic')];
-    const rel = { epic: path.join('legendaryConfig','legendary','installed.json'), gog: path.join('gog_store','installed.json') };
-    for (const base of heroicBases) {
-        const p = path.join(base, rel[storeType] || '');
-        if (!fs.existsSync(p)) continue;
-        try { const ids = parseHeroicInstalledIds(JSON.parse(fs.readFileSync(p,'utf8'))); return ids.has(appId) ? true : null; } catch(e) {}
-    }
-    return null; // positive install not confirmed — preserve existing DB value (defaults to 1)
-}
 function resolveInstallState(launchCommand, steamAppId) {
     const cmd = launchCommand || '';
-    if (/heroic:\/\/launch/i.test(cmd)) {
-        const h = isHeroicGameInstalled(cmd);
-        return h === true ? 1 : null; // only write 1 when confirmed; never force 0
-    }
+    // GOG/Epic (grinder://) install state is reconciled straight from GRINDER's DB
+    // (syncInstalledFromGrinder) — the source of truth.
     if (/steam:\/\/rungameid/i.test(cmd) && steamAppId && steamAppId !== 'None' && steamAppId !== '') {
         return isSteamGameInstalled(steamAppId) ? 1 : 0;
     }
@@ -959,6 +932,20 @@ ipcMain.handle('grinder-get-default-install-dir', () => {
 ipcMain.handle('open-grinder-gui', (_, searchTerm) => {
     spawnGrinderFace(searchTerm ? ['search', searchTerm] : [], { detached: true, stdio: 'ignore' }).unref();
     return { ok: true };
+});
+
+// Pre-install: free disk space at a path + download/disk size for a GOG/Epic title (shared engine).
+ipcMain.handle('get-disk-space', (_, p) => grinderEngine.getDiskSpace(p));
+ipcMain.handle('get-install-size', async (_, gid) => {
+    if (!ensureGrinderEngine()) return null;
+    const m = String(gid || '').match(/^(gog|epic)_(.+)$/i); if (!m) return null;
+    const store = m[1].toLowerCase(), appId = m[2];
+    if (store === 'gog') {
+        let platform = null;
+        try { platform = _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(appId, store)?.platform; } catch {}
+        return grinderEngine.gogInstallInfo(appId, platform || 'linux');
+    }
+    return grinderEngine.epicInstallInfo(appId);
 });
 
 ipcMain.handle('grinder-headless-install', (_, store, appId, platform, installDir) => {

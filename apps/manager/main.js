@@ -110,8 +110,8 @@ ipcMain.handle('open-grinder-setup', (_, game) => {
             const safe = (game.Game || 'game').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32);
             grinderGameId = `cngm_${safe}_${Date.now().toString(36)}`;
             const launchCmd = game.LaunchCommand || '';
-            const storeGuess = /heroic.*gog/i.test(launchCmd) ? 'gog'
-                             : /heroic.*epic/i.test(launchCmd) ? 'epic'
+            const storeGuess = /grinder.*gog/i.test(launchCmd) ? 'gog'
+                             : /grinder.*epic/i.test(launchCmd) ? 'epic'
                              : 'custom';
             ensureInGrinderDb(grinderGameId, game.Game, storeGuess, null, game.Installed);
             // Write back the GrinderGameId to CNGM's DB so future calls reuse it
@@ -229,8 +229,10 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN IGDBTrailer TEXT DEFAULT ''").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Installed INTEGER DEFAULT 1").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN GrinderGameId TEXT").run(); } catch(e) {}
-        try { db.prepare("ALTER TABLE games ADD COLUMN prefer_heroic INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN LaunchCommands TEXT DEFAULT NULL").run(); } catch(e) {}
+        // One-time migration: rename the legacy launch scheme heroic://launch/… → grinder://launch/… (Heroic-era leftover)
+        try { db.prepare("UPDATE games SET LaunchCommand = REPLACE(LaunchCommand, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommand LIKE '%heroic://launch/%'").run(); } catch(e) {}
+        try { db.prepare("UPDATE games SET LaunchCommands = REPLACE(LaunchCommands, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommands LIKE '%heroic://launch/%'").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
         try {
@@ -270,7 +272,7 @@ function spawnGrinder(subArgs) {
     return child;
 }
 
-// Returns a Map<appId, grinderId> from GRINDER's DB for heroic:// launch routing
+// Returns a Map<appId, grinderId> from GRINDER's DB for grinder:// launch routing
 function getGrinderMap() {
     const home = os.homedir();
     const candidates = [
@@ -337,6 +339,20 @@ function grinderDefaultDir() {
     try { return _grinderEngineDb?.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value || ''; }
     catch { return ''; }
 }
+
+// Pre-install: free disk space at a path + download/disk size for a GOG/Epic title (shared engine).
+ipcMain.handle('get-disk-space', (_, p) => grinderEngine.getDiskSpace(p));
+ipcMain.handle('get-install-size', async (_, grinderGameId) => {
+    if (!ensureGrinderEngine()) return null;
+    const parsed = parseGrinderId(grinderGameId); if (!parsed) return null;
+    if (parsed.store === 'gog') {
+        let platform = null;
+        try { platform = _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store)?.platform; } catch {}
+        return grinderEngine.gogInstallInfo(parsed.appId, platform || 'linux');
+    }
+    if (parsed.store === 'epic') return grinderEngine.epicInstallInfo(parsed.appId);
+    return null;
+});
 
 // In-process install of a GOG/Epic game via the shared engine; progress streams
 // to the calling renderer over 'grinder-install-progress'.
@@ -430,8 +446,8 @@ function getSteamLibraryPaths() {
 function guessLauncherLabel(cmd) {
     if (!cmd) return 'Custom';
     if (/steam:\/\/rungameid/i.test(cmd))         return 'Steam';
-    if (/heroic:\/\/launch\/gog/i.test(cmd))      return 'GOG via GRINDER';
-    if (/heroic:\/\/launch\/epic/i.test(cmd))     return 'Epic via GRINDER';
+    if (/grinder:\/\/launch\/gog/i.test(cmd))      return 'GOG via GRINDER';
+    if (/grinder:\/\/launch\/epic/i.test(cmd))     return 'Epic via GRINDER';
     if (cmd.startsWith('itch://'))                return 'itch.io';
     if (cmd.startsWith('pico8-cart:'))            return 'PICO-8';
     if (/^flatpak run/i.test(cmd))               return 'Flatpak';
@@ -445,34 +461,10 @@ function isSteamGameInstalled(appId) {
     return getSteamLibraryPaths().some(dir => fs.existsSync(path.join(dir, `appmanifest_${id}.acf`)));
 }
 
-function isHeroicGameInstalled(launchCommand) {
-    if (!launchCommand) return null;
-    const match = launchCommand.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
-    if (!match) return null;
-    const [, storeType, appId] = match;
-    const home = os.homedir();
-    const heroicBase = [
-        path.join(home, '.config', 'heroic'),
-        path.join(home, '.var', 'app', 'com.heroicgameslauncher.hgl', 'config', 'heroic')
-    ];
-    const relPaths = {
-        epic: path.join('legendaryConfig', 'legendary', 'installed.json'),
-        gog:  path.join('gog_store', 'installed.json')
-    };
-    for (const base of heroicBase) {
-        const p = path.join(base, relPaths[storeType] || '');
-        if (!fs.existsSync(p)) continue;
-        try { const ids = parseHeroicInstalledIds(JSON.parse(fs.readFileSync(p, 'utf8'))); return ids.has(appId) ? true : null; } catch(e) {}
-    }
-    return null; // positive install not confirmed — preserve existing DB value (defaults to 1)
-}
-
 function resolveInstallState(launchCommand, steamAppId) {
     const cmd = launchCommand || '';
-    if (/heroic:\/\/launch/i.test(cmd)) {
-        const h = isHeroicGameInstalled(cmd);
-        return h === true ? 1 : null; // only write 1 when confirmed; never force 0
-    }
+    // GOG/Epic (grinder://) install state is reconciled straight from GRINDER's DB
+    // (sync-grinder-installed / sync-all-grinder-games) — the source of truth.
     if (/steam:\/\/rungameid/i.test(cmd) && steamAppId && steamAppId !== 'None' && steamAppId !== '') {
         return isSteamGameInstalled(steamAppId) ? 1 : 0;
     }
@@ -523,50 +515,15 @@ ipcMain.handle('check-all-install-status', async () => {
         if (s !== null) { db.prepare("UPDATE games SET Installed=? WHERE id=?").run(s, g.id); updated++; }
     }
 
-    // ── HEROIC: snapshot scraped data → delete → resync → restore ────────────
-    const heroicGames = db.prepare("SELECT * FROM games WHERE LaunchCommand LIKE '%heroic://launch%'").all();
-    if (heroicGames.length > 0) {
-        // Key = stable heroic://launch/... URL extracted from launch command
-        const snapshot = {};
-        for (const g of heroicGames) {
-            const m = (g.LaunchCommand || '').match(/heroic:\/\/launch\/[^"\s]+/i);
-            const key = m ? m[0].toLowerCase() : null;
-            if (key) snapshot[key] = {
-                CoverArt: g.CoverArt, HeroArt: g.HeroArt, Logo: g.Logo, Icon: g.Icon,
-                Screenshot: g.Screenshot, Description: g.Description, SteamDesc: g.SteamDesc,
-                Description_i18n: g.Description_i18n, DEV: g.DEV, PUB: g.PUB,
-                RELEASED: g.RELEASED, GENRE: g.GENRE, METACRITIC: g.METACRITIC,
-                HLTB_Main: g.HLTB_Main, ProtonTier: g.ProtonTier, SteamAppID: g.SteamAppID,
-                Coop: g.Coop, NumPlayers: g.NumPlayers, SimilarGames: g.SimilarGames,
-                Franchise: g.Franchise, IGDBTrailer: g.IGDBTrailer, SteamTrailer: g.SteamTrailer,
-                FAV: g.FAV, WANT_TO_PLAY: g.WANT_TO_PLAY, LastPlayed: g.LastPlayed
-            };
-            db.prepare("DELETE FROM games WHERE id=?").run(g.id);
-        }
-
-        // Re-sync: INSERT path reads installed.json fresh → correct Installed status
-        await doHeroicSync();
-
-        // Restore scraped data onto re-inserted rows
-        const reinserted = db.prepare("SELECT id, LaunchCommand FROM games WHERE LaunchCommand LIKE '%heroic://launch%'").all();
-        for (const g of reinserted) {
-            const m = (g.LaunchCommand || '').match(/heroic:\/\/launch\/[^"\s]+/i);
-            const key = m ? m[0].toLowerCase() : null;
-            const saved = key ? snapshot[key] : null;
-            if (saved) {
-                db.prepare(`UPDATE games SET CoverArt=?,HeroArt=?,Logo=?,Icon=?,Screenshot=?,Description=?,SteamDesc=?,Description_i18n=?,DEV=?,PUB=?,RELEASED=?,GENRE=?,METACRITIC=?,HLTB_Main=?,ProtonTier=?,SteamAppID=?,Coop=?,NumPlayers=?,SimilarGames=?,Franchise=?,IGDBTrailer=?,SteamTrailer=?,FAV=?,WANT_TO_PLAY=?,LastPlayed=? WHERE id=?`)
-                  .run(saved.CoverArt,saved.HeroArt,saved.Logo,saved.Icon,saved.Screenshot,saved.Description,saved.SteamDesc,saved.Description_i18n,saved.DEV,saved.PUB,saved.RELEASED,saved.GENRE,saved.METACRITIC,saved.HLTB_Main,saved.ProtonTier,saved.SteamAppID,saved.Coop,saved.NumPlayers,saved.SimilarGames,saved.Franchise,saved.IGDBTrailer,saved.SteamTrailer,saved.FAV,saved.WANT_TO_PLAY,saved.LastPlayed,g.id);
-                updated++;
-            }
-        }
-    }
+    // GOG/Epic (grinder://) install state is reconciled from GRINDER's DB via
+    // sync-grinder-installed / sync-all-grinder-games — not detected here.
 
     // ── PHYSICAL / OTHERS / EMULATION / APPS: installed = has launch command ──
     const manualResult = db.prepare(`
         UPDATE games SET Installed = CASE WHEN LaunchCommand IS NOT NULL AND LaunchCommand != '' THEN 1 ELSE 0 END
         WHERE (LOWER(Store) LIKE '%physical%' OR LOWER(Store) LIKE '%others%' OR LOWER(Store) LIKE '%emulation%' OR LOWER(Store) LIKE '%apps%')
           AND LOWER(Store) NOT LIKE '%steam%' AND LOWER(Store) NOT LIKE '%epic%'
-          AND LOWER(Store) NOT LIKE '%gog%' AND LOWER(Store) NOT LIKE '%heroic%'
+          AND LOWER(Store) NOT LIKE '%gog%'
     `).run();
     updated += manualResult.changes;
 
@@ -588,38 +545,26 @@ ipcMain.handle('open-grinder', (_, gameName) => {
     return { ok: true };
 });
 
-ipcMain.handle('set-grinder-game', (_, gameId, grinderGameId) => {
-    if (!db) return false;
-    if (grinderGameId === null) {
-        // User explicitly chose Heroic — remember preference, clear GRINDER override
-        db.prepare("UPDATE games SET GrinderGameId=NULL, prefer_heroic=1 WHERE id=?").run(gameId);
-    } else {
-        // User chose GRINDER — clear Heroic preference
-        db.prepare("UPDATE games SET GrinderGameId=?, prefer_heroic=0 WHERE id=?").run(grinderGameId, gameId);
-    }
-    return true;
-});
-
 // Auto-sync GRINDER installed status into CNGM library.
 // installedIds = array of GRINDER game IDs that are installed (from grinderStatus).
-// Sets GrinderGameId + Installed=1 for matching Heroic games unless user prefers Heroic.
+// Sets GrinderGameId + Installed=1 for matching GOG/Epic games.
 ipcMain.handle('sync-grinder-installed', (_, installedIds) => {
     if (!db || !Array.isArray(installedIds)) return { synced: 0 };
     const idSet = new Set(installedIds);
     let synced = 0;
     const games = db.prepare(
-        "SELECT id, LaunchCommand, GrinderGameId, prefer_heroic FROM games WHERE LaunchCommand LIKE '%heroic://launch/%'"
+        "SELECT id, LaunchCommand, GrinderGameId FROM games WHERE LaunchCommand LIKE '%grinder://launch/%'"
     ).all();
     for (const g of games) {
-        const epicMatch = (g.LaunchCommand || '').match(/heroic:\/\/launch\/epic\/([^"\s]+)/i);
-        const gogMatch  = (g.LaunchCommand || '').match(/heroic:\/\/launch\/gog\/([^"\s]+)/i);
+        const epicMatch = (g.LaunchCommand || '').match(/grinder:\/\/launch\/epic\/([^"\s]+)/i);
+        const gogMatch  = (g.LaunchCommand || '').match(/grinder:\/\/launch\/gog\/([^"\s]+)/i);
         const m = epicMatch || gogMatch;
         if (!m) continue;
         const gid = epicMatch ? `epic_${epicMatch[1]}` : `gog_${gogMatch[1]}`;
-        if (idSet.has(gid) && !g.prefer_heroic) {
+        if (idSet.has(gid)) {
             db.prepare("UPDATE games SET GrinderGameId=?, Installed=1 WHERE id=?").run(gid, g.id);
             synced++;
-        } else if (!idSet.has(gid) && g.GrinderGameId && !g.prefer_heroic) {
+        } else if (g.GrinderGameId) {
             // No longer installed in GRINDER — clear the auto-set override
             db.prepare("UPDATE games SET GrinderGameId=NULL WHERE id=?").run(g.id);
         }
@@ -673,7 +618,21 @@ ipcMain.handle('sync-all-grinder-games', (_, allGrinderGames, grinderPath) => {
         // Never bring DLC/soundtrack/extras into CNGM's library
         if (gg.is_dlc) continue;
 
-        // Try to find a matching CNGM game by app_id embedded in the Heroic LaunchCommand
+        // Authoritative install state: any CNGM game already linked to this GRINDER game reflects
+        // GRINDER's real installed flag, regardless of CNGM's stored value (e.g. after restoring an
+        // older backup, or after a GRINDER-side install/uninstall CNGM never saw). GRINDER keeps this
+        // flag accurate via its own verify-installs (checks the files on disk).
+        try {
+            db.prepare("UPDATE games SET Installed=? WHERE GrinderGameId=?").run(gg.installed ? 1 : 0, gg.id);
+            // ...and make sure GOG/Epic games have a launch command, otherwise the UI shows "Install"
+            // (button needs LaunchCommand) even though they're installed — and they couldn't launch.
+            if (gg.app_id && (gg.store === 'gog' || gg.store === 'epic')) {
+                db.prepare("UPDATE games SET LaunchCommand=? WHERE GrinderGameId=? AND (LaunchCommand IS NULL OR TRIM(LaunchCommand)='')")
+                  .run(`grinder://launch/${gg.store}/${gg.app_id}`, gg.id);
+            }
+        } catch {}
+
+        // Try to find a matching CNGM game by app_id embedded in the GRINDER LaunchCommand
         let existing = null;
         if (gg.app_id) {
             existing = db.prepare(
@@ -691,8 +650,8 @@ ipcMain.handle('sync-all-grinder-games', (_, allGrinderGames, grinderPath) => {
             const alreadyIn = db.prepare("SELECT id FROM games WHERE GrinderGameId=?").get(gg.id);
             if (!alreadyIn) {
                 let launchCmd = '';
-                if (gg.store === 'gog' && gg.app_id)   launchCmd = `heroic://launch/gog/${gg.app_id}`;
-                if (gg.store === 'epic' && gg.app_id)  launchCmd = `heroic://launch/epic/${gg.app_id}`;
+                if (gg.store === 'gog' && gg.app_id)   launchCmd = `grinder://launch/gog/${gg.app_id}`;
+                if (gg.store === 'epic' && gg.app_id)  launchCmd = `grinder://launch/epic/${gg.app_id}`;
                 const store = gg.store === 'gog' ? 'GOG' : gg.store === 'epic' ? 'EPIC' : 'Others';
                 if (!launchCmd) launchCmd = `grinder://${gg.id}`;
 
@@ -1215,10 +1174,10 @@ ipcMain.on('launch-game', (event, cmd) => {
         return;
     }
 
-    // GOG/Epic via GRINDER (heroic:// cmd → resolve id via getGrinderMap), in-process
-    const heroicMatch = cmd.match(/heroic:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
-    if (heroicMatch) {
-        const appId = heroicMatch[2];
+    // GOG/Epic via GRINDER (grinder:// cmd → resolve id via getGrinderMap), in-process
+    const grinderMatch = cmd.match(/grinder:\/\/launch\/(epic|gog)\/([^"\s]+)/i);
+    if (grinderMatch) {
+        const appId = grinderMatch[2];
         const gMap  = getGrinderMap();
         const gId   = gMap.get(appId);
         if (gId) {
@@ -1526,22 +1485,6 @@ ipcMain.handle('update-last-played', (event, id) => {
 
 ipcMain.handle('get-strings', (_, lang) => require('./i18n')(lang || 'en'));
 
-// Normalises Heroic installed.json regardless of format:
-//   Epic  → flat dict  { "appId": { app_name, ... } }
-//   GOG   → wrapped    { "installed": [ { appName, ... }, ... ] }
-//   plain → bare array [ { appName, ... }, ... ]
-function parseHeroicInstalledIds(raw) {
-    const items = Array.isArray(raw) ? raw
-        : Array.isArray(raw.installed) ? raw.installed
-        : Object.values(raw);
-    const ids = new Set();
-    for (const item of items) {
-        const id = String(item.app_name || item.appName || item.appID || '');
-        if (id) ids.add(id);
-    }
-    return ids;
-}
-
 // ── ITCH.IO SYNC ──────────────────────────────────────────────────────────
 
 async function doItchSync() {
@@ -1715,80 +1658,6 @@ ipcMain.handle('open-store-browser', (e, store, colors) => {
 });
 
 // --- SYNC ENGINES ---
-async function doHeroicSync() {
-    if (!db) return { success: false, message: "Database not initialized." };
-    const home = os.homedir();
-    let importedCount = 0;
-
-    const heroicPaths = [
-        { type: 'NATIVE',  base: path.join(home, '.config', 'heroic'), cmdPrefix: 'heroic' },
-        { type: 'FLATPAK', base: path.join(home, '.var', 'app', 'com.heroicgameslauncher.hgl', 'config', 'heroic'), cmdPrefix: 'flatpak run com.heroicgameslauncher.hgl' }
-    ];
-    const storeConfigs = [
-        { name: 'EPIC', relInstalled: path.join('legendaryConfig', 'legendary', 'installed.json'), relLibraries: [ path.join('store_cache', 'legendary_library.json'), path.join('store_cache', 'epic_library.json'), path.join('store', 'epic', 'library.json') ], protocolId: 'epic' },
-        { name: 'GOG',  relInstalled: path.join('gog_store', 'installed.json'), relLibraries: [ path.join('store_cache', 'gog_library.json'), path.join('gog_store', 'library.json') ], protocolId: 'gog' }
-    ];
-
-    for (const env of heroicPaths) {
-        if (!fs.existsSync(env.base)) continue;
-        for (const store of storeConfigs) {
-            const gamesFound = new Map();
-            const installedIds = new Set();
-            let installedJsonLoaded = false;
-            for (const relLib of store.relLibraries) {
-                const libPath = path.join(env.base, relLib);
-                if (!fs.existsSync(libPath)) continue;
-                try {
-                    const raw = JSON.parse(fs.readFileSync(libPath, 'utf8'));
-                    let items = Array.isArray(raw) ? raw : raw.library || raw.games || (typeof raw === 'object' ? Object.values(raw) : []);
-                    for (const item of items) {
-                        const appId = item.app_name || item.appName || item.id || item.name;
-                        const title = item.title || item.name || item.appName;
-                        if (appId && title) gamesFound.set(appId, title);
-                    }
-                } catch (err) {}
-            }
-            const installedPath = path.join(env.base, store.relInstalled);
-            if (fs.existsSync(installedPath)) {
-                try {
-                    const raw = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
-                    const ids = parseHeroicInstalledIds(raw);
-                    for (const id of ids) installedIds.add(id);
-                    installedJsonLoaded = true;
-                } catch (err) {}
-            }
-            for (const [appId, gameTitle] of gamesFound.entries()) {
-                const launchCommand = `${env.cmdPrefix} "heroic://launch/${store.protocolId}/${appId}"`;
-                // Use actual detected state when json was loadable; default to 1 when file not found
-                const isInstalled = installedJsonLoaded ? (installedIds.has(appId) ? 1 : 0) : 1;
-                const existing = db.prepare("SELECT * FROM games WHERE LaunchCommand = ? OR LOWER(Game) = LOWER(?)").get(launchCommand, gameTitle);
-                if (existing) {
-                    let stores = existing.Store ? existing.Store.split(',').map(s => s.trim()) : [];
-                    if (!stores.some(s => s.toLowerCase() === store.name.toLowerCase())) stores.push(store.name);
-                    db.prepare("UPDATE games SET LaunchCommand = ?, Store = ?, Installed = ? WHERE id = ?").run(launchCommand, stores.join(', '), isInstalled, existing.id);
-                } else {
-                    db.prepare("INSERT INTO games (Game, Store, LaunchCommand, FAV, WANT_TO_PLAY, Installed) VALUES (?, ?, ?, 'NO', 'NO', ?)").run(gameTitle, store.name, launchCommand, isInstalled);
-                }
-                importedCount++;
-            }
-        }
-    }
-    return { success: true, count: importedCount, message: `Successfully synced ${importedCount} games from Heroic.` };
-}
-
-ipcMain.handle('sync-heroic', async () => doHeroicSync());
-
-// ── LAUNCH & AUTO-WATCH ────────────────────────────────────────────────────
-let heroicWatchState = null;
-
-function stopHeroicWatch() {
-    if (!heroicWatchState) return;
-    heroicWatchState.watchers.forEach(w => { try { w.close(); } catch(e) {} });
-    clearTimeout(heroicWatchState.debounceTimer);
-    clearTimeout(heroicWatchState.timeoutTimer);
-    heroicWatchState = null;
-}
-
 // ── FLATPAK ────────────────────────────────────────────────────────────────
 
 ipcMain.handle('save-flatpak-art', (e, gameId, coverB64, heroB64, iconSrcPath) => {
@@ -1811,58 +1680,6 @@ ipcMain.handle('save-flatpak-art', (e, gameId, coverB64, heroB64, iconSrcPath) =
       .run(coverPath, heroPath, logoPath, logoPath, gameId);
     return true;
 });
-
-ipcMain.handle('launch-and-watch-heroic', async (event) => {
-    const win = BrowserWindow.getFocusedWindow();
-    stopHeroicWatch();
-
-    const home = os.homedir();
-    const candidates = [
-        { base: path.join(home, '.config', 'heroic'), cmd: 'heroic' },
-        { base: path.join(home, '.var', 'app', 'com.heroicgameslauncher.hgl', 'config', 'heroic'), cmd: 'flatpak run com.heroicgameslauncher.hgl' }
-    ];
-    const valid = candidates.filter(c => fs.existsSync(c.base));
-    if (valid.length === 0) return { success: false, message: 'Heroic not found.' };
-
-    // Launch Heroic (fire-and-forget)
-    exec(valid[0].cmd, () => {});
-
-    // Collect directories to watch across all valid installs
-    const watchDirs = [];
-    for (const v of valid) {
-        const sub = ['store_cache', path.join('legendaryConfig', 'legendary'), 'gog_store', path.join('nile_config', 'nile')];
-        for (const s of sub) { const d = path.join(v.base, s); if (fs.existsSync(d)) watchDirs.push(d); }
-    }
-    if (watchDirs.length === 0) return { success: false, message: 'Heroic library directories not found.' };
-
-    heroicWatchState = { watchers: [], debounceTimer: null, timeoutTimer: null };
-
-    let _heroicSyncing = false;
-    const onFileChange = () => {
-        clearTimeout(heroicWatchState.debounceTimer);
-        heroicWatchState.debounceTimer = setTimeout(async () => {
-            if (_heroicSyncing) return;
-            _heroicSyncing = true;
-            try {
-                stopHeroicWatch();
-                if (win) win.webContents.send('heroic-watch-status', { phase: 'syncing' });
-                const result = await doHeroicSync();
-                if (win) win.webContents.send('heroic-watch-status', { phase: 'done', success: result.success, message: result.message, count: result.count });
-            } finally { _heroicSyncing = false; }
-        }, 2500);
-    };
-
-    heroicWatchState.watchers = watchDirs.map(d => { try { return fs.watch(d, { persistent: false }, onFileChange); } catch(e) { return null; } }).filter(Boolean);
-
-    heroicWatchState.timeoutTimer = setTimeout(() => {
-        stopHeroicWatch();
-        if (win) win.webContents.send('heroic-watch-status', { phase: 'timeout' });
-    }, 300000);
-
-    return { success: true };
-});
-
-ipcMain.handle('cancel-heroic-watch', () => { stopHeroicWatch(); });
 
 ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
     if (!steamId || !apiKey) return { success: false, message: "Missing SteamID or API Key." };

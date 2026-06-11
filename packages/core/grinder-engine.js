@@ -764,6 +764,67 @@ function findLinuxGameExe(gameDir) {
     return null;
 }
 
+// ── Pre-install size info + free disk space (shared by Manager & CREMA) ──────
+// Available bytes at a path (walks up to the first existing parent).
+async function getDiskSpace(dirPath) {
+    let check = expandTilde(dirPath) || HOME;
+    while (!fs.existsSync(check) && path.dirname(check) !== check) check = path.dirname(check);
+    try { const st = await fs.promises.statfs(check); return st.bavail * st.bsize; }
+    catch { return null; }
+}
+
+// GOG download/disk size. Linux uses the GOG API (installer files); Windows uses gogdl info.
+async function gogInstallInfo(appId, platform) {
+    if (platform === 'linux') {
+        try {
+            const token = await getGogToken(); if (!token) return null;
+            const data = await gogFetch(`https://api.gog.com/products/${appId}?expand=downloads`, token);
+            const installers = (data.downloads?.installers || []).filter(i => i.os === 'linux');
+            let download_size = 0;
+            for (const inst of installers) for (const f of inst.files || []) download_size += f.size || 0;
+            return download_size > 0 ? { download_size, disk_size: download_size } : null;
+        } catch { return null; }
+    }
+    const gogdl = findGogdl(); if (!gogdl) return null;
+    try { fs.chmodSync(gogdl, '755'); } catch {}
+    const authPath = writeGogAuthConfig();
+    return new Promise(resolve => {
+        let out = '';
+        const proc = spawn(gogdl, ['--auth-config-path', authPath, 'info', appId, '--platform', platform || 'windows'],
+            { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GOGDL_CONFIG_PATH: configDir } });
+        proc.stdout.on('data', d => out += d);
+        proc.stderr.on('data', d => out += d);
+        proc.on('close', () => {
+            try { fs.unlinkSync(authPath); } catch {}
+            try {
+                const data = JSON.parse(out.split('\n').find(l => l.trim().startsWith('{')));
+                let download_size = 0, disk_size = 0;
+                for (const s of Object.values(data.size || {})) { download_size += s.download_size || 0; disk_size += s.disk_size || 0; }
+                resolve({ download_size, disk_size, version: data.versionName });
+            } catch { resolve(null); }
+        });
+        proc.on('error', () => { try { fs.unlinkSync(authPath); } catch {} resolve(null); });
+    });
+}
+
+// Epic download/disk size via legendary info.
+async function epicInstallInfo(appName) {
+    const leg = findLegendary(); if (!leg) return null;
+    return new Promise(resolve => {
+        let out = '';
+        const proc = spawn(leg, ['info', appName], { stdio: ['ignore', 'pipe', 'pipe'] });
+        proc.stdout.on('data', d => out += d);
+        proc.stderr.on('data', d => out += d);
+        proc.on('close', () => {
+            const toBytes = (n, u) => { const v = parseFloat(n); return u.toLowerCase().startsWith('g') ? v*1024**3 : u.toLowerCase().startsWith('m') ? v*1024**2 : v*1024; };
+            const dl   = out.match(/Download size[^:]*:\s*([\d.]+)\s*(\w+)/i);
+            const disk = out.match(/Disk size[^:]*:\s*([\d.]+)\s*(\w+)/i);
+            resolve(dl && disk ? { download_size: toBytes(dl[1], dl[2]), disk_size: toBytes(disk[1], disk[2]) } : null);
+        });
+        proc.on('error', () => resolve(null));
+    });
+}
+
 module.exports = {
     init, setDb, writeProgress,
     sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
@@ -772,4 +833,5 @@ module.exports = {
     syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
+    getDiskSpace, gogInstallInfo, epicInstallInfo,
 };
