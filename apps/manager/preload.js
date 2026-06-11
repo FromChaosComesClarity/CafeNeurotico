@@ -53,6 +53,15 @@ contextBridge.exposeInMainWorld('api', {
                                 selectLocalImage: (id, type) => ipcRenderer.invoke('select-local-image', id, type),
                                 getSetting: (k) => ipcRenderer.invoke('get-setting', k),
                                 setSetting: (k, v) => ipcRenderer.invoke('set-setting', k, v),
+                                getHomeStats: (opts) => ipcRenderer.invoke('get-home-stats', opts),
+                                getRandomGame: (c) => ipcRenderer.invoke('get-random-game', c),
+                                itadSearch: (q) => ipcRenderer.invoke('itad-search', q),
+                                wishlistGet: () => ipcRenderer.invoke('wishlist-get'),
+                                wishlistAdd: (item) => ipcRenderer.invoke('wishlist-add', item),
+                                wishlistRemove: (id) => ipcRenderer.invoke('wishlist-remove', id),
+                                wishlistDeals: () => ipcRenderer.invoke('wishlist-deals'),
+                                freeGames: () => ipcRenderer.invoke('free-games'),
+                                getNews: () => ipcRenderer.invoke('get-news'),
                                 openWebPopup: (url) => ipcRenderer.invoke('open-web-popup', url),
 
                                 // --- TRAILERS ---

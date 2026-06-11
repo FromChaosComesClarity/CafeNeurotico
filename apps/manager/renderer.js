@@ -700,6 +700,8 @@ function applyLayoutMode(mode) {
     const _themedModes = ['mac', 'xp', 'kde', 'c64', 'amiga', 'beos', 'w95', 'nextstep', 'htop', 'ranger', 'bbs', 'vi', 'adventure', 'mc', 'nethack', 'grub'];
     _themedModes.forEach(m => document.body.classList.remove('layout-' + m));
     if (_themedModes.includes(mode)) document.body.classList.add('layout-' + mode);
+    // Sharp-corner (flat) treatment for the classic + flat layout families (not TTY/Ancient-OS).
+    document.body.classList.toggle('corners-flat', ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'].includes(mode));
     document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(b =>
         b.classList.toggle('active', b.dataset.val === mode));
     updateLayoutCatTab(mode);
@@ -762,9 +764,323 @@ document.querySelectorAll('.lsc-cat').forEach(tab =>
             g.style.display = g.dataset.cat === cat ? '' : 'none');
     }));
 
+// ════════════════════════════════════════════════════════════════════════════
+//  HOME — "Control Room" dashboard (optional start screen preceding the library)
+//  Stats come from the shared core engine via window.api.getHomeStats(); the
+//  same engine feeds CREMA's Home, so the numbers never drift between faces.
+// ════════════════════════════════════════════════════════════════════════════
+const HOME_WIDGETS = [
+    { key: 'daily',    label: 'The Daily Grind' },
+    { key: 'continue', label: 'Continue Playing' },
+    { key: 'backlog',  label: 'Backlog Weight' },
+    { key: 'overview', label: 'Library Overview' },
+    { key: 'stores',   label: 'Store Breakdown' },
+    { key: 'proton',   label: 'Proton Readiness' },
+    { key: 'genres',   label: 'Top Genres' },
+    { key: 'roulette', label: 'Roulette' },
+    { key: 'recent',   label: 'Recently Imported' },
+    { key: 'played',   label: 'Recently Played' },
+    { key: 'gems',     label: 'Hidden Gems' },
+    { key: 'wishlist', label: 'Wishlist & Deals' },
+    { key: 'freebies', label: 'Free This Week' },
+    { key: 'news',     label: 'Gaming News' },
+];
+// Online widgets are excluded from the default set so a fresh Home makes no network calls until opted in.
+const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news']);
+const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_ONLINE.has(k));
+const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, wishlist:12, freebies:12, news:12 };
+// Theme-derived chart palette — resolves against the active theme's CSS vars
+// (color-mix is evaluated live), so the donut follows whatever theme is applied.
+const HOME_PALETTE = [
+    'var(--accent)',
+    'color-mix(in srgb, var(--accent) 52%, var(--bg))',
+    'var(--text_sec)',
+    'color-mix(in srgb, var(--accent) 80%, var(--text_main))',
+    'color-mix(in srgb, var(--accent) 42%, var(--text_dim))',
+    'var(--text_dim)',
+    'color-mix(in srgb, var(--accent) 88%, #000)',
+    'color-mix(in srgb, var(--text_sec) 50%, var(--bg))',
+];
+let _homeEnabled = false;
+let _homeWidgets = HOME_DEFAULT.slice();
+let _homeSnap = null;
+
+async function loadHomeConfig() {
+    _homeEnabled = (await window.api.getSetting('home_enabled')) === '1';
+    try { const raw = await window.api.getSetting('home_widgets'); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) _homeWidgets = a.filter(k => HOME_SPAN[k]); } } catch (e) {}
+}
+function saveHomeConfig() {
+    window.api.setSetting('home_enabled', _homeEnabled ? '1' : '');
+    window.api.setSetting('home_widgets', JSON.stringify(_homeWidgets));
+}
+
+function _hImg(t) { if (!t) return ''; const p = t.CoverArt || t.HeroArt || t.Logo || ''; return p ? getSafePath(p) : ''; }
+function openHomeGameById(id, fallback) { const g = allGames.find(x => String(x.id) === String(id)) || fallback; if (g) { switchView(lastGridView); openGamepage(g); } }
+
+function _homeFeatured(t, pill) {
+    if (!t) return `<div class="hc-empty">Nothing here yet.</div>`;
+    const meta = [t.Store, (t.GENRE || '').split(',')[0].trim(), t.METACRITIC ? ('MC ' + t.METACRITIC) : '', t.HLTB_Main].filter(Boolean).join(' &middot; ');
+    const cov = _hImg(t);
+    return `<div class="hc-feature" data-gid="${t.id}">${cov ? `<img class="cov" src="${cov}">` : `<div class="cov"></div>`}<div class="meta"><span class="hc-pill">${pill}</span><div class="t">${escHtml(t.Game || '')}</div><div class="s">${meta}</div></div></div>`;
+}
+function _homeBars(items) {
+    if (!items || !items.length) return `<div class="hc-empty">No data yet.</div>`;
+    const max = Math.max(...items.map(i => i.count)) || 1;
+    return `<div class="hc-bars">${items.slice(0, 6).map(i => `<div class="hc-bar"><span class="bn">${escHtml(i.label)}</span><span class="bt"><span class="bf" style="width:${Math.round(i.count / max * 100)}%"></span></span><span class="bc">${i.count}</span></div>`).join('')}</div>`;
+}
+function _homeDonut(items) {
+    if (!items || !items.length) return `<div class="hc-empty">No data yet.</div>`;
+    const top = items.slice(0, 7);
+    const total = top.reduce((s, i) => s + i.count, 0) || 1;
+    let acc = 0; const stops = [], legend = [];
+    top.forEach((it, idx) => {
+        const col = HOME_PALETTE[idx % HOME_PALETTE.length];
+        const a = acc / total * 360; acc += it.count; const b = acc / total * 360;
+        stops.push(`${col} ${a}deg ${b}deg`);
+        legend.push(`<div><i style="background:${col}"></i><span>${escHtml(it.label)}</span><span style="color:var(--text_dim); margin-left:auto; font-weight:800;">${it.count}</span></div>`);
+    });
+    return `<div class="hc-donut-wrap"><div class="hc-donut" style="background:conic-gradient(${stops.join(',')})"></div><div class="hc-legend">${legend.join('')}</div></div>`;
+}
+function _homeTileRow(items, empty) {
+    if (!items || !items.length) return `<div class="hc-empty">${empty}</div>`;
+    return `<div class="hc-row">${items.map(t => { const c = _hImg(t); return `<div class="hc-tile" data-gid="${t.id}">${c ? `<img src="${c}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${escHtml(t.Game || '')}</div></div>`; }).join('')}</div>`;
+}
+function homeWidgetHtml(key, s) {
+    switch (key) {
+        case 'overview': {
+            const c = s.counts || {};
+            const chip = (n, l) => `<div class="hc-stat"><div class="n">${n || 0}</div><div class="l">${l}</div></div>`;
+            return `<h4>Library Overview</h4><div class="hc-stats">${chip(c.total, 'Games')}${chip(c.installed, 'Installed')}${chip(c.backlog, 'Backlog')}${chip(c.played, 'Played')}${chip(c.favs, 'Favourites')}${chip(c.want, 'Want')}</div>`;
+        }
+        case 'daily':    return `<h4>The Daily Grind</h4>${_homeFeatured(s.dailyPick, "Today's Pick")}`;
+        case 'continue': return `<h4>Continue Playing</h4>${_homeFeatured(s.continuePlaying, 'Resume')}`;
+        case 'backlog': {
+            const b = s.backlog || {};
+            return `<h4>Backlog Weight</h4><div class="hc-big"><div class="bn">${b.count || 0}</div><div class="bl">games waiting</div><div class="bh">${b.hours ? ('~' + b.hours + ' hours to clear') : '&mdash;'}</div></div>`;
+        }
+        case 'stores':  return `<h4>Store Breakdown</h4>${_homeDonut(s.stores)}`;
+        case 'proton':  return `<h4>Proton Readiness</h4>${(s.proton && s.proton.length) ? _homeBars(s.proton) : `<div class="hc-empty">No ProtonDB data scraped yet.</div>`}`;
+        case 'genres':  return `<h4>Top Genres</h4>${_homeBars(s.genres)}`;
+        case 'recent':  return `<h4>Recently Imported</h4>${_homeTileRow(s.recentlyImported, 'Nothing imported yet.')}`;
+        case 'played':  return `<h4>Recently Played</h4>${_homeTileRow(s.recentlyPlayed, 'No play history yet.')}`;
+        case 'gems':    return `<h4>Hidden Gems &mdash; Installed &amp; Unplayed</h4>${_homeTileRow(s.hiddenGems, 'No standout unplayed games found.')}`;
+        case 'wishlist': return `<h4>Wishlist &mdash; Deals</h4><div id="home-wishlist-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'freebies': return `<h4>Free This Week</h4><div id="home-freebies-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'news': return `<h4>Gaming News</h4><div id="home-news-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'roulette': return `<h4>Roulette &mdash; Can't Decide?</h4><div class="hc-roulette"><div id="home-roulette-result"><div class="hc-empty">Hit spin for a pick from your library.</div></div><div class="hc-roulette-opts"><button class="hc-chip" data-roul="installedOnly">Installed</button><button class="hc-chip" data-roul="backlogOnly">Backlog</button><button class="hc-chip" data-roul="favsOnly">Favourites</button></div><button class="hc-spin-btn" id="home-spin">Spin</button></div>`;
+        default: return '';
+    }
+}
+async function renderHome() {
+    const grid = document.getElementById('home-grid'); if (!grid) return;
+    const dEl = document.getElementById('home-date');
+    if (dEl) dEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    grid.innerHTML = `<div class="hc-empty" style="grid-column:span 12;">Reading your library&hellip;</div>`;
+    _homeSnap = (await window.api.getHomeStats()) || {};
+    grid.innerHTML = '';
+    for (const key of _homeWidgets) {
+        if (!HOME_SPAN[key]) continue;
+        const card = document.createElement('div');
+        card.className = 'home-card span-' + HOME_SPAN[key];
+        card.innerHTML = homeWidgetHtml(key, _homeSnap);
+        grid.appendChild(card);
+    }
+    grid.querySelectorAll('[data-gid]').forEach(el => el.addEventListener('click', () => openHomeGameById(el.getAttribute('data-gid'))));
+    const spin = document.getElementById('home-spin');
+    if (spin) {
+        const opts = {};
+        grid.querySelectorAll('.hc-chip[data-roul]').forEach(ch => ch.addEventListener('click', () => { ch.classList.toggle('on'); opts[ch.dataset.roul] = ch.classList.contains('on'); }));
+        spin.addEventListener('click', async () => {
+            const res = document.getElementById('home-roulette-result');
+            res.innerHTML = `<div class="hc-empty">Spinning&hellip;</div>`;
+            const g = await window.api.getRandomGame(Object.fromEntries(Object.entries(opts).filter(([, v]) => v)));
+            if (!g) { res.innerHTML = `<div class="hc-empty">No games match those filters.</div>`; return; }
+            res.innerHTML = _homeFeatured(g, 'Your Pick');
+            res.querySelector('[data-gid]')?.addEventListener('click', () => openHomeGameById(g.id, g));
+        });
+    }
+    if (grid.querySelector('#home-wishlist-body')) loadWishlistWidget();
+    if (grid.querySelector('#home-freebies-body')) loadFreebiesWidget();
+    if (grid.querySelector('#home-news-body')) loadNewsWidget();
+}
+
+// ── Gaming News widget (Phase 3, opt-in RSS) ─────────────────────────────────
+function _homeAgo(ts) {
+    if (!ts) return ''; const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 3600) return Math.max(1, Math.floor(s / 60)) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+}
+async function loadNewsWidget() {
+    const body = document.getElementById('home-news-body'); if (!body) return;
+    body.innerHTML = `<div class="hc-empty">Fetching headlines&hellip;</div>`;
+    const items = (await window.api.getNews()) || [];
+    let html = `<div class="wl-toolbar"><button id="news-settings-btn" class="home-ghost" title="News sources">&#9881;</button></div>`;
+    if (!items.length) html += `<div class="hc-empty">No headlines &mdash; check your sources or connection.</div>`;
+    else html += `<div class="news-list">` + items.map(n =>
+        `<div class="news-item" data-url="${escHtml(n.link)}"><div class="news-title">${escHtml(n.title)}</div><div class="news-meta">${escHtml(n.source)}${n.date ? ` &middot; ${_homeAgo(n.date)}` : ''}</div></div>`
+    ).join('') + `</div>`;
+    body.innerHTML = html;
+    document.getElementById('news-settings-btn')?.addEventListener('click', openNewsSettings);
+    body.querySelectorAll('.news-item[data-url]').forEach(el => el.addEventListener('click', () => window.api.openInstallUrl(el.dataset.url)));
+}
+async function openNewsSettings() {
+    const raw = await window.api.getSetting('news_sources');
+    document.getElementById('news-sources-input').value = raw || '';
+    document.getElementById('modal-news-settings').classList.add('active');
+}
+document.getElementById('news-save')?.addEventListener('click', async () => {
+    await window.api.setSetting('news_sources', document.getElementById('news-sources-input').value.trim());
+    document.getElementById('modal-news-settings').classList.remove('active');
+    loadNewsWidget();
+});
+document.getElementById('news-close')?.addEventListener('click', () => document.getElementById('modal-news-settings').classList.remove('active'));
+document.getElementById('modal-news-settings')?.addEventListener('click', e => { if (e.target.id === 'modal-news-settings') e.currentTarget.classList.remove('active'); });
+
+async function loadFreebiesWidget() {
+    const body = document.getElementById('home-freebies-body'); if (!body) return;
+    body.innerHTML = `<div class="hc-empty">Checking free games&hellip;</div>`;
+    const games = (await window.api.freeGames()) || [];
+    if (!games.length) { body.innerHTML = `<div class="hc-empty">No free games right now &mdash; check back later.</div>`; return; }
+    body.innerHTML = `<div class="wl-row">` + games.map(g =>
+        `<div class="wl-tile"><div class="wl-cov" data-url="${escHtml(g.url)}">${g.cover ? `<img src="${escHtml(g.cover)}" loading="lazy">` : `<div class="wl-ph"></div>`}<span class="wl-cut" style="background:var(--accent); color:var(--bg);">FREE</span></div><div class="wl-title">${escHtml(g.title)}</div><div class="wl-price"><span class="wl-shop">${escHtml(g.store || 'Epic')}</span></div></div>`
+    ).join('') + `</div>`;
+    body.querySelectorAll('.wl-cov[data-url]').forEach(t => t.addEventListener('click', () => window.api.openInstallUrl(t.dataset.url)));
+}
+
+// ── Wishlist & Deals widget (Phase 2, opt-in IsThereAnyDeal) ──────────────────
+function _wlFmt(amount, currency) {
+    if (amount == null) return ''; const a = Number(amount); if (!isFinite(a)) return '';
+    if (currency === 'USD' || currency === 'CAD' || currency === 'AUD') return '$' + a.toFixed(2);
+    if (currency === 'EUR') return '€' + a.toFixed(2);
+    if (currency === 'GBP') return '£' + a.toFixed(2);
+    if (currency === 'BRL') return 'R$' + a.toFixed(2);
+    return a.toFixed(2) + (currency ? (' ' + currency) : '');
+}
+function _wlItadUrl(slug) { return slug ? `https://isthereanydeal.com/game/${slug}/info/` : ''; }
+async function loadWishlistWidget() {
+    const body = document.getElementById('home-wishlist-body'); if (!body) return;
+    const [key, currency, click] = await Promise.all([
+        window.api.getSetting('itad_api_key'),
+        window.api.getSetting('itad_currency'),
+        window.api.getSetting('itad_click'),
+    ]);
+    if (!key) {
+        body.innerHTML = `<div class="wl-connect"><div class="wl-connect-t">Track prices &amp; all-time lows on games you don't own yet with <b>IsThereAnyDeal</b>.</div><button id="wl-setup-btn" class="home-primary" style="align-self:flex-start;">Set up IsThereAnyDeal</button></div>`;
+        document.getElementById('wl-setup-btn').onclick = openWishlistSettings;
+        return;
+    }
+    body.innerHTML = `<div class="hc-empty">Checking deals&hellip;</div>`;
+    const res = await window.api.wishlistDeals();
+    const rows = (res && res.rows) || [];
+    let html = `<div class="wl-toolbar"><button id="wl-add-btn" class="home-ghost">+ Add Game</button><button id="wl-settings-btn" class="home-ghost" title="Wishlist settings">&#9881;</button></div>`;
+    if (!rows.length) html += `<div class="hc-empty">Your wishlist is empty &mdash; add a game to watch its price.</div>`;
+    else html += `<div class="wl-row">` + rows.map(r => {
+        const deal = r.deal, low = r.low;
+        const dispCur = currency || (deal && deal.currency);
+        const storeUrl = (deal && deal.url) ? deal.url : '', itadUrl = _wlItadUrl(r.slug);
+        const url = (click === 'itad') ? (itadUrl || storeUrl) : (storeUrl || itadUrl);
+        const price = deal ? `<b>${_wlFmt(deal.price, dispCur)}</b>${deal.shop ? ` <span class="wl-shop">${escHtml(deal.shop)}</span>` : ''}` : '<span class="wl-na">no price</span>';
+        const cut = (deal && deal.cut) ? `<span class="wl-cut">-${deal.cut}%</span>` : '';
+        const lowLine = low ? `<div class="wl-low">all-time low ${_wlFmt(low.amount, currency || low.currency)}</div>` : '';
+        return `<div class="wl-tile"><div class="wl-cov" ${url ? `data-url="${escHtml(url)}"` : ''}>${r.cover ? `<img src="${escHtml(r.cover)}" loading="lazy">` : `<div class="wl-ph"></div>`}<button class="wl-x" data-rm="${escHtml(r.itad_id)}" title="Remove">&times;</button>${cut}</div><div class="wl-title">${escHtml(r.title)}</div><div class="wl-price">${price}</div>${lowLine}</div>`;
+    }).join('') + `</div>`;
+    body.innerHTML = html;
+    document.getElementById('wl-add-btn')?.addEventListener('click', openWishlistAdd);
+    document.getElementById('wl-settings-btn')?.addEventListener('click', openWishlistSettings);
+    body.querySelectorAll('.wl-x[data-rm]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation(); await window.api.wishlistRemove(b.dataset.rm); loadWishlistWidget(); }));
+    body.querySelectorAll('.wl-cov[data-url]').forEach(t => t.addEventListener('click', () => window.api.openInstallUrl(t.dataset.url)));
+}
+async function openWishlistSettings() {
+    const [key, country, currency, click] = await Promise.all([
+        window.api.getSetting('itad_api_key'), window.api.getSetting('itad_country'),
+        window.api.getSetting('itad_currency'), window.api.getSetting('itad_click'),
+    ]);
+    document.getElementById('wls-key').value = key || '';
+    document.getElementById('wls-country').value = country || 'US';
+    document.getElementById('wls-currency').value = currency || '';
+    document.getElementById('wls-click').value = click || 'store';
+    document.getElementById('modal-wishlist-settings').classList.add('active');
+}
+document.getElementById('wls-save')?.addEventListener('click', async () => {
+    const key = document.getElementById('wls-key').value.trim();
+    const country = (document.getElementById('wls-country').value.trim() || 'US').toUpperCase();
+    const currency = document.getElementById('wls-currency').value.trim().toUpperCase();
+    await Promise.all([
+        window.api.setSetting('itad_api_key', key),
+        window.api.setSetting('itad_country', country),
+        window.api.setSetting('itad_currency', currency),
+        window.api.setSetting('itad_click', document.getElementById('wls-click').value),
+    ]);
+    document.getElementById('modal-wishlist-settings').classList.remove('active');
+    loadWishlistWidget();
+});
+document.getElementById('wls-close')?.addEventListener('click', () => document.getElementById('modal-wishlist-settings').classList.remove('active'));
+document.getElementById('modal-wishlist-settings')?.addEventListener('click', e => { if (e.target.id === 'modal-wishlist-settings') e.currentTarget.classList.remove('active'); });
+function openWishlistAdd() {
+    document.getElementById('modal-wishlist-add').classList.add('active');
+    const inp = document.getElementById('wl-search-input'); inp.value = ''; document.getElementById('wl-search-results').innerHTML = '';
+    setTimeout(() => inp.focus(), 60);
+}
+async function runWishlistSearch() {
+    const q = document.getElementById('wl-search-input').value.trim(); if (!q) return;
+    const box = document.getElementById('wl-search-results'); box.innerHTML = `<div class="hc-empty">Searching&hellip;</div>`;
+    const results = await window.api.itadSearch(q);
+    if (!results || !results.length) { box.innerHTML = `<div class="hc-empty">No matches &mdash; is your ITAD key valid?</div>`; return; }
+    box.innerHTML = results.map(r => `<div class="wl-res"><span>${escHtml(r.title)}</span><button class="wl-res-add" data-id="${escHtml(r.id)}" data-title="${escHtml(r.title)}" data-slug="${escHtml(r.slug || '')}">Add</button></div>`).join('');
+    box.querySelectorAll('.wl-res-add').forEach(b => b.addEventListener('click', async () => {
+        b.disabled = true; b.textContent = '…';
+        const res = await window.api.wishlistAdd({ id: b.dataset.id, title: b.dataset.title, slug: b.dataset.slug });
+        b.textContent = (res && res.ok) ? '✓ Added' : 'Error';
+        loadWishlistWidget();
+    }));
+}
+document.getElementById('wl-search-go')?.addEventListener('click', runWishlistSearch);
+document.getElementById('wl-search-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') runWishlistSearch(); });
+document.getElementById('wl-add-close')?.addEventListener('click', () => document.getElementById('modal-wishlist-add').classList.remove('active'));
+document.getElementById('modal-wishlist-add')?.addEventListener('click', e => { if (e.target.id === 'modal-wishlist-add') e.currentTarget.classList.remove('active'); });
+
+let _cfgOrder = null;
+let _cfgChecked = new Set();
+function _homeCfgSync() { document.querySelectorAll('#home-cfg-widgets input[data-k]').forEach(cb => { if (cb.checked) _cfgChecked.add(cb.dataset.k); else _cfgChecked.delete(cb.dataset.k); }); }
+function renderHomeCfgList() {
+    const wrap = document.getElementById('home-cfg-widgets'); wrap.innerHTML = '';
+    _cfgOrder.forEach((key, i) => {
+        const w = HOME_WIDGETS.find(x => x.key === key); if (!w) return;
+        const row = document.createElement('div'); row.className = 'home-cfg-w';
+        row.innerHTML = `<button class="hcw-mv" data-mv="up" ${i === 0 ? 'disabled' : ''}>&#9650;</button><button class="hcw-mv" data-mv="down" ${i === _cfgOrder.length - 1 ? 'disabled' : ''}>&#9660;</button><label><input type="checkbox" data-k="${key}" ${_cfgChecked.has(key) ? 'checked' : ''}> <span>${w.label}</span></label>`;
+        row.querySelector('[data-mv="up"]').onclick = () => { _homeCfgSync(); if (i > 0) { [_cfgOrder[i - 1], _cfgOrder[i]] = [_cfgOrder[i], _cfgOrder[i - 1]]; renderHomeCfgList(); } };
+        row.querySelector('[data-mv="down"]').onclick = () => { _homeCfgSync(); if (i < _cfgOrder.length - 1) { [_cfgOrder[i + 1], _cfgOrder[i]] = [_cfgOrder[i], _cfgOrder[i + 1]]; renderHomeCfgList(); } };
+        wrap.appendChild(row);
+    });
+}
+function openHomeConfig() {
+    document.getElementById('cfg-home-enabled').checked = _homeEnabled;
+    const rest = HOME_WIDGETS.map(w => w.key).filter(k => !_homeWidgets.includes(k));
+    _cfgOrder = [..._homeWidgets.filter(k => HOME_SPAN[k]), ...rest];
+    _cfgChecked = new Set(_homeWidgets);
+    renderHomeCfgList();
+    document.getElementById('modal-home-config').classList.add('active');
+}
+document.getElementById('btn-home-config')?.addEventListener('click', openHomeConfig);
+document.getElementById('btn-home-cfg-done')?.addEventListener('click', () => {
+    _homeEnabled = document.getElementById('cfg-home-enabled').checked;
+    _homeCfgSync();
+    const picked = _cfgOrder.filter(k => _cfgChecked.has(k));
+    _homeWidgets = picked.length ? picked : HOME_DEFAULT.slice();
+    saveHomeConfig();
+    document.getElementById('modal-home-config').classList.remove('active');
+    renderHome();
+});
+document.getElementById('modal-home-config')?.addEventListener('click', e => { if (e.target.id === 'modal-home-config') e.currentTarget.classList.remove('active'); });
+document.getElementById('btn-home-enter')?.addEventListener('click', () => switchView(lastGridView));
+document.getElementById('btn-titlebar-home')?.addEventListener('click', async () => { await renderHome(); switchView('view-home'); });
+
 (async () => {
     const saved = await window.api.getSetting('layout_mode') || localStorage.getItem('cngm_layout_mode') || 'rail';
     applyLayoutMode(saved);
+    await loadHomeConfig();
+    if (_homeEnabled) { await renderHome(); switchView('view-home'); }
 })();
 
 // ── VIEW / REFRESH (all layouts) ──────────────────────────────────────────

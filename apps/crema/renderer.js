@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC" };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC", homeEnabled: false, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -429,7 +429,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; audioCfg.homeEnabled = rawCfg.homeEnabled === true; audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -617,6 +617,175 @@ async function completeSetup() {
   resetIdleTimer();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  HOME — "Marquee" couch dashboard (optional start screen, precedes the library)
+//  Data comes from the shared core engine (window.api.getHomeStats), the same
+//  one The Manager uses — so the numbers never drift between the two faces.
+// ════════════════════════════════════════════════════════════════════════════
+let homeRows = [];                 // [{ key, cells:[{type,game?,id,el}] }]
+let homeFocus = { row: 0, col: 0 };
+const _CH_LIB  = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
+const _CH_DICE = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="16" cy="16" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>`;
+function _che(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function _chImg(t, hero) { if (!t) return ''; const p = hero ? (t.HeroArt || t.Screenshot || t.CoverArt) : (t.CoverArt || t.HeroArt || t.Logo); return p ? convertSafePath(String(p).split('|')[0]) : ''; }
+function _chFmt(amount, currency) { if (amount == null) return ''; const a = Number(amount); if (!isFinite(a)) return ''; if (currency === 'USD' || currency === 'CAD' || currency === 'AUD') return '$' + a.toFixed(2); if (currency === 'EUR') return '€' + a.toFixed(2); if (currency === 'GBP') return '£' + a.toFixed(2); if (currency === 'BRL') return 'R$' + a.toFixed(2); return a.toFixed(2) + (currency ? (' ' + currency) : ''); }
+
+function transitionToHome() {
+  gameState = 'HOME';
+  clearMediaLoaders(); clearGalleryMedia();
+  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  document.getElementById('overlay-backdrop')?.classList.add('hidden');
+  document.getElementById('home-screen').classList.remove('hidden');
+  setBlur(false);
+  renderHomeScreen();
+}
+
+async function renderHomeScreen() {
+  const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
+  const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news');
+  const [snap, wlRes, freeRes, newsRes, itadCurrency, itadClick] = await Promise.all([
+    window.api.getHomeStats().then(s => s || {}),
+    wantWishlist ? window.api.wishlistDeals() : Promise.resolve(null),
+    wantFree ? window.api.freeGames() : Promise.resolve(null),
+    wantNews ? window.api.getNews() : Promise.resolve(null),
+    wantWishlist ? window.api.getSetting('itad_currency') : Promise.resolve(''),
+    wantWishlist ? window.api.getSetting('itad_click') : Promise.resolve('store'),
+  ]);
+  const c = snap.counts || {}, dp = snap.dailyPick;
+  const rows = [];
+  let html = '<div class="ch-wrap">';
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  html += `<div class="ch-top"><div class="ch-greet"><div class="g1">CREMA</div><div class="g2">${_che(dateStr)}</div></div><div class="ch-stats">`
+    + `<div class="ch-stat"><div class="n">${c.total || 0}</div><div class="l">Games</div></div>`
+    + `<div class="ch-stat"><div class="n">${c.installed || 0}</div><div class="l">Installed</div></div>`
+    + `<div class="ch-stat"><div class="n">${c.backlog || 0}</div><div class="l">Backlog</div></div>`
+    + `<div class="ch-stat"><div class="n">${(snap.backlog && snap.backlog.hours) || 0}h</div><div class="l">To Clear</div></div>`
+    + `</div></div>`;
+  if (dp) {
+    const img = _chImg(dp, true);
+    const meta = [dp.Store, (dp.GENRE || '').split(',')[0].trim(), dp.METACRITIC ? ('MC ' + dp.METACRITIC) : '', dp.HLTB_Main].filter(Boolean).join('   •   ');
+    html += `<div class="ch-hero" id="che-h">${img ? `<img src="${img}">` : ''}<div class="ov"><span class="pill">Today's Pick</span><div class="ht">${_che(dp.Game)}</div><div class="hs">${_che(meta)}</div></div></div>`;
+    rows.push({ key: 'featured', cells: [{ type: 'game', game: dp, id: 'che-h' }] });
+  }
+  const aCells = [];
+  let aHtml = '<div class="ch-actions">';
+  aHtml += `<div class="ch-act" id="che-a0"><div class="ai">${_CH_LIB}</div><div><div class="at">Enter Library</div><div class="asub">Browse everything</div></div></div>`;
+  aCells.push({ type: 'library', id: 'che-a0' });
+  aHtml += `<div class="ch-act" id="che-a1"><div class="ai">${_CH_DICE}</div><div><div class="at">Surprise Me</div><div class="asub">Random pick</div></div></div>`;
+  aCells.push({ type: 'roulette', id: 'che-a1' });
+  if (snap.continuePlaying) { const cg = snap.continuePlaying, cov = _chImg(cg, false); aHtml += `<div class="ch-act" id="che-a2">${cov ? `<img class="cov" src="${cov}">` : `<div class="ai">${_CH_LIB}</div>`}<div><div class="at">Continue</div><div class="asub">${_che(cg.Game)}</div></div></div>`; aCells.push({ type: 'game', game: cg, id: 'che-a2' }); }
+  aHtml += '</div>';
+  html += aHtml;
+  rows.push({ key: 'actions', cells: aCells });
+  const rowData = { recent: ['Recently Imported', snap.recentlyImported], gems: ['Hidden Gems', snap.hiddenGems], played: ['Recently Played', snap.recentlyPlayed] };
+  ['recent', 'gems', 'played'].forEach(k => {
+    if (!enabled.includes(k)) return;
+    const [title, items] = rowData[k];
+    if (!items || !items.length) return;
+    let rh = `<div class="ch-rowsec"><h3>${title}</h3><div class="ch-row">`;
+    const cells = [];
+    items.forEach((g, i) => { const cov = _chImg(g, false), id = `che-${k}-${i}`; rh += `<div class="ch-tile" id="${id}">${cov ? `<img src="${cov}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.Game)}</div></div>`; cells.push({ type: 'game', game: g, id }); });
+    rh += '</div></div>';
+    html += rh;
+    rows.push({ key: k, cells });
+  });
+  if (wantWishlist && wlRes && wlRes.rows && wlRes.rows.length) {
+    let rh = `<div class="ch-rowsec"><h3>Wishlist</h3><div class="ch-row">`;
+    const cells = [];
+    wlRes.rows.forEach((r, i) => {
+      const id = `che-wl-${i}`, deal = r.deal;
+      const storeUrl = (deal && deal.url) ? deal.url : '', itadUrl = r.slug ? `https://isthereanydeal.com/game/${r.slug}/info/` : '';
+      const url = (itadClick === 'itad') ? (itadUrl || storeUrl) : (storeUrl || itadUrl);
+      const priceTxt = deal ? `${_chFmt(deal.price, itadCurrency || deal.currency)}${deal.cut ? `  -${deal.cut}%` : ''}` : '';
+      rh += `<div class="ch-tile" id="${id}">${r.cover ? `<img src="${_che(r.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(r.title)}</div>${priceTxt ? `<div class="ch-price">${_che(priceTxt)}</div>` : ''}</div>`;
+      cells.push({ type: 'url', url, id });
+    });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'wishlist', cells });
+  }
+  if (wantFree && freeRes && freeRes.length) {
+    let rh = `<div class="ch-rowsec"><h3>Free This Week</h3><div class="ch-row">`;
+    const cells = [];
+    freeRes.forEach((g, i) => {
+      const id = `che-fr-${i}`;
+      rh += `<div class="ch-tile" id="${id}">${g.cover ? `<img src="${_che(g.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.title)}</div><div class="ch-price ch-free">FREE</div></div>`;
+      cells.push({ type: 'url', url: g.url, id });
+    });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'freebies', cells });
+  }
+  if (wantNews && newsRes && newsRes.length) {
+    let rh = `<div class="ch-rowsec"><h3>Gaming News</h3><div class="ch-row">`;
+    const cells = [];
+    newsRes.slice(0, 12).forEach((n, i) => {
+      const id = `che-nw-${i}`;
+      rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`;
+      cells.push({ type: 'url', url: n.link, id });
+    });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'news', cells });
+  }
+  html += `<div class="ch-foot">D-Pad Navigate &nbsp;&bull;&nbsp; A Select &nbsp;&bull;&nbsp; B Library &nbsp;&bull;&nbsp; Start Menu</div>`;
+  html += '</div>';
+  document.getElementById('home-content').innerHTML = html;
+  rows.forEach(r => r.cells.forEach(cell => { cell.el = document.getElementById(cell.id); }));
+  homeRows = rows.filter(r => r.cells.some(c => c.el));
+  homeFocus = { row: 0, col: 0 };
+  updateHomeFocus();
+}
+
+function updateHomeFocus() {
+  document.querySelectorAll('#home-content .ch-focus').forEach(e => e.classList.remove('ch-focus'));
+  const row = homeRows[homeFocus.row]; if (!row) return;
+  const cell = row.cells[homeFocus.col]; if (!cell || !cell.el) return;
+  cell.el.classList.add('ch-focus');
+  cell.el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+}
+
+function homeHandleInput(action) {
+  if (action === 'START') { openOverlay('MAIN_MENU'); return; }
+  if (action === 'BACK')  { playSound(sfxBack); transitionToStart(); return; }
+  if (!homeRows.length) return;
+  const row = homeRows[homeFocus.row]; if (!row) return;
+  if (action === 'UP') { if (homeFocus.row > 0) { homeFocus.row--; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
+  else if (action === 'DOWN') { if (homeFocus.row < homeRows.length - 1) { homeFocus.row++; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
+  else if (action === 'LEFT') { if (homeFocus.col > 0) { homeFocus.col--; playSound(sfxNav); updateHomeFocus(); } }
+  else if (action === 'RIGHT') { if (homeFocus.col < row.cells.length - 1) { homeFocus.col++; playSound(sfxNav); updateHomeFocus(); } }
+  else if (action === 'ACCEPT') {
+    const cell = row.cells[homeFocus.col]; if (!cell) return; playSound(sfxSelect);
+    if (cell.type === 'game') cremaOpenGame(cell.game);
+    else if (cell.type === 'library') transitionToStart();
+    else if (cell.type === 'roulette') homeSpin();
+    else if (cell.type === 'url') { if (cell.url) window.api.openInstallUrl(cell.url); }
+  }
+}
+
+async function homeSpin() { const g = await window.api.getRandomGame({}); if (g) cremaOpenGame(g); }
+
+// Open a specific game from Home, honoring the browse mode: GALLERY opens that
+// game's gamepage (like clicking a gallery cell); LIST selects it in the library
+// (its classic gamepage panel is always shown for the selected game).
+function cremaOpenGame(game) {
+  if (!game) return;
+  document.getElementById('home-screen')?.classList.add('hidden');
+  const i = categories.indexOf('ALL GAMES'); currentCategoryIndex = i >= 0 ? i : 0;
+  if ((audioCfg.browseMode || 'LIST') === 'GALLERY') {
+    transitionToGallery();
+    const idx = galleryGames.findIndex(g => String(g.id) === String(game.id));
+    if (idx >= 0) { galleryIndex = idx; openGalleryGamepage(galleryGames[idx]); }
+  } else {
+    transitionToMain();
+    const idx = filteredGames.findIndex(g => String(g.id) === String(game.id));
+    if (idx >= 0) { currentGameIndex = idx; updateGameSelection(); }
+  }
+}
+
+function openHomeMenu() {
+  gameState = 'OVERLAY'; currentOverlayType = 'HOME_MENU'; playSound(sfxSelect);
+  const items = [(audioCfg.homeEnabled ? '★ ' : '') + 'SHOW HOME ON STARTUP'];
+  [['recent', 'RECENTLY IMPORTED'], ['gems', 'HIDDEN GEMS'], ['played', 'RECENTLY PLAYED'], ['wishlist', 'WISHLIST'], ['freebies', 'FREE THIS WEEK'], ['news', 'GAMING NEWS']]
+    .forEach(([k, l]) => items.push((audioCfg.homeRows.includes(k) ? '★ ' : '') + l));
+  items.push(t('common.back_to_menu'));
+  renderGenericOverlay('HOME SCREEN', items);
+}
+
 async function boot() {
   currentLang = await window.api.getSetting('language') || 'en';
   strings = await window.api.getStrings(currentLang);
@@ -629,7 +798,7 @@ async function boot() {
   await loadGamePlaylists();
   for (let g of allGames) { if (g.Screenshot && String(g.Screenshot).trim() !== "") { let paths = String(g.Screenshot).split('|').filter(s => s.trim() !== ""); paths.forEach(p => availableScreenshots.push({ path: p, game: g })); } }
   let prog = 0; const bar = document.getElementById('splash-bar'); const txt = document.getElementById('splash-text');
-  const l = setInterval(() => { prog += 2; bar.style.width = `${prog}%`; if (prog === 30) txt.innerText = t('status.grinding'); if (prog === 60) txt.innerText = t('status.brewing'); if (prog >= 100) { clearInterval(l); document.querySelector('.splash-logo').classList.add('boot-anim'); setTimeout(async () => { hasBooted = true; const setupDone = await window.api.getSetting('setup_complete'); if (!setupDone) { applyBgmMode(); showSetupScreen(); } else { transitionToStart(); applyBgmMode(); resetIdleTimer(); } }, 800); } }, 30);
+  const l = setInterval(() => { prog += 2; bar.style.width = `${prog}%`; if (prog === 30) txt.innerText = t('status.grinding'); if (prog === 60) txt.innerText = t('status.brewing'); if (prog >= 100) { clearInterval(l); document.querySelector('.splash-logo').classList.add('boot-anim'); setTimeout(async () => { hasBooted = true; const setupDone = await window.api.getSetting('setup_complete'); if (!setupDone) { applyBgmMode(); showSetupScreen(); } else { if (audioCfg.homeEnabled) transitionToHome(); else transitionToStart(); applyBgmMode(); resetIdleTimer(); } }, 800); } }, 30);
   requestAnimationFrame(pollGamepad); window.api.onDownloadProgress(updateDownloadProgressBar);
   window.api.onInstallStatusUpdated(() => refreshDatabase());
 }
@@ -842,8 +1011,10 @@ function handleInput(action) {
   if (gameState === 'SPLASH' || gameState === 'PROGRESS') return;
 
   if (gameState === 'START') {
+    if (action === 'BACK' && audioCfg.homeEnabled) { playSound(sfxBack); transitionToHome(); return; }
     const _mode = audioCfg.startScreenMode; if (_mode === 'GRID') { if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') { playSound(sfxNav); navigateGrid(action); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else { if (action === 'LEFT' || action === 'UP') { playSound(sfxNav); navigateCarousel('left'); } else if (action === 'RIGHT' || action === 'DOWN') { playSound(sfxNav); navigateCarousel('right'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); }
   }
+  else if (gameState === 'HOME') { homeHandleInput(action); }
   else if (gameState === 'MAIN') {
     if (filteredGames.length === 0 && action !== 'BACK' && action !== 'LEFT' && action !== 'RIGHT' && action !== 'START' && action !== 'Y_BUTTON') return;
     if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); transitionToStart(); } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }
@@ -1228,10 +1399,10 @@ function openPico8Menu() {
 }
 
 async function openOverlay(type) {
-  if (gameState === 'START' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') { previousGameState = gameState; }
+  if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', 'HOME SCREEN', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
     const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdStr = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? t('game_menu.edit_launch') : t('game_menu.add_launch'); const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
@@ -1253,7 +1424,7 @@ function updateOverlaySelection() {
   const el = document.getElementById(`overlay-${currentOverlayIndex}`);
   if (el) { el.classList.add('selected'); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
 }
-function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
+function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
 
 function executeOverlayAction() {
   playSound(sfxSelect); const action = overlayItems[currentOverlayIndex];
@@ -1352,6 +1523,20 @@ function executeOverlayAction() {
     return;
   }
 
+  if (currentOverlayType === 'HOME_MENU') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
+    const label = String(action).replace('★ ', '');
+    if (label === 'SHOW HOME ON STARTUP') { audioCfg.homeEnabled = !audioCfg.homeEnabled; }
+    else {
+      const map = { 'RECENTLY IMPORTED': 'recent', 'HIDDEN GEMS': 'gems', 'RECENTLY PLAYED': 'played', 'WISHLIST': 'wishlist', 'FREE THIS WEEK': 'freebies', 'GAMING NEWS': 'news' };
+      const k = map[label];
+      if (k) { if (audioCfg.homeRows.includes(k)) audioCfg.homeRows = audioCfg.homeRows.filter(x => x !== k); else audioCfg.homeRows.push(k); }
+    }
+    window.api.saveAudioConfig(audioCfg);
+    openHomeMenu();
+    return;
+  }
+
   if (gameState === 'OVERLAY') {
     if (action === t('menu.jukebox_mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openJukebox(); }
     else if (action === t('menu.quit')) { currentOverlayType = 'CONFIRM_QUIT'; renderGenericOverlay(t('confirm.quit_title'), [t('confirm.yes_quit'), t('common.cancel')]); }
@@ -1387,6 +1572,7 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
     else if (action === t('menu.start_screen')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openStartScreenMenu(); }
     else if (action === t('browse.mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openBrowseModeMenu(); }
     else if (action === 'GAMEPAGE STYLE') { document.getElementById('overlay-backdrop').classList.add('hidden'); openGamepageStyleMenu(); }
+    else if (action === 'HOME SCREEN') { document.getElementById('overlay-backdrop').classList.add('hidden'); openHomeMenu(); }
     else if (action === t('menu.language')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openLanguageMenu(); }
     else if (action === t('menu.about')) {
       currentOverlayType = 'ABOUT_CREMA';
@@ -1685,7 +1871,7 @@ function openSoundOverlay() { if (document.getElementById('overlay-backdrop')) d
 function renderSoundMenu() { const lst = document.getElementById('sound-list'); lst.innerHTML = ''; overlayItems = [t('sound.music_style_label'), audioCfg.bgm ? t('sound.bgm_on') : t('sound.bgm_off'), audioCfg.sfx ? t('sound.sfx_on') : t('sound.sfx_off'), t('sound.bgm_vol', {vol: Math.round(audioCfg.vol * 100)}), t('common.back_to_menu')]; overlayItems.forEach((item, i) => { const div = document.createElement('div'); div.className = 'overlay-item'; div.innerText = item; div.id = `snd-${i}`; lst.appendChild(div); }); document.querySelectorAll('#sound-list .overlay-item').forEach(el => el.classList.remove('selected')); const el = document.getElementById(`snd-${currentOverlayIndex}`); if (el) el.classList.add('selected'); }
 function handleSoundHorizontal(dir) { if (currentOverlayIndex === 3) { let v = audioCfg.vol; if (dir === 'RIGHT') v = Math.min(1.0, v + 0.05); else v = Math.max(0.0, v - 0.05); audioCfg.vol = v; if (audioCfg.bgm && !isVideoActive()) bgmAudio.volume = v; window.api.saveAudioConfig(audioCfg); renderSoundMenu(); playSound(sfxNav); } }
 function executeSoundAction() { playSound(sfxSelect); if (currentOverlayIndex === 0) { openMusicStyleMenu(); } else if (currentOverlayIndex === 1) { audioCfg.bgm = !audioCfg.bgm; window.api.saveAudioConfig(audioCfg); applyBgmMode(); renderSoundMenu(); } else if (currentOverlayIndex === 2) { audioCfg.sfx = !audioCfg.sfx; window.api.saveAudioConfig(audioCfg); renderSoundMenu(); } else if (currentOverlayIndex === 4) closeSoundOverlay(); }
-function closeSoundOverlay() { playSound(sfxBack); document.getElementById('sound-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
+function closeSoundOverlay() { playSound(sfxBack); document.getElementById('sound-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
 
 
 async function openSearchOverlay() { if (document.getElementById('overlay-backdrop')) document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = 'SEARCH'; playSound(sfxSelect); setBlur(true); const bd = document.getElementById('search-backdrop'); const lst = document.getElementById('search-list'); const stat = document.getElementById('search-status'); lst.innerHTML = ''; currentSearchIndex = 0; searchResults = []; stat.innerText = t('status.searching_yt'); bd.classList.remove('hidden'); const results = await window.api.searchYoutube(filteredGames[currentGameIndex].Game); if(results.length === 0) { stat.innerText = t('status.no_results'); setTimeout(closeSearchOverlay, 2000); return; } stat.innerText = "Select a video to download:"; searchResults = results; searchResults.forEach((res, i) => { const div = document.createElement('div'); div.className = 'overlay-item'; div.id = `search-${i}`; div.style.display = "flex"; div.style.gap = "20px"; div.style.alignItems = "center"; div.style.textAlign = "left"; const img = document.createElement('img'); img.src = res.thumbnail; img.style.width = "120px"; img.style.borderRadius = "4px"; let ttl = String(res.title); if(ttl.length > 50) ttl = ttl.substring(0, 47) + "..."; div.appendChild(img); const txt = document.createElement('div'); txt.innerText = ttl; div.appendChild(txt); lst.appendChild(div); }); updateSearchSelection(); }
@@ -1719,6 +1905,7 @@ function transitionToStart() {
   document.getElementById('main-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.add('hidden');
   document.getElementById('ggp-screen').classList.add('hidden');
+  document.getElementById('home-screen')?.classList.add('hidden');
   document.getElementById('start-screen').classList.remove('hidden');
   const mode = audioCfg.startScreenMode === 'GRID' ? 'GRID' : 'CAROUSEL';
   document.getElementById('start-carousel').style.display = mode === 'CAROUSEL' ? 'flex' : 'none';
@@ -1734,7 +1921,7 @@ function updateCategorySelection() {
 function transitionToMain() {
   if ((audioCfg.browseMode || 'LIST') === 'GALLERY') { transitionToGallery(); return; }
   gameState = 'MAIN';
-  ['start-screen', 'gallery-screen', 'ggp-screen'].forEach(id => {
+  ['start-screen', 'gallery-screen', 'ggp-screen', 'home-screen'].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
   document.getElementById('main-screen').classList.remove('hidden');

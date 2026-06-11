@@ -14,10 +14,17 @@ const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 const { spawn } = require('child_process');
+const homeStats = require('./home-stats.js');
+const itad = require('./itad.js');
+const freebies = require('./freebies.js');
+const rss = require('./rss.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
             getBeautifulName, getOldCrushedName } = ctx;
+
+    // Wishlist of UN-OWNED games (Phase 2) — distinct from WANT_TO_PLAY (owned).
+    try { db.prepare(`CREATE TABLE IF NOT EXISTS wishlist (id INTEGER PRIMARY KEY AUTOINCREMENT, itad_id TEXT UNIQUE, title TEXT, slug TEXT, cover TEXT, appid TEXT, added_at INTEGER DEFAULT 0, target_price REAL)`).run(); } catch (e) {}
 
     ipcMain.handle('get-basedir', () => baseDir);
 
@@ -43,6 +50,61 @@ function registerSharedHandlers(ctx) {
     ipcMain.handle('get-setting', (e, key) => { try { const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key); return row ? row.value : null; } catch(e) { return null; } });
 
     ipcMain.handle('set-setting', (e, key, val) => { try { db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, val); return true; } catch(e) { return false; } });
+
+    // ── Home dashboard (Phase 1) — one snapshot, rendered by both faces' Home screens. ──
+    ipcMain.handle('get-home-stats', (e, opts) => {
+        if (!db) return null;
+        try {
+            const games = db.prepare("SELECT * FROM games").all();
+            return homeStats.computeHomeSnapshot(games, {
+                dailySeed: new Date().toISOString().slice(0, 10),
+                ...(opts || {}),
+            });
+        } catch (err) { return null; }
+    });
+
+    // Random game for the Roulette widget (constraints: installedOnly/backlogOnly/favsOnly/wantOnly/store/genre/maxHours).
+    ipcMain.handle('get-random-game', (e, constraints) => {
+        if (!db) return null;
+        try { return homeStats.pickRandom(db.prepare("SELECT * FROM games").all(), constraints || {}); }
+        catch (err) { return null; }
+    });
+
+    // ── Wishlist + IsThereAnyDeal deals (Phase 2) — all opt-in (no key → no network). ──
+    const _itadKey = () => { try { return db.prepare("SELECT value FROM settings WHERE key='itad_api_key'").get()?.value || ''; } catch { return ''; } };
+    const _itadCountry = () => { try { return db.prepare("SELECT value FROM settings WHERE key='itad_country'").get()?.value || 'US'; } catch { return 'US'; } };
+
+    ipcMain.handle('itad-search', async (e, q) => itad.search(_itadKey(), q));
+    ipcMain.handle('wishlist-get', () => { try { return db.prepare("SELECT * FROM wishlist ORDER BY added_at DESC").all(); } catch { return []; } });
+    ipcMain.handle('wishlist-remove', (e, itadId) => { try { db.prepare("DELETE FROM wishlist WHERE itad_id=?").run(itadId); return true; } catch { return false; } });
+    ipcMain.handle('wishlist-add', async (e, item) => {
+        if (!item || !item.id) return { ok: false };
+        let cover = item.cover || '', appid = item.appid || null;
+        if (!cover) { const inf = await itad.info(_itadKey(), item.id); if (inf) { cover = inf.cover; appid = appid || inf.appid; } }
+        try {
+            db.prepare("INSERT OR IGNORE INTO wishlist (itad_id,title,slug,cover,appid,added_at) VALUES (?,?,?,?,?,?)")
+              .run(item.id, item.title || '', item.slug || '', cover || '', appid, Date.now());
+            return { ok: true };
+        } catch (err) { return { ok: false, error: err.message }; }
+    });
+    // List + live prices/historical-low (network — only if a key is set).
+    ipcMain.handle('wishlist-deals', async () => {
+        let rows = []; try { rows = db.prepare("SELECT * FROM wishlist ORDER BY added_at DESC").all(); } catch {}
+        const key = _itadKey();
+        if (!key || !rows.length) return { keyed: !!key, rows: rows.map(r => ({ ...r, deal: null, low: null })) };
+        return { keyed: true, rows: await itad.enrich(key, _itadCountry(), rows) };
+    });
+
+    // Free games this week (Epic public endpoint, no key) — fetched only when the widget is on.
+    ipcMain.handle('free-games', async () => { try { return await freebies.freeGames(_itadCountry()); } catch { return []; } });
+
+    // Gaming news (RSS/Atom) — sources from `news_sources` setting (newline/comma list) or curated defaults.
+    ipcMain.handle('get-news', async () => {
+        let urls = [];
+        try { const raw = db.prepare("SELECT value FROM settings WHERE key='news_sources'").get()?.value; if (raw) urls = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean); } catch {}
+        if (!urls.length) urls = rss.DEFAULT_NEWS;
+        try { return await rss.fetchNews(urls, 14); } catch { return []; }
+    });
 
     ipcMain.handle('find-flatpak-icon', (e, iconName) => {
         const bases = [
