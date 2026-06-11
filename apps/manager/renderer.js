@@ -830,7 +830,14 @@ async function openPlaylistPickerForGame(game) {
     confirmBtn.onclick = async () => {
         const selected = [...list.querySelectorAll('.pl-select-row.pl-selected')];
         await Promise.all(selected.map(row => window.api.addGameToPlaylist(Number(row.dataset.id), game.id)));
-        if (currentPlaylistId !== null) {
+        // Refresh the current view's game set so it never goes blank. The current view's
+        // membership can't actually change here (the picker only offers playlists the game
+        // isn't already in), but re-pull through the SAME path that built it — crucially the
+        // 'recently-imported' sentinel needs getRecentlyImported, not getPlaylistGames (which
+        // would return [] and leave the gallery empty).
+        if (currentPlaylistId === 'recently-imported') {
+            currentPlaylistGames = await window.api.getRecentlyImported(recentlyImportedCount);
+        } else if (currentPlaylistId !== null) {
             currentPlaylistGames = await window.api.getPlaylistGames(currentPlaylistId);
         } else {
             currentPlaylistGames = null;   // not in a playlist → show the full library, never a stale subset

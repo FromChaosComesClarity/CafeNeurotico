@@ -1585,13 +1585,18 @@ async function executeConfirmScrapeAction() {
       document.getElementById('overlay-title').innerText = t('status.searching');
       document.getElementById('overlay-list').innerHTML = `<div class='overlay-item selected' style='color: var(--accent);'>${t('status.contacting_api')}</div>`;
       let modeText = activeScrapeMode === 'ALL' ? 'ALL DATA' : activeScrapeMode;
-      let success;
-      if (scrapeSource === 'IGDB') {
-        success = await window.api.scrapeIgdbData(game.Game, activeScrapeMode, selectedIgdbId);
-      } else {
-        success = await window.api.scrapeSteamData(game.Game, activeScrapeMode, selectedAppId);
-      }
-      await refreshDatabase(); gameState = 'SCRAPE_RESULT';
+      let success = false;
+      try {
+        if (scrapeSource === 'IGDB') {
+          success = await window.api.scrapeIgdbData(game.Game, activeScrapeMode, selectedIgdbId);
+        } else {
+          success = await window.api.scrapeSteamData(game.Game, activeScrapeMode, selectedAppId);
+        }
+      } catch (err) { console.error('[scrape] failed:', err); }
+      // Refresh separately so a DB/view-refresh error can't strand the 'contacting api'
+      // message on screen — the result overlay below must always replace it.
+      try { await refreshDatabase(); } catch (err) { console.error('[scrape] refresh failed:', err); }
+      gameState = 'SCRAPE_RESULT';
       renderGenericOverlay(t('dialog.scraping_status'), [success ? t('status.scraped_ok', {mode: modeText}) : t('status.no_data'), t('common.back_to_game_options')]);
     }
   }
