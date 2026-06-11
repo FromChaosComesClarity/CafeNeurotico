@@ -3142,6 +3142,13 @@
           .news-item:hover .news-title { color:var(--accent); }
           .news-meta { font-size:10.5px; color:var(--text_dim); margin-top:4px; text-transform:uppercase; letter-spacing:0.5px; }
           #news-sources-input { width:100%; height:130px; resize:vertical; padding:10px 12px; background:var(--bg); border:1px solid var(--border_solid); border-radius:8px; color:var(--text_main); font-size:12px; font-family:monospace; box-sizing:border-box; }
+          .pw-list { display:flex; flex-direction:column; }
+          .pw-item { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 8px; border-bottom:1px solid var(--border); }
+          .pw-item:last-child { border-bottom:none; }
+          .pw-game { font-size:13px; color:var(--text_main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .pw-change { font-size:11px; font-weight:800; letter-spacing:1px; white-space:nowrap; }
+          .pw-old { color:var(--text_dim); }
+          .pw-tier { font-weight:900; }
 
           /* ── FLAT CLASSIC LAYOUTS — sharp corners everywhere, except true circles + gallery cover art ── */
           body.corners-flat *, body.corners-flat *::before, body.corners-flat *::after { border-radius: 0 !important; }

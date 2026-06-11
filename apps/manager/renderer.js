@@ -784,11 +784,12 @@ const HOME_WIDGETS = [
     { key: 'wishlist', label: 'Wishlist & Deals' },
     { key: 'freebies', label: 'Free This Week' },
     { key: 'news',     label: 'Gaming News' },
+    { key: 'protonwatch', label: 'Proton Watch' },
 ];
 // Online widgets are excluded from the default set so a fresh Home makes no network calls until opted in.
-const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news']);
+const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'protonwatch']);
 const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_ONLINE.has(k));
-const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, wishlist:12, freebies:12, news:12 };
+const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, wishlist:12, freebies:12, news:12, protonwatch:6 };
 // Theme-derived chart palette — resolves against the active theme's CSS vars
 // (color-mix is evaluated live), so the donut follows whatever theme is applied.
 const HOME_PALETTE = [
@@ -867,6 +868,7 @@ function homeWidgetHtml(key, s) {
         case 'wishlist': return `<h4>Wishlist &mdash; Deals</h4><div id="home-wishlist-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'freebies': return `<h4>Free This Week</h4><div id="home-freebies-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'news': return `<h4>Gaming News</h4><div id="home-news-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'protonwatch': return `<h4>Proton Watch</h4><div id="home-proton-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'roulette': return `<h4>Roulette &mdash; Can't Decide?</h4><div class="hc-roulette"><div id="home-roulette-result"><div class="hc-empty">Hit spin for a pick from your library.</div></div><div class="hc-roulette-opts"><button class="hc-chip" data-roul="installedOnly">Installed</button><button class="hc-chip" data-roul="backlogOnly">Backlog</button><button class="hc-chip" data-roul="favsOnly">Favourites</button></div><button class="hc-spin-btn" id="home-spin">Spin</button></div>`;
         default: return '';
     }
@@ -876,7 +878,7 @@ async function renderHome() {
     const dEl = document.getElementById('home-date');
     if (dEl) dEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     grid.innerHTML = `<div class="hc-empty" style="grid-column:span 12;">Reading your library&hellip;</div>`;
-    _homeSnap = (await window.api.getHomeStats()) || {};
+    _homeSnap = (await window.api.getHomeStats({ hidePico8: _hidePico8 })) || {};
     grid.innerHTML = '';
     for (const key of _homeWidgets) {
         if (!HOME_SPAN[key]) continue;
@@ -893,7 +895,9 @@ async function renderHome() {
         spin.addEventListener('click', async () => {
             const res = document.getElementById('home-roulette-result');
             res.innerHTML = `<div class="hc-empty">Spinning&hellip;</div>`;
-            const g = await window.api.getRandomGame(Object.fromEntries(Object.entries(opts).filter(([, v]) => v)));
+            const c = Object.fromEntries(Object.entries(opts).filter(([, v]) => v));
+            if (_hidePico8) c.hidePico8 = true;
+            const g = await window.api.getRandomGame(c);
             if (!g) { res.innerHTML = `<div class="hc-empty">No games match those filters.</div>`; return; }
             res.innerHTML = _homeFeatured(g, 'Your Pick');
             res.querySelector('[data-gid]')?.addEventListener('click', () => openHomeGameById(g.id, g));
@@ -902,6 +906,31 @@ async function renderHome() {
     if (grid.querySelector('#home-wishlist-body')) loadWishlistWidget();
     if (grid.querySelector('#home-freebies-body')) loadFreebiesWidget();
     if (grid.querySelector('#home-news-body')) loadNewsWidget();
+    if (grid.querySelector('#home-proton-body')) loadProtonWatchWidget();
+}
+
+// ── ProtonDB Tier Watch widget (Phase 3, opt-in) ─────────────────────────────
+const PW_RANK = { BORKED:0, PENDING:1, BRONZE:2, SILVER:3, GOLD:4, PLATINUM:5, NATIVE:6 };
+const PW_COLOR = { NATIVE:'#66bb6a', PLATINUM:'#b8c6db', GOLD:'#d4af37', SILVER:'#9aa0a6', BRONZE:'#cd7f32', PENDING:'#888', BORKED:'#e05a5a' };
+async function loadProtonWatchWidget() {
+    const body = document.getElementById('home-proton-body'); if (!body) return;
+    renderProtonWatch(body, await window.api.protonWatchGet());
+}
+function renderProtonWatch(body, data) {
+    const ts = data && data.ts;
+    let html = `<div class="wl-toolbar"><span style="font-size:11px; color:var(--text_dim); align-self:center; margin-right:auto;">${ts ? ('Last checked ' + _homeAgo(ts)) : 'Not checked yet'}</span><button id="proton-check-btn" class="home-ghost">Check now</button></div>`;
+    const changes = (data && data.changes) || [];
+    const climbed = changes.filter(c => c.improved && (PW_RANK[c.now] ?? -1) >= 4).sort((a, b) => (PW_RANK[b.now] ?? 0) - (PW_RANK[a.now] ?? 0));
+    if (!ts) html += `<div class="hc-empty">Check your Steam library's current ProtonDB ratings &mdash; we'll flag anything that climbed to Gold, Platinum or Native.</div>`;
+    else if (!climbed.length) html += `<div class="hc-empty">No Gold/Platinum/Native changes since last check (${(data && data.checked) || 0} games).</div>`;
+    else html += `<div class="pw-list">` + climbed.slice(0, 16).map(c =>
+        `<div class="pw-item"><span class="pw-game">${escHtml(c.game)}</span><span class="pw-change">${c.old ? `<span class="pw-old">${escHtml(String(c.old).toUpperCase())}</span> &rarr; ` : ''}<span class="pw-tier" style="color:${PW_COLOR[c.now] || 'var(--accent)'}">${escHtml(c.now)}</span></span></div>`
+    ).join('') + `</div>`;
+    body.innerHTML = html;
+    document.getElementById('proton-check-btn')?.addEventListener('click', async () => {
+        body.innerHTML = `<div class="hc-empty">Checking ProtonDB ratings across your Steam library&hellip; this can take a moment.</div>`;
+        renderProtonWatch(body, await window.api.protonCheck());
+    });
 }
 
 // ── Gaming News widget (Phase 3, opt-in RSS) ─────────────────────────────────

@@ -31,6 +31,8 @@ function isInstalled(g) {
     return isManual ? !!g.LaunchCommand : g.Installed == 1;
 }
 
+function isPico(g) { return (g.Store || '').toLowerCase().includes('pico'); }
+
 // Collapse a (possibly comma-joined / merged) Store string into one canonical bucket.
 function storeBucket(store) {
     const s = (store || '').toLowerCase();
@@ -78,6 +80,8 @@ function tile(g) {
  */
 function computeHomeSnapshot(games, opts = {}) {
     games = Array.isArray(games) ? games : [];
+    // Honor each face's "hide PICO-8" toggle so Home matches the library.
+    if (opts.hidePico8) games = games.filter(g => !isPico(g));
     const recentImportedCount = opts.recentImportedCount || 12;
     const recentPlayedCount   = opts.recentPlayedCount   || 12;
     const hiddenGemCount      = opts.hiddenGemCount      || 12;
@@ -138,6 +142,7 @@ function computeHomeSnapshot(games, opts = {}) {
 /** Random pick honoring simple constraints — powers the Roulette widget. */
 function pickRandom(games, c = {}) {
     let pool = Array.isArray(games) ? games.slice() : [];
+    if (c.hidePico8)     pool = pool.filter(g => !isPico(g));
     if (c.installedOnly) pool = pool.filter(isInstalled);
     if (c.backlogOnly)   pool = pool.filter(isBacklog);
     if (c.favsOnly)      pool = pool.filter(isFav);

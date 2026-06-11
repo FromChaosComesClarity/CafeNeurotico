@@ -18,6 +18,7 @@ const homeStats = require('./home-stats.js');
 const itad = require('./itad.js');
 const freebies = require('./freebies.js');
 const rss = require('./rss.js');
+const proton = require('./proton.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
@@ -104,6 +105,18 @@ function registerSharedHandlers(ctx) {
         try { const raw = db.prepare("SELECT value FROM settings WHERE key='news_sources'").get()?.value; if (raw) urls = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean); } catch {}
         if (!urls.length) urls = rss.DEFAULT_NEWS;
         try { return await rss.fetchNews(urls, 14); } catch { return []; }
+    });
+
+    // ProtonDB tier watch — last cached result + an on-demand library sweep.
+    ipcMain.handle('proton-watch-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='proton_watch'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });
+    ipcMain.handle('proton-check', async () => {
+        let games = [];
+        try { games = db.prepare("SELECT id, Game, SteamAppID, ProtonTier FROM games WHERE SteamAppID IS NOT NULL AND TRIM(SteamAppID) != '' AND SteamAppID != 'None'").all(); } catch {}
+        const { checked, changes } = await proton.checkLibrary(games, { limit: 120 });
+        for (const c of changes) { try { db.prepare("UPDATE games SET ProtonTier=? WHERE id=?").run(c.now, c.id); } catch {} }
+        const result = { ts: Date.now(), checked, changes };
+        try { db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('proton_watch', ?)").run(JSON.stringify(result)); } catch {}
+        return result;
     });
 
     ipcMain.handle('find-flatpak-icon', (e, iconName) => {

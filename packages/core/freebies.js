@@ -19,15 +19,16 @@ async function epicFree(country = 'US') {
     const out = [];
     for (const e of els) {
         const blocks = e.promotions?.promotionalOffers || [];
-        let endsAt = null, active = false;
+        let endsAt = null, free = false;
         for (const block of blocks) for (const off of (block.promotionalOffers || [])) {
             const start = off.startDate ? Date.parse(off.startDate) : 0;
             const end = off.endDate ? Date.parse(off.endDate) : 0;
-            if ((!start || start <= now) && (!end || end >= now)) { active = true; endsAt = off.endDate; }
+            const pct = off.discountSetting?.discountPercentage;
+            // Epic quirk: discountPercentage is the % of the original price you PAY, so 0 == free.
+            // (Free games also report originalPrice/discountPrice as 0, so don't gate on those.)
+            if (pct === 0 && (!start || start <= now) && (!end || end >= now)) { free = true; endsAt = off.endDate; }
         }
-        const tp = e.price?.totalPrice || {};
-        // Currently free promo (discountPrice 0) on a normally-paid game (originalPrice > 0).
-        if (!active || tp.discountPrice !== 0 || !(tp.originalPrice > 0)) continue;
+        if (!free) continue;
 
         const slug = e.productSlug || e.urlSlug
             || e.catalogNs?.mappings?.[0]?.pageSlug

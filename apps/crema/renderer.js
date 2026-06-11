@@ -644,7 +644,7 @@ async function renderHomeScreen() {
   const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
   const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news');
   const [snap, wlRes, freeRes, newsRes, itadCurrency, itadClick] = await Promise.all([
-    window.api.getHomeStats().then(s => s || {}),
+    window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}),
     wantWishlist ? window.api.wishlistDeals() : Promise.resolve(null),
     wantFree ? window.api.freeGames() : Promise.resolve(null),
     wantNews ? window.api.getNews() : Promise.resolve(null),
@@ -757,7 +757,7 @@ function homeHandleInput(action) {
   }
 }
 
-async function homeSpin() { const g = await window.api.getRandomGame({}); if (g) cremaOpenGame(g); }
+async function homeSpin() { const g = await window.api.getRandomGame({ hidePico8: _cremaHidePico8 }); if (g) cremaOpenGame(g); }
 
 // Open a specific game from Home, honoring the browse mode: GALLERY opens that
 // game's gamepage (like clicking a gallery cell); LIST selects it in the library
