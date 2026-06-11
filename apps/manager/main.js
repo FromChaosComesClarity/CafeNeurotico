@@ -218,6 +218,8 @@ app.whenReady().then(() => {
 
         try { db.prepare("ALTER TABLE games ADD COLUMN ProtonTier TEXT").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN LastPlayed INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN Playtime INTEGER DEFAULT 0").run(); } catch(e) {}       // minutes (Steam playtime_forever)
+        try { db.prepare("ALTER TABLE games ADD COLUMN Playtime2wk INTEGER DEFAULT 0").run(); } catch(e) {}    // minutes (Steam playtime_2weeks)
 
         try { db.prepare("ALTER TABLE games ADD COLUMN HeroArt TEXT").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN Logo TEXT").run(); } catch(e) {}
@@ -1785,6 +1787,9 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
                 }
             }
         } })();
+        // Capture Steam playtime (minutes): playtime_forever (total) + playtime_2weeks (recent).
+        const _ptStmt = db.prepare("UPDATE games SET Playtime=?, Playtime2wk=? WHERE SteamAppID=?");
+        db.transaction(() => { for (const g of games) _ptStmt.run(g.playtime_forever || 0, g.playtime_2weeks || 0, String(g.appid)); })();
         return { success: true, count: added, message: `Imported ${added} new games from Steam.\n(Updated ${updated} existing entries).` };
     } catch (err) {
         return { success: false, message: `Steam API Error: ${err.message}` };

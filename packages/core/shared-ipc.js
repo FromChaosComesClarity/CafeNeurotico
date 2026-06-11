@@ -19,6 +19,7 @@ const itad = require('./itad.js');
 const freebies = require('./freebies.js');
 const rss = require('./rss.js');
 const proton = require('./proton.js');
+const steamnews = require('./steamnews.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
@@ -105,6 +106,16 @@ function registerSharedHandlers(ctx) {
         try { const raw = db.prepare("SELECT value FROM settings WHERE key='news_sources'").get()?.value; if (raw) urls = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean); } catch {}
         if (!urls.length) urls = rss.DEFAULT_NEWS;
         try { return await rss.fetchNews(urls, 14); } catch { return []; }
+    });
+
+    // Steam patch notes for the games you actually play/own (recently played + installed first).
+    ipcMain.handle('get-game-news', async () => {
+        let games = [];
+        try {
+            games = db.prepare("SELECT Game, SteamAppID FROM games WHERE SteamAppID IS NOT NULL AND TRIM(SteamAppID) != '' AND SteamAppID != 'None' ORDER BY (LastPlayed > 0) DESC, LastPlayed DESC, Installed DESC LIMIT 24").all();
+        } catch {}
+        const targets = games.map(g => ({ appid: String(g.SteamAppID).replace(/\.0+$/, ''), name: g.Game }));
+        try { return await steamnews.gameNews(targets, { limit: 24, total: 14 }); } catch { return []; }
     });
 
     // ProtonDB tier watch — last cached result + an on-demand library sweep.

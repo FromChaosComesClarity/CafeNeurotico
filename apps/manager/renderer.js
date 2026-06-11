@@ -781,15 +781,24 @@ const HOME_WIDGETS = [
     { key: 'recent',   label: 'Recently Imported' },
     { key: 'played',   label: 'Recently Played' },
     { key: 'gems',     label: 'Hidden Gems' },
+    { key: 'mostplayed', label: 'Most Played' },
+    { key: 'couchnight', label: 'Couch Night' },
+    { key: 'franchise', label: 'Franchise Spotlight' },
+    { key: 'beaten',   label: 'Beaten (completion)' },
+    { key: 'throwback', label: 'Throwback' },
+    { key: 'wrapped',  label: 'Year in Review' },
     { key: 'wishlist', label: 'Wishlist & Deals' },
     { key: 'freebies', label: 'Free This Week' },
     { key: 'news',     label: 'Gaming News' },
+    { key: 'gamenews', label: "Your Games — What's New" },
     { key: 'protonwatch', label: 'Proton Watch' },
 ];
 // Online widgets are excluded from the default set so a fresh Home makes no network calls until opted in.
-const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'protonwatch']);
-const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_ONLINE.has(k));
-const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, wishlist:12, freebies:12, news:12, protonwatch:6 };
+const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'gamenews', 'protonwatch']);
+// Local "extras" that are opt-in too (keep the default Home lean).
+const HOME_OPTIN = new Set([...HOME_ONLINE, 'wrapped', 'couchnight', 'franchise', 'beaten', 'throwback']);
+const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_OPTIN.has(k));
+const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, mostplayed:12, couchnight:12, franchise:12, beaten:4, throwback:4, wrapped:12, wishlist:12, freebies:12, news:12, gamenews:12, protonwatch:6 };
 // Theme-derived chart palette — resolves against the active theme's CSS vars
 // (color-mix is evaluated live), so the donut follows whatever theme is applied.
 const HOME_PALETTE = [
@@ -846,6 +855,11 @@ function _homeTileRow(items, empty) {
     if (!items || !items.length) return `<div class="hc-empty">${empty}</div>`;
     return `<div class="hc-row">${items.map(t => { const c = _hImg(t); return `<div class="hc-tile" data-gid="${t.id}">${c ? `<img src="${c}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${escHtml(t.Game || '')}</div></div>`; }).join('')}</div>`;
 }
+function _homePlaytimeLabel(min) { const m = Number(min) || 0; return m >= 60 ? Math.round(m / 60) + 'h' : m + 'm'; }
+function _homePlaytimeRow(items, key, empty) {
+    if (!items || !items.length) return `<div class="hc-empty">${empty}</div>`;
+    return `<div class="hc-row">${items.map(t => { const c = _hImg(t); return `<div class="hc-tile" data-gid="${t.id}">${c ? `<img src="${c}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${escHtml(t.Game || '')}</div><div class="hc-pt">${_homePlaytimeLabel(t[key])}</div></div>`; }).join('')}</div>`;
+}
 function homeWidgetHtml(key, s) {
     switch (key) {
         case 'overview': {
@@ -865,9 +879,32 @@ function homeWidgetHtml(key, s) {
         case 'recent':  return `<h4>Recently Imported</h4>${_homeTileRow(s.recentlyImported, 'Nothing imported yet.')}`;
         case 'played':  return `<h4>Recently Played</h4>${_homeTileRow(s.recentlyPlayed, 'No play history yet.')}`;
         case 'gems':    return `<h4>Hidden Gems &mdash; Installed &amp; Unplayed</h4>${_homeTileRow(s.hiddenGems, 'No standout unplayed games found.')}`;
+        case 'mostplayed': { const pt = s.playtime || {}; return `<h4>Most Played${pt.totalHours ? ` <span style="color:var(--text_dim); font-weight:700; letter-spacing:0;">&middot; ${pt.totalHours}h total</span>` : ''}</h4>${_homePlaytimeRow(s.mostPlayed, 'Playtime', 'No playtime yet &mdash; sync your Steam library (only Steam reports hours).')}`; }
+        case 'couchnight': return `<h4>Couch Night &mdash; Co-op</h4>${_homeTileRow(s.couchNight, 'No co-op games found (needs the Co-op field scraped).')}`;
+        case 'franchise': {
+            const f = s.franchise;
+            if (!f) return `<h4>Franchise Spotlight</h4><div class="hc-empty">No multi-game series found yet (needs the Franchise field scraped).</div>`;
+            return `<h4>Franchise Spotlight &mdash; ${escHtml(f.name)} <span style="color:var(--text_dim); font-weight:700; letter-spacing:0;">&middot; ${f.count} owned</span></h4>${_homeTileRow(f.games, '')}`;
+        }
+        case 'throwback': return `<h4>Throwback</h4>${_homeFeatured(s.throwback, 'Blast from the Past')}`;
+        case 'beaten': {
+            const pct = s.beatenPct || 0, c = s.counts || {};
+            return `<h4>Beaten</h4><div class="beaten-wrap"><div class="beaten-ring" style="background:conic-gradient(var(--accent) ${pct * 3.6}deg, var(--bg) 0deg)"><div class="beaten-ring-c">${pct}%</div></div><div class="beaten-l"><b style="color:var(--text_main); font-size:16px;">${c.played || 0}</b> of ${c.total || 0}<br>games beaten</div></div>`;
+        }
+        case 'wrapped': {
+            const w = s.wrapped || {};
+            const chip = (n, l) => (n == null || n === '') ? '' : `<div class="wrap-chip"><div class="n">${escHtml(String(n))}</div><div class="l">${l}</div></div>`;
+            const tp = w.topPlayed;
+            return `<h4>Your Library, Wrapped &middot; ${w.year || ''}</h4><div class="wrap-grid">`
+                + `<div class="wrap-hero"><div class="wrap-big">${w.totalHours || 0}<span>h</span></div><div class="wrap-big-l">hours played &middot; Steam</div></div>`
+                + (tp ? `<div class="wrap-top" data-gid="${tp.id}">${_hImg(tp) ? `<img src="${_hImg(tp)}">` : ''}<div><div class="wl">Most Played</div><div class="wt">${escHtml(tp.Game || '')}</div><div class="wh">${tp.hours || 0}h</div></div></div>` : '')
+                + `<div class="wrap-chips">${chip(w.addedThisYear, 'Added in ' + (w.year || ''))}${chip(w.beaten, 'Beaten')}${chip(w.totalGames, 'In library')}${chip(w.topGenre, 'Top genre')}${chip(w.protonReadyPct != null ? w.protonReadyPct + '%' : '', 'Proton-ready')}</div>`
+                + `</div>`;
+        }
         case 'wishlist': return `<h4>Wishlist &mdash; Deals</h4><div id="home-wishlist-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'freebies': return `<h4>Free This Week</h4><div id="home-freebies-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'news': return `<h4>Gaming News</h4><div id="home-news-body"><div class="hc-empty">Loading&hellip;</div></div>`;
+        case 'gamenews': return `<h4>Your Games &mdash; What's New</h4><div id="home-gamenews-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'protonwatch': return `<h4>Proton Watch</h4><div id="home-proton-body"><div class="hc-empty">Loading&hellip;</div></div>`;
         case 'roulette': return `<h4>Roulette &mdash; Can't Decide?</h4><div class="hc-roulette"><div id="home-roulette-result"><div class="hc-empty">Hit spin for a pick from your library.</div></div><div class="hc-roulette-opts"><button class="hc-chip" data-roul="installedOnly">Installed</button><button class="hc-chip" data-roul="backlogOnly">Backlog</button><button class="hc-chip" data-roul="favsOnly">Favourites</button></div><button class="hc-spin-btn" id="home-spin">Spin</button></div>`;
         default: return '';
@@ -906,7 +943,19 @@ async function renderHome() {
     if (grid.querySelector('#home-wishlist-body')) loadWishlistWidget();
     if (grid.querySelector('#home-freebies-body')) loadFreebiesWidget();
     if (grid.querySelector('#home-news-body')) loadNewsWidget();
+    if (grid.querySelector('#home-gamenews-body')) loadGameNewsWidget();
     if (grid.querySelector('#home-proton-body')) loadProtonWatchWidget();
+}
+
+async function loadGameNewsWidget() {
+    const body = document.getElementById('home-gamenews-body'); if (!body) return;
+    body.innerHTML = `<div class="hc-empty">Fetching patch notes&hellip;</div>`;
+    const items = (await window.api.getGameNews()) || [];
+    if (!items.length) { body.innerHTML = `<div class="hc-empty">No recent news &mdash; sync Steam and play a few games first.</div>`; return; }
+    body.innerHTML = `<div class="news-list">` + items.map(n =>
+        `<div class="news-item" data-url="${escHtml(n.url)}"><div class="news-title">${escHtml(n.title)}</div><div class="news-meta">${escHtml(n.source)}${n.date ? ` &middot; ${_homeAgo(n.date)}` : ''}</div></div>`
+    ).join('') + `</div>`;
+    body.querySelectorAll('.news-item[data-url]').forEach(el => el.addEventListener('click', () => window.api.openInstallUrl(el.dataset.url)));
 }
 
 // ── ProtonDB Tier Watch widget (Phase 3, opt-in) ─────────────────────────────

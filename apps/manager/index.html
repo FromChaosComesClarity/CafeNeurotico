@@ -3084,6 +3084,27 @@
           .hc-tile { width:92px; flex-shrink:0; cursor:pointer; }
           .hc-tile img, .hc-tile .ph { width:92px; height:122px; object-fit:cover; border-radius:7px; background:var(--bg); border:1px solid var(--border); display:block; }
           .hc-tile .tn { font-size:10px; color:var(--text_sec); margin-top:6px; line-height:1.25; max-height:26px; overflow:hidden; }
+          .hc-tile .hc-pt { font-size:11px; font-weight:800; color:var(--accent); margin-top:3px; }
+          .wrap-grid { display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; }
+          .wrap-hero { background:linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, var(--bg))); color:var(--bg); border-radius:12px; padding:16px 26px; display:flex; flex-direction:column; justify-content:center; min-width:150px; }
+          .wrap-big { font-size:46px; font-weight:900; line-height:1; }
+          .wrap-big span { font-size:22px; }
+          .wrap-big-l { font-size:10.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-top:7px; opacity:0.88; }
+          .wrap-top { display:flex; gap:13px; align-items:center; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 16px; cursor:pointer; }
+          .wrap-top img { width:54px; height:72px; object-fit:cover; border-radius:6px; background:var(--bg_panel); }
+          .wrap-top .wl { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text_dim); }
+          .wrap-top .wt { font-size:15px; font-weight:900; color:var(--text_main); margin-top:3px; }
+          .wrap-top:hover .wt { color:var(--accent); }
+          .wrap-top .wh { font-size:12px; color:var(--accent); font-weight:800; margin-top:3px; }
+          .wrap-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(108px,1fr)); gap:10px; flex:1; min-width:240px; }
+          .wrap-chip { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:11px 10px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
+          .wrap-chip .n { font-size:19px; font-weight:900; color:var(--accent); line-height:1.1; word-break:break-word; }
+          .wrap-chip .l { font-size:9.5px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:var(--text_dim); margin-top:5px; }
+          .beaten-wrap { display:flex; align-items:center; gap:16px; }
+          .beaten-ring { width:96px; height:96px; border-radius:50%; flex-shrink:0; position:relative; display:flex; align-items:center; justify-content:center; }
+          .beaten-ring::after { content:''; position:absolute; inset:12px; border-radius:50%; background:var(--bg_panel); }
+          .beaten-ring-c { position:relative; z-index:1; font-size:22px; font-weight:900; color:var(--accent); }
+          .beaten-l { font-size:13px; color:var(--text_sec); line-height:1.5; }
           .hc-tile:hover img, .hc-tile:hover .ph { border-color:var(--accent); }
           .hc-tile:hover .tn { color:var(--accent); }
           .hc-empty { font-size:12px; color:var(--text_dim); font-style:italic; padding:14px 2px; }
@@ -3156,6 +3177,7 @@
           body.corners-flat #btn-gsearch-clear, body.corners-flat #btn-see-config, body.corners-flat #btn-close-themes,
           body.corners-flat .btn-split-row-fav, body.corners-flat .btn-split-row-want, body.corners-flat .btn-split-row-playlist,
           body.corners-flat .split-action-btn, body.corners-flat .hc-donut, body.corners-flat .hc-donut::after, body.corners-flat .wl-x, body.corners-flat #fdo-cover-aura,
+          body.corners-flat .beaten-ring, body.corners-flat .beaten-ring::after,
           body.corners-flat [style*="border-radius:50%"], body.corners-flat [style*="border-radius: 50%"] { border-radius: 50% !important; }
           /* the one exception you asked for: the gallery cover-art box (card) keeps its rounded corners */
           body.corners-flat .gallery-item { border-radius: 8px !important; }

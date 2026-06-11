@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('api', {
                                 wishlistDeals: () => ipcRenderer.invoke('wishlist-deals'),
                                 freeGames: () => ipcRenderer.invoke('free-games'),
                                 getNews: () => ipcRenderer.invoke('get-news'),
+                                getGameNews: () => ipcRenderer.invoke('get-game-news'),
                                 protonCheck: () => ipcRenderer.invoke('proton-check'),
                                 protonWatchGet: () => ipcRenderer.invoke('proton-watch-get'),
                                 openWebPopup: (url) => ipcRenderer.invoke('open-web-popup', url),

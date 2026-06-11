@@ -71,6 +71,7 @@ function tile(g) {
         ProtonTier: g.ProtonTier, DEV: g.DEV, Installed: g.Installed, LaunchCommand: g.LaunchCommand,
         GrinderGameId: g.GrinderGameId, FAV: g.FAV, WANT_TO_PLAY: g.WANT_TO_PLAY, kb_played: g.kb_played,
         LastPlayed: g.LastPlayed, date_added: g.date_added, SteamAppID: g.SteamAppID,
+        Playtime: g.Playtime, Playtime2wk: g.Playtime2wk,
     };
 }
 
@@ -127,6 +128,53 @@ function computeHomeSnapshot(games, opts = {}) {
     const finalPool = pool.length ? pool : games;
     if (finalPool.length) dailyPick = tile(finalPool[hashStr(dailySeed) % finalPool.length]);
 
+    // Playtime (Steam-sourced; GOG/Epic/others can't be auto-timed → 0).
+    const playtimeCount = opts.playtimeCount || 12;
+    let totalPlaytimeMin = 0;
+    for (const g of games) totalPlaytimeMin += leadingInt(g.Playtime) || 0;
+    const mostPlayed = games.filter(g => (leadingInt(g.Playtime) || 0) > 0)
+        .sort((a, b) => (leadingInt(b.Playtime) || 0) - (leadingInt(a.Playtime) || 0))
+        .slice(0, playtimeCount).map(tile);
+    const recentlyActive = games.filter(g => (leadingInt(g.Playtime2wk) || 0) > 0)
+        .sort((a, b) => (leadingInt(b.Playtime2wk) || 0) - (leadingInt(a.Playtime2wk) || 0))
+        .slice(0, playtimeCount).map(tile);
+
+    // Couch Night — local/online co-op games (installed first).
+    const couchNight = games.filter(g => { const c = (g.Coop || '').toLowerCase(); return c && c !== 'none'; })
+        .sort((a, b) => (isInstalled(b) ? 1 : 0) - (isInstalled(a) ? 1 : 0)).slice(0, 12).map(tile);
+
+    // Franchise Spotlight — the series you own the most of (>= 2).
+    const franchiseMap = new Map();
+    for (const g of games) { const f = (g.Franchise || '').trim(); if (f) { if (!franchiseMap.has(f)) franchiseMap.set(f, []); franchiseMap.get(f).push(g); } }
+    let franchise = null, fBest = null;
+    for (const [name, list] of franchiseMap) { if (list.length >= 2 && (!fBest || list.length > fBest.list.length)) fBest = { name, list }; }
+    if (fBest) franchise = { name: fBest.name, count: fBest.list.length, games: fBest.list.slice(0, 12).map(tile) };
+
+    // Beaten ring — share of the library marked played.
+    const beatenPct = total ? Math.round(played / total * 100) : 0;
+
+    // Throwback — deterministic daily retro pick (released before 2010, else oldest available).
+    const retroPool = games.filter(g => { const y = leadingInt(String(g.RELEASED || '').slice(-4)); return y && y < 2010; });
+    const tbPool = retroPool.length ? retroPool : games.filter(g => leadingInt(String(g.RELEASED || '').slice(-4)));
+    const throwback = tbPool.length ? tile(tbPool[hashStr('tb' + dailySeed) % tbPool.length]) : null;
+
+    // Wrapped / "library rewind" summary.
+    const yearStartSec = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+    let addedThisYear = 0;
+    for (const g of games) { const da = leadingInt(g.date_added); if (da && da >= yearStartSec) addedThisYear++; }
+    const genreTally = sortedTally(genres), decadeTally = sortedTally(decades);
+    let protonRated = 0, protonReadyN = 0;
+    for (const { label, count } of sortedTally(proton)) { protonRated += count; if (label === 'GOLD' || label === 'PLATINUM' || label === 'NATIVE') protonReadyN += count; }
+    const wrapped = {
+        year: new Date().getFullYear(),
+        totalHours: Math.round(totalPlaytimeMin / 60),
+        topPlayed: mostPlayed[0] ? { ...mostPlayed[0], hours: Math.round((leadingInt(mostPlayed[0].Playtime) || 0) / 60) } : null,
+        addedThisYear, beaten: played, totalGames: total,
+        topGenre: genreTally.length ? genreTally[0].label : null,
+        topDecade: decadeTally.length ? decadeTally[0].label : null,
+        protonReadyPct: protonRated ? Math.round(protonReadyN / protonRated * 100) : null,
+    };
+
     return {
         counts: { total, installed, backlog, played, favs, want },
         stores: sortedTally(stores),
@@ -135,7 +183,9 @@ function computeHomeSnapshot(games, opts = {}) {
         decades: sortedTally(decades).sort((a, b) => a.label.localeCompare(b.label)),
         metacriticAvg: mcN ? Math.round(mcSum / mcN) : null,
         backlog: { count: backlog, hours: backlogHours },
-        dailyPick, continuePlaying, recentlyImported, recentlyPlayed, hiddenGems,
+        playtime: { totalHours: Math.round(totalPlaytimeMin / 60), totalMin: totalPlaytimeMin },
+        dailyPick, continuePlaying, recentlyImported, recentlyPlayed, hiddenGems, mostPlayed, recentlyActive, wrapped,
+        couchNight, franchise, beatenPct, throwback,
     };
 }
 

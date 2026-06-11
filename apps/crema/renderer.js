@@ -642,12 +642,15 @@ function transitionToHome() {
 
 async function renderHomeScreen() {
   const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
-  const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news');
-  const [snap, wlRes, freeRes, newsRes, itadCurrency, itadClick] = await Promise.all([
+  const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news'),
+        wantProton = enabled.includes('protonwatch'), wantGameNews = enabled.includes('gamenews');
+  const [snap, wlRes, freeRes, newsRes, protonRes, gnRes, itadCurrency, itadClick] = await Promise.all([
     window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}),
     wantWishlist ? window.api.wishlistDeals() : Promise.resolve(null),
     wantFree ? window.api.freeGames() : Promise.resolve(null),
     wantNews ? window.api.getNews() : Promise.resolve(null),
+    wantProton ? window.api.protonWatchGet() : Promise.resolve(null),
+    wantGameNews ? window.api.getGameNews() : Promise.resolve(null),
     wantWishlist ? window.api.getSetting('itad_currency') : Promise.resolve(''),
     wantWishlist ? window.api.getSetting('itad_click') : Promise.resolve('store'),
   ]);
@@ -660,6 +663,8 @@ async function renderHomeScreen() {
     + `<div class="ch-stat"><div class="n">${c.installed || 0}</div><div class="l">Installed</div></div>`
     + `<div class="ch-stat"><div class="n">${c.backlog || 0}</div><div class="l">Backlog</div></div>`
     + `<div class="ch-stat"><div class="n">${(snap.backlog && snap.backlog.hours) || 0}h</div><div class="l">To Clear</div></div>`
+    + ((snap.playtime && snap.playtime.totalHours) ? `<div class="ch-stat"><div class="n">${snap.playtime.totalHours}h</div><div class="l">Played</div></div>` : '')
+    + (c.total ? `<div class="ch-stat"><div class="n">${snap.beatenPct || 0}%</div><div class="l">Beaten</div></div>` : '')
     + `</div></div>`;
   if (dp) {
     const img = _chImg(dp, true);
@@ -689,6 +694,22 @@ async function renderHomeScreen() {
     html += rh;
     rows.push({ key: k, cells });
   });
+  if (enabled.includes('mostplayed') && snap.mostPlayed && snap.mostPlayed.length) {
+    let rh = `<div class="ch-rowsec"><h3>Most Played</h3><div class="ch-row">`;
+    const cells = [];
+    snap.mostPlayed.forEach((g, i) => {
+      const cov = _chImg(g, false), id = `che-mp-${i}`, m = Number(g.Playtime) || 0;
+      rh += `<div class="ch-tile" id="${id}">${cov ? `<img src="${cov}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.Game)}</div><div class="ch-price">${m >= 60 ? Math.round(m / 60) + 'h' : m + 'm'}</div></div>`;
+      cells.push({ type: 'game', game: g, id });
+    });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'mostplayed', cells });
+  }
+  if (enabled.includes('couchnight') && snap.couchNight && snap.couchNight.length) {
+    let rh = `<div class="ch-rowsec"><h3>Couch Night</h3><div class="ch-row">`;
+    const cells = [];
+    snap.couchNight.forEach((g, i) => { const cov = _chImg(g, false), id = `che-cn-${i}`; rh += `<div class="ch-tile" id="${id}">${cov ? `<img src="${cov}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.Game)}</div></div>`; cells.push({ type: 'game', game: g, id }); });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'couchnight', cells });
+  }
   if (wantWishlist && wlRes && wlRes.rows && wlRes.rows.length) {
     let rh = `<div class="ch-rowsec"><h3>Wishlist</h3><div class="ch-row">`;
     const cells = [];
@@ -721,6 +742,23 @@ async function renderHomeScreen() {
       cells.push({ type: 'url', url: n.link, id });
     });
     rh += '</div></div>'; html += rh; rows.push({ key: 'news', cells });
+  }
+  if (wantProton && protonRes && protonRes.changes) {
+    const PW_R = { BORKED: 0, PENDING: 1, BRONZE: 2, SILVER: 3, GOLD: 4, PLATINUM: 5, NATIVE: 6 };
+    const PW_C = { NATIVE: '#66bb6a', PLATINUM: '#b8c6db', GOLD: '#d4af37', SILVER: '#9aa0a6', BRONZE: '#cd7f32' };
+    const climbed = protonRes.changes.filter(c => c.improved && (PW_R[c.now] ?? -1) >= 4).sort((a, b) => (PW_R[b.now] ?? 0) - (PW_R[a.now] ?? 0)).slice(0, 12);
+    if (climbed.length) {
+      let rh = `<div class="ch-rowsec"><h3>Proton Watch</h3><div class="ch-row">`;
+      const cells = [];
+      climbed.forEach((cc, i) => { const id = `che-pw-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(cc.game)}</div><div class="ch-news-s" style="color:${PW_C[cc.now] || 'var(--accent)'}">${cc.old ? _che(String(cc.old).toUpperCase()) + ' → ' : ''}${_che(cc.now)}</div></div>`; cells.push({ type: 'game', game: { id: cc.id }, id }); });
+      rh += '</div></div>'; html += rh; rows.push({ key: 'protonwatch', cells });
+    }
+  }
+  if (wantGameNews && gnRes && gnRes.length) {
+    let rh = `<div class="ch-rowsec"><h3>Your Games &mdash; What's New</h3><div class="ch-row">`;
+    const cells = [];
+    gnRes.slice(0, 12).forEach((n, i) => { const id = `che-gn-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.url, id }); });
+    rh += '</div></div>'; html += rh; rows.push({ key: 'gamenews', cells });
   }
   html += `<div class="ch-foot">D-Pad Navigate &nbsp;&bull;&nbsp; A Select &nbsp;&bull;&nbsp; B Library &nbsp;&bull;&nbsp; Start Menu</div>`;
   html += '</div>';
@@ -780,7 +818,7 @@ function cremaOpenGame(game) {
 function openHomeMenu() {
   gameState = 'OVERLAY'; currentOverlayType = 'HOME_MENU'; playSound(sfxSelect);
   const items = [(audioCfg.homeEnabled ? '★ ' : '') + 'SHOW HOME ON STARTUP'];
-  [['recent', 'RECENTLY IMPORTED'], ['gems', 'HIDDEN GEMS'], ['played', 'RECENTLY PLAYED'], ['wishlist', 'WISHLIST'], ['freebies', 'FREE THIS WEEK'], ['news', 'GAMING NEWS']]
+  [['recent', 'RECENTLY IMPORTED'], ['gems', 'HIDDEN GEMS'], ['played', 'RECENTLY PLAYED'], ['mostplayed', 'MOST PLAYED'], ['couchnight', 'COUCH NIGHT'], ['wishlist', 'WISHLIST'], ['freebies', 'FREE THIS WEEK'], ['news', 'GAMING NEWS'], ['gamenews', 'YOUR GAMES NEWS'], ['protonwatch', 'PROTON WATCH']]
     .forEach(([k, l]) => items.push((audioCfg.homeRows.includes(k) ? '★ ' : '') + l));
   items.push(t('common.back_to_menu'));
   renderGenericOverlay('HOME SCREEN', items);
@@ -1528,7 +1566,7 @@ function executeOverlayAction() {
     const label = String(action).replace('★ ', '');
     if (label === 'SHOW HOME ON STARTUP') { audioCfg.homeEnabled = !audioCfg.homeEnabled; }
     else {
-      const map = { 'RECENTLY IMPORTED': 'recent', 'HIDDEN GEMS': 'gems', 'RECENTLY PLAYED': 'played', 'WISHLIST': 'wishlist', 'FREE THIS WEEK': 'freebies', 'GAMING NEWS': 'news' };
+      const map = { 'RECENTLY IMPORTED': 'recent', 'HIDDEN GEMS': 'gems', 'RECENTLY PLAYED': 'played', 'MOST PLAYED': 'mostplayed', 'COUCH NIGHT': 'couchnight', 'WISHLIST': 'wishlist', 'FREE THIS WEEK': 'freebies', 'GAMING NEWS': 'news', 'YOUR GAMES NEWS': 'gamenews', 'PROTON WATCH': 'protonwatch' };
       const k = map[label];
       if (k) { if (audioCfg.homeRows.includes(k)) audioCfg.homeRows = audioCfg.homeRows.filter(x => x !== k); else audioCfg.homeRows.push(k); }
     }
