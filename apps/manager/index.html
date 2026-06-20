@@ -60,6 +60,17 @@
     #crema-cta:active { transform: scale(0.96); }
     .crema-cta-icon { width: 19px; height: 19px; flex-shrink: 0; }
     .crema-cta-text { font-size: 10px; font-weight: 900; letter-spacing: 0.4px; color: #FFE6A7; white-space: nowrap; }
+    /* Support call-to-action — amber pill (same family as the CREMA pill), red pixel heart */
+    #support-cta { -webkit-app-region: no-drag; align-self: center; display: flex; align-items: center; gap: 6px;
+        height: 25px; margin: 0 4px 0 4px; padding: 0 13px 0 11px;
+        background: linear-gradient(135deg, #2C1E16 0%, #432818 55%, #5a3a22 100%);
+        border: 1px solid #D4A373; border-radius: 50px; cursor: pointer; font-family: 'Raleway', sans-serif;
+        box-shadow: 0 0 10px rgba(212,163,115,0.25);
+        transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease; }
+    #support-cta:hover { border-color: #FFE6A7; box-shadow: 0 0 16px rgba(212,163,115,0.6); }
+    #support-cta:active { transform: scale(0.96); }
+    .support-cta-heart { width: 13px; height: 12px; flex-shrink: 0; filter: drop-shadow(0 0 3px rgba(255,75,62,0.55)); }
+    .support-cta-text { font-size: 10px; font-weight: 900; letter-spacing: 0.4px; color: #FFE6A7; white-space: nowrap; }
     /* Playlist multi-select rows */
     .pl-select-row { padding:10px 14px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:10px; font-size:12px; font-weight:900; color:var(--text_sec); border-bottom:1px solid var(--border); transition:background 0.1s; font-family:inherit; }
     .pl-select-row:last-child { border-bottom:none; }
@@ -93,8 +104,10 @@
     .btn-list-want:hover, .btn-list-want.active { color: #ff9800; }
     .btn-list-playlist:hover { color: var(--accent); }
     .btn-list-fav.active svg, .btn-list-want.active svg { fill: currentColor; }
-    .btn-install-gallery { margin: 5px; font-size: 12px; padding: 4px; background: #e65100; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 700; letter-spacing: 1px; }
+    .btn-install-gallery { margin: 5px; font-size: 12px; padding: 4px; background: #e65100; border: none; color: #fff; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 700; letter-spacing: 1px; }
     .btn-install-gallery:hover { background: #ff6d00; }
+    /* gallery action buttons share the cover-art card's 8px radius for consistency */
+    .btn-play-gallery, .btn-install-gallery { border-radius: 8px; }
     .btn-install { padding: 4px 8px; background: #e65100; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 12px; }
     .btn-install:hover { background: #ff6d00; }
     .btn-install-primary { background: #e65100; color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-family: inherit; font-weight: 900; font-size: 14px; cursor: pointer; letter-spacing: 1px; }
@@ -192,6 +205,30 @@
     .cmd-icon-btn.active { background:rgba(255,255,255,0.1); color:var(--accent); }
     .cmd-icon-btn.active svg { opacity:1; }
     .cmd-icon-sep { width:18px; height:1px; background:rgba(255,255,255,0.1); margin:3px auto; }
+
+    /* Store filter panel — slides in to the left of the floating icon bar */
+    #cmd-stores-panel { position:fixed; top:50%; right:58px; z-index:501; width:250px; max-height:72vh; display:flex; flex-direction:column;
+        background:rgba(6,6,6,0.86); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+        border:1px solid rgba(255,255,255,0.13); border-radius:12px; overflow:hidden;
+        box-shadow:0 18px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+        opacity:0; pointer-events:none; transform:translateY(-50%) translateX(calc(100% + 72px));
+        transition:transform 0.34s cubic-bezier(0.22,1,0.36,1), opacity 0.26s ease; }
+    #cmd-stores-panel.open { opacity:1; pointer-events:auto; transform:translateY(-50%) translateX(0); }
+    .csp-head { display:flex; align-items:center; justify-content:space-between; padding:13px 13px 10px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0; }
+    .csp-head span { color:var(--accent); font-size:11px; font-weight:900; letter-spacing:2px; font-family:'Fira Code','Courier New',monospace; }
+    .csp-x { background:transparent; border:none; color:var(--text_dim); cursor:pointer; font-size:12px; padding:3px 6px; border-radius:6px; line-height:1; }
+    .csp-x:hover { color:#fff; background:rgba(255,255,255,0.08); }
+    #csp-list { overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:3px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.2) transparent; }
+    .csp-row { display:flex; align-items:center; gap:9px; width:100%; background:transparent; border:1px solid transparent; color:#cfcfcf; padding:8px 10px; border-radius:8px; cursor:pointer; font-family:'Fira Code','Courier New',monospace; font-size:12px; text-align:left; transition:background 0.14s, color 0.14s, border-color 0.14s; }
+    .csp-row:hover { background:rgba(255,255,255,0.06); color:#fff; }
+    .csp-row.active { background:color-mix(in srgb, var(--accent) 17%, transparent); border-color:var(--accent); color:#fff; }
+    .csp-dot { width:7px; height:7px; border-radius:50%; background:var(--text_dim); flex-shrink:0; transition:background 0.14s, box-shadow 0.14s; }
+    .csp-row.active .csp-dot { background:var(--accent); box-shadow:0 0 7px var(--accent); }
+    .csp-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .csp-count { color:var(--text_dim); font-size:11px; font-variant-numeric:tabular-nums; flex-shrink:0; }
+    .csp-row.active .csp-count { color:var(--accent); }
+    .csp-all { justify-content:space-between; margin-bottom:2px; }
+    .csp-all .csp-name { font-weight:700; }
 
     /* ── FLAT LAYOUTS — shared ──────────────────────────────────────────────── */
     #app-container.layout-catalog       #icon-rail, #app-container.layout-catalog       #side-panel, #app-container.layout-catalog       #sidebar, #app-container.layout-catalog       #topnav,
@@ -2496,8 +2533,7 @@
     button { background-color: var(--bg_panel); color: var(--text_main); border: 1px solid var(--border_solid); padding: 10px 12px; font-family: 'Raleway', sans-serif; font-weight: 900; cursor: pointer; border-radius: 6px; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-transform: uppercase; letter-spacing: 1px; }
     button:hover { background-color: var(--text_main); color: var(--bg); }
 
-    /* ── CREMA launch — the marquee action; stands out in every layout ───────── */
-    #btn-topnav-crema, #btn-launch-crema-sb, #btn-launch-crema, #btn-cmd-crema, #btn-split-crema,
+    /* ── CREMA launch — Ancient-OS faux-desktop launchers (classic/TTY use the titlebar pill) ── */
     #mac-special-crema, #xp-sm-crema, #kde-strip-crema, #kde-km-crema, #w95-icon-crema, #w95-sm-crema,
     #nx-am-crema, #nx-dk-crema, #beos-t-crema, #beos-db-crema, #amiga-t-crema, #c64-act-crema {
         color: var(--accent) !important;
@@ -2646,6 +2682,11 @@
     .p8-opt-btn.on { background: var(--accent); color: var(--bg); border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
     .btn-hero.active { background: var(--text_main); color: var(--bg); border-color: var(--text_main); box-shadow: 0 0 10px rgba(255,255,255,0.2); }
     #btn-gamepage-fav.active svg, #btn-gamepage-want.active svg { fill: currentColor; }
+    /* "Open in Steam" dropdown menu */
+    .steam-menu { position:fixed; z-index:12000; background:var(--bg_menu); border:1px solid var(--border_solid); border-radius:8px; padding:5px; min-width:172px; box-shadow:0 12px 32px rgba(0,0,0,0.6); display:flex; flex-direction:column; gap:2px; animation:smFade 0.14s ease; }
+    @keyframes smFade { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+    .steam-menu-item { background:transparent; border:none; color:var(--text_sec); text-align:left; padding:9px 12px; border-radius:6px; cursor:pointer; font-family:'Raleway',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.4px; white-space:nowrap; }
+    .steam-menu-item:hover { background:var(--accent); color:var(--bg); }
 
     .screenshots-banner { position: relative; height: 160px; background-size: cover; background-position: center; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border_solid); box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: box-shadow 0.2s, border-color 0.2s; cursor: pointer; overflow: hidden; }
     .screenshots-banner:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-color: var(--accent); }
@@ -2718,6 +2759,8 @@
     #btn-gamepage-play { position:fixed !important; bottom:28px; right:28px; font-size:18px !important; padding:14px 36px !important; border-radius:50px !important; box-shadow:0 8px 28px rgba(0,0,0,0.7) !important; letter-spacing:2px !important; z-index:50; }
   </style>
   <script>(function(){try{var c=localStorage.getItem('cngm_theme_cache');if(c){var t=JSON.parse(c);Object.keys(t).forEach(function(k){document.documentElement.style.setProperty('--'+k,t[k]);});}}catch(e){}})();</script>
+  <link rel="stylesheet" href="vendor/gridstack.min.css">
+  <link rel="stylesheet" href="vendor/gridstack-extra.min.css">
 </head>
 <body>
 
@@ -2726,6 +2769,18 @@
     <div class="titlebar-controls">
       <button id="btn-titlebar-home" title="Home dashboard">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </button>
+      <button id="support-cta" title="Support the project — ways to donate &amp; help">
+        <svg class="support-cta-heart" viewBox="0 0 7 6" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="0" width="2" height="1" fill="#ff4b3e"/>
+          <rect x="4" y="0" width="2" height="1" fill="#ff4b3e"/>
+          <rect x="0" y="1" width="7" height="1" fill="#ff4b3e"/>
+          <rect x="0" y="2" width="7" height="1" fill="#e5392f"/>
+          <rect x="1" y="3" width="5" height="1" fill="#e5392f"/>
+          <rect x="2" y="4" width="3" height="1" fill="#c62f27"/>
+          <rect x="3" y="5" width="1" height="1" fill="#c62f27"/>
+        </svg>
+        <span class="support-cta-text">Support</span>
       </button>
       <button id="crema-cta" title="Go fullscreen with CREMA — couch &amp; gamepad mode">
         <svg class="crema-cta-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
@@ -2804,9 +2859,6 @@
       <button id="btn-topnav-playlists" class="topnav-action" title="Playlists">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       </button>
-      <button id="btn-topnav-crema" class="topnav-action" title="Launch CREMA" style="display:none;">
-        <svg viewBox="0 0 24 24" width="17" height="17"><rect x="2" y="3" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><text x="12" y="13.5" text-anchor="middle" font-size="7" font-weight="bold" font-family="sans-serif" fill="currentColor" stroke="none">CR</text></svg>
-      </button>
       <button id="btn-topnav-emulatte" class="topnav-action" title="Launch EmuLatte" style="display:none;">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="12" rx="4"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
       </button>
@@ -2884,10 +2936,6 @@
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             About
           </button>
-          <button class="split-nav-btn" id="btn-launch-crema-sb" title="Go Fullscreen With CREMA" style="display:none;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 4-4"/></svg>
-            CREMA
-          </button>
           <button class="split-nav-btn" id="btn-launch-emulatte-sb" title="Launch EmuLatte" style="display:none;">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
             EmuLatte
@@ -2942,9 +2990,6 @@
         </button>
         <button class="rail-btn" id="btn-open-tools" title="Tools">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        </button>
-        <button class="rail-btn" id="btn-launch-crema" title="Go Fullscreen With CREMA" style="display:none;">
-          <svg viewBox="0 0 24 24" width="17" height="17"><rect x="2" y="3" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><text x="12" y="13.5" text-anchor="middle" font-size="7" font-weight="bold" font-family="sans-serif" fill="currentColor" stroke="none">CR</text></svg>
         </button>
         <div id="btn-about" class="rail-btn" title="Cafe Neurotico Game Manager" style="cursor:pointer; height:38px; flex-direction:column; gap:1px; margin-top:6px; border-top:1px solid var(--border_solid);">
           <span style="font-size:7px; font-weight:900; color:var(--text_dim); letter-spacing:1px; line-height:1;">CN</span>
@@ -3023,16 +3068,21 @@
           <button class="cmd-icon-btn" id="btn-cmd-want" data-filter="want" title="Want to Play">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
           </button>
+          <button class="cmd-icon-btn" id="btn-cmd-stores" title="Filter by store">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7l4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>
+          </button>
           <div class="cmd-icon-sep"></div>
           <button class="cmd-icon-btn" id="btn-cmd-playlists" title="Playlists">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3" y2="6"/><line x1="3" y1="12" x2="3" y2="12"/><line x1="3" y1="18" x2="3" y2="18"/></svg>
           </button>
-          <button class="cmd-icon-btn" id="btn-cmd-crema" title="Launch CREMA" style="display:none;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 4-4"/></svg>
-          </button>
           <button class="cmd-icon-btn" id="btn-cmd-emulatte" title="Launch EmuLatte" style="display:none;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
           </button>
+        </div>
+        <!-- Store filter panel (command layout, gallery view only) — slides in from the right -->
+        <div id="cmd-stores-panel">
+          <div class="csp-head"><span>STORES</span><button id="btn-csp-close" class="csp-x" title="Close">&#10005;</button></div>
+          <div id="csp-list"></div>
         </div>
 
         <!-- Gamepage floating back button — lives outside the scrollable view so it's always at the top -->
@@ -3053,11 +3103,27 @@
           .home-primary:hover { filter:brightness(1.1); }
           .home-ghost { background:transparent; color:var(--text_sec); border:1px solid var(--border_solid); padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:800; font-family:inherit; }
           .home-ghost:hover { color:var(--accent); border-color:var(--accent); }
-          .home-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; align-items:start; }
-          .home-card { background:var(--bg_panel); border:1px solid var(--border); border-radius:14px; padding:16px 16px 15px; display:flex; flex-direction:column; min-height:118px; box-shadow:0 6px 18px rgba(0,0,0,0.18); }
-          .home-card h4 { margin:0 0 13px; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); border-left:3px solid var(--accent); padding-left:8px; }
-          .span-3{grid-column:span 3} .span-4{grid-column:span 4} .span-6{grid-column:span 6} .span-8{grid-column:span 8} .span-12{grid-column:span 12}
-          @media (max-width:1150px){ .home-grid{grid-template-columns:repeat(6,1fr)} .span-3,.span-4{grid-column:span 3} .span-6,.span-8{grid-column:span 6} .span-12{grid-column:span 6} }
+          #home-edit-bar { position:fixed; top:44px; right:24px; z-index:600; display:flex; align-items:center; gap:10px; background:var(--bg_menu); padding:9px 11px 9px 14px; border-radius:12px; border:1px solid var(--accent); box-shadow:0 12px 34px rgba(0,0,0,0.55); animation:hebDrop 0.22s ease both; }
+          #home-edit-bar .heb-label { font-size:10px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-right:2px; white-space:nowrap; }
+          @keyframes hebDrop { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+          /* Full-bleed Home — takes over the whole window (over the sidebar), under the titlebar + modals */
+          body.viewing-home #view-home.view { position:fixed; top:35px; left:0; right:0; bottom:0; z-index:500; padding:0 !important; background:var(--bg); overflow-y:auto; }
+          /* Skeleton loaders */
+          .hc-skel { background:linear-gradient(90deg, var(--bg) 25%, var(--bg_panel) 50%, var(--bg) 75%); background-size:200% 100%; animation:hcShim 1.2s linear infinite; }
+          @keyframes hcShim { from { background-position:200% 0; } to { background-position:-200% 0; } }
+          /* ── Gridstack 2D dashboard (Manager Home) ── */
+          .grid-stack { background:transparent; }
+          .grid-stack-item-content { background:var(--bg_panel); border:1px solid var(--border); border-radius:14px; padding:16px 16px 15px; display:flex; flex-direction:column; box-shadow:0 6px 18px rgba(0,0,0,0.18); overflow:hidden; box-sizing:border-box; animation:hcFade 0.4s ease both; }
+          @keyframes hcFade { from { opacity:0; } to { opacity:1; } }
+          .grid-stack-item-content h4 { margin:0 0 13px; font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); border-left:3px solid var(--accent); padding-left:8px; flex-shrink:0; }
+          .home-editing .grid-stack-item-content { outline:2px dashed var(--border_solid); outline-offset:-3px; cursor:move; }
+          .home-editing .grid-stack-item-content > *:not(.hc-edit-bar) { pointer-events:none; }
+          .hc-edit-bar { position:absolute; top:8px; right:8px; display:flex; gap:5px; z-index:6; pointer-events:auto; }
+          .hc-eb { width:27px; height:27px; border:none; border-radius:7px; background:rgba(0,0,0,0.62); color:#fff; font-size:16px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; padding:0; }
+          .hc-eb:hover { background:var(--accent); color:var(--bg); }
+          .hc-eb-x:hover { background:#c0392b; color:#fff; }
+          .grid-stack-item > .ui-resizable-se { width:20px; height:20px; right:2px; bottom:2px; background:none; }
+          .grid-stack-item > .ui-resizable-se::after { content:''; position:absolute; right:3px; bottom:3px; width:9px; height:9px; border-right:2px solid var(--accent); border-bottom:2px solid var(--accent); opacity:0.75; }
           .hc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:10px; }
           .hc-stat { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:13px 8px; text-align:center; }
           .hc-stat .n { font-size:26px; font-weight:900; color:var(--accent); line-height:1; }
@@ -3181,10 +3247,10 @@
           body.corners-flat [style*="border-radius:50%"], body.corners-flat [style*="border-radius: 50%"] { border-radius: 50% !important; }
           /* the one exception you asked for: the gallery cover-art box (card) keeps its rounded corners */
           body.corners-flat .gallery-item { border-radius: 8px !important; }
-          /* keep the CREMA pill in the titlebar a pill */
-          body.corners-flat #crema-cta { border-radius: 50px !important; }
-          /* gallery Install / Play buttons: pill ends, same as the CREMA pill */
-          body.corners-flat .btn-play-gallery, body.corners-flat .btn-install-gallery { border-radius: 50px !important; }
+          /* keep the CREMA + Support pills in the titlebar as pills */
+          body.corners-flat #crema-cta, body.corners-flat #support-cta { border-radius: 50px !important; }
+          /* gallery Install / Play buttons: match the cover-art card's 8px radius */
+          body.corners-flat .btn-play-gallery, body.corners-flat .btn-install-gallery { border-radius: 8px !important; }
         </style>
         <div id="view-home" class="view">
           <div class="home-wrap">
@@ -3194,11 +3260,17 @@
                 <div class="home-sub" id="home-date"></div>
               </div>
               <div class="home-head-actions">
-                <button id="btn-home-config" class="home-ghost">Customize</button>
+                <button id="btn-home-edit" class="home-ghost">Edit Layout</button>
                 <button id="btn-home-enter" class="home-primary">Enter Library &rarr;</button>
               </div>
+              <div id="home-edit-bar" style="display:none;">
+                <span class="heb-label">Editing layout</span>
+                <button id="btn-home-add" class="home-ghost">+ Add Widget</button>
+                <button id="btn-home-reset" class="home-ghost">Reset</button>
+                <button id="btn-home-done" class="home-primary">Done</button>
+              </div>
             </div>
-            <div id="home-grid" class="home-grid"></div>
+            <div id="home-grid" class="grid-stack"></div>
           </div>
         </div>
 
@@ -3370,6 +3442,9 @@
                         </button>
                         <button id="btn-gamepage-grinder" class="btn-hero btn-hero-sq" title="Open in GRINDER" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                        </button>
+                        <button id="btn-gamepage-steam" class="btn-hero btn-hero-sq" title="Open in Steam" style="display:none;">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="15.5" cy="9" r="3.2"/><circle cx="8" cy="15.5" r="2.3"/><path d="M13 11.3 9.6 14"/><path d="M5.7 13.4 2.6 12"/></svg>
                         </button>
                         <button id="btn-gamepage-uninstall" class="btn-hero btn-hero-sq" title="Uninstall" style="display:none; border-color:#ef5350; color:#ef5350;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -3604,10 +3679,6 @@
           <button class="split-nav-btn" id="btn-split-playlists" title="Playlists">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             Playlists
-          </button>
-          <button class="split-nav-btn" id="btn-split-crema" title="Launch CREMA" style="display:none;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 4-4"/></svg>
-            CREMA
           </button>
           <button class="split-nav-btn" id="btn-split-emulatte" title="Launch EmuLatte" style="display:none;">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
@@ -5518,9 +5589,10 @@ LOADING...READY.</div>
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Layout</div>
           <div id="layout-cat-tabs">
             <button class="lsc-cat" data-cat="classic">Classic</button>
-            <button class="lsc-cat" data-cat="flat">Flat</button>
-            <button class="lsc-cat" data-cat="tty">TTY</button>
-            <button class="lsc-cat" data-cat="ancient">Ancient OS</button>
+            <!-- Flat / TTY / Ancient OS layout families temporarily hidden — still functional, to be reintroduced later. -->
+            <button class="lsc-cat" data-cat="flat" style="display:none">Flat</button>
+            <button class="lsc-cat" data-cat="tty" style="display:none">TTY</button>
+            <button class="lsc-cat" data-cat="ancient" style="display:none">Ancient OS</button>
           </div>
           <div id="layout-segmented-control">
             <div class="lsc-group" data-cat="classic" style="display:none">
@@ -6055,6 +6127,7 @@ LOADING...READY.</div>
 
   <div id="split-cover-zoom"><img id="split-cover-zoom-img" src="" alt=""></div>
 
+  <script src="vendor/gridstack-all.js"></script>
   <script src="renderer.js"></script>
 
   <!-- Now Playing overlay -->

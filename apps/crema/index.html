@@ -405,6 +405,8 @@
       #home-screen { padding:0; }
       #home-content { flex:1; min-height:0; overflow-y:auto; }
       .ch-wrap { min-height:100%; box-sizing:border-box; padding:44px 60px 26px; display:flex; flex-direction:column; gap:24px; }
+      @keyframes chUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+      .ch-top, .ch-hero, .ch-actions, .ch-rowsec { animation:chUp 0.42s cubic-bezier(0.2,0.8,0.2,1) both; }
       .ch-top { display:flex; justify-content:space-between; align-items:flex-end; gap:30px; flex-wrap:wrap; }
       .ch-greet .g1 { font-size:42px; font-weight:900; letter-spacing:1px; color:var(--text_main); }
       .ch-greet .g2 { font-size:15px; letter-spacing:3px; text-transform:uppercase; color:var(--text_dim); margin-top:5px; }
@@ -438,7 +440,11 @@
       /* ── Cinematic Wrapped ── */
       #wrapped-screen { background:radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--accent) 32%, var(--bg)), var(--bg) 72%); }
       .wr-wrap { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:40px; box-sizing:border-box; }
-      .wr-slide, .wr-intro { display:flex; flex-direction:column; align-items:center; gap:14px; animation:wrIn 0.5s cubic-bezier(0.2,0.8,0.2,1); }
+      .wr-slide, .wr-intro { display:flex; flex-direction:column; align-items:center; gap:14px; }
+      .wr-slide > *, .wr-intro > * { animation:wrIn 0.55s cubic-bezier(0.2,0.8,0.2,1) both; }
+      .wr-slide > *:nth-child(2), .wr-intro > *:nth-child(2) { animation-delay:0.1s; }
+      .wr-slide > *:nth-child(3), .wr-intro > *:nth-child(3) { animation-delay:0.2s; }
+      .wr-slide > *:nth-child(4), .wr-intro > *:nth-child(4) { animation-delay:0.3s; }
       @keyframes wrIn { from { opacity:0; transform:translateY(30px) scale(0.95); } to { opacity:1; transform:none; } }
       .wr-kick { font-size:18px; letter-spacing:5px; text-transform:uppercase; color:var(--accent); font-weight:800; }
       .wr-title { font-size:62px; font-weight:900; letter-spacing:7px; color:var(--text_main); }

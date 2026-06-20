@@ -28,6 +28,15 @@ function registerSharedHandlers(ctx) {
     // Wishlist of UN-OWNED games (Phase 2) — distinct from WANT_TO_PLAY (owned).
     try { db.prepare(`CREATE TABLE IF NOT EXISTS wishlist (id INTEGER PRIMARY KEY AUTOINCREMENT, itad_id TEXT UNIQUE, title TEXT, slug TEXT, cover TEXT, appid TEXT, added_at INTEGER DEFAULT 0, target_price REAL)`).run(); } catch (e) {}
 
+    // Tiny TTL memo so the online Home widgets don't refetch on every Home open
+    // (the CPU/network spike). Keyed by inputs → settings changes bust naturally.
+    const _hcache = {};
+    function _cached(key, ttl, fn) {
+        const c = _hcache[key];
+        if (c && Date.now() - c.ts < ttl) return Promise.resolve(c.val);
+        return Promise.resolve().then(fn).then(v => { _hcache[key] = { ts: Date.now(), val: v }; return v; }).catch(() => (c ? c.val : null));
+    }
+
     ipcMain.handle('get-basedir', () => baseDir);
 
     ipcMain.handle('get-games', () => {
@@ -77,8 +86,9 @@ function registerSharedHandlers(ctx) {
     const _itadCountry = () => { try { return db.prepare("SELECT value FROM settings WHERE key='itad_country'").get()?.value || 'US'; } catch { return 'US'; } };
 
     ipcMain.handle('itad-search', async (e, q) => itad.search(_itadKey(), q));
+    const _bustWishlist = () => Object.keys(_hcache).forEach(k => { if (k.startsWith('wishlist')) delete _hcache[k]; });
     ipcMain.handle('wishlist-get', () => { try { return db.prepare("SELECT * FROM wishlist ORDER BY added_at DESC").all(); } catch { return []; } });
-    ipcMain.handle('wishlist-remove', (e, itadId) => { try { db.prepare("DELETE FROM wishlist WHERE itad_id=?").run(itadId); return true; } catch { return false; } });
+    ipcMain.handle('wishlist-remove', (e, itadId) => { try { db.prepare("DELETE FROM wishlist WHERE itad_id=?").run(itadId); _bustWishlist(); return true; } catch { return false; } });
     ipcMain.handle('wishlist-add', async (e, item) => {
         if (!item || !item.id) return { ok: false };
         let cover = item.cover || '', appid = item.appid || null;
@@ -86,37 +96,38 @@ function registerSharedHandlers(ctx) {
         try {
             db.prepare("INSERT OR IGNORE INTO wishlist (itad_id,title,slug,cover,appid,added_at) VALUES (?,?,?,?,?,?)")
               .run(item.id, item.title || '', item.slug || '', cover || '', appid, Date.now());
+            _bustWishlist();
             return { ok: true };
         } catch (err) { return { ok: false, error: err.message }; }
     });
-    // List + live prices/historical-low (network — only if a key is set).
-    ipcMain.handle('wishlist-deals', async () => {
+    // List + live prices/historical-low (network — only if a key is set). Cached ~20 min.
+    ipcMain.handle('wishlist-deals', () => _cached('wishlist:' + _itadCountry(), 20 * 60000, async () => {
         let rows = []; try { rows = db.prepare("SELECT * FROM wishlist ORDER BY added_at DESC").all(); } catch {}
         const key = _itadKey();
         if (!key || !rows.length) return { keyed: !!key, rows: rows.map(r => ({ ...r, deal: null, low: null })) };
         return { keyed: true, rows: await itad.enrich(key, _itadCountry(), rows) };
-    });
+    }));
 
-    // Free games this week (Epic public endpoint, no key) — fetched only when the widget is on.
-    ipcMain.handle('free-games', async () => { try { return await freebies.freeGames(_itadCountry()); } catch { return []; } });
+    // Free games this week (Epic public endpoint, no key). Cached ~30 min.
+    ipcMain.handle('free-games', () => _cached('free:' + _itadCountry(), 30 * 60000, async () => { try { return await freebies.freeGames(_itadCountry()); } catch { return []; } }));
 
-    // Gaming news (RSS/Atom) — sources from `news_sources` setting (newline/comma list) or curated defaults.
-    ipcMain.handle('get-news', async () => {
+    // Gaming news (RSS/Atom) — sources from `news_sources` or curated defaults. Cached ~15 min (key = sources).
+    ipcMain.handle('get-news', () => {
         let urls = [];
         try { const raw = db.prepare("SELECT value FROM settings WHERE key='news_sources'").get()?.value; if (raw) urls = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean); } catch {}
         if (!urls.length) urls = rss.DEFAULT_NEWS;
-        try { return await rss.fetchNews(urls, 14); } catch { return []; }
+        return _cached('news:' + urls.join('|'), 15 * 60000, () => rss.fetchNews(urls, 14).catch(() => []));
     });
 
-    // Steam patch notes for the games you actually play/own (recently played + installed first).
-    ipcMain.handle('get-game-news', async () => {
+    // Steam patch notes for the games you actually play/own. Cached ~20 min.
+    ipcMain.handle('get-game-news', () => _cached('gamenews', 20 * 60000, async () => {
         let games = [];
         try {
             games = db.prepare("SELECT Game, SteamAppID FROM games WHERE SteamAppID IS NOT NULL AND TRIM(SteamAppID) != '' AND SteamAppID != 'None' ORDER BY (LastPlayed > 0) DESC, LastPlayed DESC, Installed DESC LIMIT 24").all();
         } catch {}
         const targets = games.map(g => ({ appid: String(g.SteamAppID).replace(/\.0+$/, ''), name: g.Game }));
         try { return await steamnews.gameNews(targets, { limit: 24, total: 14 }); } catch { return []; }
-    });
+    }));
 
     // Achievement completion — cached scan result (the scan itself runs in the Manager).
     ipcMain.handle('ach-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='ach_stats'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });

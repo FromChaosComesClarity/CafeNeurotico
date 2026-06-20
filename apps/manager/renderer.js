@@ -87,6 +87,48 @@ function getInstallCommand(game) {
     return null;
 }
 
+// Clean Steam AppID (strips trailing ".0", rejects empty/"None"); '' when not a Steam title.
+function _steamAppId(game) {
+    const id = game && game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '').trim() : '';
+    return (id && id !== 'None') ? id : '';
+}
+
+// ── "Open in Steam" dropdown — deep-links into the Steam client via steam:// URLs ──
+function _closeSteamMenu() {
+    document.getElementById('steam-menu')?.remove();
+    document.removeEventListener('click', _steamMenuOutside, true);
+}
+function _steamMenuOutside(e) {
+    if (e.target.closest('#steam-menu') || e.target.closest('#btn-gamepage-steam')) return;
+    _closeSteamMenu();
+}
+function openSteamMenu(anchorBtn, appId) {
+    _closeSteamMenu();
+    const items = [
+        { label: 'Open game page', url: `steam://nav/games/details/${appId}` },
+        { label: 'Game properties', url: `steam://gameproperties/${appId}` },
+        { label: 'Store page',      url: `steam://store/${appId}` },
+        { label: 'Verify files',    url: `steam://validate/${appId}` },
+    ];
+    const menu = document.createElement('div');
+    menu.id = 'steam-menu';
+    menu.className = 'steam-menu';
+    menu.innerHTML = items.map(it => `<button class="steam-menu-item" data-url="${it.url}">${it.label}</button>`).join('');
+    document.body.appendChild(menu);
+    const r = anchorBtn.getBoundingClientRect();
+    let left = r.right - menu.offsetWidth;
+    if (left < 8) left = 8;
+    menu.style.left = left + 'px';
+    menu.style.top = (r.bottom + 6) + 'px';
+    menu.addEventListener('click', (e) => {
+        const b = e.target.closest('.steam-menu-item');
+        if (!b) return;
+        window.api.openExternal(b.dataset.url);
+        _closeSteamMenu();
+    });
+    setTimeout(() => document.addEventListener('click', _steamMenuOutside, true), 0);
+}
+
 // ── Now Playing popup ─────────────────────────────────────────────────────────
 let _npTimer = null;
 
@@ -478,19 +520,6 @@ window.api.getSetting('language').then(lang => {
   window.api.getStrings(currentLang).then(s => { strings = s; applyI18nToDOM(); });
 });
 
-window.api.checkCrema().then(exists => {
-    if (exists) {
-        ['btn-launch-crema', 'btn-launch-crema-sb'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'flex';
-        });
-        const splitCrema = document.getElementById('btn-split-crema');
-        if (splitCrema) splitCrema.style.display = '';
-        const cmdCrema = document.getElementById('btn-cmd-crema');
-        if (cmdCrema) cmdCrema.style.display = 'flex';
-    }
-});
-
 window.api.checkEmuLatte().then(exists => {
     if (exists) {
         const splitEmu = document.getElementById('btn-split-emulatte');
@@ -503,10 +532,11 @@ window.api.checkEmuLatte().then(exists => {
         if (cmdEmu) cmdEmu.style.display = 'flex';
     }
 });
-['btn-launch-crema', 'btn-launch-crema-sb'].forEach(id =>
-    document.getElementById(id)?.addEventListener('click', () => window.api.launchCrema()));
 // Always-visible floating CREMA call-to-action
 document.getElementById('crema-cta')?.addEventListener('click', () => window.api.launchCrema());
+// Support pill → project website donation/support page
+const SUPPORT_URL = 'https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/support.html';
+document.getElementById('support-cta')?.addEventListener('click', () => window.api.openExternal(SUPPORT_URL));
 document.getElementById('btn-topnav-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-launch-emulatte-sb')?.addEventListener('click', () => window.api.launchEmuLatte());
 
@@ -714,6 +744,7 @@ function applyLayoutMode(mode) {
         if (inp) { inp.value = ''; applyFilters(); }
         document.getElementById('cmd-bar')?.classList.remove('cmd-visible');
         document.getElementById('cmd-icon-bar')?.classList.remove('cmd-visible');
+        closeCmdStores();
     }
     if (mode === 'catalog')   { renderCatalog(); }
     if (mode === 'newspaper') { renderNewspaper(); }
@@ -751,7 +782,10 @@ const _layoutCats = {
     mac:'ancient', xp:'ancient', kde:'ancient', c64:'ancient', amiga:'ancient', beos:'ancient', w95:'ancient', nextstep:'ancient'
 };
 function updateLayoutCatTab(mode) {
-    const cat = _layoutCats[mode] || 'classic';
+    // Only the Classic family is selectable for now — Flat/TTY/Ancient-OS tabs are
+    // hidden, so the picker always lands on the classic group (even if the active
+    // layout belongs to a hidden family). The layouts themselves remain functional.
+    const cat = 'classic';
     document.querySelectorAll('.lsc-cat').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
     document.querySelectorAll('#layout-segmented-control .lsc-group').forEach(g =>
         g.style.display = g.dataset.cat === cat ? '' : 'none');
@@ -795,12 +829,28 @@ const HOME_WIDGETS = [
     { key: 'gamenews', label: "Your Games — What's New" },
     { key: 'protonwatch', label: 'Proton Watch' },
 ];
-// Online widgets are excluded from the default set so a fresh Home makes no network calls until opted in.
+// Online widgets make network calls — opt-in only.
 const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'gamenews', 'protonwatch']);
-// Local "extras" that are opt-in too (keep the default Home lean).
-const HOME_OPTIN = new Set([...HOME_ONLINE, 'wrapped', 'couchnight', 'franchise', 'beaten', 'throwback', 'disk', 'completion']);
-const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => !HOME_OPTIN.has(k));
-const HOME_SPAN = { daily:4, continue:4, backlog:4, overview:12, stores:4, proton:4, genres:4, roulette:12, recent:6, played:6, gems:12, mostplayed:12, couchnight:12, franchise:12, beaten:4, completion:6, throwback:4, disk:6, wrapped:12, wishlist:12, freebies:12, news:12, gamenews:12, protonwatch:6 };
+// Default Home = only a lean handful of widgets that draw on data the Manager already has on
+// hand from a plain library import. Everything else (Steam-playtime, disk/achievement scans, the
+// online widgets, and the heavier "extras") is opt-in via "+ Add Widget".
+const HOME_DEFAULT_SET = new Set(['daily', 'overview', 'backlog', 'roulette', 'recent', 'genres']);
+const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => HOME_DEFAULT_SET.has(k));
+// 2D layout defaults on a 6-column grid (cellHeight 140px): { w, h, minW, minH } in cells.
+const HOME_GS = {
+    daily:      { w:2, h:2, minW:2, minH:2 }, continue:   { w:2, h:2, minW:2, minH:2 },
+    backlog:    { w:2, h:2, minW:1, minH:1 }, overview:   { w:6, h:1, minW:2, minH:1 },
+    stores:     { w:2, h:2, minW:2, minH:2 }, proton:     { w:2, h:2, minW:2, minH:2 },
+    genres:     { w:2, h:2, minW:2, minH:2 }, roulette:   { w:2, h:2, minW:2, minH:2 },
+    recent:     { w:6, h:2, minW:3, minH:2 }, played:     { w:6, h:2, minW:3, minH:2 },
+    gems:       { w:6, h:2, minW:3, minH:2 }, mostplayed: { w:6, h:2, minW:3, minH:2 },
+    couchnight: { w:6, h:2, minW:3, minH:2 }, franchise:  { w:6, h:2, minW:3, minH:2 },
+    beaten:     { w:2, h:2, minW:2, minH:2 }, completion: { w:2, h:2, minW:2, minH:2 },
+    throwback:  { w:2, h:2, minW:2, minH:2 }, disk:       { w:3, h:2, minW:2, minH:2 },
+    wrapped:    { w:6, h:2, minW:3, minH:2 }, wishlist:   { w:6, h:2, minW:3, minH:2 },
+    freebies:   { w:6, h:2, minW:3, minH:2 }, news:       { w:3, h:2, minW:2, minH:2 },
+    gamenews:   { w:3, h:2, minW:2, minH:2 }, protonwatch:{ w:3, h:2, minW:2, minH:2 },
+};
 // Theme-derived chart palette — resolves against the active theme's CSS vars
 // (color-mix is evaluated live), so the donut follows whatever theme is applied.
 const HOME_PALETTE = [
@@ -815,15 +865,19 @@ const HOME_PALETTE = [
 ];
 let _homeEnabled = false;
 let _homeWidgets = HOME_DEFAULT.slice();
+let _homeLayout = {};                 // key → { x, y, w, h } from the Gridstack board
+let _homeEditMode = false, _gsGrid = null;
 let _homeSnap = null;
 
 async function loadHomeConfig() {
     _homeEnabled = (await window.api.getSetting('home_enabled')) === '1';
-    try { const raw = await window.api.getSetting('home_widgets'); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) _homeWidgets = a.filter(k => HOME_SPAN[k]); } } catch (e) {}
+    try { const raw = await window.api.getSetting('home_widgets'); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) _homeWidgets = a.filter(k => HOME_GS[k]); } } catch (e) {}
+    try { const raw = await window.api.getSetting('home_layout'); if (raw) { const o = JSON.parse(raw); if (o && typeof o === 'object') _homeLayout = o; } } catch (e) {}
 }
 function saveHomeConfig() {
     window.api.setSetting('home_enabled', _homeEnabled ? '1' : '');
     window.api.setSetting('home_widgets', JSON.stringify(_homeWidgets));
+    window.api.setSetting('home_layout', JSON.stringify(_homeLayout));
 }
 
 function _hImg(t) { if (!t) return ''; const p = t.CoverArt || t.HeroArt || t.Logo || ''; return p ? getSafePath(p) : ''; }
@@ -857,6 +911,8 @@ function _homeTileRow(items, empty) {
     if (!items || !items.length) return `<div class="hc-empty">${empty}</div>`;
     return `<div class="hc-row">${items.map(t => { const c = _hImg(t); return `<div class="hc-tile" data-gid="${t.id}">${c ? `<img src="${c}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${escHtml(t.Game || '')}</div></div>`; }).join('')}</div>`;
 }
+function _homeSkelRow(n) { return `<div class="hc-row">${Array.from({ length: n }).map(() => `<div class="hc-skel" style="width:92px;height:122px;border-radius:7px;flex-shrink:0;"></div>`).join('')}</div>`; }
+function _homeSkelList(n) { return `<div class="news-list">${Array.from({ length: n }).map(() => `<div style="padding:11px 8px;"><div class="hc-skel" style="height:13px;width:72%;border-radius:4px;"></div><div class="hc-skel" style="height:9px;width:34%;border-radius:4px;margin-top:7px;"></div></div>`).join('')}</div>`; }
 function _homePlaytimeLabel(min) { const m = Number(min) || 0; return m >= 60 ? Math.round(m / 60) + 'h' : m + 'm'; }
 function _homePlaytimeRow(items, key, empty) {
     if (!items || !items.length) return `<div class="hc-empty">${empty}</div>`;
@@ -918,17 +974,42 @@ async function renderHome() {
     const grid = document.getElementById('home-grid'); if (!grid) return;
     const dEl = document.getElementById('home-date');
     if (dEl) dEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    grid.innerHTML = `<div class="hc-empty" style="grid-column:span 12;">Reading your library&hellip;</div>`;
+    const hEl = document.getElementById('home-hello');
+    if (hEl) { const h = new Date().getHours(); hEl.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+    grid.innerHTML = `<div class="hc-empty">Reading your library&hellip;</div>`;
     _homeSnap = (await window.api.getHomeStats({ hidePico8: _hidePico8 })) || {};
+    if (_gsGrid) { try { _gsGrid.destroy(false); } catch (e) {} _gsGrid = null; }
     grid.innerHTML = '';
+    grid.classList.toggle('home-editing', _homeEditMode);
+    const editBar = `<div class="hc-edit-bar"><button class="hc-eb hc-eb-x" data-act="remove" title="Remove">&times;</button></div>`;
     for (const key of _homeWidgets) {
-        if (!HOME_SPAN[key]) continue;
-        const card = document.createElement('div');
-        card.className = 'home-card span-' + HOME_SPAN[key];
-        card.innerHTML = homeWidgetHtml(key, _homeSnap);
-        grid.appendChild(card);
+        const def = HOME_GS[key]; if (!def) continue;
+        const lay = _homeLayout[key] || {};
+        const item = document.createElement('div');
+        item.className = 'grid-stack-item';
+        item.setAttribute('gs-id', key);
+        item.setAttribute('gs-w', lay.w || def.w);
+        item.setAttribute('gs-h', lay.h || def.h);
+        item.setAttribute('gs-min-w', def.minW);
+        item.setAttribute('gs-min-h', def.minH);
+        if (lay.x != null && lay.y != null) { item.setAttribute('gs-x', lay.x); item.setAttribute('gs-y', lay.y); }
+        item.innerHTML = `<div class="grid-stack-item-content">${_homeEditMode ? editBar : ''}${homeWidgetHtml(key, _homeSnap)}</div>`;
+        grid.appendChild(item);
     }
-    grid.querySelectorAll('[data-gid]').forEach(el => el.addEventListener('click', () => openHomeGameById(el.getAttribute('data-gid'))));
+    // gridstack-all.js (UMD) exposes a namespace → the class can be at GridStack or GridStack.GridStack.
+    const _GS = (typeof GridStack !== 'undefined') ? (GridStack.init ? GridStack : GridStack.GridStack) : null;
+    if (!_GS) { grid.innerHTML = `<div class="hc-empty">Dashboard engine failed to load.</div>`; return; }
+    _gsGrid = _GS.init({ column: 6, cellHeight: 140, margin: 8, float: true, animate: true, draggable: { handle: '.grid-stack-item-content' }, resizable: { handles: 'se' } }, grid);
+    _gsGrid.setStatic(!_homeEditMode);
+    _gsGrid.on('change', _persistLayout);
+    if (_homeWidgets.some(k => !_homeLayout[k])) setTimeout(_persistLayout, 0);   // capture auto-placed positions
+    if (_homeEditMode) {
+        grid.querySelectorAll('.hc-eb-x[data-act="remove"]').forEach(b => {
+            b.addEventListener('pointerdown', e => e.stopPropagation());   // don't start a drag from the × button
+            b.addEventListener('click', e => { e.stopPropagation(); const k = b.closest('.grid-stack-item')?.getAttribute('gs-id'); if (!k) return; _homeWidgets = _homeWidgets.filter(x => x !== k); delete _homeLayout[k]; saveHomeConfig(); renderHome(); });
+        });
+    }
+    grid.querySelectorAll('[data-gid]').forEach(el => el.addEventListener('click', () => { if (!_homeEditMode) openHomeGameById(el.getAttribute('data-gid')); }));
     const spin = document.getElementById('home-spin');
     if (spin) {
         const opts = {};
@@ -996,7 +1077,7 @@ function renderDisk(data) {
 
 async function loadGameNewsWidget() {
     const body = document.getElementById('home-gamenews-body'); if (!body) return;
-    body.innerHTML = `<div class="hc-empty">Fetching patch notes&hellip;</div>`;
+    body.innerHTML = _homeSkelList(5);
     const items = (await window.api.getGameNews()) || [];
     if (!items.length) { body.innerHTML = `<div class="hc-empty">No recent news &mdash; sync Steam and play a few games first.</div>`; return; }
     body.innerHTML = `<div class="news-list">` + items.map(n =>
@@ -1038,7 +1119,7 @@ function _homeAgo(ts) {
 }
 async function loadNewsWidget() {
     const body = document.getElementById('home-news-body'); if (!body) return;
-    body.innerHTML = `<div class="hc-empty">Fetching headlines&hellip;</div>`;
+    body.innerHTML = _homeSkelList(5);
     const items = (await window.api.getNews()) || [];
     let html = `<div class="wl-toolbar"><button id="news-settings-btn" class="home-ghost" title="News sources">&#9881;</button></div>`;
     if (!items.length) html += `<div class="hc-empty">No headlines &mdash; check your sources or connection.</div>`;
@@ -1064,7 +1145,7 @@ document.getElementById('modal-news-settings')?.addEventListener('click', e => {
 
 async function loadFreebiesWidget() {
     const body = document.getElementById('home-freebies-body'); if (!body) return;
-    body.innerHTML = `<div class="hc-empty">Checking free games&hellip;</div>`;
+    body.innerHTML = _homeSkelRow(5);
     const games = (await window.api.freeGames()) || [];
     if (!games.length) { body.innerHTML = `<div class="hc-empty">No free games right now &mdash; check back later.</div>`; return; }
     body.innerHTML = `<div class="wl-row">` + games.map(g =>
@@ -1095,7 +1176,7 @@ async function loadWishlistWidget() {
         document.getElementById('wl-setup-btn').onclick = openWishlistSettings;
         return;
     }
-    body.innerHTML = `<div class="hc-empty">Checking deals&hellip;</div>`;
+    body.innerHTML = _homeSkelRow(6);
     const res = await window.api.wishlistDeals();
     const rows = (res && res.rows) || [];
     let html = `<div class="wl-toolbar"><button id="wl-add-btn" class="home-ghost">+ Add Game</button><button id="wl-settings-btn" class="home-ghost" title="Wishlist settings">&#9881;</button></div>`;
@@ -1165,47 +1246,62 @@ document.getElementById('wl-search-input')?.addEventListener('keydown', e => { i
 document.getElementById('wl-add-close')?.addEventListener('click', () => document.getElementById('modal-wishlist-add').classList.remove('active'));
 document.getElementById('modal-wishlist-add')?.addEventListener('click', e => { if (e.target.id === 'modal-wishlist-add') e.currentTarget.classList.remove('active'); });
 
-let _cfgOrder = null;
-let _cfgChecked = new Set();
-function _homeCfgSync() { document.querySelectorAll('#home-cfg-widgets input[data-k]').forEach(cb => { if (cb.checked) _cfgChecked.add(cb.dataset.k); else _cfgChecked.delete(cb.dataset.k); }); }
-function renderHomeCfgList() {
-    const wrap = document.getElementById('home-cfg-widgets'); wrap.innerHTML = '';
-    _cfgOrder.forEach((key, i) => {
-        const w = HOME_WIDGETS.find(x => x.key === key); if (!w) return;
-        const row = document.createElement('div'); row.className = 'home-cfg-w';
-        row.innerHTML = `<button class="hcw-mv" data-mv="up" ${i === 0 ? 'disabled' : ''}>&#9650;</button><button class="hcw-mv" data-mv="down" ${i === _cfgOrder.length - 1 ? 'disabled' : ''}>&#9660;</button><label><input type="checkbox" data-k="${key}" ${_cfgChecked.has(key) ? 'checked' : ''}> <span>${w.label}</span></label>`;
-        row.querySelector('[data-mv="up"]').onclick = () => { _homeCfgSync(); if (i > 0) { [_cfgOrder[i - 1], _cfgOrder[i]] = [_cfgOrder[i], _cfgOrder[i - 1]]; renderHomeCfgList(); } };
-        row.querySelector('[data-mv="down"]').onclick = () => { _homeCfgSync(); if (i < _cfgOrder.length - 1) { [_cfgOrder[i + 1], _cfgOrder[i]] = [_cfgOrder[i], _cfgOrder[i + 1]]; renderHomeCfgList(); } };
-        wrap.appendChild(row);
-    });
+// ── Edit-layout mode: drag to reorder, − / + to resize, × to remove ──────────
+function _persistLayout() {
+    if (!_gsGrid) return;
+    const layout = {};
+    (_gsGrid.save(false) || []).forEach(n => { if (n.id != null) layout[n.id] = { x: n.x, y: n.y, w: n.w, h: n.h }; });
+    _homeLayout = layout;
+    // keep _homeWidgets in the saved board order (left-to-right, top-to-bottom)
+    const ordered = Object.keys(layout).sort((a, b) => (layout[a].y - layout[b].y) || (layout[a].x - layout[b].x));
+    if (ordered.length) _homeWidgets = ordered;
+    saveHomeConfig();
 }
+function setHomeEdit(on) {
+    _homeEditMode = on;
+    document.getElementById('btn-home-edit').style.display = on ? 'none' : '';
+    document.getElementById('btn-home-enter').style.display = on ? 'none' : '';
+    document.getElementById('home-edit-bar').style.display = on ? 'flex' : 'none';
+    renderHome();
+}
+document.getElementById('btn-home-edit')?.addEventListener('click', () => setHomeEdit(true));
+document.getElementById('btn-home-done')?.addEventListener('click', () => setHomeEdit(false));
+document.getElementById('btn-home-reset')?.addEventListener('click', async () => {
+    if (!(await showConfirm('Reset the Home layout (positions, sizes & widgets) back to default?', 'Reset'))) return;
+    _homeLayout = {}; _homeWidgets = HOME_DEFAULT.slice();
+    saveHomeConfig(); renderHome();
+});
+
+// "+ Add Widget" → toggle which widgets exist; order & size are handled by drag/resize.
 function openHomeConfig() {
     document.getElementById('cfg-home-enabled').checked = _homeEnabled;
-    const rest = HOME_WIDGETS.map(w => w.key).filter(k => !_homeWidgets.includes(k));
-    _cfgOrder = [..._homeWidgets.filter(k => HOME_SPAN[k]), ...rest];
-    _cfgChecked = new Set(_homeWidgets);
-    renderHomeCfgList();
+    const wrap = document.getElementById('home-cfg-widgets'); wrap.innerHTML = '';
+    HOME_WIDGETS.forEach(w => wrap.insertAdjacentHTML('beforeend', `<label><input type="checkbox" data-k="${w.key}" ${_homeWidgets.includes(w.key) ? 'checked' : ''}> <span>${w.label}</span></label>`));
     document.getElementById('modal-home-config').classList.add('active');
 }
-document.getElementById('btn-home-config')?.addEventListener('click', openHomeConfig);
+document.getElementById('btn-home-add')?.addEventListener('click', openHomeConfig);
 document.getElementById('btn-home-cfg-done')?.addEventListener('click', () => {
     _homeEnabled = document.getElementById('cfg-home-enabled').checked;
-    _homeCfgSync();
-    const picked = _cfgOrder.filter(k => _cfgChecked.has(k));
-    _homeWidgets = picked.length ? picked : HOME_DEFAULT.slice();
+    const checked = new Set([...document.querySelectorAll('#home-cfg-widgets input[data-k]')].filter(cb => cb.checked).map(cb => cb.dataset.k));
+    const kept = _homeWidgets.filter(k => checked.has(k));
+    const added = HOME_WIDGETS.map(w => w.key).filter(k => checked.has(k) && !kept.includes(k));
+    _homeWidgets = (kept.length || added.length) ? [...kept, ...added] : HOME_DEFAULT.slice();
     saveHomeConfig();
     document.getElementById('modal-home-config').classList.remove('active');
     renderHome();
 });
 document.getElementById('modal-home-config')?.addEventListener('click', e => { if (e.target.id === 'modal-home-config') e.currentTarget.classList.remove('active'); });
 document.getElementById('btn-home-enter')?.addEventListener('click', () => switchView(lastGridView));
-document.getElementById('btn-titlebar-home')?.addEventListener('click', async () => { await renderHome(); switchView('view-home'); });
+document.getElementById('btn-titlebar-home')?.addEventListener('click', async () => {
+    if (_homeEditMode) { _homeEditMode = false; document.getElementById('btn-home-edit').style.display = ''; document.getElementById('btn-home-enter').style.display = ''; document.getElementById('home-edit-bar').style.display = 'none'; }
+    switchView('view-home'); await renderHome();
+});
 
 (async () => {
     const saved = await window.api.getSetting('layout_mode') || localStorage.getItem('cngm_layout_mode') || 'rail';
     applyLayoutMode(saved);
     await loadHomeConfig();
-    if (_homeEnabled) { await renderHome(); switchView('view-home'); }
+    if (_homeEnabled) { switchView('view-home'); await renderHome(); }
 })();
 
 // ── VIEW / REFRESH (all layouts) ──────────────────────────────────────────
@@ -1787,10 +1883,12 @@ function syncFilterActiveStates() {
 }
 
 function switchView(viewId) {
+    _closeSteamMenu();
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     target.classList.add('active');
     target.scrollTop = 0;
+    document.body.classList.toggle('viewing-home', viewId === 'view-home');   // full-bleed Home
 
     document.getElementById('gamepage-back-bar').style.display = viewId === 'view-gamepage' ? 'block' : 'none';
 
@@ -1813,7 +1911,7 @@ function switchView(viewId) {
     const showCmd = isCmd && viewId === 'view-gallery';
     document.getElementById('cmd-bar')?.classList.toggle('cmd-visible', showCmd);
     document.getElementById('cmd-icon-bar')?.classList.toggle('cmd-visible', showCmd);
-    if (showCmd) updateCmdBarTop(0);
+    if (showCmd) updateCmdBarTop(0); else closeCmdStores();
 }
 
 // ── COMMAND LAYOUT ───────────────────────────────────────────────────────────
@@ -1830,6 +1928,84 @@ document.getElementById('view-gallery').addEventListener('scroll', function () {
     if (document.getElementById('app-container').classList.contains('layout-commander')) {
         updateCmdBarTop(this.scrollTop);
     }
+});
+
+// ── COMMAND LAYOUT · store filter panel ──────────────────────────────────────
+const CMD_STORE_DEFS = [
+    { key: 'steam',     label: 'Steam' },
+    { key: 'gog',       label: 'GOG' },
+    { key: 'epic',      label: 'Epic' },
+    { key: 'flatpak',   label: 'Flatpak' },
+    { key: 'itch',      label: 'itch.io' },
+    { key: 'emulation', label: 'Emulation' },
+    { key: 'physical',  label: 'Physical' },
+    { key: 'apps',      label: 'Apps' },
+    { key: 'others',    label: 'Others' },
+    { key: 'pico8',     label: 'PICO-8' },
+];
+function _cmdStoreMatch(key, game) {
+    const s = (game.Store || '').toLowerCase();
+    switch (key) {
+        case 'steam':     return s.includes('steam');
+        case 'epic':      return s.includes('epic');
+        case 'gog':       return s.includes('gog');
+        case 'physical':  return s.includes('physical');
+        case 'flatpak':   return s.includes('flatpak');
+        case 'pico8':     return s.includes('pico-8');
+        case 'itch':      return s.includes('itch') || (game.LaunchCommand || '').startsWith('itch://');
+        case 'apps':      return s.includes('apps');
+        case 'others':    return s.includes('others');
+        case 'emulation': return s.includes('emulation');
+    }
+    return false;
+}
+function renderCmdStores() {
+    const list = document.getElementById('csp-list');
+    if (!list) return;
+    const base = currentPlaylistGames !== null ? currentPlaylistGames : allGames;
+    const storeActive = [...activeFilters].filter(f => STORE_FILTERS.has(f));
+    let html = `<button class="csp-row csp-all${storeActive.length === 0 ? ' active' : ''}" data-csp="__all"><span class="csp-name">All Stores</span><span class="csp-count">${base.length}</span></button>`;
+    for (const def of CMD_STORE_DEFS) {
+        const count = base.reduce((n, g) => n + (_cmdStoreMatch(def.key, g) ? 1 : 0), 0);
+        if (!count) continue;
+        const active = activeFilters.has(def.key);
+        html += `<button class="csp-row${active ? ' active' : ''}" data-csp="${def.key}"><span class="csp-dot"></span><span class="csp-name">${def.label}</span><span class="csp-count">${count}</span></button>`;
+    }
+    list.innerHTML = html;
+}
+function openCmdStores() {
+    renderCmdStores();
+    document.getElementById('cmd-stores-panel')?.classList.add('open');
+    document.getElementById('btn-cmd-stores')?.classList.add('active');
+}
+function closeCmdStores() {
+    document.getElementById('cmd-stores-panel')?.classList.remove('open');
+    document.getElementById('btn-cmd-stores')?.classList.remove('active');
+}
+function toggleCmdStores() {
+    if (document.getElementById('cmd-stores-panel')?.classList.contains('open')) closeCmdStores();
+    else openCmdStores();
+}
+document.getElementById('btn-cmd-stores')?.addEventListener('click', (e) => { e.stopPropagation(); toggleCmdStores(); });
+document.getElementById('btn-csp-close')?.addEventListener('click', closeCmdStores);
+document.getElementById('csp-list')?.addEventListener('click', (e) => {
+    const row = e.target.closest('.csp-row');
+    if (!row) return;
+    if (row.dataset.csp === '__all') {
+        [...activeFilters].filter(f => STORE_FILTERS.has(f)).forEach(f => activeFilters.delete(f));
+        syncFilterActiveStates();
+        applyFilters();
+    } else {
+        activateFilter(row.dataset.csp);
+    }
+    renderCmdStores();
+});
+// Click outside the panel (but not on its toggle button) closes it
+document.addEventListener('click', (e) => {
+    const p = document.getElementById('cmd-stores-panel');
+    if (!p || !p.classList.contains('open')) return;
+    if (p.contains(e.target) || e.target.closest('#btn-cmd-stores')) return;
+    closeCmdStores();
 });
 
 // Command search input wired to applyFilters; cursor hides when input is focused/has text
@@ -1893,7 +2069,6 @@ document.getElementById('btn-cmd-about')?.addEventListener('click', () => {
 document.getElementById('btn-cmd-playlists')?.addEventListener('click', () => {
     (document.getElementById('btn-topnav-playlists') || document.getElementById('btn-split-playlists'))?.click();
 });
-document.getElementById('btn-cmd-crema')?.addEventListener('click', () => window.api.launchCrema());
 document.getElementById('btn-cmd-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 
 // Debounced applyFilters — collapses rapid successive calls (search keystrokes) into one render.
@@ -2573,7 +2748,6 @@ document.getElementById('btn-split-filter-cfg')?.addEventListener('click', () =>
 // Split footer nav buttons
 document.getElementById('btn-split-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect').click());
 document.getElementById('btn-split-tools')?.addEventListener('click', () => openToolsModal());
-document.getElementById('btn-split-crema')?.addEventListener('click', () => window.api.launchCrema());
 document.getElementById('btn-split-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-split-refresh')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-split-refresh');
@@ -6799,12 +6973,40 @@ function openGamepage(game) {
         grinderBtn.onclick = null;
     }
 
-    // Uninstall button — installed GOG/Epic grinder games (in-process uninstall)
+    // "Open in Steam" button — any game carrying a SteamAppID
+    const steamBtn = document.getElementById('btn-gamepage-steam');
+    if (steamBtn) {
+        const sAppId = _steamAppId(game);
+        if (sAppId) {
+            steamBtn.style.display = 'block';
+            steamBtn.onclick = (e) => { e.stopPropagation(); openSteamMenu(steamBtn, sAppId); };
+        } else {
+            steamBtn.style.display = 'none';
+            steamBtn.onclick = null;
+        }
+    }
+
+    // Uninstall button — installed GOG/Epic (in-process) or Steam (via the Steam client)
     const uninstallBtn = document.getElementById('btn-gamepage-uninstall');
     if (uninstallBtn) {
-        const canUninstall = /^(gog|epic)_/i.test(game.GrinderGameId || '') && (game.Installed == 1);
-        uninstallBtn.style.display = canUninstall ? 'block' : 'none';
-        uninstallBtn.onclick = canUninstall ? () => openGrinderUninstall(game) : null;
+        const grinderCan = /^(gog|epic)_/i.test(game.GrinderGameId || '') && (game.Installed == 1);
+        const sAppId = _steamAppId(game);
+        const steamCan = !grinderCan && sAppId && (game.Installed == 1);
+        if (grinderCan) {
+            uninstallBtn.style.display = 'block';
+            uninstallBtn.title = 'Uninstall';
+            uninstallBtn.onclick = () => openGrinderUninstall(game);
+        } else if (steamCan) {
+            uninstallBtn.style.display = 'block';
+            uninstallBtn.title = 'Uninstall via Steam';
+            uninstallBtn.onclick = async () => {
+                const ok = await showConfirm(`Uninstall "${game.Game}" through Steam?\nSteam will open and ask you to confirm.`, 'Uninstall', true);
+                if (ok) window.api.openExternal(`steam://uninstall/${sAppId}`);
+            };
+        } else {
+            uninstallBtn.style.display = 'none';
+            uninstallBtn.onclick = null;
+        }
     }
 
     // SPLORE button — PICO-8 games only
@@ -7825,8 +8027,6 @@ document.getElementById('btn-topnav-refresh')?.addEventListener('click', async (
 document.getElementById('btn-topnav-add')?.addEventListener('click', () => document.getElementById('btn-add-game').click());
 document.getElementById('btn-topnav-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect').click());
 document.getElementById('btn-topnav-tools')?.addEventListener('click', () => openToolsModal());
-window.api.checkCrema().then(e => { if (e) document.getElementById('btn-topnav-crema').style.display = ''; });
-document.getElementById('btn-topnav-crema')?.addEventListener('click', () => window.api.launchCrema());
 
 // ── PICO-8 HERO BUTTONS ───────────────────────────────────────────────────
 

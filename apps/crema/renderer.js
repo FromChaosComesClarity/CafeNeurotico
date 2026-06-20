@@ -640,21 +640,72 @@ function transitionToHome() {
   renderHomeScreen();
 }
 
+// Append a row to the live Home (before the footer) + extend gamepad nav.
+let _homeRenderToken = 0;
+function _chAppendRow(rh, cells, key) {
+  const foot = document.getElementById('home-foot');
+  if (!foot || !foot.parentNode) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = rh;
+  const el = tmp.firstElementChild; if (!el) return;
+  foot.parentNode.insertBefore(el, foot);
+  cells.forEach(c => { c.el = document.getElementById(c.id); });
+  const live = cells.filter(c => c.el);
+  if (live.length) homeRows.push({ key, cells: live });
+}
+// Online rows fill in AFTER the local Home has painted (cached → instant on repeat opens).
+function _chFillOnline(enabled, token) {
+  const ok = () => token === _homeRenderToken && gameState === 'HOME';
+  if (enabled.includes('wishlist')) {
+    Promise.all([window.api.wishlistDeals(), window.api.getSetting('itad_currency'), window.api.getSetting('itad_click')]).then(([wlRes, cur, click]) => {
+      if (!ok() || !wlRes || !wlRes.rows || !wlRes.rows.length) return;
+      let rh = `<div class="ch-rowsec"><h3>Wishlist</h3><div class="ch-row">`; const cells = [];
+      wlRes.rows.forEach((r, i) => {
+        const id = `che-wl-${i}`, deal = r.deal;
+        const storeUrl = (deal && deal.url) ? deal.url : '', itadUrl = r.slug ? `https://isthereanydeal.com/game/${r.slug}/info/` : '';
+        const url = (click === 'itad') ? (itadUrl || storeUrl) : (storeUrl || itadUrl);
+        const priceTxt = deal ? `${_chFmt(deal.price, cur || deal.currency)}${deal.cut ? `  -${deal.cut}%` : ''}` : '';
+        rh += `<div class="ch-tile" id="${id}">${r.cover ? `<img src="${_che(r.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(r.title)}</div>${priceTxt ? `<div class="ch-price">${_che(priceTxt)}</div>` : ''}</div>`;
+        cells.push({ type: 'url', url, id });
+      });
+      rh += '</div></div>'; _chAppendRow(rh, cells, 'wishlist');
+    });
+  }
+  if (enabled.includes('freebies')) {
+    window.api.freeGames().then(freeRes => {
+      if (!ok() || !freeRes || !freeRes.length) return;
+      let rh = `<div class="ch-rowsec"><h3>Free This Week</h3><div class="ch-row">`; const cells = [];
+      freeRes.forEach((g, i) => { const id = `che-fr-${i}`; rh += `<div class="ch-tile" id="${id}">${g.cover ? `<img src="${_che(g.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.title)}</div><div class="ch-price ch-free">FREE</div></div>`; cells.push({ type: 'url', url: g.url, id }); });
+      rh += '</div></div>'; _chAppendRow(rh, cells, 'freebies');
+    });
+  }
+  if (enabled.includes('news')) {
+    window.api.getNews().then(newsRes => {
+      if (!ok() || !newsRes || !newsRes.length) return;
+      let rh = `<div class="ch-rowsec"><h3>Gaming News</h3><div class="ch-row">`; const cells = [];
+      newsRes.slice(0, 12).forEach((n, i) => { const id = `che-nw-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.link, id }); });
+      rh += '</div></div>'; _chAppendRow(rh, cells, 'news');
+    });
+  }
+  if (enabled.includes('gamenews')) {
+    window.api.getGameNews().then(gnRes => {
+      if (!ok() || !gnRes || !gnRes.length) return;
+      let rh = `<div class="ch-rowsec"><h3>Your Games &mdash; What's New</h3><div class="ch-row">`; const cells = [];
+      gnRes.slice(0, 12).forEach((n, i) => { const id = `che-gn-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.url, id }); });
+      rh += '</div></div>'; _chAppendRow(rh, cells, 'gamenews');
+    });
+  }
+}
 async function renderHomeScreen() {
   const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
-  const wantWishlist = enabled.includes('wishlist'), wantFree = enabled.includes('freebies'), wantNews = enabled.includes('news'),
-        wantProton = enabled.includes('protonwatch'), wantGameNews = enabled.includes('gamenews');
-  const [snap, wlRes, freeRes, newsRes, protonRes, gnRes, itadCurrency, itadClick, achRes] = await Promise.all([
+  const wantProton = enabled.includes('protonwatch');
+  const myToken = ++_homeRenderToken;
+  // Fast path — only cheap/cached reads (no network) so the Marquee paints instantly.
+  const [snap, achRes, protonRes] = await Promise.all([
     window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}),
-    wantWishlist ? window.api.wishlistDeals() : Promise.resolve(null),
-    wantFree ? window.api.freeGames() : Promise.resolve(null),
-    wantNews ? window.api.getNews() : Promise.resolve(null),
-    wantProton ? window.api.protonWatchGet() : Promise.resolve(null),
-    wantGameNews ? window.api.getGameNews() : Promise.resolve(null),
-    wantWishlist ? window.api.getSetting('itad_currency') : Promise.resolve(''),
-    wantWishlist ? window.api.getSetting('itad_click') : Promise.resolve('store'),
     window.api.achGet(),
+    wantProton ? window.api.protonWatchGet() : Promise.resolve(null),
   ]);
+  if (myToken !== _homeRenderToken) return;
   const c = snap.counts || {}, dp = snap.dailyPick;
   const rows = [];
   let html = '<div class="ch-wrap">';
@@ -714,39 +765,7 @@ async function renderHomeScreen() {
     snap.couchNight.forEach((g, i) => { const cov = _chImg(g, false), id = `che-cn-${i}`; rh += `<div class="ch-tile" id="${id}">${cov ? `<img src="${cov}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.Game)}</div></div>`; cells.push({ type: 'game', game: g, id }); });
     rh += '</div></div>'; html += rh; rows.push({ key: 'couchnight', cells });
   }
-  if (wantWishlist && wlRes && wlRes.rows && wlRes.rows.length) {
-    let rh = `<div class="ch-rowsec"><h3>Wishlist</h3><div class="ch-row">`;
-    const cells = [];
-    wlRes.rows.forEach((r, i) => {
-      const id = `che-wl-${i}`, deal = r.deal;
-      const storeUrl = (deal && deal.url) ? deal.url : '', itadUrl = r.slug ? `https://isthereanydeal.com/game/${r.slug}/info/` : '';
-      const url = (itadClick === 'itad') ? (itadUrl || storeUrl) : (storeUrl || itadUrl);
-      const priceTxt = deal ? `${_chFmt(deal.price, itadCurrency || deal.currency)}${deal.cut ? `  -${deal.cut}%` : ''}` : '';
-      rh += `<div class="ch-tile" id="${id}">${r.cover ? `<img src="${_che(r.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(r.title)}</div>${priceTxt ? `<div class="ch-price">${_che(priceTxt)}</div>` : ''}</div>`;
-      cells.push({ type: 'url', url, id });
-    });
-    rh += '</div></div>'; html += rh; rows.push({ key: 'wishlist', cells });
-  }
-  if (wantFree && freeRes && freeRes.length) {
-    let rh = `<div class="ch-rowsec"><h3>Free This Week</h3><div class="ch-row">`;
-    const cells = [];
-    freeRes.forEach((g, i) => {
-      const id = `che-fr-${i}`;
-      rh += `<div class="ch-tile" id="${id}">${g.cover ? `<img src="${_che(g.cover)}" loading="lazy">` : `<div class="ph"></div>`}<div class="tn">${_che(g.title)}</div><div class="ch-price ch-free">FREE</div></div>`;
-      cells.push({ type: 'url', url: g.url, id });
-    });
-    rh += '</div></div>'; html += rh; rows.push({ key: 'freebies', cells });
-  }
-  if (wantNews && newsRes && newsRes.length) {
-    let rh = `<div class="ch-rowsec"><h3>Gaming News</h3><div class="ch-row">`;
-    const cells = [];
-    newsRes.slice(0, 12).forEach((n, i) => {
-      const id = `che-nw-${i}`;
-      rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`;
-      cells.push({ type: 'url', url: n.link, id });
-    });
-    rh += '</div></div>'; html += rh; rows.push({ key: 'news', cells });
-  }
+  // wishlist / free-games / news rows are network-bound → appended async by _chFillOnline.
   if (wantProton && protonRes && protonRes.changes) {
     const PW_R = { BORKED: 0, PENDING: 1, BRONZE: 2, SILVER: 3, GOLD: 4, PLATINUM: 5, NATIVE: 6 };
     const PW_C = { NATIVE: '#66bb6a', PLATINUM: '#b8c6db', GOLD: '#d4af37', SILVER: '#9aa0a6', BRONZE: '#cd7f32' };
@@ -758,19 +777,14 @@ async function renderHomeScreen() {
       rh += '</div></div>'; html += rh; rows.push({ key: 'protonwatch', cells });
     }
   }
-  if (wantGameNews && gnRes && gnRes.length) {
-    let rh = `<div class="ch-rowsec"><h3>Your Games &mdash; What's New</h3><div class="ch-row">`;
-    const cells = [];
-    gnRes.slice(0, 12).forEach((n, i) => { const id = `che-gn-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.url, id }); });
-    rh += '</div></div>'; html += rh; rows.push({ key: 'gamenews', cells });
-  }
-  html += `<div class="ch-foot">D-Pad Navigate &nbsp;&bull;&nbsp; A Select &nbsp;&bull;&nbsp; B Library &nbsp;&bull;&nbsp; Start Menu</div>`;
+  html += `<div class="ch-foot" id="home-foot">D-Pad Navigate &nbsp;&bull;&nbsp; A Select &nbsp;&bull;&nbsp; B Library &nbsp;&bull;&nbsp; Start Menu</div>`;
   html += '</div>';
   document.getElementById('home-content').innerHTML = html;
   rows.forEach(r => r.cells.forEach(cell => { cell.el = document.getElementById(cell.id); }));
   homeRows = rows.filter(r => r.cells.some(c => c.el));
   homeFocus = { row: 0, col: 0 };
   updateHomeFocus();
+  _chFillOnline(enabled, myToken);   // network rows fill in afterwards (non-blocking)
 }
 
 function updateHomeFocus() {
