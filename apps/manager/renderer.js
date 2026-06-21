@@ -663,6 +663,17 @@ document.querySelectorAll('.ui-scale-btn').forEach(btn => {
     });
 });
 
+// Segmented Control Logic for Corner Style (sharp vs round)
+document.querySelectorAll('.corners-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+        document.querySelectorAll('.corners-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        _cornersStyle = e.target.getAttribute('data-val');
+        applyCornersStyle();
+        await window.api.setSetting('corners_style', _cornersStyle);
+    });
+});
+
 // Clear Gaming History Logic
 document.getElementById('btn-clear-history').addEventListener('click', async () => {
     if (await showConfirm(t('confirm.clear_history'), 'Clear', true)) {
@@ -719,6 +730,16 @@ document.querySelectorAll('.pico8-vis-btn').forEach(btn =>
     if (saved === '1') applyPico8Visibility(true);
 })();
 
+// ── CORNER STYLE (sharp vs round) — classic + flat layout families ────────
+// 'sharp' = current flat look (corners-flat class on body); 'round' = the
+// previous rounded style (no class). Only affects the layouts listed below.
+const _CORNERS_FLAT_LAYOUTS = ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'];
+let _cornersStyle = 'sharp';
+function applyCornersStyle() {
+    const mode = localStorage.getItem('cngm_layout_mode') || 'rail';
+    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
+}
+
 // ── LAYOUT MODE ───────────────────────────────────────────────────────────
 function applyLayoutMode(mode) {
     if (mode === 'cp') mode = 'rail'; // Navigator removed
@@ -730,8 +751,9 @@ function applyLayoutMode(mode) {
     const _themedModes = ['mac', 'xp', 'kde', 'c64', 'amiga', 'beos', 'w95', 'nextstep', 'htop', 'ranger', 'bbs', 'vi', 'adventure', 'mc', 'nethack', 'grub'];
     _themedModes.forEach(m => document.body.classList.remove('layout-' + m));
     if (_themedModes.includes(mode)) document.body.classList.add('layout-' + mode);
-    // Sharp-corner (flat) treatment for the classic + flat layout families (not TTY/Ancient-OS).
-    document.body.classList.toggle('corners-flat', ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'].includes(mode));
+    // Sharp-corner (flat) treatment for the classic + flat layout families (not TTY/Ancient-OS),
+    // unless the user opted into the previous rounded style via the Corners setting.
+    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
     document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(b =>
         b.classList.toggle('active', b.dataset.val === mode));
     updateLayoutCatTab(mode);
@@ -831,10 +853,10 @@ const HOME_WIDGETS = [
 ];
 // Online widgets make network calls — opt-in only.
 const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'gamenews', 'protonwatch']);
-// Default Home = only a lean handful of widgets that draw on data the Manager already has on
-// hand from a plain library import. Everything else (Steam-playtime, disk/achievement scans, the
-// online widgets, and the heavier "extras") is opt-in via "+ Add Widget".
-const HOME_DEFAULT_SET = new Set(['daily', 'overview', 'backlog', 'roulette', 'recent', 'genres']);
+// Default Home = a lean handful of widgets covering local stats plus one online feed.
+// Everything else (Steam-playtime, disk/achievement scans, the other online widgets, and the
+// heavier "extras") is opt-in via "+ Add Widget".
+const HOME_DEFAULT_SET = new Set(['continue', 'overview', 'roulette', 'recent', 'gems', 'news']);
 const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => HOME_DEFAULT_SET.has(k));
 // 2D layout defaults on a 6-column grid (cellHeight 140px): { w, h, minW, minH } in cells.
 const HOME_GS = {
@@ -868,6 +890,24 @@ let _homeWidgets = HOME_DEFAULT.slice();
 let _homeLayout = {};                 // key → { x, y, w, h } from the Gridstack board
 let _homeEditMode = false, _gsGrid = null;
 let _homeSnap = null;
+let _homeClockTimer = null;
+
+// Live clock for the Home header — ticks once a second while the Home view is on
+// screen and self-clears when it isn't (so it never runs in the background).
+function _updateHomeClock() {
+    const cEl = document.getElementById('home-clock');
+    const onHome = document.getElementById('view-home')?.classList.contains('active');
+    if (!cEl || !onHome) { if (_homeClockTimer) { clearInterval(_homeClockTimer); _homeClockTimer = null; } return; }
+    const now = new Date();
+    cEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const hEl = document.getElementById('home-hello');
+    if (hEl) { const h = now.getHours(); hEl.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+}
+function _startHomeClock() {
+    if (_homeClockTimer) clearInterval(_homeClockTimer);
+    _updateHomeClock();
+    _homeClockTimer = setInterval(_updateHomeClock, 1000);
+}
 
 async function loadHomeConfig() {
     _homeEnabled = (await window.api.getSetting('home_enabled')) === '1';
@@ -974,8 +1014,7 @@ async function renderHome() {
     const grid = document.getElementById('home-grid'); if (!grid) return;
     const dEl = document.getElementById('home-date');
     if (dEl) dEl.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    const hEl = document.getElementById('home-hello');
-    if (hEl) { const h = new Date().getHours(); hEl.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+    _startHomeClock();   // live ticking time + keeps the greeting in sync as the hour rolls over
     grid.innerHTML = `<div class="hc-empty">Reading your library&hellip;</div>`;
     _homeSnap = (await window.api.getHomeStats({ hidePico8: _hidePico8 })) || {};
     if (_gsGrid) { try { _gsGrid.destroy(false); } catch (e) {} _gsGrid = null; }
@@ -1249,8 +1288,22 @@ document.getElementById('modal-wishlist-add')?.addEventListener('click', e => { 
 // ── Edit-layout mode: drag to reorder, − / + to resize, × to remove ──────────
 function _persistLayout() {
     if (!_gsGrid) return;
+    const grid = document.getElementById('home-grid'); if (!grid) return;
     const layout = {};
-    (_gsGrid.save(false) || []).forEach(n => { if (n.id != null) layout[n.id] = { x: n.x, y: n.y, w: n.w, h: n.h }; });
+    // Read each item's live size/position straight off its gridstackNode (with the rendered
+    // gs-* attributes as a fallback) — more reliable than save(), which could drop w/h for
+    // some widgets and leave them snapping back to their default size on the next render.
+    grid.querySelectorAll('.grid-stack-item').forEach(el => {
+        const id = el.getAttribute('gs-id'); if (!id) return;
+        const n = el.gridstackNode || {};
+        const def = HOME_GS[id] || {};
+        layout[id] = {
+            x: n.x != null ? n.x : (parseInt(el.getAttribute('gs-x'), 10) || 0),
+            y: n.y != null ? n.y : (parseInt(el.getAttribute('gs-y'), 10) || 0),
+            w: n.w || parseInt(el.getAttribute('gs-w'), 10) || def.w || 1,
+            h: n.h || parseInt(el.getAttribute('gs-h'), 10) || def.h || 1,
+        };
+    });
     _homeLayout = layout;
     // keep _homeWidgets in the saved board order (left-to-right, top-to-bottom)
     const ordered = Object.keys(layout).sort((a, b) => (layout[a].y - layout[b].y) || (layout[a].x - layout[b].x));
@@ -1296,8 +1349,14 @@ document.getElementById('btn-titlebar-home')?.addEventListener('click', async ()
     if (_homeEditMode) { _homeEditMode = false; document.getElementById('btn-home-edit').style.display = ''; document.getElementById('btn-home-enter').style.display = ''; document.getElementById('home-edit-bar').style.display = 'none'; }
     switchView('view-home'); await renderHome();
 });
+document.getElementById('btn-titlebar-library')?.addEventListener('click', () => {
+    if (_homeEditMode) { _homeEditMode = false; document.getElementById('btn-home-edit').style.display = ''; document.getElementById('btn-home-enter').style.display = ''; document.getElementById('home-edit-bar').style.display = 'none'; }
+    switchView(lastGridView);
+});
 
 (async () => {
+    _cornersStyle = (await window.api.getSetting('corners_style')) === 'round' ? 'round' : 'sharp';
+    document.querySelectorAll('.corners-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _cornersStyle));
     const saved = await window.api.getSetting('layout_mode') || localStorage.getItem('cngm_layout_mode') || 'rail';
     applyLayoutMode(saved);
     await loadHomeConfig();
@@ -1325,6 +1384,18 @@ document.getElementById('btn-refresh-library-sb')?.addEventListener('click', () 
     document.getElementById('btn-refresh-library').click());
 
 document.getElementById('btn-gamepage-back').addEventListener('click', () => {
+    applyFilters();
+    switchView(lastGridView);
+    document.getElementById(lastGridView).scrollTop = savedGridScrollTop;
+});
+
+// Floating-overlay gamepage: clicking the blurred backdrop (outside the panel) closes it.
+// The backdrop is body::before, so a click on it reports e.target === document.body; clicks on
+// the panel, its pinned back bar / play button, or the titlebar report a different target (and
+// so does the single click on a Home tile that opens the overlay — it never self-closes).
+document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('gamepage-overlay')) return;
+    if (e.target !== document.body) return;
     applyFilters();
     switchView(lastGridView);
     document.getElementById(lastGridView).scrollTop = savedGridScrollTop;
@@ -1884,6 +1955,25 @@ function syncFilterActiveStates() {
 
 function switchView(viewId) {
     _closeSteamMenu();
+    // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
+    //    centered panel over the (blurred) current view instead of swapping in full-page.
+    //    Split-pane (layout-split) keeps its split-edit behavior; flat/themed layouts use
+    //    their own game pages, so they never reach this and are untouched.
+    const _ac = document.getElementById('app-container');
+    const _overlayGamepage = viewId === 'view-gamepage' &&
+        ['layout-rail', 'layout-sidebar', 'layout-topnav', 'layout-commander'].some(c => _ac?.classList.contains(c));
+    if (_overlayGamepage) {
+        document.body.classList.add('gamepage-overlay');
+        const gp = document.getElementById('view-gamepage');
+        gp.classList.add('active');           // keep the current view active behind it
+        gp.scrollTop = 0;
+        document.getElementById('gamepage-back-bar').style.display = 'block';
+        const _vp = document.getElementById('detail-video-player'); if (_vp) _vp.pause();
+        clearInterval(heroKbInterval);
+        clearInterval(detailScreenshotInterval);
+        return;
+    }
+    document.body.classList.remove('gamepage-overlay');
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     target.classList.add('active');
@@ -6630,8 +6720,8 @@ _grid.addEventListener('click', (e) => {
         if (game) openPlaylistPickerForGame(game);
         return;
     }
-});
-_grid.addEventListener('dblclick', (e) => {
+
+    // plain click on the card (not on a flag/play/install button) opens the gamepage
     const item = e.target.closest('.gallery-item[data-id]');
     if (item) { const g = allGames.find(x => String(x.id) === item.dataset.id); if (g) openGamepage(g); }
 });

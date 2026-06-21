@@ -2633,6 +2633,24 @@
     .view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: auto; display: none; padding: 20px; box-sizing: border-box; }
     .view.active { display: block; }
     #view-list { padding-top: 0; }
+
+    /* ── Floating-overlay gamepage (classic layouts only) ─────────────────────────
+       In the classic layouts view-gamepage floats as a centered panel over the rest
+       of the interface, which is blurred behind it. The backdrop + panel sit below the
+       z-9999 titlebar so the window controls stay crisp. Split-pane, flat and the themed
+       layouts keep their own game pages and are unaffected. */
+    body.gamepage-overlay::before { content:''; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9000; background:rgba(0,0,0,0.34); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); }
+    /* centered without transform — a transformed ancestor would re-anchor the fixed Play button to this panel and make it scroll */
+    body.gamepage-overlay #view-gamepage.view { position:fixed; top:55px; left:0; right:0; margin-left:auto; margin-right:auto; width:min(1080px, 94vw); height:auto; max-height:calc(100vh - 78px); overflow-x:hidden; overflow-y:auto; border-radius:16px; background:var(--bg); box-shadow:0 26px 72px rgba(0,0,0,0.62), 0 0 0 1px var(--border); z-index:9001; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar { width:11px; }
+    /* inset the track 16px top & bottom so the scrollbar never reaches (bleeds into) the panel's rounded corners */
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-track { background:transparent; margin:16px 0; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb { background:var(--border_solid); border-radius:8px; border:3px solid transparent; background-clip:content-box; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb:hover { background:var(--text_dim); background-clip:content-box; }
+    /* keep the floating "Back to Library" bar pinned to the panel's top (overrides its inline absolute styles) */
+    body.gamepage-overlay #gamepage-back-bar { position:fixed !important; top:55px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:min(1080px, 94vw); box-sizing:border-box; z-index:9002 !important; border-radius:16px 16px 0 0; }
+    /* float the Play/Install button at the panel's bottom-right corner (fixed → never scrolls), above the overlay */
+    body.gamepage-overlay #btn-gamepage-play { z-index:9003 !important; right:calc((100vw - min(1080px, 94vw)) / 2 + 28px) !important; bottom:46px !important; }
     #view-list .btn-play, #view-list .btn-install { font-size: 9px !important; }
 
     table { width: 100%; border-collapse: separate; border-spacing: 0 5px; text-align: left; }
@@ -2769,6 +2787,9 @@
     <div class="titlebar-controls">
       <button id="btn-titlebar-home" title="Home dashboard">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </button>
+      <button id="btn-titlebar-library" title="Go to library">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </button>
       <button id="support-cta" title="Support the project — ways to donate &amp; help">
         <svg class="support-cta-heart" viewBox="0 0 7 6" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
@@ -3092,12 +3113,14 @@
 
         <!-- ════════ HOME — "Control Room" dashboard (optional start screen) ════════ -->
         <style>
-          #btn-titlebar-home { -webkit-app-region:no-drag; background:transparent; border:none; color:var(--text_sec); cursor:pointer; padding:0 9px; display:flex; align-items:center; }
-          #btn-titlebar-home:hover { color:var(--accent); }
+          #btn-titlebar-home, #btn-titlebar-library { -webkit-app-region:no-drag; background:transparent; border:none; color:var(--text_sec); cursor:pointer; padding:0 9px; display:flex; align-items:center; }
+          #btn-titlebar-home:hover, #btn-titlebar-library:hover { color:var(--accent); }
           .home-wrap { max-width:1500px; margin:0 auto; padding:20px 24px 48px; }
           .home-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
           .home-hello { font-size:27px; font-weight:900; letter-spacing:0.5px; color:var(--text_main); }
-          .home-sub { font-size:12px; color:var(--text_dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:3px; }
+          .home-sub { display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text_dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:6px; }
+          .home-clock { font-family:'DSEG7', monospace; font-size:23px; font-weight:400; letter-spacing:2px; line-height:1; color:var(--accent); text-transform:none; text-shadow:0 0 11px color-mix(in srgb, var(--accent) 50%, transparent); }
+          .home-clock:empty { display:none; }
           .home-head-actions { display:flex; gap:10px; align-items:center; }
           .home-primary { background:var(--accent); color:var(--bg); border:none; font-weight:900; letter-spacing:1px; padding:11px 18px; border-radius:8px; cursor:pointer; text-transform:uppercase; font-family:inherit; }
           .home-primary:hover { filter:brightness(1.1); }
@@ -3122,8 +3145,13 @@
           .hc-eb { width:27px; height:27px; border:none; border-radius:7px; background:rgba(0,0,0,0.62); color:#fff; font-size:16px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; padding:0; }
           .hc-eb:hover { background:var(--accent); color:var(--bg); }
           .hc-eb-x:hover { background:#c0392b; color:#fff; }
-          .grid-stack-item > .ui-resizable-se { width:20px; height:20px; right:2px; bottom:2px; background:none; }
-          .grid-stack-item > .ui-resizable-se::after { content:''; position:absolute; right:3px; bottom:3px; width:9px; height:9px; border-right:2px solid var(--accent); border-bottom:2px solid var(--accent); opacity:0.75; }
+          /* Resize handle — two parallel bars along the corner diagonal (long + short), pointing into the corner (edit mode only) */
+          /* (cancel gridstack's built-in -45deg handle rotation so our SVG renders exactly as drawn) */
+          .grid-stack-item > .ui-resizable-se { width:34px; height:34px; right:0; bottom:0; background:none; transform:none; z-index:7; }
+          .grid-stack-item > .ui-resizable-se::after { content:''; position:absolute; right:3px; bottom:3px; width:24px; height:24px; background:var(--accent); opacity:0.9; transition:opacity .15s, transform .15s;
+            -webkit-mask:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cg%20transform='rotate(90%2012%2012)'%3E%3Cpath%20d='M5,5L21,21M13,6L21,14'%20stroke='%23000'%20stroke-width='3'%20fill='none'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain;
+                    mask:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cg%20transform='rotate(90%2012%2012)'%3E%3Cpath%20d='M5,5L21,21M13,6L21,14'%20stroke='%23000'%20stroke-width='3'%20fill='none'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain; }
+          .grid-stack-item > .ui-resizable-se:hover::after { opacity:1; transform:scale(1.08); }
           .hc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:10px; }
           .hc-stat { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:13px 8px; text-align:center; }
           .hc-stat .n { font-size:26px; font-weight:900; color:var(--accent); line-height:1; }
@@ -3257,7 +3285,7 @@
             <div class="home-head">
               <div>
                 <div class="home-hello" id="home-hello">Welcome back</div>
-                <div class="home-sub" id="home-date"></div>
+                <div class="home-sub"><span id="home-date"></span><span id="home-clock" class="home-clock"></span></div>
               </div>
               <div class="home-head-actions">
                 <button id="btn-home-edit" class="home-ghost">Edit Layout</button>
@@ -5630,7 +5658,7 @@ LOADING...READY.</div>
           </div>
         </div>
 
-        <div class="tool-card tools-section" data-search="appearance theme color scheme ui scale zoom size">
+        <div class="tool-card tools-section" data-search="appearance theme color scheme ui scale zoom size corners corner style sharp round rounded square flat">
 
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span data-i18n="html.card_appearance">Appearance</span> <span style="font-weight:400; font-size:9px; color:var(--text_dim); letter-spacing:0.5px;">(classic &amp; flat layouts)</span></div>
           <button id="btn-theme-switch" style="width: 100%; background-color: transparent; color: var(--accent); border-color: var(--accent); font-size: 11px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg><span data-i18n="html.btn_theme_selection">Theme Selection</span></button>
@@ -5640,6 +5668,11 @@ LOADING...READY.</div>
             <button class="segmented-btn ui-scale-btn" data-val="1.0">100%</button>
             <button class="segmented-btn ui-scale-btn" data-val="1.25">125%</button>
             <button class="segmented-btn ui-scale-btn" data-val="1.5">150%</button>
+          </div>
+          <div style="font-size:10px; color:var(--text_dim); margin:8px 0 0; letter-spacing:0.5px;">Corner Style</div>
+          <div class="segmented-control" id="corners-segmented-control" style="margin-top: 4px;">
+            <button class="segmented-btn corners-btn" data-val="sharp">Sharp</button>
+            <button class="segmented-btn corners-btn" data-val="round">Round</button>
           </div>
         </div>
 
