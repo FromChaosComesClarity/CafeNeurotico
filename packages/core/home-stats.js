@@ -123,10 +123,24 @@ function computeHomeSnapshot(games, opts = {}) {
         .slice(0, hiddenGemCount).map(tile);
 
     // Daily pick: deterministic by date. Prefer the installed backlog; fall back to any game.
+    // Rotate the STORE bucket round-robin per day first, then pick a game inside it — otherwise
+    // whichever store dominates the backlog (Flatpak/PICO-8/Steam) would monopolise the slot.
     let dailyPick = null;
-    const pool = games.filter(g => isInstalled(g) && isBacklog(g));
-    const finalPool = pool.length ? pool : games;
-    if (finalPool.length) dailyPick = tile(finalPool[hashStr(dailySeed) % finalPool.length]);
+    const named = games.filter(g => g.Game && String(g.Game).trim()); // never feature a blank/placeholder row
+    const pool = named.filter(g => isInstalled(g) && isBacklog(g));
+    const finalPool = pool.length ? pool : named;
+    if (finalPool.length) {
+        const byBucket = new Map();
+        for (const g of finalPool) {
+            const b = storeBucket(g.Store);
+            if (!byBucket.has(b)) byBucket.set(b, []);
+            byBucket.get(b).push(g);
+        }
+        const buckets = [...byBucket.keys()].sort();
+        const dayIdx = Math.floor((Date.parse(dailySeed) || 0) / 86400000); // days since epoch → cycles buckets daily
+        const bucketGames = byBucket.get(buckets[((dayIdx % buckets.length) + buckets.length) % buckets.length]);
+        dailyPick = tile(bucketGames[hashStr(dailySeed) % bucketGames.length]);
+    }
 
     // Playtime (Steam-sourced; GOG/Epic/others can't be auto-timed → 0).
     const playtimeCount = opts.playtimeCount || 12;

@@ -734,7 +734,7 @@ document.querySelectorAll('.pico8-vis-btn').forEach(btn =>
 // 'sharp' = current flat look (corners-flat class on body); 'round' = the
 // previous rounded style (no class). Only affects the layouts listed below.
 const _CORNERS_FLAT_LAYOUTS = ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'];
-let _cornersStyle = 'sharp';
+let _cornersStyle = 'round';
 function applyCornersStyle() {
     const mode = localStorage.getItem('cngm_layout_mode') || 'rail';
     document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
@@ -891,6 +891,7 @@ let _homeLayout = {};                 // key → { x, y, w, h } from the Gridsta
 let _homeEditMode = false, _gsGrid = null;
 let _homeSnap = null;
 let _homeClockTimer = null;
+let _homeClockOn = true;   // faux-LCD header clock — show/hide via Customize Home
 
 // Live clock for the Home header — ticks once a second while the Home view is on
 // screen and self-clears when it isn't (so it never runs in the background).
@@ -903,19 +904,26 @@ function _updateHomeClock() {
     const hEl = document.getElementById('home-hello');
     if (hEl) { const h = now.getHours(); hEl.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
 }
+function _applyHomeClockVis() {
+    const lcd = document.getElementById('home-lcd');
+    if (lcd) lcd.classList.toggle('clock-off', !_homeClockOn);
+}
 function _startHomeClock() {
     if (_homeClockTimer) clearInterval(_homeClockTimer);
+    _applyHomeClockVis();
     _updateHomeClock();
     _homeClockTimer = setInterval(_updateHomeClock, 1000);
 }
 
 async function loadHomeConfig() {
     _homeEnabled = (await window.api.getSetting('home_enabled')) === '1';
+    _homeClockOn = (await window.api.getSetting('home_clock')) !== '0';   // default ON
     try { const raw = await window.api.getSetting('home_widgets'); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a) && a.length) _homeWidgets = a.filter(k => HOME_GS[k]); } } catch (e) {}
     try { const raw = await window.api.getSetting('home_layout'); if (raw) { const o = JSON.parse(raw); if (o && typeof o === 'object') _homeLayout = o; } } catch (e) {}
 }
 function saveHomeConfig() {
     window.api.setSetting('home_enabled', _homeEnabled ? '1' : '');
+    window.api.setSetting('home_clock', _homeClockOn ? '1' : '0');
     window.api.setSetting('home_widgets', JSON.stringify(_homeWidgets));
     window.api.setSetting('home_layout', JSON.stringify(_homeLayout));
 }
@@ -1328,6 +1336,7 @@ document.getElementById('btn-home-reset')?.addEventListener('click', async () =>
 // "+ Add Widget" → toggle which widgets exist; order & size are handled by drag/resize.
 function openHomeConfig() {
     document.getElementById('cfg-home-enabled').checked = _homeEnabled;
+    document.getElementById('cfg-home-clock').checked = _homeClockOn;
     const wrap = document.getElementById('home-cfg-widgets'); wrap.innerHTML = '';
     HOME_WIDGETS.forEach(w => wrap.insertAdjacentHTML('beforeend', `<label><input type="checkbox" data-k="${w.key}" ${_homeWidgets.includes(w.key) ? 'checked' : ''}> <span>${w.label}</span></label>`));
     document.getElementById('modal-home-config').classList.add('active');
@@ -1335,6 +1344,7 @@ function openHomeConfig() {
 document.getElementById('btn-home-add')?.addEventListener('click', openHomeConfig);
 document.getElementById('btn-home-cfg-done')?.addEventListener('click', () => {
     _homeEnabled = document.getElementById('cfg-home-enabled').checked;
+    _homeClockOn = document.getElementById('cfg-home-clock').checked;
     const checked = new Set([...document.querySelectorAll('#home-cfg-widgets input[data-k]')].filter(cb => cb.checked).map(cb => cb.dataset.k));
     const kept = _homeWidgets.filter(k => checked.has(k));
     const added = HOME_WIDGETS.map(w => w.key).filter(k => checked.has(k) && !kept.includes(k));
@@ -1355,7 +1365,7 @@ document.getElementById('btn-titlebar-library')?.addEventListener('click', () =>
 });
 
 (async () => {
-    _cornersStyle = (await window.api.getSetting('corners_style')) === 'round' ? 'round' : 'sharp';
+    _cornersStyle = (await window.api.getSetting('corners_style')) === 'sharp' ? 'sharp' : 'round';
     document.querySelectorAll('.corners-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _cornersStyle));
     const saved = await window.api.getSetting('layout_mode') || localStorage.getItem('cngm_layout_mode') || 'rail';
     applyLayoutMode(saved);

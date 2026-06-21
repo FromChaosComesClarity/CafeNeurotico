@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <title>Cafe Crema</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;700;900&display=swap');
+    /* Raleway bundled locally (no network dependency) — files in assets/fonts/. */
+    @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Regular.ttf') format('truetype'); font-weight: 400; }
+    @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Bold.ttf') format('truetype'); font-weight: 700; }
+    @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Black.ttf') format('truetype'); font-weight: 900; }
     :root {
       --bg: #2C1E16; --bg_panel: rgba(67, 40, 24, 0.6); --bg_menu: #432818;
       --accent: #D4A373; --accent_menu: #D4A373; --text_main: #FFE6A7;

@@ -246,6 +246,14 @@ app.whenReady().then(() => {
                 WHEN NEW.date_added IS NULL OR NEW.date_added = 0
                 BEGIN UPDATE games SET date_added = CAST(strftime('%s','now') AS INTEGER) WHERE id = NEW.id; END`).run();
         } catch(e) {}
+        // A blank Store leaves a game uncategorizable; file it under "Others" (same bucket GRINDER games use).
+        try { db.prepare("UPDATE games SET Store = 'Others' WHERE Store IS NULL OR TRIM(Store) = ''").run(); } catch(e) {}
+        try {
+            db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_store_others
+                AFTER INSERT ON games
+                WHEN NEW.Store IS NULL OR TRIM(NEW.Store) = ''
+                BEGIN UPDATE games SET Store = 'Others' WHERE id = NEW.id; END`).run();
+        } catch(e) {}
 
         db.prepare(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`).run();
         db.prepare(`CREATE TABLE IF NOT EXISTS playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`).run();
