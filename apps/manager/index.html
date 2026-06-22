@@ -2639,18 +2639,40 @@
        of the interface, which is blurred behind it. The backdrop + panel sit below the
        z-9999 titlebar so the window controls stay crisp. Split-pane, flat and the themed
        layouts keep their own game pages and are unaffected. */
-    body.gamepage-overlay::before { content:''; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9000; background:rgba(0,0,0,0.34); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); }
-    /* centered without transform — a transformed ancestor would re-anchor the fixed Play button to this panel and make it scroll */
-    body.gamepage-overlay #view-gamepage.view { position:fixed; top:55px; left:0; right:0; margin-left:auto; margin-right:auto; width:min(1080px, 94vw); height:auto; max-height:calc(100vh - 78px); overflow-x:hidden; overflow-y:auto; border-radius:16px; background:var(--bg); box-shadow:0 26px 72px rgba(0,0,0,0.62), 0 0 0 1px var(--border); z-index:9001; }
-    body.gamepage-overlay #view-gamepage::-webkit-scrollbar { width:11px; }
+    body.gamepage-overlay::before { content:''; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9000; background:rgba(0,0,0,0.34); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); animation:gpOverlayBackdropIn 0.25s ease both; }
+    /* centered without transform — a transformed ancestor would re-anchor the fixed Play button to this panel and make it scroll. (The open/close animation slides via `top`, not transform, for the same reason.) */
+    /* The Edit page (#view-details) shares the exact same floating panel box so it lays directly on
+       top of the gamepage at the same size — it's opened from there and returns there (seamless). */
+    body.gamepage-overlay #view-gamepage.view,
+    body.gamepage-overlay #view-details.view { position:fixed; top:55px; left:0; right:0; margin-left:auto; margin-right:auto; width:min(1080px, 94vw); height:auto; max-height:calc(100vh - 78px); overflow-x:hidden; overflow-y:auto; border-radius:16px; background:var(--bg); box-shadow:0 26px 72px rgba(0,0,0,0.62), 0 0 0 1px var(--border); z-index:9001; animation:gpOverlayFadeIn 0.24s ease both; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar,
+    body.gamepage-overlay #view-details::-webkit-scrollbar { width:11px; }
     /* inset the track 16px top & bottom so the scrollbar never reaches (bleeds into) the panel's rounded corners */
-    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-track { background:transparent; margin:16px 0; }
-    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb { background:var(--border_solid); border-radius:8px; border:3px solid transparent; background-clip:content-box; }
-    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb:hover { background:var(--text_dim); background-clip:content-box; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-track,
+    body.gamepage-overlay #view-details::-webkit-scrollbar-track { background:transparent; margin:16px 0; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb,
+    body.gamepage-overlay #view-details::-webkit-scrollbar-thumb { background:var(--border_solid); border-radius:8px; border:3px solid transparent; background-clip:content-box; }
+    body.gamepage-overlay #view-gamepage::-webkit-scrollbar-thumb:hover,
+    body.gamepage-overlay #view-details::-webkit-scrollbar-thumb:hover { background:var(--text_dim); background-clip:content-box; }
     /* keep the floating "Back to Library" bar pinned to the panel's top (overrides its inline absolute styles) */
-    body.gamepage-overlay #gamepage-back-bar { position:fixed !important; top:55px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:min(1080px, 94vw); box-sizing:border-box; z-index:9002 !important; border-radius:16px 16px 0 0; }
+    body.gamepage-overlay #gamepage-back-bar { position:fixed !important; top:55px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:min(1080px, 94vw); box-sizing:border-box; z-index:9002 !important; border-radius:16px 16px 0 0; animation:gpOverlayFadeIn 0.3s ease both; }
     /* float the Play/Install button at the panel's bottom-right corner (fixed → never scrolls), above the overlay */
     body.gamepage-overlay #btn-gamepage-play { z-index:9003 !important; right:calc((100vw - min(1080px, 94vw)) / 2 + 28px) !important; bottom:46px !important; }
+    /* Leave animations — `.gamepage-overlay-closing` is added (on top of .gamepage-overlay) for the
+       duration of the close so the panel/backdrop reverse out before the view actually switches.
+       Same specificity as the enter rules, placed after → these win while closing. */
+    body.gamepage-overlay-closing::before { animation:gpOverlayBackdropOut 0.22s ease both; }
+    body.gamepage-overlay-closing #view-gamepage.view,
+    body.gamepage-overlay-closing #view-details.view { animation:gpOverlayFadeOut 0.2s ease both; }
+    body.gamepage-overlay-closing #gamepage-back-bar { animation:gpOverlayFadeOut 0.2s ease both; }
+    @keyframes gpOverlayBackdropIn  { from { opacity:0; } to { opacity:1; } }
+    @keyframes gpOverlayBackdropOut { from { opacity:1; } to { opacity:0; } }
+    @keyframes gpOverlayFadeIn  { from { opacity:0; } to { opacity:1; } }
+    @keyframes gpOverlayFadeOut { from { opacity:1; } to { opacity:0; } }
+    @media (prefers-reduced-motion: reduce) {
+      body.gamepage-overlay::before, body.gamepage-overlay #view-gamepage.view, body.gamepage-overlay #view-details.view, body.gamepage-overlay #gamepage-back-bar,
+      body.gamepage-overlay-closing::before, body.gamepage-overlay-closing #view-gamepage.view, body.gamepage-overlay-closing #view-details.view, body.gamepage-overlay-closing #gamepage-back-bar { animation:none !important; }
+    }
     #view-list .btn-play, #view-list .btn-install { font-size: 9px !important; }
 
     table { width: 100%; border-collapse: separate; border-spacing: 0 5px; text-align: left; }

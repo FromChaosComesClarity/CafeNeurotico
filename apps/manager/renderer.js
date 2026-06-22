@@ -463,6 +463,9 @@ const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable']);
 let lastGridView = 'view-gallery';
 let _activePanelSection = null; // 'stores' | null
 let savedGridScrollTop = 0;
+// When set, switchView restores this scrollTop on the next view it activates (instead of zeroing).
+// Survives the async overlay-close (which re-runs switchView after the leave animation).
+let _pendingScrollRestore = null;
 let baseDir = '';
 
 let strings = {};
@@ -1395,8 +1398,8 @@ document.getElementById('btn-refresh-library-sb')?.addEventListener('click', () 
 
 document.getElementById('btn-gamepage-back').addEventListener('click', () => {
     applyFilters();
+    _pendingScrollRestore = savedGridScrollTop;   // restored when switchView re-activates the grid (survives the close animation)
     switchView(lastGridView);
-    document.getElementById(lastGridView).scrollTop = savedGridScrollTop;
 });
 
 // Floating-overlay gamepage: clicking the blurred backdrop (outside the panel) closes it.
@@ -1407,8 +1410,8 @@ document.addEventListener('click', (e) => {
     if (!document.body.classList.contains('gamepage-overlay')) return;
     if (e.target !== document.body) return;
     applyFilters();
+    _pendingScrollRestore = savedGridScrollTop;
     switchView(lastGridView);
-    document.getElementById(lastGridView).scrollTop = savedGridScrollTop;
 });
 
 document.getElementById('btn-back-to-gamepage').addEventListener('click', () => {
@@ -1963,6 +1966,31 @@ function syncFilterActiveStates() {
     });
 }
 
+// Play the floating-overlay gamepage's leave animation, then run `done()` (which re-enters
+// switchView to actually swap views). Falls back on a timer if animationend never fires.
+let _gpOverlayCloseTimer = null;
+function _animateOverlayClose(done) {
+    // Animate out whichever panel is currently floating (gamepage or the edit page on top of it).
+    const gp = document.querySelector('#view-details.active') || document.getElementById('view-gamepage');
+    if (!gp || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.body.classList.remove('gamepage-overlay', 'gamepage-overlay-closing');
+        done();
+        return;
+    }
+    document.body.classList.add('gamepage-overlay-closing');
+    let finished = false;
+    const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(_gpOverlayCloseTimer);
+        gp.removeEventListener('animationend', onEnd);
+        done();
+    };
+    const onEnd = (e) => { if (e.target === gp) finish(); };
+    gp.addEventListener('animationend', onEnd);
+    _gpOverlayCloseTimer = setTimeout(finish, 360);
+}
+
 function switchView(viewId) {
     _closeSteamMenu();
     // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
@@ -1970,24 +1998,36 @@ function switchView(viewId) {
     //    Split-pane (layout-split) keeps its split-edit behavior; flat/themed layouts use
     //    their own game pages, so they never reach this and are untouched.
     const _ac = document.getElementById('app-container');
-    const _overlayGamepage = viewId === 'view-gamepage' &&
-        ['layout-rail', 'layout-sidebar', 'layout-topnav', 'layout-commander'].some(c => _ac?.classList.contains(c));
-    if (_overlayGamepage) {
+    const _classicOverlay = ['layout-rail', 'layout-sidebar', 'layout-topnav', 'layout-commander'].some(c => _ac?.classList.contains(c));
+    const _overlayGamepage = viewId === 'view-gamepage' && _classicOverlay;
+    // The Edit page (view-details), when reached FROM the floating gamepage, floats in the SAME
+    // panel box directly on top — so opening/returning feels seamless, not a full-page swap.
+    const _overlayDetails = viewId === 'view-details' && _classicOverlay && document.body.classList.contains('gamepage-overlay');
+    if (_overlayGamepage || _overlayDetails) {
+        document.body.classList.remove('gamepage-overlay-closing');   // cancel any in-flight close
         document.body.classList.add('gamepage-overlay');
-        const gp = document.getElementById('view-gamepage');
-        gp.classList.add('active');           // keep the current view active behind it
-        gp.scrollTop = 0;
-        document.getElementById('gamepage-back-bar').style.display = 'block';
+        const panel = document.getElementById(_overlayDetails ? 'view-details' : 'view-gamepage');
+        const other = document.getElementById(_overlayDetails ? 'view-gamepage' : 'view-details');
+        other.classList.remove('active');     // swap the visible panel; the grid view stays active behind both
+        panel.classList.add('active');
+        panel.scrollTop = 0;
+        document.getElementById('gamepage-back-bar').style.display = _overlayGamepage ? 'block' : 'none';
         const _vp = document.getElementById('detail-video-player'); if (_vp) _vp.pause();
-        clearInterval(heroKbInterval);
-        clearInterval(detailScreenshotInterval);
+        clearInterval(heroKbInterval);                                   // gamepage hero — hidden either way
+        if (_overlayGamepage) clearInterval(detailScreenshotInterval);   // stop edit screenshots when leaving the edit page (keep them while editing)
         return;
     }
-    document.body.classList.remove('gamepage-overlay');
+    // Leaving the floating overlay → animate it out first, then complete the switch.
+    if (document.body.classList.contains('gamepage-overlay') && !document.body.classList.contains('gamepage-overlay-closing')) {
+        _animateOverlayClose(() => switchView(viewId));
+        return;
+    }
+    document.body.classList.remove('gamepage-overlay', 'gamepage-overlay-closing');
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     target.classList.add('active');
-    target.scrollTop = 0;
+    if (_pendingScrollRestore != null) { target.scrollTop = _pendingScrollRestore; _pendingScrollRestore = null; }
+    else { target.scrollTop = 0; }
     document.body.classList.toggle('viewing-home', viewId === 'view-home');   // full-bleed Home
 
     document.getElementById('gamepage-back-bar').style.display = viewId === 'view-gamepage' ? 'block' : 'none';
@@ -2815,6 +2855,13 @@ document.getElementById('split-cover-img')?.addEventListener('click', () => {
     const src = document.getElementById('split-cover-img').src;
     if (!src) return;
     document.getElementById('split-cover-zoom-img').src = src;
+    document.getElementById('split-cover-zoom').classList.add('active');
+});
+// Classic gamepage boxart → reuse the same big-cover lightbox (only when real art is present).
+document.getElementById('gamepage-cover')?.addEventListener('click', () => {
+    const el = document.getElementById('gamepage-cover');
+    if (!el.dataset.zoom) return;
+    document.getElementById('split-cover-zoom-img').src = el.src;
     document.getElementById('split-cover-zoom').classList.add('active');
 });
 ['split-cover-zoom', 'split-cover-zoom-img'].forEach(id => {
@@ -7126,7 +7173,10 @@ function openGamepage(game) {
     };
 
     // Info Column
-    coverEl.src = (game.CoverArt && game.CoverArt.trim() !== "") ? getSafePath(game.CoverArt) : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    const _gpHasCover = game.CoverArt && game.CoverArt.trim() !== "";
+    coverEl.src = _gpHasCover ? getSafePath(game.CoverArt) : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    coverEl.style.cursor = _gpHasCover ? 'zoom-in' : 'default';   // click → big cover lightbox
+    coverEl.dataset.zoom = _gpHasCover ? '1' : '';
 
     document.getElementById('gp-released').innerText = game.RELEASED || "--";
     document.getElementById('gp-dev').innerText = game.DEV || "--";
