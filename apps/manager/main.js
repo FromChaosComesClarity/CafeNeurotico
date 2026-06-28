@@ -1162,29 +1162,58 @@ ipcMain.handle('clear-all-images', () => {
     }
 });
 
+// RetroArch save locations, so the suite backup can bundle EmuLatte's save states (they live
+// OUTSIDE GameManagerConfig). Reads EmuLatte's owned RA config first, then the host config.
+const _runFile = (prog, args, opts) => new Promise((res, rej) => execFile(prog, args, opts, e => e ? rej(e) : res()));
+function raCfgDir() {
+    const flat = path.join(os.homedir(), '.var', 'app', 'org.libretro.RetroArch', 'config', 'retroarch');
+    return fs.existsSync(flat) ? flat : path.join(os.homedir(), '.config', 'retroarch');
+}
+function raCfgKey(key) {
+    const owned = path.join(configDir, 'EmuLatte', 'retroarch', 'emulatte-retroarch.cfg');
+    const host  = path.join(raCfgDir(), 'retroarch.cfg');
+    for (const f of [owned, host]) {
+        try {
+            const m = fs.readFileSync(f, 'utf8').match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"`, 'm'));
+            if (m && m[1] && m[1] !== 'default') return m[1].replace(/^~(?=[/\\])/, os.homedir()).replace(/^:/, raCfgDir());
+        } catch {}
+    }
+    return '';
+}
+const raStateDir = () => raCfgKey('savestate_directory') || path.join(raCfgDir(), 'states');
+const raSaveDir  = () => raCfgKey('savefile_directory')  || path.join(raCfgDir(), 'saves');
+
 ipcMain.handle('backup-zip', async (event) => {
     const win = BrowserWindow.getFocusedWindow();
     const { filePath } = await dialog.showSaveDialog(win, {
         title: 'Save ZIP Backup',
-        defaultPath: 'CNGM_Backup.zip',
+        defaultPath: 'CafeNeurotico Suite.zip',
             filters: [{ name: 'ZIP Archives', extensions: ['zip'] }]
     });
     if (!filePath) return { success: false, canceled: true };
 
     event.sender.send('zip-started');
 
-    return new Promise((resolve) => {
-        const isWin = process.platform === 'win32';
-        const [prog, args] = isWin
-            ? ['powershell', ['-command', `Compress-Archive -Path '${configDir}' -DestinationPath '${filePath}' -Force`]]
-            : ['zip', ['-r', filePath, 'GameManagerConfig']];
-        const opts = isWin ? {} : { cwd: baseDir };
-
-        execFile(prog, args, { ...opts, timeout: 120000 }, (error) => {
-            if (error) resolve({ success: false, message: `Backup failed: ${error.message}` });
-            else resolve({ success: true, message: "ZIP Backup successfully created!" });
-        });
-    });
+    const isWin = process.platform === 'win32';
+    try {
+        if (isWin) {
+            await _runFile('powershell', ['-command', `Compress-Archive -Path '${configDir}' -DestinationPath '${filePath}' -Force`], { timeout: 300000 });
+        } else {
+            await _runFile('zip', ['-r', filePath, 'GameManagerConfig'], { cwd: baseDir, timeout: 300000 });
+            // Bundle RetroArch save states + savefiles under a known prefix (they live outside GameManagerConfig).
+            const stateDir = raStateDir(), saveDir = raSaveDir();
+            const stage = path.join(os.tmpdir(), 'cn-suite-saves-' + Date.now());
+            let staged = false;
+            try {
+                if (fs.existsSync(stateDir)) { fs.cpSync(stateDir, path.join(stage, '__ra_saves__', 'states'), { recursive: true }); staged = true; }
+                if (fs.existsSync(saveDir) && path.resolve(saveDir) !== path.resolve(stateDir)) { fs.cpSync(saveDir, path.join(stage, '__ra_saves__', 'saves'), { recursive: true }); staged = true; }
+                if (staged) await _runFile('zip', ['-r', filePath, '__ra_saves__'], { cwd: stage, timeout: 300000 });
+            } finally { try { fs.rmSync(stage, { recursive: true, force: true }); } catch {} }
+        }
+        return { success: true, message: "ZIP Backup successfully created!" };
+    } catch (error) {
+        return { success: false, message: `Backup failed: ${error.message}` };
+    }
 });
 
 ipcMain.handle('restore-zip', async (event) => {
@@ -1199,17 +1228,26 @@ ipcMain.handle('restore-zip', async (event) => {
     event.sender.send('zip-started');
 
     const filePath = filePaths[0];
-    return new Promise((resolve) => {
-        const isWin = process.platform === 'win32';
-        const [prog, args] = isWin
-            ? ['powershell', ['-command', `Expand-Archive -Path '${filePath}' -DestinationPath '${baseDir}' -Force`]]
-            : ['unzip', ['-o', filePath, '-d', baseDir]];
-
-        execFile(prog, args, (error) => {
-            if (error) resolve({ success: false, message: `Restore failed: ${error.message}` });
-            else resolve({ success: true, message: "Restore successful! Please restart the app to load the new database." });
-        });
-    });
+    const isWin = process.platform === 'win32';
+    try {
+        if (isWin) {
+            await _runFile('powershell', ['-command', `Expand-Archive -Path '${filePath}' -DestinationPath '${baseDir}' -Force`], { timeout: 300000 });
+        } else {
+            await _runFile('unzip', ['-o', filePath, '-d', baseDir], { timeout: 300000 });
+            // Re-home any bundled RetroArch saves into THIS machine's RA dirs, then drop the temp folder.
+            const extracted = path.join(baseDir, '__ra_saves__');
+            if (fs.existsSync(extracted)) {
+                try {
+                    const stStates = path.join(extracted, 'states'), stSaves = path.join(extracted, 'saves');
+                    if (fs.existsSync(stStates)) fs.cpSync(stStates, raStateDir(), { recursive: true });
+                    if (fs.existsSync(stSaves))  fs.cpSync(stSaves,  raSaveDir(),  { recursive: true });
+                } finally { try { fs.rmSync(extracted, { recursive: true, force: true }); } catch {} }
+            }
+        }
+        return { success: true, message: "Restore successful! Please restart the app to load the new database." };
+    } catch (error) {
+        return { success: false, message: `Restore failed: ${error.message}` };
+    }
 });
 
 ipcMain.handle('add-game', (e, name) => {
