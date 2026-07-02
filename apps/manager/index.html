@@ -99,6 +99,14 @@
     .gallery-f2p-pill { position: absolute; bottom: 7px; left: 7px; z-index: 3; }
     .f2p-pill-inline { vertical-align: middle; margin-left: 4px; font-size: 8px; padding: 2px 5px; }
     #gamepage-f2p-pill { position: absolute; top: 18px; left: 18px; z-index: 12; font-size: 11px; padding: 5px 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
+    /* Hidden Games manager rows */
+    .hidden-game-row { display: flex; align-items: center; gap: 12px; padding: 8px; background: rgba(0,0,0,0.18); border: 1px solid var(--border); border-radius: 8px; }
+    .hidden-game-row .hg-cover { width: 34px; height: 48px; flex-shrink: 0; border-radius: 4px; overflow: hidden; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+    .hidden-game-row .hg-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .hidden-game-row .hg-meta { flex: 1; min-width: 0; }
+    .hidden-game-row .hg-title { font-weight: bold; font-size: 13px; color: var(--text_main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hidden-game-row .hg-store { font-size: 11px; color: var(--text_dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hidden-game-row .hg-unhide { flex-shrink: 0; font-size: 11px; padding: 6px 12px; font-weight: bold; letter-spacing: 1px; cursor: pointer; }
     .btn-gallery-fav, .btn-gallery-want { width: 26px; height: 26px; border-radius: 5px; border: none; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.35); transition: color 0.15s, background 0.15s; line-height: 1; padding: 0; }
     .btn-gallery-fav:hover { background: rgba(0,0,0,0.75); color: #ffeb3b; }
     .btn-gallery-want:hover { background: rgba(0,0,0,0.75); color: #ff9800; }
@@ -3515,6 +3523,9 @@
                         <button id="btn-gamepage-playlist" class="btn-hero btn-hero-sq" title="Add to Playlist">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="13" y2="18"/><line x1="18" y1="17" x2="18" y2="23"/><line x1="15" y1="20" x2="21" y2="20"/></svg>
                         </button>
+                        <button id="btn-gamepage-hide" class="btn-hero btn-hero-sq" title="Hide this game from the library">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
                         <button id="btn-gamepage-remove-playlist" class="btn-hero btn-hero-sq" title="Remove from current Playlist" style="display:none; border-color:#ef5350; color:#ef5350;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="11" y2="18"/><line x1="15" y1="16" x2="21" y2="22"/><line x1="21" y1="16" x2="15" y2="22"/></svg>
                         </button>
@@ -5788,6 +5799,12 @@ LOADING...READY.</div>
           </div>
         </div>
 
+        <div class="tool-card tools-section" data-search="hidden games hide show unhide manage removed library">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Hidden Games</div>
+          <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Games you've hidden from the library. Open the manager to unhide them individually.</p>
+          <button id="btn-open-hidden-games" style="width:100%; font-size:12px; padding:10px; letter-spacing:1px;" class="primary"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Manage Hidden Games</span></button>
+        </div>
+
         <div class="tool-card tools-section" data-search="add game custom manual entry library new">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Add Custom Game</div>
           <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Manually add any game, app, or emulator to your library.</p>
@@ -5986,7 +6003,18 @@ LOADING...READY.</div>
         <button class="segmented-btn freegames-vis-btn" data-val="show">Show</button>
         <button class="segmented-btn freegames-vis-btn" data-val="hide">Hide</button>
       </div>
+      <button id="btn-f2p-hide-one" style="margin-top: 6px; width: 100%; display: none; background-color: var(--bg_menu); color: #ef8f5a; border-color: #ef8f5a; font-weight: bold;">Hide only this game</button>
       <button id="btn-close-free-games" style="margin-top: 6px; width: 100%;" data-i18n="html.close">Close</button>
+    </div>
+  </div>
+
+  <div id="modal-hidden-games" class="modal-overlay">
+    <div class="modal-box" style="max-width: 560px; width: 560px; max-height: 82vh;">
+      <h3 style="margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Hidden Games <span style="opacity:0.6; font-weight:400;">(<span id="hidden-games-count">0</span>)</span></h3>
+      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.5; margin: 0;">These games are hidden from every library view. Unhide any to bring it back.</p>
+      <div id="hidden-games-empty" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center;">No hidden games. Hide one from its game page or a FREE pill.</div>
+      <div id="hidden-games-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px;"></div>
+      <button id="btn-close-hidden-games" style="margin-top: 4px; width: 100%;" data-i18n="html.close">Close</button>
     </div>
   </div>
 

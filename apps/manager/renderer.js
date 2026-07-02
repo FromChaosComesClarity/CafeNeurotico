@@ -751,10 +751,15 @@ function applyFreeGamesVisibility(hide) {
 }
 document.querySelectorAll('.freegames-vis-btn').forEach(btn =>
     btn.addEventListener('click', () => applyFreeGamesVisibility(btn.dataset.val === 'hide')));
-// Pill click → the show/hide popup.
-function openFreeGamesPrompt() {
+// Pill click → the show/hide popup. When opened from a specific game's pill, also
+// offer to hide just that one game (via the general hide system below).
+let _f2pPromptGame = null;
+function openFreeGamesPrompt(game = null) {
+    _f2pPromptGame = game || null;
     document.querySelectorAll('#modal-free-games .freegames-vis-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.val === (_hideFreeGames ? 'hide' : 'show')));
+    const oneBtn = document.getElementById('btn-f2p-hide-one');
+    if (oneBtn) oneBtn.style.display = _f2pPromptGame ? 'block' : 'none';
     document.getElementById('modal-free-games')?.classList.add('active');
 }
 (async () => {
@@ -768,6 +773,63 @@ document.getElementById('btn-close-free-games')?.addEventListener('click', () =>
     document.getElementById('modal-free-games')?.classList.remove('active'));
 document.getElementById('modal-free-games')?.addEventListener('click', (e) => {
     if (e.target.id === 'modal-free-games') e.currentTarget.classList.remove('active');
+});
+
+// ── HIDDEN GAMES (per-game hide; managed from the Control Panel) ────────────
+// Any game can be hidden from every library view; hidden games live in the
+// Hidden Games manager where they can be unhidden individually.
+function isHidden(game) { return game && (game.Hidden == 1); }
+async function setGameHidden(id, hidden) {
+    const val = hidden ? 1 : 0;
+    // Optimistic: patch the master list AND any active playlist snapshot in place, then re-render
+    // immediately so the game disappears/reappears instantly — persist to the DB afterwards.
+    for (const arr of [allGames, currentPlaylistGames]) {
+        const g = arr && arr.find(x => String(x.id) === String(id));
+        if (g) g.Hidden = val;
+    }
+    applyFilters();
+    await window.api.setGameFlag(id, 'Hidden', val);
+}
+function renderHiddenGamesList() {
+    const list = document.getElementById('hidden-games-list');
+    if (!list) return;
+    const hidden = allGames.filter(isHidden).sort((a, b) => (a.Game || '').localeCompare(b.Game || ''));
+    const countEl = document.getElementById('hidden-games-count');
+    if (countEl) countEl.textContent = hidden.length;
+    const emptyEl = document.getElementById('hidden-games-empty');
+    if (emptyEl) emptyEl.style.display = hidden.length ? 'none' : 'block';
+    list.innerHTML = '';
+    for (const g of hidden) {
+        const row = document.createElement('div');
+        row.className = 'hidden-game-row';
+        const cover = g.CoverArt ? getSafePath(g.CoverArt) : '';
+        row.innerHTML =
+            `<div class="hg-cover">${cover ? `<img src="${cover}" loading="lazy">` : ''}</div>` +
+            `<div class="hg-meta"><div class="hg-title">${g.Game || ''}</div><div class="hg-store">${g.Store || ''}</div></div>` +
+            `<button class="hg-unhide" data-unhide="${g.id}">Unhide</button>`;
+        list.appendChild(row);
+    }
+}
+function openHiddenGamesModal() {
+    renderHiddenGamesList();
+    document.getElementById('modal-hidden-games')?.classList.add('active');
+}
+document.getElementById('hidden-games-list')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-unhide]');
+    if (!btn) return;
+    await setGameHidden(btn.dataset.unhide, false);
+    renderHiddenGamesList();
+});
+document.getElementById('btn-open-hidden-games')?.addEventListener('click', openHiddenGamesModal);
+document.getElementById('btn-close-hidden-games')?.addEventListener('click', () =>
+    document.getElementById('modal-hidden-games')?.classList.remove('active'));
+document.getElementById('modal-hidden-games')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-hidden-games') e.currentTarget.classList.remove('active');
+});
+// F2P popup: "Hide this game only" — hides just the game whose pill was clicked.
+document.getElementById('btn-f2p-hide-one')?.addEventListener('click', async () => {
+    if (_f2pPromptGame) await setGameHidden(_f2pPromptGame.id, true);
+    document.getElementById('modal-free-games')?.classList.remove('active');
 });
 
 // ── CORNER STYLE (sharp vs round) — classic + flat layout families ────────
@@ -1433,11 +1495,12 @@ document.getElementById('btn-refresh-library').addEventListener('click', async (
 document.getElementById('btn-refresh-library-sb')?.addEventListener('click', () =>
     document.getElementById('btn-refresh-library').click());
 
-document.getElementById('btn-gamepage-back').addEventListener('click', () => {
+function closeGamepageToLibrary() {
     applyFilters();
     _pendingScrollRestore = savedGridScrollTop;   // restored when switchView re-activates the grid (survives the close animation)
     switchView(lastGridView);
-});
+}
+document.getElementById('btn-gamepage-back').addEventListener('click', closeGamepageToLibrary);
 
 // Floating-overlay gamepage: clicking the blurred backdrop (outside the panel) closes it.
 // The backdrop is body::before, so a click on it reports e.target === document.body; clicks on
@@ -2265,6 +2328,13 @@ function loadGames() {
             const res = await window.api.getGames();
             let games = res.games || [];
             allGames = games.filter(g => g.Game && g.Game !== 'null');
+            // Keep the active playlist/recently-imported snapshot fresh too — it's a separate
+            // fetch, so without this a scrape/edit/hide only shows after switching views and back.
+            if (currentPlaylistId === 'recently-imported') {
+                currentPlaylistGames = await window.api.getRecentlyImported(recentlyImportedCount);
+            } else if (currentPlaylistId !== null) {
+                currentPlaylistGames = await window.api.getPlaylistGames(currentPlaylistId);
+            }
             applyFilters();
             resolve();
         }, 80);
@@ -2355,6 +2425,9 @@ function applyFilters() {
 
     let filtered = baseGames.filter(game => {
         const storeLower = (game.Store || '').toLowerCase();
+
+        // User-hidden games never appear in any library view (only in the Hidden Games manager)
+        if (isHidden(game)) return false;
 
         // PICO-8 visibility: hide unless pico8 filter is active or user explicitly searches for it
         if (_hidePico8) {
@@ -2994,7 +3067,12 @@ document.addEventListener('keydown', e => {
 // ── Table event delegation (set up once) ──────────────────────────────────────
 const _tbody = document.getElementById('list-tbody');
 _tbody.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-f2p-pill]')) { e.stopPropagation(); openFreeGamesPrompt(); return; }
+    if (e.target.closest('[data-f2p-pill]')) {
+        e.stopPropagation();
+        const row = e.target.closest('tr[data-id]');
+        openFreeGamesPrompt(row ? allGames.find(g => String(g.id) === row.dataset.id) : null);
+        return;
+    }
     const play = e.target.closest('.btn-play');
     if (play) { e.stopPropagation(); verifyAndLaunch(play.dataset.id, play.dataset.cmd); return; }
     const install = e.target.closest('.btn-install');
@@ -6766,7 +6844,12 @@ function renderGallery(recent, regular) {
 // ── Gallery event delegation (set up once) ────────────────────────────────────
 const _grid = document.getElementById('gallery-grid');
 _grid.addEventListener('click', (e) => {
-    if (e.target.closest('[data-f2p-pill]')) { e.stopPropagation(); openFreeGamesPrompt(); return; }
+    if (e.target.closest('[data-f2p-pill]')) {
+        e.stopPropagation();
+        const card = e.target.closest('.gallery-item[data-id]');
+        openFreeGamesPrompt(card ? allGames.find(g => String(g.id) === card.dataset.id) : null);
+        return;
+    }
     const play = e.target.closest('.btn-play-gallery');
     if (play) { e.stopPropagation(); verifyAndLaunch(play.dataset.id, play.dataset.cmd); return; }
     const install = e.target.closest('.btn-install-gallery');
@@ -7120,13 +7203,20 @@ function openGamepage(game) {
         });
     }
 
-    // Free-to-play hero pill — click opens the show/hide popup.
+    // Free-to-play hero pill — click opens the show/hide popup (with this game's per-game hide).
     const f2pPill = document.getElementById('gamepage-f2p-pill');
     if (f2pPill) {
         f2pPill.style.display = isFreeToPlay(game) ? 'inline-flex' : 'none';
         f2pPill.classList.toggle('hidden-mode', _hideFreeGames);
-        f2pPill.onclick = (e) => { e.stopPropagation(); openFreeGamesPrompt(); };
+        f2pPill.onclick = (e) => { e.stopPropagation(); openFreeGamesPrompt(game); };
     }
+
+    // Hide-game hero button — hides this game from the library and returns to it.
+    const hideBtn = document.getElementById('btn-gamepage-hide');
+    if (hideBtn) hideBtn.onclick = async () => {
+        await setGameHidden(game.id, true);
+        closeGamepageToLibrary();
+    };
 
     // Live Toggle Logic for Favs / Wants (icon buttons — active class drives fill via CSS)
     const updateTogglesUI = () => {

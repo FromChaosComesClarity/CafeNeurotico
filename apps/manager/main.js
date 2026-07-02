@@ -241,6 +241,7 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN FreeToPlay INTEGER DEFAULT 0").run(); } catch(e) {} // 1 = Steam free-to-play (played-free-games)
+        try { db.prepare("ALTER TABLE games ADD COLUMN Hidden INTEGER DEFAULT 0").run(); } catch(e) {}      // 1 = user-hidden from all library views
         try {
             db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_date_added
                 AFTER INSERT ON games
@@ -1273,7 +1274,7 @@ ipcMain.handle('add-game', (e, name) => {
 });
 
 ipcMain.handle('set-game-flag', (_, id, field, value) => {
-    const allowed = ['FAV', 'WANT_TO_PLAY', 'kb_played'];
+    const allowed = ['FAV', 'WANT_TO_PLAY', 'kb_played', 'Hidden'];
     if (!allowed.includes(field)) return { ok: false };
     db.prepare(`UPDATE games SET ${field}=? WHERE id=?`).run(value, id);
     return { ok: true };
