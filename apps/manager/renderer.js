@@ -733,6 +733,43 @@ document.querySelectorAll('.pico8-vis-btn').forEach(btn =>
     if (saved === '1') applyPico8Visibility(true);
 })();
 
+// ── FREE-TO-PLAY VISIBILITY ────────────────────────────────────────────────
+// Steam free-to-play games (game.FreeToPlay==1) are shown by default; the user can
+// hide them from every library view via the Tools toggle or by clicking a "FREE"
+// pill on any of them. Tags come from sync-steam (see main.js).
+let _hideFreeGames = false;
+function isFreeToPlay(game) { return game && (game.FreeToPlay == 1); }
+function applyFreeGamesVisibility(hide) {
+    _hideFreeGames = hide;
+    window.api.setSetting('hide_free_games', hide ? '1' : '');
+    document.querySelectorAll('.freegames-vis-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === (hide ? 'hide' : 'show')));
+    applyFilters();
+    // If a gamepage is open, refresh its F2P pill (a hidden game may still be showing).
+    const gp = document.getElementById('gamepage-f2p-pill');
+    if (gp) gp.classList.toggle('hidden-mode', _hideFreeGames);
+}
+document.querySelectorAll('.freegames-vis-btn').forEach(btn =>
+    btn.addEventListener('click', () => applyFreeGamesVisibility(btn.dataset.val === 'hide')));
+// Pill click → the show/hide popup.
+function openFreeGamesPrompt() {
+    document.querySelectorAll('#modal-free-games .freegames-vis-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === (_hideFreeGames ? 'hide' : 'show')));
+    document.getElementById('modal-free-games')?.classList.add('active');
+}
+(async () => {
+    const saved = await window.api.getSetting('hide_free_games');
+    if (saved === '1') applyFreeGamesVisibility(true);
+})();
+// Popup dismissal: choosing Show/Hide inside it, the Close button, or a backdrop click.
+document.querySelectorAll('#modal-free-games .freegames-vis-btn').forEach(btn =>
+    btn.addEventListener('click', () => document.getElementById('modal-free-games')?.classList.remove('active')));
+document.getElementById('btn-close-free-games')?.addEventListener('click', () =>
+    document.getElementById('modal-free-games')?.classList.remove('active'));
+document.getElementById('modal-free-games')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-free-games') e.currentTarget.classList.remove('active');
+});
+
 // ── CORNER STYLE (sharp vs round) — classic + flat layout families ────────
 // 'sharp' = current flat look (corners-flat class on body); 'round' = the
 // previous rounded style (no class). Only affects the layouts listed below.
@@ -2325,6 +2362,9 @@ function applyFilters() {
             if (isPico8 && !activeFilters.has('pico8') && !query.includes('pico')) return false;
         }
 
+        // Free-to-play visibility: hide tagged games everywhere when the toggle is off
+        if (_hideFreeGames && isFreeToPlay(game)) return false;
+
         // Stores: OR — game must match at least one selected store (open if none selected)
         if (storeActive.length > 0) {
             const storeMatch = storeActive.some(f => {
@@ -2459,7 +2499,7 @@ function renderTable(recent, regular) {
         <td><button class="btn-list-fav${game.FAV === 'YES' ? ' active' : ''}" data-list-fav="${game.id}" title="Favourite">${_lStarSvg}</button></td>
         <td><button class="btn-list-want${game.WANT_TO_PLAY === 'YES' ? ' active' : ''}" data-list-want="${game.id}" title="Want to play">${_lBkSvg}</button></td>
         <td><button class="btn-list-playlist" data-list-playlist="${game.id}" title="Add to Playlist">${_lPlSvg}</button></td>
-        <td style="font-weight: bold;">${game.Game}</td>
+        <td style="font-weight: bold;">${game.Game}${isFreeToPlay(game) ? ` <span class="f2p-pill f2p-pill-inline" data-f2p-pill="1" title="Free-to-play — click to show/hide these">FREE</span>` : ''}</td>
         <td>${displayStore}</td>
         <td>${game.GENRE || ''}</td>
         <td>${game.RELEASED || ''}</td>
@@ -2954,6 +2994,7 @@ document.addEventListener('keydown', e => {
 // ── Table event delegation (set up once) ──────────────────────────────────────
 const _tbody = document.getElementById('list-tbody');
 _tbody.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-f2p-pill]')) { e.stopPropagation(); openFreeGamesPrompt(); return; }
     const play = e.target.closest('.btn-play');
     if (play) { e.stopPropagation(); verifyAndLaunch(play.dataset.id, play.dataset.cmd); return; }
     const install = e.target.closest('.btn-install');
@@ -3001,6 +3042,7 @@ _tbody.addEventListener('click', async (e) => {
     }
 });
 _tbody.addEventListener('dblclick', (e) => {
+    if (e.target.closest('[data-f2p-pill]')) return;
     const tr = e.target.closest('tr[data-id]');
     if (tr) { const g = allGames.find(x => String(x.id) === tr.dataset.id); if (g) openGamepage(g); }
 });
@@ -6660,6 +6702,7 @@ function renderGallery(recent, regular) {
         const imgHtml = imgSrc ? `<img src="${imgSrc}" class="gallery-cover" loading="lazy">` : `<div class="gallery-cover" style="display:flex; align-items:center; justify-content:center; color:#555; font-size:12px;">${t('game.no_cover')}</div>`;
         const _badges = (game.Store ? String(game.Store).split(',') : []).map(s => s.trim()).filter(Boolean).map(s => { const l = getStoreLogo(s); return l ? `<div class="gallery-store-badge" style="-webkit-mask-image:url('${l}');"></div>` : ''; }).join('');
         const badgeHtml = _badges ? `<div class="gallery-store-badges">${_badges}</div>` : '';
+        const f2pHtml = isFreeToPlay(game) ? `<div class="f2p-pill gallery-f2p-pill" data-f2p-pill="1" title="Free-to-play — click to show/hide these">FREE</div>` : '';
         const installCmdG = getInstallCommand(game);
         const isInstalled = !!game.LaunchCommand && (game.Installed == null || game.Installed == 1);
         const dotHtml = game.LaunchCommand ? `<div class="install-dot ${isInstalled ? 'is-installed' : 'not-installed'}" title="${isInstalled ? t('status.installed') : t('status.not_installed')}"></div>` : '';
@@ -6680,7 +6723,7 @@ function renderGallery(recent, regular) {
             actionBtn = `<button class="btn-install-gallery" data-addcmd="1" data-id="${game.id}" data-name="${game.Game.replace(/"/g, '&quot;')}" style="margin: 5px; font-size: 12px; padding: 4px;">${t('status.install')}</button>`;
         }
         div.innerHTML = `
-        <div class="gallery-cover-wrap">${imgHtml}${dotHtml}${badgeHtml}${flagsHtml}</div>
+        <div class="gallery-cover-wrap">${imgHtml}${dotHtml}${badgeHtml}${f2pHtml}${flagsHtml}</div>
         <div class="gallery-title">${game.Game}</div>
         ${actionBtn}
         `;
@@ -6723,6 +6766,7 @@ function renderGallery(recent, regular) {
 // ── Gallery event delegation (set up once) ────────────────────────────────────
 const _grid = document.getElementById('gallery-grid');
 _grid.addEventListener('click', (e) => {
+    if (e.target.closest('[data-f2p-pill]')) { e.stopPropagation(); openFreeGamesPrompt(); return; }
     const play = e.target.closest('.btn-play-gallery');
     if (play) { e.stopPropagation(); verifyAndLaunch(play.dataset.id, play.dataset.cmd); return; }
     const install = e.target.closest('.btn-install-gallery');
@@ -7074,6 +7118,14 @@ function openGamepage(game) {
             div.style.filter = "drop-shadow(0 2px 5px rgba(0,0,0,0.8))";
             storeContainer.appendChild(div);
         });
+    }
+
+    // Free-to-play hero pill — click opens the show/hide popup.
+    const f2pPill = document.getElementById('gamepage-f2p-pill');
+    if (f2pPill) {
+        f2pPill.style.display = isFreeToPlay(game) ? 'inline-flex' : 'none';
+        f2pPill.classList.toggle('hidden-mode', _hideFreeGames);
+        f2pPill.onclick = (e) => { e.stopPropagation(); openFreeGamesPrompt(); };
     }
 
     // Live Toggle Logic for Favs / Wants (icon buttons — active class drives fill via CSS)

@@ -91,6 +91,14 @@
     .install-dot.not-installed { background: #ff9800; }
     .gallery-flag-btns { position: absolute; top: 7px; right: 7px; display: flex; flex-direction: column; gap: 4px; z-index: 3; opacity: 0; transition: opacity 0.15s; }
     .gallery-item:hover .gallery-flag-btns { opacity: 1; }
+    /* Free-to-play pill — gallery cover, list row, and gamepage hero */
+    .f2p-pill { display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; line-height: 1; padding: 3px 6px; border-radius: 4px; background: rgba(12,14,17,0.82); color: #5be27a; border: 1px solid rgba(91,226,122,0.55); cursor: pointer; white-space: nowrap; user-select: none; transition: background 0.12s, color 0.12s; }
+    .f2p-pill:hover { background: #5be27a; color: #08160d; border-color: #5be27a; }
+    .f2p-pill.hidden-mode { color: #9aa0a6; border-color: rgba(154,160,166,0.5); text-decoration: line-through; }
+    .f2p-pill.hidden-mode:hover { background: #9aa0a6; color: #14171a; }
+    .gallery-f2p-pill { position: absolute; bottom: 7px; left: 7px; z-index: 3; }
+    .f2p-pill-inline { vertical-align: middle; margin-left: 4px; font-size: 8px; padding: 2px 5px; }
+    #gamepage-f2p-pill { position: absolute; top: 18px; left: 18px; z-index: 12; font-size: 11px; padding: 5px 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
     .btn-gallery-fav, .btn-gallery-want { width: 26px; height: 26px; border-radius: 5px; border: none; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.35); transition: color 0.15s, background 0.15s; line-height: 1; padding: 0; }
     .btn-gallery-fav:hover { background: rgba(0,0,0,0.75); color: #ffeb3b; }
     .btn-gallery-want:hover { background: rgba(0,0,0,0.75); color: #ff9800; }
@@ -3487,6 +3495,8 @@
             <div id="gamepage-hero" style="position: relative; height: 350px; background-size: cover; background-position: center; border-radius: 12px; margin-bottom: 25px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid var(--border); background-color: var(--bg_menu);">
                 <div style="position: absolute; top:-2px; left:-2px; width:calc(100% + 4px); height:calc(100% + 4px); background: linear-gradient(to top, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.4) 50%, transparent 100%); z-index: 1;"></div>
 
+                <div id="gamepage-f2p-pill" class="f2p-pill" style="display: none;" title="Free-to-play — click to show/hide these">FREE TO PLAY</div>
+
                 <img id="gamepage-logo" src="" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-height: 250px; max-width: 80%; object-fit: contain; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.9)); z-index: 5; display: none;">
 
                 <div style="position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
@@ -5769,6 +5779,15 @@ LOADING...READY.</div>
           </div>
         </div>
 
+        <div class="tool-card tools-section" data-search="free to play f2p steam games show hide visibility filter pill">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>Free-to-Play Games</div>
+          <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Show or hide Steam free-to-play games across all library views. They're marked with a FREE pill.</p>
+          <div class="segmented-control" id="freegames-vis-control">
+            <button class="segmented-btn freegames-vis-btn active" data-val="show">Show</button>
+            <button class="segmented-btn freegames-vis-btn" data-val="hide">Hide</button>
+          </div>
+        </div>
+
         <div class="tool-card tools-section" data-search="add game custom manual entry library new">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Add Custom Game</div>
           <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Manually add any game, app, or emulator to your library.</p>
@@ -5956,6 +5975,18 @@ LOADING...READY.</div>
       <h3 style="margin: 0 0 15px 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Setup Required</h3>
       <div id="update-info-body" style="display: flex; flex-direction: column; gap: 15px; font-size: 13px; color: var(--text_sec); line-height: 1.6;"></div>
       <button id="btn-close-update-info" style="margin-top: 20px; width: 100%;" data-i18n="html.close">Close</button>
+    </div>
+  </div>
+
+  <div id="modal-free-games" class="modal-overlay">
+    <div class="modal-box" style="max-width: 420px;">
+      <h3 style="margin: 0 0 4px 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Free-to-Play Games</h3>
+      <p style="font-size: 13px; color: var(--text_sec); line-height: 1.6; margin: 0;">These are Steam free-to-play titles you've played. Show them in your library, or hide them from every view?</p>
+      <div class="segmented-control">
+        <button class="segmented-btn freegames-vis-btn" data-val="show">Show</button>
+        <button class="segmented-btn freegames-vis-btn" data-val="hide">Hide</button>
+      </div>
+      <button id="btn-close-free-games" style="margin-top: 6px; width: 100%;" data-i18n="html.close">Close</button>
     </div>
   </div>
 

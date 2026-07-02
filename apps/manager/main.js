@@ -240,6 +240,7 @@ app.whenReady().then(() => {
         try { db.prepare("UPDATE games SET LaunchCommands = REPLACE(LaunchCommands, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommands LIKE '%heroic://launch/%'").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN FreeToPlay INTEGER DEFAULT 0").run(); } catch(e) {} // 1 = Steam free-to-play (played-free-games)
         try {
             db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_date_added
                 AFTER INSERT ON games
@@ -1828,12 +1829,35 @@ ipcMain.handle('save-flatpak-art', (e, gameId, coverB64, heroB64, iconSrcPath) =
 
 ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
     if (!steamId || !apiKey) return { success: false, message: "Missing SteamID or API Key." };
-    const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=true`;
+    // skip_unvetted_apps=false is REQUIRED: it defaults to true, which makes Steam
+    // silently omit "unvetted" apps (a trust flag on many small/indie titles) from
+    // GetOwnedGames — so owned games like those never import.
+    // include_played_free_games=true also pulls free-to-play games you've played.
+    const base = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=true&skip_unvetted_apps=false`;
     try {
-        const response = await fetch(url);
+        // Primary list = everything, including played free-to-play games (the import set).
+        const response = await fetch(`${base}&include_played_free_games=true`);
         if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
         const data = await response.json();
         if (!data.response || !data.response.games) return { success: false, message: "Could not read games." };
+
+        // Second list = paid/owned only (no free games). Any appid in the primary list
+        // but NOT here is a free-to-play title → tag it so the UI can pill + hide it.
+        // Best-effort: if this call fails we still import everything, just untagged.
+        const freeAppids = new Set();
+        let freeSetKnown = false;
+        try {
+            const paidResp = await fetch(base);
+            if (paidResp.ok) {
+                const paidData = await paidResp.json();
+                const paidIds = new Set((paidData.response?.games || []).map(g => String(g.appid)));
+                for (const g of data.response.games) {
+                    const id = String(g.appid);
+                    if (!paidIds.has(id)) freeAppids.add(id);
+                }
+                freeSetKnown = true;
+            }
+        } catch (e) { /* 2nd fetch failed → leave tags untouched this run */ }
 
         let added = 0;
         let updated = 0;
@@ -1933,6 +1957,12 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
         // Capture Steam playtime (minutes): playtime_forever (total) + playtime_2weeks (recent).
         const _ptStmt = db.prepare("UPDATE games SET Playtime=?, Playtime2wk=? WHERE SteamAppID=?");
         db.transaction(() => { for (const g of games) _ptStmt.run(g.playtime_forever || 0, g.playtime_2weeks || 0, String(g.appid)); })();
+        // Tag free-to-play Steam games (matched by SteamAppID, whichever import path they took).
+        // Only re-tag when the free set was actually computed, so a failed 2nd fetch never wipes tags.
+        if (freeSetKnown) {
+            const _ftpStmt = db.prepare("UPDATE games SET FreeToPlay=? WHERE SteamAppID=?");
+            db.transaction(() => { for (const g of games) _ftpStmt.run(freeAppids.has(String(g.appid)) ? 1 : 0, String(g.appid)); })();
+        }
         return { success: true, count: added, message: `Imported ${added} new games from Steam.\n(Updated ${updated} existing entries).` };
     } catch (err) {
         return { success: false, message: `Steam API Error: ${err.message}` };
