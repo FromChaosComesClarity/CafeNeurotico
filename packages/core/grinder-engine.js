@@ -97,6 +97,13 @@ function which(bin) {
 
 // Tool paths resolved once — avoids repeated execSync('which ...') on every launch/IPC call
 let _legendary = null, _gogdl = null, _comet = null, _umu = null, _wine = null;
+let _activeInstallProc = null;   // the gogdl/legendary child currently downloading (for cancel)
+// Kill the in-flight headless download, if any. The spawn's close handler then resolves
+// failure, so headlessInstall emits an error event and the caller's _grinderBusy clears.
+function cancelActiveInstall() {
+    if (_activeInstallProc) { try { _activeInstallProc.kill('SIGTERM'); } catch {} _activeInstallProc = null; return true; }
+    return false;
+}
 function findLegendary() {
     if (_legendary !== null) return _legendary;
     _legendary = fs.existsSync(BUNDLED_LEGENDARY) ? BUNDLED_LEGENDARY : (which('legendary') || '');
@@ -180,6 +187,7 @@ async function headlessInstall(store, appId, platform, installDir) {
                     '--auth-config-path', authPath, 'download', appId,
                     '--platform', plat, '--path', dir, '--lang', 'en-US',
                 ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GOGDL_CONFIG_PATH: configDir } });
+                _activeInstallProc = proc;
                 let buf = '';
                 const onData = d => {
                     buf += String(d);
@@ -193,7 +201,8 @@ async function headlessInstall(store, appId, platform, installDir) {
                     }
                 };
                 proc.stdout.on('data', onData); proc.stderr.on('data', onData);
-                proc.on('close', code => resolve(code === 0)); proc.on('error', () => resolve(false));
+                proc.on('close', code => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(code === 0); });
+                proc.on('error', () => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(false); });
             });
             return { ok, lastLines };
         };
@@ -242,6 +251,7 @@ async function headlessInstall(store, appId, platform, installDir) {
 
         const dlOk = await new Promise(resolve => {
             const proc = spawn(leg, ['install', appId, '--base-path', dir, '-y'], { stdio: ['ignore', 'pipe', 'pipe'] });
+            _activeInstallProc = proc;
             let buf = '';
             const onData = d => {
                 buf += String(d);
@@ -253,7 +263,8 @@ async function headlessInstall(store, appId, platform, installDir) {
                 }
             };
             proc.stdout.on('data', onData); proc.stderr.on('data', onData);
-            proc.on('close', code => resolve(code === 0)); proc.on('error', () => resolve(false));
+            proc.on('close', code => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(code === 0); });
+            proc.on('error', () => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(false); });
         });
         if (!dlOk) { writeProgress({ ...base, step: 'error', message: 'Download failed.', done: true }); return; }
         writeProgress({ ...base, step: 'installing', percent: 100, message: 'Finalizing...' });
@@ -921,5 +932,5 @@ module.exports = {
     syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
-    getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary,
+    getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary, cancelActiveInstall,
 };

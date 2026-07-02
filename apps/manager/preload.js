@@ -132,6 +132,7 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderRefreshOwned: () => ipcRenderer.invoke('grinder-refresh-owned'),
                                 // --- in-process install (no GRINDER window) ---
                                 grinderInstall:   (payload) => ipcRenderer.invoke('grinder-install', payload),
+                                grinderCancelInstall: () => ipcRenderer.invoke('grinder-install-cancel'),
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),
                                 grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),
                                 grinderPickDir:    () => ipcRenderer.invoke('grinder-pick-dir'),

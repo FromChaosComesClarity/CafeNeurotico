@@ -262,8 +262,22 @@ let _giInstallName = '';
 window.api.onGrinderInstallProgress(d => {
     const step = (d.step || '').toUpperCase();
     const pct  = typeof d.percent === 'number' ? d.percent : undefined;
-    const label = `${_giInstallName ? _giInstallName + ' — ' : ''}${step}${d.message ? ': ' + d.message : ''}`;
-    if (d.done) opToastDone(label); else opToast(label, pct);   // auto-hide once the engine signals completion/error
+
+    // Feed the active download's live state (drives the Download Manager card).
+    if (_dlActive) {
+        if (typeof d.percent === 'number') _dlActive.pct = d.percent;
+        if (d.message) _dlActive.message = d.message;
+        _dlActive.step = step;
+    }
+
+    if (_dlmOpen) {
+        renderDownloadManager();        // manager is open → it owns the display, keep the toast hidden
+    } else {
+        const name = _dlActive ? _dlActive.name : _giInstallName;
+        const label = `${name ? name + ' — ' : ''}${step}${d.message ? ': ' + d.message : ''}`;
+        if (d.done) opToastDone(label); else opToast(label, pct);   // auto-hide once the engine signals completion/error
+    }
+
     const pr = document.getElementById('gi-progress');
     if (pr && pr.style.display !== 'none') {
         document.getElementById('gi-step').textContent = step;
@@ -271,6 +285,132 @@ window.api.onGrinderInstallProgress(d => {
         if (d.message) document.getElementById('gi-msg').textContent = d.message;
     }
 });
+
+// ── DOWNLOAD MANAGER (multi-download queue — the same manager as GRINDER, in CN) ──
+// Installs still run one at a time in the engine; this queues extra requests and
+// surfaces active/queued/completed in #modal-dlm, opened by clicking the top toast.
+let _dlActive = null;        // { gameId, gid, name, store, dir, pct, message, step }
+const _dlQueue = [];         // pending: { gameId, gid, name, store, dir }
+const _dlHistory = [];       // completed: { name, store, success, error, at }
+let _dlmOpen = false;
+function _dlStoreOf(gid) { return /^gog_/i.test(gid) ? 'gog' : /^epic_/i.test(gid) ? 'epic' : 'other'; }
+function _dlStoreMeta(s) {
+    if (s === 'gog')  return { label: 'GOG',  color: '#9b59d9' };
+    if (s === 'epic') return { label: 'EPIC', color: '#4a9eff' };
+    return { label: (s || '').toUpperCase() || 'GAME', color: 'var(--text_dim)' };
+}
+function _dlEsc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+// Queue a download (dir/platform already chosen). Starts immediately if nothing is active.
+function enqueueDownload(item) {
+    const dup = (_dlActive && String(_dlActive.gameId) === String(item.gameId)) ||
+                _dlQueue.some(q => String(q.gameId) === String(item.gameId));
+    if (dup) { opToast('Already downloading / queued: ' + item.name, _dlActive ? _dlActive.pct : 0); return; }
+    _dlQueue.push(item);
+    if (_dlActive && !_dlmOpen) opToast(`Queued: ${item.name}  (+${_dlQueue.length} in queue)`, _dlActive.pct || 0);
+    renderDownloadManager();
+    _pumpDownloadQueue();
+}
+
+async function _pumpDownloadQueue() {
+    if (_dlActive || _dlQueue.length === 0) return;
+    const item = _dlQueue.shift();
+    _dlActive = { ...item, pct: 0, message: 'Starting…', step: 'START' };
+    if (!_dlmOpen) opToast('Installing ' + item.name + '…', 0);
+    renderDownloadManager();
+    let res;
+    try { res = await window.api.grinderInstall({ gameId: item.gameId, grinderGameId: item.gid, installDir: item.dir }); }
+    catch (e) { res = { ok: false, error: e.message }; }
+    const success = !!(res && res.ok);
+    _dlHistory.unshift({ name: item.name, store: item.store, success, error: success ? null : (res && res.error), at: Date.now() });
+    if (_dlHistory.length > 30) _dlHistory.length = 30;
+    if (!_dlmOpen) {
+        if (success) opToastDone('✓ Installed: ' + item.name);
+        else { opToast('Install failed: ' + item.name); setTimeout(opToastHide, 5000); }
+    }
+    _dlActive = null;
+    await loadGames();
+    renderDownloadManager();
+    _pumpDownloadQueue();   // advance to the next queued download
+}
+
+function cancelQueuedDownload(gameId) {
+    const i = _dlQueue.findIndex(q => String(q.gameId) === String(gameId));
+    if (i >= 0) { _dlQueue.splice(i, 1); renderDownloadManager(); }
+}
+async function cancelActiveDownload() {
+    if (!_dlActive) return;
+    _dlActive.message = 'Cancelling…';
+    renderDownloadManager();
+    await window.api.grinderCancelInstall();   // engine kills the child → install resolves failed → queue advances
+}
+
+function openDownloadManager() {
+    _dlmOpen = true;
+    opToastHide();   // the toast sits at z-31000 and would cover the modal; hide it while the manager is open
+    document.getElementById('modal-dlm')?.classList.add('active');
+    renderDownloadManager();
+}
+function closeDownloadManager() {
+    _dlmOpen = false;
+    document.getElementById('modal-dlm')?.classList.remove('active');
+    if (_dlActive) opToast('Installing ' + _dlActive.name + '…', _dlActive.pct || 0);   // restore the progress bar
+}
+
+function renderDownloadManager() {
+    if (!_dlmOpen) return;
+    const $ = id => document.getElementById(id);
+    // Active
+    $('dlm-active-section').style.display = _dlActive ? 'flex' : 'none';
+    if (_dlActive) {
+        const m = _dlStoreMeta(_dlActive.store);
+        $('dlm-active-title').textContent = _dlActive.name || '';
+        $('dlm-active-store').textContent = m.label; $('dlm-active-store').style.color = m.color;
+        $('dlm-bar').style.width = (_dlActive.pct || 0) + '%';
+        $('dlm-pct').textContent = (_dlActive.pct || 0).toFixed(1) + '%';
+        $('dlm-msg').textContent = _dlActive.message || '';
+    }
+    // Queue
+    $('dlm-queue-section').style.display = _dlQueue.length ? 'flex' : 'none';
+    if (_dlQueue.length) {
+        $('dlm-queue-label').textContent = `${_dlQueue.length} waiting`;
+        $('dlm-queue-list').innerHTML = _dlQueue.map(item => {
+            const m = _dlStoreMeta(item.store);
+            return `<div class="dlm-row"><div class="dlm-dot"></div><div class="dlm-row-meta">` +
+                   `<div class="dlm-row-title">${_dlEsc(item.name)}</div>` +
+                   `<div class="dlm-row-sub" style="color:${m.color}">${m.label} · Waiting</div></div>` +
+                   `<button class="dlm-remove" data-dlq="${_dlEsc(item.gameId)}">✕ Remove</button></div>`;
+        }).join('');
+    }
+    // Completed
+    $('dlm-history-section').style.display = _dlHistory.length ? 'flex' : 'none';
+    if (_dlHistory.length) {
+        $('dlm-history-list').innerHTML = _dlHistory.map(h => {
+            const m = _dlStoreMeta(h.store);
+            return `<div class="dlm-row"><div class="dlm-dot" style="background:${h.success ? '#66bb6a' : '#ef5350'}"></div>` +
+                   `<div class="dlm-row-meta"><div class="dlm-row-title">${_dlEsc(h.name)}</div>` +
+                   `<div class="dlm-row-sub" style="color:${m.color}">${m.label} · ${h.success ? 'Completed' : 'Failed'}</div></div></div>`;
+        }).join('');
+    }
+    // Empty state
+    $('dlm-empty').style.display = (!_dlActive && !_dlQueue.length && !_dlHistory.length) ? 'flex' : 'none';
+}
+
+// NOTE: renderer.js is included (line ~6273 of index.html) BEFORE #op-toast / #modal-dlm
+// are parsed, so these elements don't exist yet at top-level execution time. Wire the
+// listeners once the DOM is ready (fallback: run now if it already parsed).
+function _wireDownloadManager() {
+    document.getElementById('op-toast')?.addEventListener('click', openDownloadManager);
+    document.getElementById('btn-dlm-close')?.addEventListener('click', closeDownloadManager);
+    document.getElementById('modal-dlm')?.addEventListener('click', (e) => { if (e.target.id === 'modal-dlm') closeDownloadManager(); });
+    document.getElementById('dlm-btn-cancel-active')?.addEventListener('click', cancelActiveDownload);
+    document.getElementById('dlm-queue-list')?.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-dlq]'); if (b) cancelQueuedDownload(b.dataset.dlq);
+    });
+    document.getElementById('dlm-btn-clear-history')?.addEventListener('click', () => { _dlHistory.length = 0; renderDownloadManager(); });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _wireDownloadManager);
+else _wireDownloadManager();
 
 // In-process GOG/Epic install with a progress modal (no GRINDER window).
 async function openGrinderInstall(game) {
@@ -312,25 +452,12 @@ async function openGrinderInstall(game) {
 
     $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); } };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
-    $('gi-install').onclick = async () => {
-        $('gi-config').style.display = 'none';
-        $('gi-progress').style.display = '';
-        $('gi-install').disabled = true;
-        $('gi-cancel').textContent = 'Hide';   // install keeps running if hidden
-        _giInstallName = game.Game || '';
-        opToast('Installing ' + _giInstallName + '…', 0);
-        const res = await window.api.grinderInstall({ gameId: game.id, grinderGameId: gid, installDir: $('gi-dir').value });
-        if (res && res.ok) {
-            $('gi-step').textContent = 'DONE'; $('gi-bar').style.width = '100%'; $('gi-msg').textContent = 'Installation complete!';
-            opToastDone('✓ Installed: ' + _giInstallName);
-            setTimeout(() => { modal.classList.remove('active'); loadGames(); }, 1200);
-        } else {
-            $('gi-step').textContent = 'ERROR'; $('gi-step').style.color = '#ff6d00';
-            $('gi-msg').textContent = (res && res.error) || 'Install failed.';
-            opToast('Install failed: ' + _giInstallName); setTimeout(opToastHide, 5000);
-            $('gi-install').style.display = 'none'; $('gi-cancel').textContent = 'Close';
-        }
-        _giInstallName = '';
+    $('gi-install').onclick = () => {
+        // Hand off to the Download Manager queue: it downloads now (or waits its turn),
+        // shows progress in the top toast, and is managed by clicking that toast.
+        const item = { gameId: game.id, gid, name: game.Game || '', store: _dlStoreOf(gid), dir: $('gi-dir').value };
+        modal.classList.remove('active');
+        enqueueDownload(item);
     };
 }
 

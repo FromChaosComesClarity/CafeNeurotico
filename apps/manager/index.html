@@ -43,11 +43,21 @@
     .modal-box { background: var(--bg_menu); padding: 30px; border-radius: 12px; border: 2px solid var(--border_solid); width: 400px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
 
     /* Global operation toast (install/sync/scrape progress) — always-visible, above modals */
-    .op-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 31000; display: none; flex-direction: column; gap: 7px; min-width: 280px; max-width: 420px; padding: 12px 16px; background: var(--bg_menu); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); font-family: 'Raleway', sans-serif; }
+    .op-toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 31000; display: none; flex-direction: column; gap: 7px; min-width: 280px; max-width: 420px; padding: 12px 16px; background: var(--bg_menu); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); font-family: 'Raleway', sans-serif; cursor: pointer; -webkit-app-region: no-drag; }
     .op-toast.show { display: flex; }
+    .op-toast:hover { border-color: color-mix(in srgb, var(--accent) 70%, #ffffff); }
     .op-toast-label { font-size: 11px; font-weight: 800; color: var(--text_main); letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .op-toast-track { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
     .op-toast-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s linear; }
+    .op-toast-hint { font-size: 8px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text_dim); text-align: center; }
+    /* Download Manager rows */
+    .dlm-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; }
+    .dlm-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text_dim); flex-shrink: 0; }
+    .dlm-row-meta { flex: 1; min-width: 0; }
+    .dlm-row-title { font-size: 13px; font-weight: 700; color: var(--text_sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dlm-row-sub { font-size: 10px; margin-top: 2px; letter-spacing: 0.5px; font-weight: 700; }
+    .dlm-remove { flex-shrink: 0; padding: 4px 10px; background: transparent; border: 1px solid var(--border_solid); color: var(--text_dim); border-radius: 4px; font-weight: 900; font-size: 10px; letter-spacing: 1px; cursor: pointer; text-transform: uppercase; }
+    .dlm-remove:hover { border-color: #ef5350; color: #ef5350; }
 
     /* CREMA call-to-action — compact pill inside the titlebar, just before the window controls */
     #crema-cta { -webkit-app-region: no-drag; align-self: center; display: flex; align-items: center; gap: 7px;
@@ -6343,9 +6353,68 @@ LOADING...READY.</div>
   </div>
 
   <!-- Global operation toast — keeps install/sync/scrape progress visible even when the modal is hidden -->
-  <div id="op-toast" class="op-toast">
+  <div id="op-toast" class="op-toast" title="Open the Download Manager">
     <div class="op-toast-label" id="op-toast-label"></div>
     <div class="op-toast-track"><div class="op-toast-fill" id="op-toast-fill"></div></div>
+    <div class="op-toast-hint">Click to manage downloads</div>
+  </div>
+
+  <!-- Download Manager (multi-download queue) -->
+  <div id="modal-dlm" class="modal-overlay">
+    <div class="modal-box" style="width:600px; max-width:94vw; max-height:85vh; padding:0; gap:0; overflow:hidden;">
+      <div style="padding:18px 24px 14px; border-bottom:1px solid var(--border_solid); flex-shrink:0; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:9px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase; margin-bottom:4px;">Cafe Neurotico</div>
+          <h3 style="margin:0; font-size:15px; letter-spacing:2.5px; color:var(--accent); text-transform:uppercase;">Download Manager</h3>
+        </div>
+        <button id="btn-dlm-close" style="background:transparent; border:none; color:var(--text_dim); font-size:20px; cursor:pointer; padding:4px 8px; line-height:1;">✕</button>
+      </div>
+      <div style="overflow-y:auto; flex:1; padding:20px 24px; display:flex; flex-direction:column; gap:22px; min-height:0;">
+
+        <div id="dlm-active-section" style="display:none; flex-direction:column; gap:10px;">
+          <div style="font-size:9px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase;">Downloading Now</div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--accent); border-radius:8px; padding:20px 22px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:14px;">
+              <div style="min-width:0;">
+                <div id="dlm-active-store" style="font-size:9px; font-weight:900; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;"></div>
+                <div id="dlm-active-title" style="font-size:18px; font-weight:900; color:var(--text_main); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+              </div>
+              <button id="dlm-btn-cancel-active" style="flex-shrink:0; padding:6px 14px; background:rgba(239,83,80,0.1); border:1px solid #ef5350; color:#ef5350; border-radius:5px; font-weight:900; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; white-space:nowrap;">Cancel</button>
+            </div>
+            <div style="width:100%; background:rgba(0,0,0,0.5); border-radius:5px; height:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); margin-bottom:12px;">
+              <div id="dlm-bar" style="height:100%; width:0%; background:var(--accent); transition:width 0.35s ease; border-radius:5px;"></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:18px;">
+              <span id="dlm-pct" style="font-size:28px; font-weight:900; color:var(--accent); letter-spacing:-1px; line-height:1;">0%</span>
+              <span id="dlm-msg" style="font-size:12px; color:var(--text_dim); letter-spacing:0.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div id="dlm-queue-section" style="display:none; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:9px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase;">Queue</div>
+            <span id="dlm-queue-label" style="font-size:11px; color:var(--text_dim);"></span>
+          </div>
+          <div id="dlm-queue-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+        </div>
+
+        <div id="dlm-history-section" style="display:none; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:9px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase;">Completed</div>
+            <button id="dlm-btn-clear-history" style="font-size:9px; font-weight:900; color:var(--text_dim); background:transparent; border:1px solid var(--border_solid); border-radius:4px; padding:3px 10px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Clear</button>
+          </div>
+          <div id="dlm-history-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+        </div>
+
+        <div id="dlm-empty" style="display:none; flex-direction:column; align-items:center; justify-content:center; padding:48px 0; gap:12px; text-align:center;">
+          <div style="font-size:32px; opacity:0.15; line-height:1;">↓</div>
+          <div style="font-size:12px; font-weight:900; color:var(--text_dim); letter-spacing:2px; text-transform:uppercase;">No Downloads</div>
+          <div style="font-size:12px; color:var(--text_dim); opacity:0.6;">Install a GOG or Epic game to see it here.</div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
 </body>

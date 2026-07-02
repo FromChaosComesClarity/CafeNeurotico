@@ -395,9 +395,15 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
     })();
     const dir = installDir || grinderDefaultDir() || undefined;
     _grinderBusy = true;
-    _grinderProgressCb = (data) => { try { event.sender.send('grinder-install-progress', data); } catch {} };
+    // Watch for an error/cancel event so we don't mark a failed or cancelled download as installed.
+    let installErr = null;
+    _grinderProgressCb = (data) => {
+        if (data && data.step === 'error') installErr = data.message || 'Install failed.';
+        try { event.sender.send('grinder-install-progress', data); } catch {}
+    };
     try {
         await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir);
+        if (installErr) return { ok: false, error: installErr };
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=1 WHERE id=?").run(gameId); } catch {} }
         try { event.sender.send('install-status-updated'); } catch {}
         return { ok: true };
@@ -406,6 +412,13 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
     } finally {
         _grinderBusy = false; _grinderProgressCb = null;
     }
+});
+
+// Cancel the in-flight in-process download (kills gogdl/legendary). The install
+// promise then resolves as failed and the renderer's queue advances to the next.
+ipcMain.handle('grinder-install-cancel', () => {
+    if (!_grinderEngineDb) return { ok: false };
+    return { ok: grinderEngine.cancelActiveInstall() };
 });
 
 ipcMain.handle('grinder-uninstall', async (event, { gameId, grinderGameId } = {}) => {
