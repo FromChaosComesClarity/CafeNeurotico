@@ -8431,6 +8431,27 @@ async function updateLibraryFlow({ quiet = false } = {}) {
         document.getElementById('modal-update-info').classList.add('active');
     }
 
+    // Headless store refresh — pull newly-bought GOG/Epic games from the stores
+    // into GRINDER's DB (import-only, not install) so the GRINDER sync below picks
+    // them up into CNGM's library.
+    cpTaskProgress(45);
+    line('🔄 Refreshing GOG/Epic library...');
+    try {
+        const ro = await window.api.grinderRefreshOwned();
+        if (!ro || ro.available === false) {
+            statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Refreshing GOG/Epic library...', '⚪ GOG/Epic: GRINDER not found');
+        } else {
+            const parts = [];
+            if (ro.gog?.loggedIn)  parts.push(`GOG +${ro.gog.added || 0}`);
+            if (ro.epic?.loggedIn) parts.push(`Epic +${ro.epic.added || 0}`);
+            const msg = parts.length ? parts.join(', ') : 'not logged in to GOG/Epic';
+            statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Refreshing GOG/Epic library...', `✅ Stores: ${msg}`);
+            if ((ro.gog?.added || 0) + (ro.epic?.added || 0) > 0) anySuccess = true;
+        }
+    } catch (e) {
+        statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Refreshing GOG/Epic library...', `⚠️ GOG/Epic: ${e.message}`);
+    }
+
     // GRINDER sync — always attempt if GRINDER is present
     cpTaskProgress(60);
     line('🔄 Syncing GRINDER...');

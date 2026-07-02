@@ -696,6 +696,94 @@ function writeGogAuthConfig() {
     return authPath;
 }
 
+// Headless owned-library refresh. Pulls the full owned-games list from the GOG
+// and Epic store APIs into grinder.db (installed=0 = imported, NOT installed), so
+// any face can pick up newly-purchased titles without opening the GRINDER GUI.
+// Mirrors GRINDER's legendary-list-owned/legendary-import + gog-list-owned/gog-import,
+// but does list+import in one pass (no interactive picker). Returns per-store
+// { loggedIn, total, added, error }.
+async function syncOwnedLibrary() {
+    const result = {
+        epic: { loggedIn: false, total: 0, added: 0, error: null },
+        gog:  { loggedIn: false, total: 0, added: 0, error: null },
+    };
+    if (!db) return result;
+
+    // ── Epic (legendary) ──────────────────────────────────────────────────────
+    if (findLegendary()) {
+        const r = await runLegendary(['list', '--json']);
+        if (r.ok) {
+            try {
+                const all = JSON.parse(r.stdout || '[]');
+                result.epic.loggedIn = true;
+                result.epic.total = all.length;
+                const stmt = db.prepare(`
+                    INSERT OR IGNORE INTO games (id, title, store, app_id, install_path, executable, installed, version)
+                    VALUES (?, ?, 'epic', ?, ?, ?, 0, ?)
+                `);
+                const tx = db.transaction(list => {
+                    let n = 0;
+                    for (const g of list) {
+                        const title = g.app_title || g.metadata?.title || 'Unknown';
+                        const info = stmt.run('epic_' + g.app_name, title, g.app_name, null, null, null);
+                        if (info.changes) n++;
+                    }
+                    return n;
+                });
+                result.epic.added = tx(all);
+            } catch { result.epic.error = 'Failed to parse legendary output.'; }
+        } else {
+            // Not logged in / legendary error — surface quietly (loggedIn stays false).
+            result.epic.error = (r.error || r.stderr || '').trim() || 'Not logged in to Epic.';
+        }
+    }
+
+    // ── GOG ────────────────────────────────────────────────────────────────────
+    const token = await getGogToken();
+    if (token) {
+        result.gog.loggedIn = true;
+        try {
+            const owned = await gogFetch('https://embed.gog.com/user/data/games', token);
+            const ids   = owned.owned || [];
+            result.gog.total = ids.length;
+            const games = [];
+            for (let i = 0; i < ids.length; i += 50) {
+                const batch = ids.slice(i, i + 50).join(',');
+                const data  = await gogFetch(`https://api.gog.com/products?ids=${batch}&expand=downloads`, token);
+                const items = Array.isArray(data) ? data : [data];
+                for (const item of items) {
+                    if (!item?.id) continue;
+                    const oses      = [...new Set((item.downloads?.installers || []).map(x => x.os).filter(Boolean))];
+                    const platform  = oses.includes('linux') ? 'linux' : 'windows';
+                    const platforms = oses.filter(o => o === 'linux' || o === 'windows').join(',') || platform;
+                    const is_dlc    = item.game_type && item.game_type !== 'game' ? 1 : 0;
+                    games.push({ id: String(item.id), title: item.title || 'Unknown', platform, platforms, is_dlc });
+                }
+            }
+            const stmtInsert = db.prepare(
+                "INSERT OR IGNORE INTO games (id, title, store, app_id, platform, platforms, installed, is_dlc) VALUES (?, ?, 'gog', ?, ?, ?, 0, ?)"
+            );
+            const stmtUpdate = db.prepare(
+                "UPDATE games SET platforms = ?, is_dlc = ? WHERE app_id = ? AND store = 'gog'"
+            );
+            const tx = db.transaction(list => {
+                let n = 0;
+                for (const g of list) {
+                    const plats  = g.platforms || g.platform || 'windows';
+                    const is_dlc = g.is_dlc ? 1 : 0;
+                    const info = stmtInsert.run('gog_' + g.id, g.title, g.id, g.platform || 'windows', plats, is_dlc);
+                    if (info.changes) n++;
+                    stmtUpdate.run(plats, is_dlc, g.id);   // refresh platforms/is_dlc on existing rows too
+                }
+                return n;
+            });
+            result.gog.added = tx(games);
+        } catch (e) { result.gog.error = e.message; }
+    }
+
+    return result;
+}
+
 function findGogInstallResult(baseDir, appId, preExistingDirs = null) {
     try {
         const entries = fs.readdirSync(baseDir, { withFileTypes: true });
@@ -833,5 +921,5 @@ module.exports = {
     syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
-    getDiskSpace, gogInstallInfo, epicInstallInfo,
+    getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary,
 };

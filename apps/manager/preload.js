@@ -129,6 +129,7 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
                                 syncGrinderInstalled: (ids) => ipcRenderer.invoke('sync-grinder-installed', ids),
                                 syncAllGrinderGames: (games, p) => ipcRenderer.invoke('sync-all-grinder-games', games, p),
+                                grinderRefreshOwned: () => ipcRenderer.invoke('grinder-refresh-owned'),
                                 // --- in-process install (no GRINDER window) ---
                                 grinderInstall:   (payload) => ipcRenderer.invoke('grinder-install', payload),
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),

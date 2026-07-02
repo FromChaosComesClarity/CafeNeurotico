@@ -367,6 +367,19 @@ ipcMain.handle('get-install-size', async (_, grinderGameId) => {
     return null;
 });
 
+// Headless owned-library refresh: pull newly-purchased GOG/Epic titles from the
+// store APIs into grinder.db (import-only, installed=0). The refresh-library flow
+// runs this before sync-all-grinder-games so the new titles enter CNGM's library.
+ipcMain.handle('grinder-refresh-owned', async () => {
+    if (!ensureGrinderEngine()) return { available: false };
+    try {
+        const r = await grinderEngine.syncOwnedLibrary();
+        return { available: true, ...r };
+    } catch (e) {
+        return { available: true, error: e.message };
+    }
+});
+
 // In-process install of a GOG/Epic game via the shared engine; progress streams
 // to the calling renderer over 'grinder-install-progress'.
 ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, installDir } = {}) => {
