@@ -322,16 +322,16 @@ async function _pumpDownloadQueue() {
     try { res = await window.api.grinderInstall({ gameId: item.gameId, grinderGameId: item.gid, installDir: item.dir }); }
     catch (e) { res = { ok: false, error: e.message }; }
     const success = !!(res && res.ok);
-    _dlHistory.unshift({ name: item.name, store: item.store, success, error: success ? null : (res && res.error), at: Date.now() });
+    _dlHistory.unshift({ gameId: item.gameId, name: item.name, store: item.store, success, error: success ? null : (res && res.error), at: Date.now() });
     if (_dlHistory.length > 30) _dlHistory.length = 30;
     if (!_dlmOpen) {
         if (success) opToastDone('✓ Installed: ' + item.name);
         else { opToast('Install failed: ' + item.name); setTimeout(opToastHide, 5000); }
     }
     _dlActive = null;
-    await loadGames();
     renderDownloadManager();
-    _pumpDownloadQueue();   // advance to the next queued download
+    loadGames();               // refresh the library (Play button etc.) in the background
+    _pumpDownloadQueue();      // advance to the next queued download immediately — never blocked on the refresh
 }
 
 function cancelQueuedDownload(gameId) {
@@ -357,14 +357,33 @@ function closeDownloadManager() {
     if (_dlActive) opToast('Installing ' + _dlActive.name + '…', _dlActive.pct || 0);   // restore the progress bar
 }
 
+// Clicking a game's name anywhere in the manager jumps to its gamepage.
+function openGameFromDownloadManager(gameId) {
+    const g = allGames.find(x => String(x.id) === String(gameId));
+    if (!g) return;
+    closeDownloadManager();
+    switchView(lastGridView);
+    openGamepage(g);
+}
+
+// Titlebar downloads button badge — shows the count of active + queued downloads.
+function _updateDownloadBadge() {
+    const badge = document.getElementById('dl-badge');
+    if (!badge) return;
+    const n = (_dlActive ? 1 : 0) + _dlQueue.length;
+    if (n > 0) { badge.style.display = 'block'; badge.textContent = n; }
+    else badge.style.display = 'none';
+}
+
 function renderDownloadManager() {
+    _updateDownloadBadge();   // keep the titlebar badge current even when the modal is closed
     if (!_dlmOpen) return;
     const $ = id => document.getElementById(id);
     // Active
     $('dlm-active-section').style.display = _dlActive ? 'flex' : 'none';
     if (_dlActive) {
         const m = _dlStoreMeta(_dlActive.store);
-        $('dlm-active-title').textContent = _dlActive.name || '';
+        const _at = $('dlm-active-title'); _at.textContent = _dlActive.name || ''; _at.dataset.dlgame = _dlActive.gameId; _at.classList.add('dlm-clickable');
         $('dlm-active-store').textContent = m.label; $('dlm-active-store').style.color = m.color;
         $('dlm-bar').style.width = (_dlActive.pct || 0) + '%';
         $('dlm-pct').textContent = (_dlActive.pct || 0).toFixed(1) + '%';
@@ -377,7 +396,7 @@ function renderDownloadManager() {
         $('dlm-queue-list').innerHTML = _dlQueue.map(item => {
             const m = _dlStoreMeta(item.store);
             return `<div class="dlm-row"><div class="dlm-dot"></div><div class="dlm-row-meta">` +
-                   `<div class="dlm-row-title">${_dlEsc(item.name)}</div>` +
+                   `<div class="dlm-row-title dlm-clickable" data-dlgame="${_dlEsc(item.gameId)}">${_dlEsc(item.name)}</div>` +
                    `<div class="dlm-row-sub" style="color:${m.color}">${m.label} · Waiting</div></div>` +
                    `<button class="dlm-remove" data-dlq="${_dlEsc(item.gameId)}">✕ Remove</button></div>`;
         }).join('');
@@ -388,7 +407,7 @@ function renderDownloadManager() {
         $('dlm-history-list').innerHTML = _dlHistory.map(h => {
             const m = _dlStoreMeta(h.store);
             return `<div class="dlm-row"><div class="dlm-dot" style="background:${h.success ? '#66bb6a' : '#ef5350'}"></div>` +
-                   `<div class="dlm-row-meta"><div class="dlm-row-title">${_dlEsc(h.name)}</div>` +
+                   `<div class="dlm-row-meta"><div class="dlm-row-title dlm-clickable" data-dlgame="${_dlEsc(h.gameId)}">${_dlEsc(h.name)}</div>` +
                    `<div class="dlm-row-sub" style="color:${m.color}">${m.label} · ${h.success ? 'Completed' : 'Failed'}</div></div></div>`;
         }).join('');
     }
@@ -400,9 +419,14 @@ function renderDownloadManager() {
 // are parsed, so these elements don't exist yet at top-level execution time. Wire the
 // listeners once the DOM is ready (fallback: run now if it already parsed).
 function _wireDownloadManager() {
+    document.getElementById('btn-titlebar-downloads')?.addEventListener('click', openDownloadManager);
     document.getElementById('op-toast')?.addEventListener('click', openDownloadManager);
     document.getElementById('btn-dlm-close')?.addEventListener('click', closeDownloadManager);
-    document.getElementById('modal-dlm')?.addEventListener('click', (e) => { if (e.target.id === 'modal-dlm') closeDownloadManager(); });
+    document.getElementById('modal-dlm')?.addEventListener('click', (e) => {
+        const gt = e.target.closest('[data-dlgame]');
+        if (gt) { openGameFromDownloadManager(gt.dataset.dlgame); return; }
+        if (e.target.id === 'modal-dlm') closeDownloadManager();
+    });
     document.getElementById('dlm-btn-cancel-active')?.addEventListener('click', cancelActiveDownload);
     document.getElementById('dlm-queue-list')?.addEventListener('click', (e) => {
         const b = e.target.closest('[data-dlq]'); if (b) cancelQueuedDownload(b.dataset.dlq);
@@ -2448,22 +2472,30 @@ function _debouncedApplyFilters() {
 // Debounced loadGames — collapses rapid successive calls (e.g. from two parallel .then() chains)
 // into a single DB fetch 80ms after the last call, invisible to the user.
 let _lgTimer = null;
+let _lgResolvers = [];   // resolvers of every loadGames() coalesced into the pending timer
 function loadGames() {
     clearTimeout(_lgTimer);
     return new Promise(resolve => {
+        // Coalesce: each call registers its resolver; the surviving timer resolves them ALL.
+        // (Previously the resolver lived inside the timer, so a later call that cleared the
+        // timer left earlier promises pending forever — hanging any `await loadGames()`.)
+        _lgResolvers.push(resolve);
         _lgTimer = setTimeout(async () => {
-            const res = await window.api.getGames();
-            let games = res.games || [];
-            allGames = games.filter(g => g.Game && g.Game !== 'null');
-            // Keep the active playlist/recently-imported snapshot fresh too — it's a separate
-            // fetch, so without this a scrape/edit/hide only shows after switching views and back.
-            if (currentPlaylistId === 'recently-imported') {
-                currentPlaylistGames = await window.api.getRecentlyImported(recentlyImportedCount);
-            } else if (currentPlaylistId !== null) {
-                currentPlaylistGames = await window.api.getPlaylistGames(currentPlaylistId);
-            }
-            applyFilters();
-            resolve();
+            const resolvers = _lgResolvers; _lgResolvers = [];
+            try {
+                const res = await window.api.getGames();
+                let games = res.games || [];
+                allGames = games.filter(g => g.Game && g.Game !== 'null');
+                // Keep the active playlist/recently-imported snapshot fresh too — it's a separate
+                // fetch, so without this a scrape/edit/hide only shows after switching views and back.
+                if (currentPlaylistId === 'recently-imported') {
+                    currentPlaylistGames = await window.api.getRecentlyImported(recentlyImportedCount);
+                } else if (currentPlaylistId !== null) {
+                    currentPlaylistGames = await window.api.getPlaylistGames(currentPlaylistId);
+                }
+                applyFilters();
+            } catch (e) { console.error('[loadGames]', e); }
+            finally { resolvers.forEach(r => { try { r(); } catch {} }); }
         }, 80);
     });
 }
