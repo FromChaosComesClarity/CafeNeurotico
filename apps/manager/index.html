@@ -172,6 +172,28 @@
     #btn-gsearch-clear { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--text_dim); cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 11px; padding: 0; letter-spacing: 0; text-transform: none; transition: background 0.15s, color 0.15s, transform 0.15s; }
     #btn-gsearch-clear:hover { background: var(--accent); color: var(--bg); transform: translateY(-50%) scale(1.1); box-shadow: 0 0 10px var(--accent); }
     #gallery-search-count { font-size: 10px; font-weight: 900; color: var(--text_dim); letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; flex-shrink: 0; min-width: 64px; text-align: right; transition: color 0.2s; }
+    /* Custom select (ported from EmuLatte) — native <select> hidden, replaced by a
+       styled button + a portaled list appended to <body> (z-100000). */
+    .cust-sel { position: relative; width: 100%; }
+    .cust-sel-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background-color: rgba(0,0,0,0.3); color: var(--text_main); border: 1px solid var(--border_solid);
+      padding: 10px 12px; border-radius: 6px; font-family: 'Raleway', sans-serif; font-size: 13px;
+      cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s; }
+    .cust-sel-btn:hover { border-color: var(--accent); }
+    .cust-sel.open .cust-sel-btn { border-color: var(--accent); box-shadow: 0 0 10px var(--border); }
+    .cust-sel-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cust-sel-arrow { color: var(--text_dim); font-size: 9px; flex-shrink: 0; transition: transform 0.15s, color 0.15s; }
+    .cust-sel.open .cust-sel-arrow { transform: rotate(180deg); color: var(--accent); }
+    .cust-sel-list { position: fixed; z-index: 100000; max-height: 260px; overflow-y: auto;
+      background: var(--bg_menu); border: 1px solid var(--accent); border-radius: 6px; padding: 4px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
+    .cust-sel-item { padding: 8px 10px; border-radius: 4px; color: var(--text_sec); font-size: 13px;
+      cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cust-sel-item:hover { background: var(--bg_panel); color: var(--text_main); }
+    .cust-sel-item.sel { background: var(--accent); color: var(--bg); font-weight: 700; }
+    #gallery-search-wrap .cust-sel { width: 158px; flex-shrink: 0; }
+    #gallery-search-wrap #gallery-category + .cust-sel { width: 132px; }
+    #gallery-search-wrap .cust-sel-btn { padding: 12px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
     #main-content { flex: 1; display: flex; flex-direction: column; background-color: transparent; position: relative; overflow: hidden; }
 
     /* ── CLASSIC SIDEBAR ─────────────────────────────────────────────────────── */
@@ -2618,6 +2640,17 @@
     .cp-pane { display: none; flex-direction: column; gap: 14px; }
     .cp-pane.active { display: flex; }
     .cp-content.searching .cp-pane { display: flex; }
+    .cp-content.searching .cp-pane[data-pane="welcome"] { display: none; }   /* splash never mixes into search results */
+    /* Control Panel landing splash — typographic wordmark, theme-aware */
+    .cp-welcome { position: relative; flex: 1; min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; user-select: none; overflow: hidden; }
+    .cp-welcome-glow { position: absolute; width: 560px; height: 560px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 62%); opacity: 0.09; pointer-events: none; }
+    .cp-welcome-brand { font-family: 'Raleway', sans-serif; font-weight: 900; font-size: clamp(44px, 7vw, 84px); line-height: 0.98; letter-spacing: 10px; text-indent: 10px;
+      background: linear-gradient(160deg, var(--text_main) 20%, var(--accent) 75%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 6px 30px color-mix(in srgb, var(--accent) 35%, transparent)); }
+    .cp-welcome-rule { width: 160px; height: 2px; margin: 26px 0 18px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+    .cp-welcome-sub { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 14px; text-indent: 14px; color: var(--text_sec); }
+    .cp-welcome-hint { margin-top: 46px; font-size: 11.5px; color: var(--text_dim); letter-spacing: 0.5px; font-style: italic; }
     .cp-pane-title { margin: 0 0 4px; font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--text_dim); }
     .cp-content.searching .cp-pane-title { display: none; }
     .cp-tico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 7px; flex-shrink: 0; }
@@ -2700,6 +2733,7 @@
     @media (prefers-reduced-motion: reduce) {
       body.gamepage-overlay::before, body.gamepage-overlay #view-gamepage.view, body.gamepage-overlay #view-details.view, body.gamepage-overlay #gamepage-back-bar,
       body.gamepage-overlay-closing::before, body.gamepage-overlay-closing #view-gamepage.view, body.gamepage-overlay-closing #view-details.view, body.gamepage-overlay-closing #gamepage-back-bar { animation:none !important; }
+      .hero-kb-img { animation: none !important; }
     }
     #view-list .btn-play, #view-list .btn-install { font-size: 9px !important; }
 
@@ -2713,7 +2747,13 @@
     ::-webkit-scrollbar-thumb { background: var(--border_solid); border-radius: 5px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-    .hero-kb-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease; }
+    /* Ken Burns (copied from EmuLatte): single composited transform on one element —
+       cheap while focused; paused whenever the view is inactive, and frozen entirely by
+       gpu-suspended when the window is blurred/hidden. */
+    @keyframes panZoom { 0% { transform: scale(1) translate(0, 0); } 100% { transform: scale(1.15) translate(2%, 2%); } }
+    .hero-kb-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; animation: panZoom 8s infinite alternate ease-in-out; opacity: 0; transition: opacity 0.5s ease; }
+    .view:not(.active) .hero-kb-img { animation-play-state: paused; }
+    body.kb-off .hero-kb-img { animation: none !important; }   /* user toggle (Control Panel → Appearance) */
     /* GPU idle suspend: freeze ALL CSS animations when the window is hidden/unfocused
        (toggled from renderer.js) so the compositor stops burning GPU while idle. */
     body.gpu-suspended *, body.gpu-suspended *::before, body.gpu-suspended *::after { animation-play-state: paused !important; }
@@ -3375,12 +3415,15 @@
 
         <div id="modal-home-config" class="modal-overlay">
           <div class="modal-box" style="width:440px; max-height:82vh; overflow:auto; text-align:left;">
-            <h3 style="margin:0 0 6px; color:var(--accent); letter-spacing:2px;">CUSTOMIZE HOME</h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin:0 0 6px;">
+              <h3 style="margin:0; color:var(--accent); letter-spacing:2px;">CUSTOMIZE HOME</h3>
+              <button id="btn-home-cfg-close" title="Close" style="background:transparent; border:none; color:var(--text_dim); font-size:20px; line-height:1; cursor:pointer; padding:2px 6px;">&times;</button>
+            </div>
             <label class="home-cfg-row"><input type="checkbox" id="cfg-home-enabled"> <span>Show Home on startup</span></label>
             <label class="home-cfg-row"><input type="checkbox" id="cfg-home-clock"> <span>Show LCD clock</span></label>
             <div style="font-size:11px; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px; margin:10px 0 2px;">Widgets to show</div>
             <div id="home-cfg-widgets"></div>
-            <button id="btn-home-cfg-done" class="primary" style="margin-top:14px; width:100%;">Done</button>
+            <div style="font-size:10.5px; color:var(--text_dim); margin-top:12px; text-align:center; font-style:italic;">Changes apply instantly.</div>
           </div>
         </div>
 
@@ -3506,6 +3549,33 @@
               <input type="text" id="gallery-search" placeholder="Search All Games…" autocomplete="off" spellcheck="false">
               <button id="btn-gsearch-clear" title="Clear search">✕</button>
             </div>
+            <select id="gallery-category" title="Show only…" aria-label="Category filter">
+              <option value="all">All Games</option>
+              <option value="installed">Installed</option>
+              <option value="favs">Favourites</option>
+              <option value="want">Want to Play</option>
+              <option value="steam">Steam</option>
+              <option value="gog">GOG</option>
+              <option value="epic">Epic</option>
+              <option value="flatpak">Flatpak</option>
+              <option value="pico8">PICO-8</option>
+              <option value="itch">itch.io</option>
+              <option value="physical">Physical</option>
+              <option value="emulation">Emulation</option>
+              <option value="apps">Apps</option>
+              <option value="others">Others</option>
+            </select>
+            <select id="gallery-sort" title="Sort by" aria-label="Sort">
+              <option value="alpha">A — Z</option>
+              <option value="played">Last Played</option>
+              <option value="favs">Favourites First</option>
+              <option value="want">Want to Play First</option>
+              <option value="added">Recently Added</option>
+              <option value="scraped">Scraped First</option>
+            </select>
+            <select id="gallery-playlist" title="Playlist" aria-label="Playlist">
+              <option value="none">No Playlist</option><!-- options rebuilt from allPlaylists at runtime -->
+            </select>
             <span id="gallery-search-count"></span>
           </div>
 
@@ -5659,11 +5729,11 @@ LOADING...READY.</div>
       <!-- Body: category rail + detail panes -->
       <div class="cp-body">
         <nav class="cp-rail" id="cp-rail">
-          <button class="cp-rail-item active" data-pane="library">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span>
-          </button>
           <button class="cp-rail-item" data-pane="appearance">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg><span>Appearance</span>
+          </button>
+          <button class="cp-rail-item" data-pane="library">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span>
           </button>
           <button class="cp-rail-item" data-pane="behavior">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg><span>Behavior</span>
@@ -5683,14 +5753,27 @@ LOADING...READY.</div>
         <!-- Scrollable detail panes. The tool cards below are reparented into these
              sections by cpInit() in renderer.js (keeps every id + per-layout theme). -->
         <div id="tools-cards-container" class="cp-content">
-          <section class="cp-pane active" data-pane="library"><div class="cp-pane-title">Library</div></section>
+          <!-- Landing splash: shown when the menu opens, before any nav item is chosen -->
+          <section class="cp-pane active" data-pane="welcome">
+            <div class="cp-welcome">
+              <div class="cp-welcome-glow"></div>
+              <div class="cp-welcome-brand">CAFE<br>NEUROTICO</div>
+              <div class="cp-welcome-rule"></div>
+              <div class="cp-welcome-sub">GAME MANAGER</div>
+              <div class="cp-welcome-hint">Pick a section on the left — or just start typing to search the settings.</div>
+            </div>
+          </section>
+          <section class="cp-pane" data-pane="library"><div class="cp-pane-title">Library</div></section>
           <section class="cp-pane" data-pane="appearance"><div class="cp-pane-title">Appearance</div></section>
           <section class="cp-pane" data-pane="behavior"><div class="cp-pane-title">Behavior</div></section>
           <section class="cp-pane" data-pane="connections"><div class="cp-pane-title">Connections</div></section>
           <section class="cp-pane" data-pane="system"><div class="cp-pane-title">System</div></section>
           <section class="cp-pane" data-pane="danger"><div class="cp-pane-title">Danger Zone</div></section>
 
-        <div class="tool-card tools-section" data-search="layout sidebar rail command palette navigation icon panel view navigator minimal split pane flat catalog newspaper timeline kanban tty htop ranger bbs vi adventure ancient mac xp kde windows c64 amiga beos nextstep">
+        <!-- Layout picker temporarily removed from the menu for the release build — all layouts
+             remain functional (applyLayoutMode + saved layout_mode untouched); to reintroduce,
+             restore the tools-section class and drop the display:none. -->
+        <div class="tool-card" style="display:none" data-search="layout sidebar rail command palette navigation icon panel view navigator minimal split pane flat catalog newspaper timeline kanban tty htop ranger bbs vi adventure ancient mac xp kde windows c64 amiga beos nextstep">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Layout</div>
           <div id="layout-cat-tabs">
             <button class="lsc-cat" data-cat="classic">Classic</button>
@@ -5750,6 +5833,11 @@ LOADING...READY.</div>
           <div class="segmented-control" id="corners-segmented-control" style="margin-top: 4px;">
             <button class="segmented-btn corners-btn" data-val="sharp">Sharp</button>
             <button class="segmented-btn corners-btn" data-val="round">Round</button>
+          </div>
+          <div style="font-size:10px; color:var(--text_dim); margin:8px 0 0; letter-spacing:0.5px;">Ken Burns Hero Effect <span style="opacity:0.7;">(pan &amp; zoom — turn off on less powerful machines)</span></div>
+          <div class="segmented-control" id="kenburns-segmented-control" style="margin-top: 4px;">
+            <button class="segmented-btn kenburns-btn active" data-val="on">On</button>
+            <button class="segmented-btn kenburns-btn" data-val="off">Off</button>
           </div>
         </div>
 

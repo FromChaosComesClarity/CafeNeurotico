@@ -828,6 +828,20 @@ document.querySelectorAll('.corners-btn').forEach(btn => {
     });
 });
 
+// Ken Burns hero effect toggle (On default / Off for less powerful machines).
+// CSS gate: body.kb-off kills the panZoom animation on every .hero-kb-img.
+function applyKenBurns(off) {
+    document.body.classList.toggle('kb-off', off);
+    document.querySelectorAll('.kenburns-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === (off ? 'off' : 'on')));
+    window.api.setSetting('kenburns_off', off ? '1' : '');
+}
+document.querySelectorAll('.kenburns-btn').forEach(btn =>
+    btn.addEventListener('click', () => applyKenBurns(btn.dataset.val === 'off')));
+(async () => {
+    if (await window.api.getSetting('kenburns_off') === '1') applyKenBurns(true);
+})();
+
 // Clear Gaming History Logic
 document.getElementById('btn-clear-history').addEventListener('click', async () => {
     if (await showConfirm(t('confirm.clear_history'), 'Clear', true)) {
@@ -1109,7 +1123,7 @@ const HOME_ONLINE = new Set(['wishlist', 'freebies', 'news', 'gamenews', 'proton
 // Default Home = a lean handful of widgets covering local stats plus one online feed.
 // Everything else (Steam-playtime, disk/achievement scans, the other online widgets, and the
 // heavier "extras") is opt-in via "+ Add Widget".
-const HOME_DEFAULT_SET = new Set(['continue', 'overview', 'roulette', 'recent', 'gems', 'news']);
+const HOME_DEFAULT_SET = new Set(['roulette', 'throwback', 'continue', 'gems', 'freebies', 'news', 'wishlist']);
 const HOME_DEFAULT = HOME_WIDGETS.map(w => w.key).filter(k => HOME_DEFAULT_SET.has(k));
 // 2D layout defaults on a 6-column grid (cellHeight 140px): { w, h, minW, minH } in cells.
 const HOME_GS = {
@@ -1126,6 +1140,19 @@ const HOME_GS = {
     freebies:   { w:6, h:2, minW:3, minH:2 }, news:       { w:3, h:2, minW:2, minH:2 },
     gamenews:   { w:3, h:2, minW:2, minH:2 }, protonwatch:{ w:3, h:2, minW:2, minH:2 },
 };
+// Starting arrangement for new installs (and Reset): 6-col grid.
+//  row 1: Roulette · Throwback · Continue Playing   (w2 each)
+//  row 2: Hidden Gems · Free This Week              (w3 each)
+//  row 3: Gaming News · Wishlist                    (w3 each, double height)
+const HOME_DEFAULT_LAYOUT = {
+    roulette:  { x:0, y:0, w:2, h:2 },
+    throwback: { x:2, y:0, w:2, h:2 },
+    continue:  { x:4, y:0, w:2, h:2 },
+    gems:      { x:0, y:2, w:3, h:2 },
+    freebies:  { x:3, y:2, w:3, h:2 },
+    news:      { x:0, y:4, w:3, h:4 },
+    wishlist:  { x:3, y:4, w:3, h:4 },
+};
 // Theme-derived chart palette — resolves against the active theme's CSS vars
 // (color-mix is evaluated live), so the donut follows whatever theme is applied.
 const HOME_PALETTE = [
@@ -1140,7 +1167,7 @@ const HOME_PALETTE = [
 ];
 let _homeEnabled = false;
 let _homeWidgets = HOME_DEFAULT.slice();
-let _homeLayout = {};                 // key → { x, y, w, h } from the Gridstack board
+let _homeLayout = { ...HOME_DEFAULT_LAYOUT };   // key → { x, y, w, h }; seeded with the default arrangement
 let _homeEditMode = false, _gsGrid = null;
 let _homeSnap = null;
 let _homeClockTimer = null;
@@ -1582,7 +1609,7 @@ document.getElementById('btn-home-edit')?.addEventListener('click', () => setHom
 document.getElementById('btn-home-done')?.addEventListener('click', () => setHomeEdit(false));
 document.getElementById('btn-home-reset')?.addEventListener('click', async () => {
     if (!(await showConfirm('Reset the Home layout (positions, sizes & widgets) back to default?', 'Reset'))) return;
-    _homeLayout = {}; _homeWidgets = HOME_DEFAULT.slice();
+    _homeLayout = { ...HOME_DEFAULT_LAYOUT }; _homeWidgets = HOME_DEFAULT.slice();
     saveHomeConfig(); renderHome();
 });
 
@@ -1595,17 +1622,18 @@ function openHomeConfig() {
     document.getElementById('modal-home-config').classList.add('active');
 }
 document.getElementById('btn-home-add')?.addEventListener('click', openHomeConfig);
-document.getElementById('btn-home-cfg-done')?.addEventListener('click', () => {
-    _homeEnabled = document.getElementById('cfg-home-enabled').checked;
-    _homeClockOn = document.getElementById('cfg-home-clock').checked;
-    const checked = new Set([...document.querySelectorAll('#home-cfg-widgets input[data-k]')].filter(cb => cb.checked).map(cb => cb.dataset.k));
-    const kept = _homeWidgets.filter(k => checked.has(k));
-    const added = HOME_WIDGETS.map(w => w.key).filter(k => checked.has(k) && !kept.includes(k));
-    _homeWidgets = (kept.length || added.length) ? [...kept, ...added] : HOME_DEFAULT.slice();
+// Instant apply — no Done button. Any toggle saves + re-renders immediately.
+document.getElementById('cfg-home-enabled')?.addEventListener('change', (e) => { _homeEnabled = e.target.checked; saveHomeConfig(); });
+document.getElementById('cfg-home-clock')?.addEventListener('change', (e) => { _homeClockOn = e.target.checked; saveHomeConfig(); _applyHomeClockVis(); });
+document.getElementById('home-cfg-widgets')?.addEventListener('change', (e) => {
+    const cb = e.target.closest('input[data-k]'); if (!cb) return;
+    const k = cb.dataset.k;
+    if (cb.checked) { if (!_homeWidgets.includes(k)) _homeWidgets.push(k); }
+    else { _homeWidgets = _homeWidgets.filter(x => x !== k); delete _homeLayout[k]; }
     saveHomeConfig();
-    document.getElementById('modal-home-config').classList.remove('active');
     renderHome();
 });
+document.getElementById('btn-home-cfg-close')?.addEventListener('click', () => document.getElementById('modal-home-config').classList.remove('active'));
 document.getElementById('modal-home-config')?.addEventListener('click', e => { if (e.target.id === 'modal-home-config') e.currentTarget.classList.remove('active'); });
 document.getElementById('btn-home-enter')?.addEventListener('click', () => switchView(lastGridView));
 document.getElementById('btn-titlebar-home')?.addEventListener('click', async () => {
@@ -1620,8 +1648,9 @@ document.getElementById('btn-titlebar-library')?.addEventListener('click', () =>
 (async () => {
     _cornersStyle = (await window.api.getSetting('corners_style')) === 'sharp' ? 'sharp' : 'round';
     document.querySelectorAll('.corners-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _cornersStyle));
-    const saved = await window.api.getSetting('layout_mode') || localStorage.getItem('cngm_layout_mode') || 'rail';
-    applyLayoutMode(saved);
+    // Release build: the icon side rail is the ONLY available layout — any saved
+    // layout_mode is ignored (all layout code + the hidden picker kept for later).
+    applyLayoutMode('rail');
     await loadHomeConfig();
     if (_homeEnabled) { switchView('view-home'); await renderHome(); }
 })();
@@ -1996,6 +2025,7 @@ function renderPlaylistPanels() {
     _renderPlaylistList('sidebar-playlists-list', 'sidebar');
     _renderPlaylistList('modal-playlists-nav-list', 'nav');
     _macUpdatePlaylistMenu();
+    _rebuildPlaylistDropdown();   // search-bar playlist dropdown (hoisted; defined with the gallery selects)
 }
 
 function _renderPlaylistList(containerId, mode) {
@@ -2215,6 +2245,16 @@ function syncFilterActiveStates() {
     document.querySelectorAll('.flat-tb-filter-btn[data-filter]').forEach(btn => {
         btn.classList.toggle('active', activeFilters.has(btn.dataset.filter));
     });
+    // Keep the search-bar category dropdown in step with the rail/sidebar buttons.
+    // (Value assignment goes through the cust-sel shim → label syncs, no change event.)
+    const catSel = document.getElementById('gallery-category');
+    if (catSel) {
+        if (activeFilters.size === 0) catSel.value = 'all';
+        else if (activeFilters.size === 1) {
+            const f = [...activeFilters][0];
+            if ([...catSel.options].some(o => o.value === f)) catSel.value = f;
+        } // multi-select via sidebar: leave the dropdown label as-is
+    }
 }
 
 // Play the floating-overlay gamepage's leave animation, then run `done()` (which re-enters
@@ -2280,6 +2320,14 @@ function switchView(viewId) {
     if (_pendingScrollRestore != null) { target.scrollTop = _pendingScrollRestore; _pendingScrollRestore = null; }
     else { target.scrollTop = 0; }
     document.body.classList.toggle('viewing-home', viewId === 'view-home');   // full-bleed Home
+
+    // The search/category/sort/playlist row is a single node shared by the grid views —
+    // move it into whichever one is being shown (all its wiring is id-based, so it just works).
+    const _gsw = document.getElementById('gallery-search-wrap');
+    if (_gsw) {
+        if (viewId === 'view-list') target.insertBefore(_gsw, target.firstChild);
+        else if (viewId === 'view-gallery') target.insertBefore(_gsw, document.getElementById('gallery-grid'));
+    }
 
     document.getElementById('gamepage-back-bar').style.display = viewId === 'view-gamepage' ? 'block' : 'none';
 
@@ -2509,6 +2557,164 @@ document.getElementById('btn-gsearch-clear').addEventListener('click', () => {
     document.getElementById('gallery-search').focus();
 });
 
+// ── GALLERY CATEGORY + SORT (search-bar dropdowns; custom select ported from EmuLatte) ──
+let _gallerySort = 'alpha';
+const _galleryIsScraped = g => !!(g.CoverArt || g.Description);
+// Sort modes mirror EmuLatte's sortGames, mapped to Manager fields.
+function sortGalleryGames(games) {
+    const byTitle = (a, b) => (a.Game || '').localeCompare(b.Game || '', undefined, { sensitivity: 'base' });
+    const arr = [...games];
+    switch (_gallerySort) {
+        case 'played':  return arr.sort((a, b) => (b.LastPlayed || 0) - (a.LastPlayed || 0) || byTitle(a, b));
+        case 'favs':    return arr.sort((a, b) => (b.FAV === 'YES' ? 1 : 0) - (a.FAV === 'YES' ? 1 : 0) || byTitle(a, b));
+        case 'want':    return arr.sort((a, b) => (b.WANT_TO_PLAY === 'YES' ? 1 : 0) - (a.WANT_TO_PLAY === 'YES' ? 1 : 0) || byTitle(a, b));
+        case 'added':   return arr.sort((a, b) => (b.date_added || 0) - (a.date_added || 0) || (b.id || 0) - (a.id || 0));
+        case 'scraped': return arr.sort((a, b) => (_galleryIsScraped(b) ? 1 : 0) - (_galleryIsScraped(a) ? 1 : 0) || byTitle(a, b));
+        default:        return arr.sort(byTitle);                                             // 'alpha'
+    }
+}
+
+// Custom select widget (EmuLatte port): hides the native <select>, renders a themed
+// button whose option list is PORTALED to <body> at z-100000 so it can't be clipped.
+let _openCustSel = null;
+function installSelectValueShim(sel, onChange) {
+    const vd = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    const id = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
+    Object.defineProperty(sel, 'value',         { configurable: true, get() { return vd.get.call(this); }, set(v) { vd.set.call(this, v); onChange(); } });
+    Object.defineProperty(sel, 'selectedIndex', { configurable: true, get() { return id.get.call(this); }, set(v) { id.set.call(this, v); onChange(); } });
+}
+function enhanceSelect(sel) {
+    if (!sel || sel.dataset.enh) return;
+    sel.dataset.enh = '1';
+    sel.style.display = 'none';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cust-sel';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cust-sel-btn';
+    btn.innerHTML = '<span class="cust-sel-label"></span><span class="cust-sel-arrow">▾</span>';
+    wrap.appendChild(btn);
+    sel.parentNode.insertBefore(wrap, sel.nextSibling);
+    const labelEl = btn.querySelector('.cust-sel-label');
+
+    const syncLabel = () => { const o = sel.options[sel.selectedIndex]; labelEl.textContent = o ? o.textContent : ''; };
+
+    let listEl = null;
+    const api = { close };
+
+    function close() {
+        if (listEl) { listEl.remove(); listEl = null; }
+        wrap.classList.remove('open');
+        document.removeEventListener('mousedown', onDocDown, true);
+        document.removeEventListener('keydown', onKey, true);
+        window.removeEventListener('resize', close, true);
+        window.removeEventListener('scroll', onScroll, true);
+        if (_openCustSel === api) _openCustSel = null;
+    }
+    function onDocDown(e) { if (!listEl?.contains(e.target) && !wrap.contains(e.target)) close(); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    // Dismiss when the page behind the list scrolls, but NOT when scrolling the list itself.
+    function onScroll(e) { if (!listEl?.contains(e.target)) close(); }
+
+    function position() {
+        const r = btn.getBoundingClientRect();
+        listEl.style.left  = `${r.left}px`;
+        listEl.style.width = `${r.width}px`;
+        const below  = window.innerHeight - r.bottom;
+        const listH  = Math.min(listEl.scrollHeight, 260);
+        if (below < listH + 8 && r.top > below) {
+            listEl.style.top = ''; listEl.style.bottom = `${window.innerHeight - r.top + 4}px`;
+        } else {
+            listEl.style.bottom = ''; listEl.style.top = `${r.bottom + 4}px`;
+        }
+    }
+
+    function open() {
+        _openCustSel?.close();
+        listEl = document.createElement('div');
+        listEl.className = 'cust-sel-list';
+        Array.from(sel.options).forEach((o, i) => {
+            const item = document.createElement('div');
+            item.className = 'cust-sel-item' + (i === sel.selectedIndex ? ' sel' : '');
+            item.textContent = o.textContent;
+            item.addEventListener('mousedown', e => {
+                e.preventDefault();
+                try {
+                    sel.selectedIndex = i;                              // shim → syncLabel
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                } finally {
+                    close();                                            // always tear down the portaled list + listeners
+                }
+            });
+            listEl.appendChild(item);
+        });
+        document.body.appendChild(listEl);
+        position();
+        wrap.classList.add('open');
+        document.addEventListener('mousedown', onDocDown, true);
+        document.addEventListener('keydown', onKey, true);
+        window.addEventListener('resize', close, true);
+        window.addEventListener('scroll', onScroll, true);
+        _openCustSel = api;
+        listEl.querySelector('.sel')?.scrollIntoView({ block: 'nearest' });
+    }
+
+    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); listEl ? close() : open(); });
+
+    installSelectValueShim(sel, syncLabel);
+    new MutationObserver(syncLabel).observe(sel, { childList: true });
+    syncLabel();
+}
+
+// Only the gallery selects are enhanced (other native selects live in modals/forms).
+enhanceSelect(document.getElementById('gallery-category'));
+enhanceSelect(document.getElementById('gallery-sort'));
+enhanceSelect(document.getElementById('gallery-playlist'));
+
+// Playlist dropdown — options rebuilt from allPlaylists (called from renderPlaylistPanels,
+// so create/delete/rename and filter changes all keep it current). innerHTML swap triggers
+// the cust-sel MutationObserver → label re-syncs.
+function _rebuildPlaylistDropdown() {
+    const sel = document.getElementById('gallery-playlist');
+    if (!sel) return;
+    const opts = ['<option value="none">No Playlist</option>'];
+    if (recentlyImportedCount > 0) opts.push('<option value="recently-imported">Recently Imported</option>');
+    allPlaylists.forEach(p => opts.push(`<option value="${p.id}">${escHtml(p.name)}</option>`));
+    opts.push('<option value="__new__">+ New Playlist…</option>');
+    sel.innerHTML = opts.join('');
+    sel.value = currentPlaylistId == null ? 'none' : String(currentPlaylistId);
+    if (sel.selectedIndex < 0) sel.value = 'none';   // active playlist was deleted
+}
+document.getElementById('gallery-playlist').addEventListener('change', e => {
+    const v = e.target.value;
+    if (v === '__new__') { _rebuildPlaylistDropdown(); openCreatePlaylistModal(); }   // revert label, open the create modal
+    else if (v === 'none') clearPlaylistFilter();
+    else if (v === 'recently-imported') setRecentlyImportedFilter();
+    else setPlaylistFilter(Number(v));
+});
+
+document.getElementById('gallery-category').addEventListener('change', e => {
+    // Dropdown is single-choice: clear any multi-selection first, then route through
+    // activateFilter so the flatpak/pico8 scan hooks and view-return logic still run.
+    activeFilters.clear();
+    activateFilter(e.target.value);
+});
+document.getElementById('gallery-sort').addEventListener('change', e => {
+    _gallerySort = e.target.value;
+    window.api.setSetting('gallery_sort', _gallerySort);
+    applyFilters();
+});
+(async () => {
+    const saved = await window.api.getSetting('gallery_sort');
+    if (saved && ['alpha','played','favs','want','added','scraped'].includes(saved)) {
+        _gallerySort = saved;
+        const sel = document.getElementById('gallery-sort');
+        if (sel) sel.value = saved;   // shim syncs the custom label
+        applyFilters();
+    }
+})();
+
 async function activateFilter(filter) {
     // Leaving playlist mode when a store/qualifier filter is activated
     if (currentPlaylistId !== null) {
@@ -2658,10 +2864,15 @@ function applyFilters() {
         if (el) el.style.display = show ? 'flex' : 'none';
     });
 
+    // Search-bar sort dropdown: order the grid by the chosen mode. With an explicit
+    // non-alphabetical sort the RECENTLY-PLAYED strip is skipped so the whole grid
+    // reads in the selected order.
+    filtered = sortGalleryGames(filtered);
+
     let recentGames = [];
     let regularGames = [...filtered];
 
-    if (recentGamesCount > 0) {
+    if (recentGamesCount > 0 && _gallerySort === 'alpha') {
         let playedGames = filtered.filter(g => g.LastPlayed && g.LastPlayed > 0).sort((a, b) => b.LastPlayed - a.LastPlayed);
         recentGames = playedGames.slice(0, recentGamesCount);
         const recentIds = new Set(recentGames.map(g => g.id));
@@ -8839,7 +9050,9 @@ document.getElementById('btn-restore-zip').addEventListener('click', async () =>
 });
 
 const modalTools = document.getElementById('modal-tools');
-function openToolsModal(pane = 'library') {
+function openToolsModal(pane = 'welcome') {
+    // Used directly as a click handler too — an Event lands in `pane`; treat it as default.
+    if (typeof pane !== 'string') pane = 'welcome';
     modalTools.classList.add('active');
     document.getElementById('batch-status').innerText = '';
     document.getElementById('install-menu-status').innerText = '';
@@ -8986,6 +9199,8 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
         ['history-segmented-control', 'behavior'],
         ['recently-imported-segmented-control', 'behavior'],
         ['pico8-vis-control', 'behavior'],
+        ['freegames-vis-control', 'behavior'],   // Show/Hide toggles live together in Behavior
+        ['btn-open-hidden-games', 'behavior'],
         ['btn-backup-zip', 'system'],
         ['btn-clean-images', 'danger'],
     ].forEach(([id, p]) => { const c = card(id), pn = pane(p); if (c && pn) pn.appendChild(c); });
@@ -9018,8 +9233,8 @@ document.addEventListener('keydown', e => {
     if (inField || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     const items = [...document.querySelectorAll('#cp-rail .cp-rail-item')];
     const cur = items.findIndex(i => i.classList.contains('active'));
-    if (cur === -1) return;
-    const next = e.key === 'ArrowDown' ? Math.min(cur + 1, items.length - 1) : Math.max(cur - 1, 0);
+    if (cur === -1 && e.key !== 'ArrowDown') return;   // on the welcome splash, ↓ enters the rail
+    const next = cur === -1 ? 0 : e.key === 'ArrowDown' ? Math.min(cur + 1, items.length - 1) : Math.max(cur - 1, 0);
     _cpSelectPane(items[next].dataset.pane);
     e.preventDefault();
 });
