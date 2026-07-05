@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
                                 addGame: (name) => ipcRenderer.invoke('add-game', name),
                                 updateGame: (id, data) => ipcRenderer.invoke('update-game', id, data),
                                 setGameFlag: (id, field, value) => ipcRenderer.invoke('set-game-flag', id, field, value),
+                                notify: (p) => ipcRenderer.invoke('notify', p),
                                 deleteGame: (id) => ipcRenderer.invoke('delete-game', id),
                                 signalReady: () => ipcRenderer.send('renderer-ready'),
                                 verifyInstallStatus: (id) => ipcRenderer.invoke('verify-install-status', id),

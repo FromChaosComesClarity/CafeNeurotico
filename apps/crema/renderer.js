@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC", homeEnabled: false, homeRows: ["recent","gems","played"] };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC", homeEnabled: true, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -77,6 +77,8 @@ let overlayItems = [], searchResults = [];
 // Default to 5 recent games for CREMA
 let recentGamesCount = 9;
 let _cremaHidePico8 = false; // when true, PICO-8 games show only inside the PICO-8 category
+let _cremaHideFree = false;  // when true, Steam free-to-play games (FreeToPlay==1) are hidden everywhere
+let _cremaGallerySort = 'alpha'; // gallery sort (X in gallery) — mirrors the Manager's sort dropdown
 let numRecentInList = 0;
 
 let trailerTimeout = null, screenshotInterval = null, bgmFadeInterval = null;
@@ -381,24 +383,26 @@ function getMappedBtn(logicalBtn) {
   return getBtn(iconName);
 }
 function renderHardwareIcons() {
-  const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')}`;
+  const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')}`;
   const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.media')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')} &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
   const prmpt = document.getElementById('mini-prompt'); if (prmpt) prmpt.innerHTML = t('footer.trailer', {btn: getMappedBtn('WEST')});
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = getMappedBtn('SOUTH'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = getMappedBtn('NORTH'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = getMappedBtn('WEST');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
-  const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.category')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')}`;
+  const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.category')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} SORT &nbsp;&nbsp; ${getMappedBtn('SELECT')} PLAYLISTS &nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')} &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
   const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
   const cfgpF = document.getElementById('cfgp-footer'); if (cfgpF) cfgpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')}`;
+  updateHomeFooter();
 }
 function renderFootersForKeyboard() {
   const k = getKey;
-  const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${k('M')} ${t('footer.menu')}`;
+  const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp;&nbsp; ${k('M')} ${t('footer.menu')}`;
   const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('←')}${k('→')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('X')} ${t('footer.media')} &nbsp;&amp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('O')} ${t('footer.options')} &nbsp;&nbsp; ${k('M')} ${t('footer.menu')} &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}`;
   const prmpt = document.getElementById('mini-prompt'); if (prmpt) prmpt.innerHTML = t('footer.trailer', {btn: k('X')});
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = k('Enter'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = k('Y'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = k('X');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('X')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${k('O')} ${t('footer.options')}`;
-  const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${k('↑')}${k('↓')}${k('←')}${k('→')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('M')} ${t('footer.menu')}`;
+  const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${k('↑')}${k('↓')}${k('←')}${k('→')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('X')} SORT &nbsp;&nbsp; ${k('O')} PLAYLISTS &nbsp;&nbsp; ${k('M')} ${t('footer.menu')} &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}`;
   const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.page')} &nbsp;&nbsp; ${k('Y')} Achievements &nbsp;&nbsp; ${k('O')} ${t('footer.options')}`;
+  updateHomeFooter();
 }
 function updateJbFsHints() {
   const hint = document.getElementById('jb-fs-controls-hint'); if (!hint) return;
@@ -429,7 +433,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; audioCfg.homeEnabled = rawCfg.homeEnabled === true; audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -624,16 +628,34 @@ async function completeSetup() {
 // ════════════════════════════════════════════════════════════════════════════
 let homeRows = [];                 // [{ key, cells:[{type,game?,id,el}] }]
 let homeFocus = { row: 0, col: 0 };
+let _homeOrigin = false;   // true while viewing a game opened FROM Home → B returns to Home, not the library
 const _CH_LIB  = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
 const _CH_DICE = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="16" cy="16" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>`;
 function _che(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function _chImg(t, hero) { if (!t) return ''; const p = hero ? (t.HeroArt || t.Screenshot || t.CoverArt) : (t.CoverArt || t.HeroArt || t.Logo); return p ? convertSafePath(String(p).split('|')[0]) : ''; }
 function _chFmt(amount, currency) { if (amount == null) return ''; const a = Number(amount); if (!isFinite(a)) return ''; if (currency === 'USD' || currency === 'CAD' || currency === 'AUD') return '$' + a.toFixed(2); if (currency === 'EUR') return '€' + a.toFixed(2); if (currency === 'GBP') return '£' + a.toFixed(2); if (currency === 'BRL') return 'R$' + a.toFixed(2); return a.toFixed(2) + (currency ? (' ' + currency) : ''); }
 
+// Home footer — real glyph footer like every other screen; L3/R3 music appears only
+// while custom music is actually playing. Rebuilt on input-method/layout changes and
+// on bgm play/pause (via _chUpdateJbTile → updateHomeFooter).
+function _homeFooterHtml() {
+  const music = (isCustom && customPlaylist.length > 0 && !bgmAudio.paused);
+  if (usingKeyboard) {
+    const k = getKey;
+    return `${k('↑')}${k('↓')}${k('←')}${k('→')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('Esc')} Library &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('M')} ${t('footer.menu')}${music ? ` &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}` : ''}`;
+  }
+  return `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getMappedBtn('EAST')} Library &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')}${music ? ` &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}` : ''}`;
+}
+function updateHomeFooter() {
+  const el = document.getElementById('home-footer-bar');
+  if (el) el.innerHTML = _homeFooterHtml();
+}
+
 function transitionToHome() {
   gameState = 'HOME';
+  _homeOrigin = false;
   clearMediaLoaders(); clearGalleryMedia();
-  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'wrapped-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'wrapped-screen', 'reader-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
   document.getElementById('overlay-backdrop')?.classList.add('hidden');
   document.getElementById('home-screen').classList.remove('hidden');
   setBlur(false);
@@ -682,7 +704,7 @@ function _chFillOnline(enabled, token) {
     window.api.getNews().then(newsRes => {
       if (!ok() || !newsRes || !newsRes.length) return;
       let rh = `<div class="ch-rowsec"><h3>Gaming News</h3><div class="ch-row">`; const cells = [];
-      newsRes.slice(0, 12).forEach((n, i) => { const id = `che-nw-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.link, id }); });
+      newsRes.slice(0, 12).forEach((n, i) => { const id = `che-nw-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'article', url: n.link, title: n.title, source: n.source, id }); });
       rh += '</div></div>'; _chAppendRow(rh, cells, 'news');
     });
   }
@@ -690,7 +712,7 @@ function _chFillOnline(enabled, token) {
     window.api.getGameNews().then(gnRes => {
       if (!ok() || !gnRes || !gnRes.length) return;
       let rh = `<div class="ch-rowsec"><h3>Your Games &mdash; What's New</h3><div class="ch-row">`; const cells = [];
-      gnRes.slice(0, 12).forEach((n, i) => { const id = `che-gn-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'url', url: n.url, id }); });
+      gnRes.slice(0, 12).forEach((n, i) => { const id = `che-gn-${i}`; rh += `<div class="ch-news" id="${id}"><div class="ch-news-t">${_che(n.title)}</div><div class="ch-news-s">${_che(n.source)}</div></div>`; cells.push({ type: 'article', url: n.url, title: n.title, source: n.source, id }); });
       rh += '</div></div>'; _chAppendRow(rh, cells, 'gamenews');
     });
   }
@@ -700,10 +722,11 @@ async function renderHomeScreen() {
   const wantProton = enabled.includes('protonwatch');
   const myToken = ++_homeRenderToken;
   // Fast path — only cheap/cached reads (no network) so the Marquee paints instantly.
+  // Every source is .catch-guarded — one rejection must never blank the whole Home.
   const [snap, achRes, protonRes] = await Promise.all([
-    window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}),
-    window.api.achGet(),
-    wantProton ? window.api.protonWatchGet() : Promise.resolve(null),
+    window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}).catch(() => ({})),
+    window.api.achGet().catch(() => null),
+    wantProton ? window.api.protonWatchGet().catch(() => null) : Promise.resolve(null),
   ]);
   if (myToken !== _homeRenderToken) return;
   const c = snap.counts || {}, dp = snap.dailyPick;
@@ -732,8 +755,13 @@ async function renderHomeScreen() {
   aHtml += `<div class="ch-act" id="che-a1"><div class="ai">${_CH_DICE}</div><div><div class="at">Surprise Me</div><div class="asub">Random pick</div></div></div>`;
   aCells.push({ type: 'roulette', id: 'che-a1' });
   if (snap.continuePlaying) { const cg = snap.continuePlaying, cov = _chImg(cg, false); aHtml += `<div class="ch-act" id="che-a2">${cov ? `<img class="cov" src="${cov}">` : `<div class="ai">${_CH_LIB}</div>`}<div><div class="at">Continue</div><div class="asub">${_che(cg.Game)}</div></div></div>`; aCells.push({ type: 'game', game: cg, id: 'che-a2' }); }
-  aHtml += `<div class="ch-act" id="che-aw"><div class="ai">${_CH_STAR}</div><div><div class="at">Your Year</div><div class="asub">Library Wrapped</div></div></div>`;
-  aCells.push({ type: 'wrapped', id: 'che-aw' });
+  // Jukebox tile — rendered idle here; _chUpdateJbTile() (also wired to bgmAudio
+  // play/pause events) patches in the live now-playing state from boot onwards.
+  aHtml += `<div class="ch-act ch-act-jb" id="che-aj">`
+    + `<div class="ai" id="che-aj-art">${_CH_NOTE}</div>`
+    + `<div style="min-width:0"><div class="at">Jukebox</div><div class="asub">Your music, big screen</div></div>`
+    + `</div>`;
+  aCells.push({ type: 'jukebox', id: 'che-aj' });
   aHtml += '</div>';
   html += aHtml;
   rows.push({ key: 'actions', cells: aCells });
@@ -777,15 +805,53 @@ async function renderHomeScreen() {
       rh += '</div></div>'; html += rh; rows.push({ key: 'protonwatch', cells });
     }
   }
-  html += `<div class="ch-foot" id="home-foot">D-Pad Navigate &nbsp;&bull;&nbsp; A Select &nbsp;&bull;&nbsp; B Library &nbsp;&bull;&nbsp; Start Menu</div>`;
+  html += `<div id="home-foot" style="display:none"></div>`;   // invisible anchor — online rows insert before it; the real footer is the fixed #home-footer-bar
   html += '</div>';
   document.getElementById('home-content').innerHTML = html;
   rows.forEach(r => r.cells.forEach(cell => { cell.el = document.getElementById(cell.id); }));
   homeRows = rows.filter(r => r.cells.some(c => c.el));
   homeFocus = { row: 0, col: 0 };
   updateHomeFocus();
+  _chUpdateJbTile();                 // live now-playing state (boot music may already be on)
   _chFillOnline(enabled, myToken);   // network rows fill in afterwards (non-blocking)
 }
+
+// Keep the Home Jukebox tile in sync with the actual player: fires on render and on
+// every bgmAudio play/pause (each custom track swaps src then plays → 'play' per track).
+const _CH_NOTE = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+let _chJbToken = 0;
+async function _chUpdateJbTile() {
+  updateHomeFooter();   // the footer's L3/R3 music hint tracks the same play state
+  const tile = document.getElementById('che-aj'); if (!tile) return;
+  const myTok = ++_chJbToken;
+  const at = tile.querySelector('.at'), asub = tile.querySelector('.asub');
+  const playing = isCustom && customPlaylist.length > 0 && !bgmAudio.paused;
+  if (!playing) {
+    tile.classList.remove('playing');
+    tile.querySelector('.jb-eq')?.remove();
+    if (at) at.textContent = 'Jukebox';
+    if (asub) asub.textContent = 'Your music, big screen';
+    const slot = document.getElementById('che-aj-art');
+    if (slot && slot.tagName === 'IMG') slot.outerHTML = `<div class="ai" id="che-aj-art">${_CH_NOTE}</div>`;
+    return;
+  }
+  const curPath = customPlaylist[customIndex - 1] || customPlaylist[0];
+  const tk = await window.api.getAudioMetadata(curPath).catch(() => null);
+  if (myTok !== _chJbToken || !document.getElementById('che-aj')) return;   // re-render / newer track won
+  const title = (tk && tk.title) || String(curPath).split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+  const artist = tk && tk.artist && tk.artist !== 'Unknown Artist' ? tk.artist : '';
+  if (at) at.textContent = title;
+  if (asub) asub.textContent = 'Now Playing' + (artist ? ' · ' + artist : '');
+  tile.classList.add('playing');
+  if (!tile.querySelector('.jb-eq')) tile.insertAdjacentHTML('beforeend', '<div class="jb-eq"><span></span><span></span><span></span></div>');
+  const slot = document.getElementById('che-aj-art');
+  if (slot) {
+    if (tk && tk.cover) slot.outerHTML = `<img id="che-aj-art" class="jb-cov" src="${tk.cover}">`;
+    else if (slot.tagName === 'IMG') slot.outerHTML = `<div class="ai" id="che-aj-art">${_CH_NOTE}</div>`;
+  }
+}
+bgmAudio.addEventListener('play',  () => setTimeout(_chUpdateJbTile, 60));
+bgmAudio.addEventListener('pause', () => setTimeout(_chUpdateJbTile, 60));
 
 function updateHomeFocus() {
   document.querySelectorAll('#home-content .ch-focus').forEach(e => e.classList.remove('ch-focus'));
@@ -795,13 +861,27 @@ function updateHomeFocus() {
   cell.el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
 }
 
+// Y-search from Home/Start: jump into the library (respecting browse mode) with the OSK open.
+function openLibrarySearch(keepCategory) {
+  playSound(sfxSelect);
+  if (!keepCategory) { const i = categories.indexOf('ALL GAMES'); currentCategoryIndex = i >= 0 ? i : 0; }
+  if ((audioCfg.browseMode || 'LIST') === 'GALLERY') {
+    transitionToGallery();
+    openOSK('GALLERY_SEARCH', t('html.osk_search_title'), galleryQuery);
+  } else {
+    transitionToMain();
+    openOSK('SEARCH', t('html.osk_search_title'), searchQuery);
+  }
+}
+
 function homeHandleInput(action) {
   if (action === 'START') { openOverlay('MAIN_MENU'); return; }
   if (action === 'BACK')  { playSound(sfxBack); transitionToStart(); return; }
+  if (action === 'Y_BUTTON') { openLibrarySearch(false); return; }
   if (!homeRows.length) return;
   const row = homeRows[homeFocus.row]; if (!row) return;
-  if (action === 'UP') { if (homeFocus.row > 0) { homeFocus.row--; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
-  else if (action === 'DOWN') { if (homeFocus.row < homeRows.length - 1) { homeFocus.row++; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
+  if (action === 'UP') { if (homeRows.length > 1) { homeFocus.row = (homeFocus.row - 1 + homeRows.length) % homeRows.length; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
+  else if (action === 'DOWN') { if (homeRows.length > 1) { homeFocus.row = (homeFocus.row + 1) % homeRows.length; homeFocus.col = Math.min(homeFocus.col, homeRows[homeFocus.row].cells.length - 1); playSound(sfxNav); updateHomeFocus(); } }
   else if (action === 'LEFT') { if (homeFocus.col > 0) { homeFocus.col--; playSound(sfxNav); updateHomeFocus(); } }
   else if (action === 'RIGHT') { if (homeFocus.col < row.cells.length - 1) { homeFocus.col++; playSound(sfxNav); updateHomeFocus(); } }
   else if (action === 'ACCEPT') {
@@ -810,11 +890,93 @@ function homeHandleInput(action) {
     else if (cell.type === 'library') transitionToStart();
     else if (cell.type === 'roulette') homeSpin();
     else if (cell.type === 'wrapped') openWrapped();
+    else if (cell.type === 'jukebox') { previousGameState = 'HOME'; openJukebox(); }
+    else if (cell.type === 'article') { if (cell.url) openReader(cell.url, cell.title, cell.source); }
     else if (cell.type === 'url') { if (cell.url) window.api.openInstallUrl(cell.url); }
   }
 }
 
 async function homeSpin() { const g = await window.api.getRandomGame({ hidePico8: _cremaHidePico8 }); if (g) cremaOpenGame(g); }
+
+// ── TV READER — in-app article view for the news rows (themed, big fonts, gamepad) ──
+// Fetches the page's raw HTML via IPC, extracts the readable content with DOMParser
+// (no external browser on the couch), sanitizes it to a strict tag whitelist.
+let _readerUrl = '';
+const _RD_ALLOW = new Set(['P','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE','PRE','CODE','EM','STRONG','B','I','BR','HR','FIGURE','FIGCAPTION','IMG']);
+function _rdSanitize(srcNode, out, baseUrl) {
+  for (const n of srcNode.childNodes) {
+    if (n.nodeType === 3) { out.appendChild(document.createTextNode(n.textContent)); continue; }
+    if (n.nodeType !== 1) continue;
+    const tag = n.tagName;
+    if (tag === 'IMG') {
+      let src = n.getAttribute('src') || n.getAttribute('data-src') || '';
+      try { src = new URL(src, baseUrl).href; } catch { src = ''; }
+      if (/^https?:\/\//i.test(src)) { const img = document.createElement('img'); img.src = src; img.loading = 'lazy'; out.appendChild(img); }
+      continue;
+    }
+    if (_RD_ALLOW.has(tag)) {
+      const el = document.createElement(tag);
+      _rdSanitize(n, el, baseUrl);
+      out.appendChild(el);
+    } else {
+      _rdSanitize(n, out, baseUrl);   // unknown/link/span wrappers → unwrap, keep their content
+    }
+  }
+}
+function _rdExtract(doc) {
+  doc.querySelectorAll('script,style,noscript,iframe,svg,form,nav,header,footer,aside,button,video,audio').forEach(e => e.remove());
+  let root = doc.querySelector('article')
+    || doc.querySelector('[itemprop="articleBody"], .article-body, .articleBody, .post-content, .entry-content, .article__content, #article-body, .news-article, .content-block');
+  if (!root) {   // densest <p>-cluster parent wins
+    const scores = new Map();
+    doc.querySelectorAll('p').forEach(p => { const par = p.parentElement; if (!par) return; scores.set(par, (scores.get(par) || 0) + (p.textContent || '').length); });
+    root = [...scores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || doc.body;
+  }
+  return root;
+}
+async function openReader(url, title, source) {
+  gameState = 'READER';
+  _readerUrl = url;
+  document.getElementById('home-screen')?.classList.add('hidden');
+  document.getElementById('reader-screen').classList.remove('hidden');
+  document.getElementById('rd-title').textContent = title || '';
+  let host = ''; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+  document.getElementById('rd-src').textContent = [source, host].filter(Boolean).join('  ·  ');
+  const body = document.getElementById('rd-body');
+  body.innerHTML = '<div class="rd-status">Brewing the article…</div>';
+  document.getElementById('reader-scroll').scrollTop = 0;
+  const res = await window.api.fetchArticle(url).catch(() => null);
+  if (gameState !== 'READER' || _readerUrl !== url) return;   // user backed out meanwhile
+  let ok = false;
+  if (res && res.ok && res.html) {
+    try {
+      const doc = new DOMParser().parseFromString(res.html, 'text/html');
+      const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
+      if (ogTitle && !title) document.getElementById('rd-title').textContent = ogTitle;
+      const root = _rdExtract(doc);
+      const frag = document.createElement('div');
+      _rdSanitize(root, frag, res.url || url);
+      if ((frag.textContent || '').trim().length >= 300) { body.innerHTML = ''; while (frag.firstChild) body.appendChild(frag.firstChild); ok = true; }
+    } catch (e) { console.error('[reader]', e); }
+  }
+  if (!ok) body.innerHTML = '<div class="rd-status">Couldn\'t brew a readable version of this page.<br><br>Press X to open it in the browser instead &nbsp;·&nbsp; B to go back.</div>';
+}
+function closeReader() {
+  document.getElementById('reader-screen').classList.add('hidden');
+  document.getElementById('home-screen')?.classList.remove('hidden');
+  gameState = 'HOME';   // Home DOM is untouched — no re-render needed
+}
+function readerHandleInput(action) {
+  const sc = document.getElementById('reader-scroll');
+  if (action === 'BACK') { playSound(sfxBack); closeReader(); }
+  else if (action === 'UP') { sc.scrollBy(0, -150); }
+  else if (action === 'DOWN') { sc.scrollBy(0, 150); }
+  else if (action === 'L1' || action === 'LEFT')  { sc.scrollBy(0, -Math.round(sc.clientHeight * 0.85)); }
+  else if (action === 'R1' || action === 'RIGHT') { sc.scrollBy(0, Math.round(sc.clientHeight * 0.85)); }
+  else if (action === 'L2') { sc.scrollTop = 0; }
+  else if (action === 'R2') { sc.scrollTop = sc.scrollHeight; }
+  else if (action === 'X_BUTTON') { if (_readerUrl) { playSound(sfxSelect); window.api.openInstallUrl(_readerUrl); } }
+}
 
 // Open a specific game from Home, honoring the browse mode: GALLERY opens that
 // game's gamepage (like clicking a gallery cell); LIST selects it in the library
@@ -826,12 +988,13 @@ function cremaOpenGame(game) {
   if ((audioCfg.browseMode || 'LIST') === 'GALLERY') {
     transitionToGallery();
     const idx = galleryGames.findIndex(g => String(g.id) === String(game.id));
-    if (idx >= 0) { galleryIndex = idx; openGalleryGamepage(galleryGames[idx]); }
+    if (idx >= 0) { galleryIndex = idx; openSmartGamepage(galleryGames[idx]); }
   } else {
     transitionToMain();
     const idx = filteredGames.findIndex(g => String(g.id) === String(game.id));
     if (idx >= 0) { currentGameIndex = idx; updateGameSelection(); }
   }
+  _homeOrigin = true;   // set AFTER the transitions above (they clear it)
 }
 
 function openHomeMenu() {
@@ -894,6 +1057,8 @@ async function boot() {
   updateAppScale(); await initAudio(); await resolveAndApplyTheme(); renderHardwareIcons();
   const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
   _cremaHidePico8 = (await window.api.getSetting('crema_hide_pico8')) === '1';
+  _cremaHideFree = (await window.api.getSetting('crema_hide_free')) === '1';
+  const gsSaved = await window.api.getSetting('crema_gallery_sort'); if (gsSaved && ['alpha','played','favs','want','added','scraped'].includes(gsSaved)) _cremaGallerySort = gsSaved;
   await window.api.syncGrinderInstalled().catch(() => {});
   const res = await window.api.getGames(); allGames = (res.games || []).filter(g => g.Game && String(g.Game).trim() !== "");
   await loadGamePlaylists();
@@ -1113,13 +1278,15 @@ function handleInput(action) {
 
   if (gameState === 'START') {
     if (action === 'BACK' && audioCfg.homeEnabled) { playSound(sfxBack); transitionToHome(); return; }
+    if (action === 'Y_BUTTON') { openLibrarySearch(true); return; }
     const _mode = audioCfg.startScreenMode; if (_mode === 'GRID') { if (action === 'UP' || action === 'DOWN' || action === 'LEFT' || action === 'RIGHT') { playSound(sfxNav); navigateGrid(action); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); } else { if (action === 'LEFT' || action === 'UP') { playSound(sfxNav); navigateCarousel('left'); } else if (action === 'RIGHT' || action === 'DOWN') { playSound(sfxNav); navigateCarousel('right'); } else if (action === 'ACCEPT') { playSound(sfxSelect); transitionToMain(); } else if (action === 'START') openOverlay("MAIN_MENU"); }
   }
   else if (gameState === 'HOME') { homeHandleInput(action); }
+  else if (gameState === 'READER') { readerHandleInput(action); }
   else if (gameState === 'WRAPPED') { wrappedHandleInput(action); }
   else if (gameState === 'MAIN') {
     if (filteredGames.length === 0 && action !== 'BACK' && action !== 'LEFT' && action !== 'RIGHT' && action !== 'START' && action !== 'Y_BUTTON') return;
-    if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); transitionToStart(); } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }
+    if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); if (_homeOrigin) { transitionToHome(); } else { transitionToStart(); } } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }
     else if (action === 'X_BUTTON') {
       if (gameHasTrailer) { playSound(sfxSelect); mediaSwapped = !mediaSwapped; const md = document.getElementById('media-container'), mn = document.getElementById('mini-dock'), v = document.getElementById('video-player'), s = document.getElementById('screenshot-player'), wp = !v.paused; if (mediaSwapped) { md.appendChild(s); mn.appendChild(v); } else { md.appendChild(v); mn.appendChild(s); } if (wp) v.play().catch(e=>{}); }
       else openSearchOverlay();
@@ -1131,6 +1298,7 @@ function handleInput(action) {
         const isInstalled = g.Installed == null || g.Installed == 1;
         const stL = (g.Store || '').toLowerCase();
         if (!isInstalled && (stL.includes('gog') || stL.includes('epic'))) { showGrinderConfirm(g); }
+        else if (!isInstalled && stL.includes('steam') && g.SteamAppID && String(g.SteamAppID) !== 'None') { showSteamInstallConfirm(g); }
         else { tryLaunch(g); }
       }
       else if (isManualCategory(g)) { openOverlay("GAME_MENU"); }
@@ -1146,6 +1314,8 @@ function handleInput(action) {
     else if (action === 'L1') { galleryCatIndex = (galleryCatIndex - 1 + categories.length) % categories.length; playSound(sfxNav); maybeRunFlatpakScan(categories[galleryCatIndex]); maybeRunPico8Scan(categories[galleryCatIndex]); applyGalleryFilter(); renderGalleryGrid(); }
     else if (action === 'R1') { galleryCatIndex = (galleryCatIndex + 1) % categories.length; playSound(sfxNav); maybeRunFlatpakScan(categories[galleryCatIndex]); maybeRunPico8Scan(categories[galleryCatIndex]); applyGalleryFilter(); renderGalleryGrid(); }
     else if (action === 'Y_BUTTON') { openOSK('GALLERY_SEARCH', t('html.osk_search_title'), galleryQuery); }
+    else if (action === 'X_BUTTON') { openGallerySortMenu(); }
+    else if (action === 'SELECT_BTN') { openGalleryPlaylistsMenu(); }
     else if (action === 'START') { openOverlay("MAIN_MENU"); }
   }
   else if (gameState === 'GALLERY_GAMEPAGE') {
@@ -1156,7 +1326,7 @@ function handleInput(action) {
       else if (action === 'BACK' || action === 'ACCEPT' || ggpTrailerMode) { ggpCloseSlideshow(); }
       return;
     }
-    if (action === 'BACK') { playSound(sfxBack); closeGalleryGamepage(); }
+    if (action === 'BACK') { playSound(sfxBack); if (_homeOrigin) { transitionToHome(); } else { closeGalleryGamepage(); } }
     else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
     else if (action === 'START') { openOverlay("MAIN_MENU"); }
     else if (action === 'SELECT_BTN') { if (galleryCurrentGame) { filteredGames = galleryGames; currentGameIndex = galleryIndex; openOverlay("GAME_MENU"); } }
@@ -1188,7 +1358,7 @@ function handleInput(action) {
     else if (action === 'ACCEPT')  { _cfgpActivateBtn(); }
     else if (action === 'L1')      { galleryGamepageNavigate(-1); openCremaFlatGamepage(galleryCurrentGame); }
     else if (action === 'R1')      { galleryGamepageNavigate(1);  openCremaFlatGamepage(galleryCurrentGame); }
-    else if (action === 'BACK')    { playSound(sfxBack); closeCremaFlatGamepage(); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); }
+    else if (action === 'BACK')    { playSound(sfxBack); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
     else if (action === 'START')   { openOverlay('MAIN_MENU'); }
   }
   else if (gameState === 'OSK') { handleOSKInput(action); }
@@ -1219,7 +1389,7 @@ function handleInput(action) {
   else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
     else if (action === 'BACK') {
-      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') openOverlay("GAME_MENU");
+      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAME_SCRAPE_MENU' || gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
@@ -1279,7 +1449,7 @@ function handleOSKInput(action) {
     else if (oskMode === 'LAUNCH_CMD' || oskMode === 'RENAME_GAME') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openOverlay('GAME_MENU'); }
     else if (oskMode === 'SGDB_API' || oskMode === 'REFINE_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
     else if (oskMode === 'NEW_PLAYLIST' || oskMode === 'NEW_PLAYLIST_ADD' || oskMode === 'JB_SEARCH' || oskMode === 'RENAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); gameState = 'JUKEBOX'; }
-    else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); renderPlaylistAssignMenu(); }
+    else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); if (_newPlFromGallery) { _newPlFromGallery = false; gameState = 'GALLERY'; setBlur(false); } else { renderPlaylistAssignMenu(); } }
     else if (oskMode === 'GALLERY_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; }
     else if (oskMode === 'INSTALL_DIR') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); showGrinderConfirm(_grinderConfirmGame); }
   }
@@ -1311,6 +1481,17 @@ function handleOSKInput(action) {
         document.getElementById('osk-backdrop').classList.add('hidden');
         const nm = String(targetStr).trim();
         const gid = _plAssignGame ? _plAssignGame.id : null;
+        if (_newPlFromGallery) {
+          _newPlFromGallery = false;
+          const done = () => loadGamePlaylists().then(() => {
+            const i = categories.indexOf(PLAYLIST_CAT_PREFIX + nm);
+            if (i >= 0) { galleryCatIndex = i; galleryIndex = 0; }
+            applyGalleryFilter(); renderGalleryGrid();
+            gameState = 'GALLERY'; setBlur(false);
+          });
+          if (nm) window.api.addPlaylist(nm).then(done); else done();
+          return;
+        }
         if (nm) {
           window.api.addPlaylist(nm).then(newId => {
             const after = () => loadGamePlaylists().then(() => renderPlaylistAssignMenu());
@@ -1368,6 +1549,51 @@ function handleOSKInput(action) {
   }
 }
 
+// Steam installs go through the desktop Steam client — warn before leaving the couch UI.
+let _steamInstallGame = null;
+function showSteamInstallConfirm(game) {
+  _steamInstallGame = game;
+  if (['START', 'HOME', 'MAIN', 'GALLERY', 'GALLERY_GAMEPAGE', 'CREMA_FGP'].includes(gameState)) previousGameState = gameState;
+  gameState = 'OVERLAY'; currentOverlayType = 'STEAM_INSTALL_CONFIRM'; setBlur(true); playSound(sfxSelect);
+  renderGenericOverlay('INSTALL VIA STEAM', ['§Steam will open on your desktop to install this game.', 'CONTINUE — OPEN STEAM', t('common.close_menu')]);
+}
+
+// Gallery sort (ported from the Manager's sort dropdown; same six modes).
+const CREMA_SORTS = [['A — Z','alpha'],['Last Played','played'],['Favourites First','favs'],['Want to Play First','want'],['Recently Added','added'],['Scraped First','scraped']];
+function sortCremaGallery(games) {
+  const byTitle = (a, b) => String(a.Game || '').localeCompare(String(b.Game || ''), undefined, { sensitivity: 'base' });
+  const scraped = g => !!(g.CoverArt || g.Description);
+  const arr = games.slice();
+  switch (_cremaGallerySort) {
+    case 'played':  return arr.sort((a, b) => (b.LastPlayed || 0) - (a.LastPlayed || 0) || byTitle(a, b));
+    case 'favs':    return arr.sort((a, b) => (b.FAV === 'YES' ? 1 : 0) - (a.FAV === 'YES' ? 1 : 0) || byTitle(a, b));
+    case 'want':    return arr.sort((a, b) => (b.WANT_TO_PLAY === 'YES' ? 1 : 0) - (a.WANT_TO_PLAY === 'YES' ? 1 : 0) || byTitle(a, b));
+    case 'added':   return arr.sort((a, b) => (b.date_added || 0) - (a.date_added || 0) || (b.id || 0) - (a.id || 0));
+    case 'scraped': return arr.sort((a, b) => (scraped(b) ? 1 : 0) - (scraped(a) ? 1 : 0) || byTitle(a, b));
+    default:        return arr.sort(byTitle);
+  }
+}
+function openGallerySortMenu() {
+  previousGameState = 'GALLERY';
+  gameState = 'OVERLAY'; currentOverlayType = 'GALLERY_SORT_MENU'; setBlur(true); playSound(sfxSelect);
+  const items = CREMA_SORTS.map(([label, key]) => (key === _cremaGallerySort ? '★ ' + label : label));
+  items.push(t('common.close_menu'));
+  renderGenericOverlay('SORT GALLERY', items);
+}
+function openGalleryPlaylistsMenu() {
+  previousGameState = 'GALLERY';
+  gameState = 'OVERLAY'; currentOverlayType = 'GALLERY_PL_MENU'; setBlur(true); playSound(sfxSelect);
+  const cur = categories[galleryCatIndex];
+  const items = [];
+  const mark = (label) => (label === cur ? '★ ' + label : label);
+  items.push(mark('ALL GAMES'));
+  if (categories.includes(RECENTLY_IMPORTED_CAT)) items.push(mark(RECENTLY_IMPORTED_CAT));
+  gamePlaylists.forEach(pl => items.push(mark(PLAYLIST_CAT_PREFIX + pl.name)));
+  items.push('+ NEW PLAYLIST');
+  items.push(t('common.close_menu'));
+  renderGenericOverlay('PLAYLISTS', items);
+}
+
 function pico8HiddenFor(g, catName) {
   if (!_cremaHidePico8 || catName === 'PICO-8') return false;
   return (g.Store ? String(g.Store).toLowerCase() : '').includes('pico');
@@ -1380,7 +1606,7 @@ function applyLiveFilters(preserveIndex = false) {
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
     if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
-    if (!matchCat) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
+    if (!matchCat) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
     let recentGames = [];
@@ -1500,14 +1726,31 @@ function openPico8Menu() {
   renderGenericOverlay('PICO-8 GAMES', mapped);
 }
 
+function openHiddenGamesMenu() {
+  gameState = 'OVERLAY'; currentOverlayType = 'HIDDEN_MENU'; playSound(sfxSelect);
+  const hidden = allGames.filter(g => g.Hidden == 1).sort((a, b) => String(a.Game).localeCompare(String(b.Game)));
+  const items = hidden.length ? ['§SELECT A GAME TO UNHIDE IT', ...hidden.map(g => g.Game)] : ['§NO HIDDEN GAMES'];
+  items.push(t('common.back_to_menu'));
+  renderGenericOverlay('HIDDEN GAMES', items);
+}
+
+function openFreeGamesMenu() {
+  gameState = 'OVERLAY';
+  currentOverlayType = 'FREE_MENU';
+  playSound(sfxSelect);
+  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _cremaHideFree) ? '★ ' + o : o);
+  mapped.push(t('common.back_to_menu'));
+  renderGenericOverlay('FREE-TO-PLAY GAMES', mapped);
+}
+
 async function openOverlay(type) {
   if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', 'HOME SCREEN', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.language'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
-    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdStr = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? t('game_menu.edit_launch') : t('game_menu.add_launch'); const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
+    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdItems = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? [] : [t('game_menu.add_launch')]; /* EDIT LAUNCH COMMAND removed for release */ const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
     const storeL = (game.Store || '').toLowerCase();
     const isGrinderStore = ((storeL.includes('gog') || storeL.includes('epic')) && game.app_id) || !!game.GrinderGameId;
     const isInstalled = game.Installed == null || game.Installed == 1;
@@ -1517,7 +1760,7 @@ async function openOverlay(type) {
     if (gogId) { const r = await window.api.getGameAchievements(gogId); if (r.ok && r.achievements.length) hasAchievements = true; }
     if (!hasAchievements && steamRaw) { const r = await window.api.getGameAchievements(`steam_${steamRaw}`); if (r.ok && r.achievements.length) hasAchievements = true; }
     const achItems = hasAchievements ? ['§ACHIEVEMENTS', 'VIEW ACHIEVEMENTS'] : [];
-    renderGenericOverlay(t('menu.game_options'), [trStr, favStr, wantStr, playedStr, 'ADD TO PLAYLIST', cmdStr, t('game_menu.rename'), t('game_menu.scraping'), ...achItems, ...grinderItems, t('common.close_menu')]);
+    renderGenericOverlay(t('menu.game_options'), [trStr, favStr, wantStr, playedStr, 'ADD TO PLAYLIST', ...cmdItems, t('game_menu.rename'), t('game_menu.scraping'), ...achItems, ...grinderItems, t('common.close_menu')]);
   }
 }
 
@@ -1526,7 +1769,7 @@ function updateOverlaySelection() {
   const el = document.getElementById(`overlay-${currentOverlayIndex}`);
   if (el) { el.classList.add('selected'); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
 }
-function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
+function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') setBlur(false); }
 
 function executeOverlayAction() {
   playSound(sfxSelect); const action = overlayItems[currentOverlayIndex];
@@ -1625,6 +1868,66 @@ function executeOverlayAction() {
     return;
   }
 
+  if (currentOverlayType === 'FREE_MENU') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
+    _cremaHideFree = (String(action).replace('★ ', '') === 'HIDDEN');
+    window.api.setSetting('crema_hide_free', _cremaHideFree ? '1' : '');
+    applyLiveFilters();
+    applyGalleryFilter();
+    openFreeGamesMenu();
+    return;
+  }
+
+  if (currentOverlayType === 'GALLERY_SORT_MENU') {
+    if (action === t('common.close_menu')) { closeOverlay(); return; }
+    const label = String(action).replace('★ ', '');
+    const hit = CREMA_SORTS.find(([l]) => l === label);
+    if (hit) {
+      _cremaGallerySort = hit[1];
+      window.api.setSetting('crema_gallery_sort', _cremaGallerySort);
+      galleryIndex = 0;
+      applyGalleryFilter();
+      renderGalleryGrid();
+    }
+    closeOverlay();
+    return;
+  }
+
+  if (currentOverlayType === 'GALLERY_PL_MENU') {
+    if (action === t('common.close_menu')) { closeOverlay(); return; }
+    if (action === '+ NEW PLAYLIST') {
+      _plAssignGame = null;             // creating from the gallery — nothing to auto-assign
+      _newPlFromGallery = true;
+      document.getElementById('overlay-backdrop').classList.add('hidden');
+      openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', '');
+      return;
+    }
+    const label = String(action).replace('★ ', '');
+    const idx = categories.indexOf(label);
+    if (idx >= 0) { galleryCatIndex = idx; galleryIndex = 0; applyGalleryFilter(); renderGalleryGrid(); }
+    closeOverlay();
+    return;
+  }
+
+  if (currentOverlayType === 'STEAM_INSTALL_CONFIRM') {
+    if (action === 'CONTINUE — OPEN STEAM') {
+      const g = _steamInstallGame;
+      const appid = g && g.SteamAppID ? String(g.SteamAppID).replace(/\.0+$/, '') : '';
+      if (appid) window.api.openInstallUrl('steam://install/' + appid);
+    }
+    _steamInstallGame = null;
+    closeOverlay();
+    return;
+  }
+
+  if (currentOverlayType === 'HIDDEN_MENU') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
+    const g = allGames.find(x => x.Game === action && x.Hidden == 1);
+    if (g) { g.Hidden = 0; window.api.saveDbField({ game: g.Game, field: 'Hidden', value: 0 }); applyLiveFilters(); applyGalleryFilter(); }
+    openHiddenGamesMenu();
+    return;
+  }
+
   if (currentOverlayType === 'HOME_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
     const label = String(action).replace('★ ', '');
@@ -1671,6 +1974,8 @@ function executeOverlayAction() {
     else if (action === t('menu.screensaver')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openScreensaverMenu(); }
 else if (action === t('menu.history')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openHistoryMenu(); }
     else if (action === 'PICO-8 GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openPico8Menu(); }
+    else if (action === 'FREE-TO-PLAY GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openFreeGamesMenu(); }
+    else if (action === 'HIDDEN GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openHiddenGamesMenu(); }
     else if (action === t('menu.start_screen')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openStartScreenMenu(); }
     else if (action === t('browse.mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openBrowseModeMenu(); }
     else if (action === 'GAMEPAGE STYLE') { document.getElementById('overlay-backdrop').classList.add('hidden'); openGamepageStyleMenu(); }
@@ -1733,7 +2038,10 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
     }
   }
   else if (gameState === 'PLAYLIST_ASSIGN') {
-    if (action === t('common.back_to_game_options')) { openOverlay("GAME_MENU"); return; }
+    if (action === t('common.back_to_game_options')) {
+      if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); return; }
+      openOverlay("GAME_MENU"); return;
+    }
     if (action === '+ NEW PLAYLIST') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', ''); return; }
     // The first gamePlaylists.length items map 1:1 to gamePlaylists — toggle by index
     // rather than parsing the (★-prefixed) label.
@@ -1753,8 +2061,10 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
 // game is a member; selecting one toggles membership. _plAssignGame is the game
 // the GAME_MENU was opened for (always filteredGames[currentGameIndex]).
 let _plAssignGame = null;
-async function openPlaylistAssignMenu() {
-  _plAssignGame = filteredGames[currentGameIndex];
+let _plAssignReturn = null;   // when set (gamepage state), BACK returns there instead of GAME_MENU
+let _newPlFromGallery = false; // '+ NEW PLAYLIST' opened from the gallery Playlists modal
+async function openPlaylistAssignMenu(game) {
+  _plAssignGame = game || filteredGames[currentGameIndex];
   await loadGamePlaylists();
   renderPlaylistAssignMenu();
 }
@@ -1985,7 +2295,7 @@ function updateDownloadProgressBar(percentage) { const fillEl = document.getElem
 function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -2003,10 +2313,12 @@ function updateHeroMosaic(catName) { fillMosaicIn(catName, 'hero-icon', 'hero-mo
 function transitionToStart() {
   gameState = 'START'; clearMediaLoaders();
   clearGalleryMedia();
+  _homeOrigin = false;   // user is browsing the library proper now — B follows normal flow
   document.getElementById('splash-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.add('hidden');
   document.getElementById('ggp-screen').classList.add('hidden');
+  document.getElementById('reader-screen')?.classList.add('hidden');
   document.getElementById('home-screen')?.classList.add('hidden');
   document.getElementById('start-screen').classList.remove('hidden');
   const mode = audioCfg.startScreenMode === 'GRID' ? 'GRID' : 'CAROUSEL';
@@ -2303,7 +2615,7 @@ function formatJbTime(sec) {
 
 async function openJukebox() {
   gameState = 'JUKEBOX'; setBlur(false);
-  ['start-screen', 'main-screen', 'gallery-screen', 'ggp-screen'].forEach(id => {
+  ['start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'home-screen', 'reader-screen'].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
   document.getElementById('jukebox-screen').classList.remove('hidden');
@@ -2334,6 +2646,9 @@ function closeJukebox() {
     document.getElementById('start-screen').classList.remove('hidden');
   } else if (gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') {
     document.getElementById('gallery-screen').classList.remove('hidden');
+  } else if (gameState === 'HOME') {
+    document.getElementById('home-screen').classList.remove('hidden');
+    renderHomeScreen();   // refresh the Jukebox tile's now-playing state
   } else {
     document.getElementById('main-screen').classList.remove('hidden');
   }
@@ -2841,6 +3156,8 @@ function applyGalleryFilter() {
   const q = galleryQuery.toLowerCase();
   const base = allGames.filter(g => {
     if (!matchCatForGallery(g, catName)) return false;
+    if (g.Hidden == 1) return false;
+    if (_cremaHideFree && g.FreeToPlay == 1) return false;
     if (pico8HiddenFor(g, catName)) return false;
     if (q) {
       const title = String(g.Game || '').toLowerCase();
@@ -2854,6 +3171,13 @@ function applyGalleryFilter() {
     }
     return true;
   });
+
+  if (_cremaGallerySort !== 'alpha') {
+    galleryNumRecent = 0;
+    galleryGames = sortCremaGallery(base);
+    if (galleryIndex >= galleryGames.length) galleryIndex = Math.max(0, galleryGames.length - 1);
+    return;
+  }
 
   let recentGames = [];
   let regularGames = base.slice().sort((a, b) => String(a.Game).localeCompare(String(b.Game)));
@@ -2874,7 +3198,7 @@ function transitionToGallery() {
   gameState = 'GALLERY';
   galleryCatIndex = currentCategoryIndex;
   galleryQuery = '';
-  ['start-screen','main-screen','jukebox-screen','gallery-screen','ggp-screen'].forEach(id => {
+  ['start-screen','main-screen','jukebox-screen','gallery-screen','ggp-screen','home-screen','reader-screen'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList[id === 'gallery-screen' ? 'remove' : 'add']('hidden');
   });
@@ -2941,7 +3265,8 @@ function renderGalleryGrid() {
     if (!actionBtn && isManualCategory(game)) {
       actionBtn = `<button class="gcell-play-btn gcell-install-btn">⬇ ${t('status.install')}</button>`;
     }
-    const footerRow = (actionBtn || storeBadgeGroup) ? `<div class="gcell-footer-row">${actionBtn}${storeBadgeGroup}</div>` : '';
+    const f2pTag = game.FreeToPlay == 1 ? '<span class="gcell-f2p">FREE</span>' : '';
+    const footerRow = (actionBtn || storeBadgeGroup || f2pTag) ? `<div class="gcell-footer-row">${actionBtn}${f2pTag}${storeBadgeGroup}</div>` : '';
     cell.innerHTML = `${coverArea}<div class="gcell-footer"><div class="gcell-title">${game.Game}</div>${footerRow}</div>`;
     cell.addEventListener('click', () => { galleryIndex = i; playSound(sfxSelect); openGalleryGamepage(galleryGames[i]); });
     grid.appendChild(cell);
@@ -3127,7 +3452,7 @@ function _cRenderAchBox(container, label, achievements, showLabel) {
       Achievements${showLabel ? `<br><span style="font-size:9px; letter-spacing:1px; opacity:0.7;">${label}</span>` : ''}
     </div>
     <div style="font-size:13px; font-weight:900; color:var(--accent);">${unlocked} / ${total}</div>
-    <div style="font-size:10px; color:var(--text_dim);">Press to view all</div>`;
+    <div style="font-size:10px; color:var(--text_dim);">Press ${usingKeyboard ? '<b>Y</b>' : getMappedBtn('NORTH')} to view all</div>`;
 
   container.appendChild(box);
 }
@@ -3416,6 +3741,12 @@ function updateGalleryGamepageContent(game) {
     playBtn.classList.remove('install-mode');
   }
 
+  // Conditional hero buttons: Steam (has a Steam appid) / Uninstall (installed GOG/Epic)
+  const _stL = (game.Store || '').toLowerCase();
+  const _hasAppid = game.SteamAppID && String(game.SteamAppID).trim() && String(game.SteamAppID) !== 'None';
+  document.getElementById('ggp-btn-steam').style.display = _hasAppid ? 'block' : 'none';
+  document.getElementById('ggp-btn-uninstall').style.display = (isGameInstalled && hasCmd && (_stL.includes('gog') || _stL.includes('epic'))) ? 'block' : 'none';
+
   updateGalleryGamepageBadges(game);
   ggpBuildButtonList();
   ggpUpdateButtonFocus();
@@ -3511,6 +3842,7 @@ function updateGalleryGamepageContent(game) {
 function updateGalleryGamepageBadges(game) {
   const favBtn = document.getElementById('ggp-btn-fav');
   const wantBtn = document.getElementById('ggp-btn-want');
+  const _gp2 = document.getElementById('ggp-f2p-pill'); if (_gp2) _gp2.style.display = game.FreeToPlay == 1 ? '' : 'none';
   if (favBtn) {
     const on = game.FAV === 'YES';
     favBtn.innerText = on ? '★ FAV' : '+ FAV';
@@ -3539,7 +3871,9 @@ function clearGalleryMedia() {
 }
 
 function ggpBuildButtonList() {
-  const ids = ['ggp-btn-fav', 'ggp-btn-want'];
+  const ids = ['ggp-btn-fav', 'ggp-btn-want', 'ggp-btn-playlist', 'ggp-btn-hide'];
+  if (document.getElementById('ggp-btn-steam')?.style.display !== 'none') ids.push('ggp-btn-steam');
+  if (document.getElementById('ggp-btn-uninstall')?.style.display !== 'none') ids.push('ggp-btn-uninstall');
   if (document.getElementById('ggp-btn-trailer')?.style.display !== 'none') ids.push('ggp-btn-trailer');
   if (document.getElementById('ggp-btn-play')?.style.display !== 'none') ids.push('ggp-btn-play');
   ggpButtonIds = ids;
@@ -3585,6 +3919,19 @@ function ggpActivateButton() {
     game.WANT_TO_PLAY = game.WANT_TO_PLAY === 'YES' ? 'NO' : 'YES';
     window.api.saveDbField({ game: game.Game, field: 'WANT_TO_PLAY', value: game.WANT_TO_PLAY });
     updateGalleryGamepageBadges(game);
+  } else if (id === 'ggp-btn-playlist') {
+    filteredGames = galleryGames; currentGameIndex = galleryIndex;
+    _plAssignReturn = 'GALLERY_GAMEPAGE';
+    openPlaylistAssignMenu(game);
+  } else if (id === 'ggp-btn-hide') {
+    game.Hidden = 1;
+    window.api.saveDbField({ game: game.Game, field: 'Hidden', value: 1 });
+    if (_homeOrigin) { transitionToHome(); } else { closeGalleryGamepage(); }
+  } else if (id === 'ggp-btn-steam') {
+    const appid = String(game.SteamAppID || '').replace(/\.0+$/, '');
+    if (appid) window.api.openInstallUrl('steam://nav/games/details/' + appid);
+  } else if (id === 'ggp-btn-uninstall') {
+    triggerGrinderUninstall(game);
   } else if (id === 'ggp-btn-trailer') {
     const url = document.getElementById('ggp-btn-trailer')?.dataset?.url;
     if (url) { ggpPlayTrailer(url); }
@@ -3599,6 +3946,7 @@ function ggpActivateButton() {
       if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) {
         window.api.openGrinderGui(game.Game);
       } else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+      else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
     } else if (game.LaunchCommand) { tryLaunch(game); }
   }
 }
@@ -3788,6 +4136,14 @@ async function openCremaFlatGamepage(game) {
   const playBtn = document.getElementById('cfgp-btn-play');
   playBtn.style.display = (game.LaunchCommand && String(game.LaunchCommand).trim()) ? '' : 'none';
 
+  // Conditional bar buttons + FREE pill (mirror the Manager's hero row)
+  const _cstL = (game.Store || '').toLowerCase();
+  const _cHasAppid = game.SteamAppID && String(game.SteamAppID).trim() && String(game.SteamAppID) !== 'None';
+  const _cInstalled = game.Installed == null || game.Installed == 1;
+  document.getElementById('cfgp-btn-steam').style.display = _cHasAppid ? '' : 'none';
+  document.getElementById('cfgp-btn-uninstall').style.display = (_cInstalled && game.LaunchCommand && (_cstL.includes('gog') || _cstL.includes('epic'))) ? '' : 'none';
+  const _cf2 = document.getElementById('cfgp-f2p-pill'); if (_cf2) _cf2.style.display = game.FreeToPlay == 1 ? '' : 'none';
+
   _cfgpBuildButtonList();
   _cfgpFocusBtn(0);
   renderFooters();
@@ -3813,7 +4169,7 @@ function _cfgpUpdateBadges(game) {
 }
 
 function _cfgpBuildButtonList() {
-  _cfgpBtns = ['cfgp-btn-back','cfgp-btn-fav','cfgp-btn-want','cfgp-btn-trailer','cfgp-btn-play']
+  _cfgpBtns = ['cfgp-btn-back','cfgp-btn-fav','cfgp-btn-want','cfgp-btn-playlist','cfgp-btn-hide','cfgp-btn-steam','cfgp-btn-uninstall','cfgp-btn-trailer','cfgp-btn-play']
     .map(id => document.getElementById(id))
     .filter(b => b && b.style.display !== 'none');
 }
@@ -3843,6 +4199,20 @@ function _cfgpActivateBtn() {
     game.WANT_TO_PLAY = game.WANT_TO_PLAY === 'YES' ? 'NO' : 'YES';
     window.api.saveDbField({ game: game.Game, field: 'WANT_TO_PLAY', value: game.WANT_TO_PLAY });
     _cfgpUpdateBadges(game);
+  } else if (id === 'cfgp-btn-playlist') {
+    _plAssignReturn = 'CREMA_FGP';
+    openPlaylistAssignMenu(game);
+  } else if (id === 'cfgp-btn-hide') {
+    game.Hidden = 1;
+    window.api.saveDbField({ game: game.Game, field: 'Hidden', value: 1 });
+    closeCremaFlatGamepage();
+    if (_homeOrigin) { transitionToHome(); }
+    else { applyGalleryFilter(); renderGalleryGrid(); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); }
+  } else if (id === 'cfgp-btn-steam') {
+    const appid = String(game.SteamAppID || '').replace(/\.0+$/, '');
+    if (appid) window.api.openInstallUrl('steam://nav/games/details/' + appid);
+  } else if (id === 'cfgp-btn-uninstall') {
+    triggerGrinderUninstall(game);
   } else if (id === 'cfgp-btn-trailer') {
     const video = document.getElementById('cfgp-video');
     if (video.src && video.style.display !== 'none') {
@@ -3852,7 +4222,10 @@ function _cfgpActivateBtn() {
         : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>MUTE';
     }
   } else if (id === 'cfgp-btn-play') {
-    tryLaunch(game);
+    const _pInst = game.Installed == null || game.Installed == 1;
+    const _pStL = (game.Store || '').toLowerCase();
+    if (!_pInst && _pStL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+    else { tryLaunch(game); }
   }
 }
 
@@ -3861,7 +4234,7 @@ function handleCfgpInput(action) {
   if (action === 'LEFT')   { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx - 1); }
   else if (action === 'RIGHT')  { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx + 1); }
   else if (action === 'ACCEPT') _cfgpActivateBtn();
-  else if (action === 'BACK')   { playSound(sfxBack); _cfgpActivateBtn.call(null); closeCremaFlatGamepage(); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); }
+  else if (action === 'BACK')   { playSound(sfxBack); _cfgpActivateBtn.call(null); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
 }
 
 // ══════════════════════════════════════════════════════════════════════════

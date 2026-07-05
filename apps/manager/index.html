@@ -2717,6 +2717,11 @@
     body.gamepage-overlay #view-details::-webkit-scrollbar-thumb:hover { background:var(--text_dim); background-clip:content-box; }
     /* keep the floating "Back to Library" bar pinned to the panel's top (overrides its inline absolute styles) */
     body.gamepage-overlay #gamepage-back-bar { position:fixed !important; top:55px !important; left:50% !important; right:auto !important; transform:translateX(-50%); width:min(1080px, 94vw); box-sizing:border-box; z-index:9002 !important; border-radius:16px 16px 0 0; animation:gpOverlayFadeIn 0.3s ease both; }
+    /* Back-to-library button: quiet at rest, accent on hover, filled on press */
+    #btn-gamepage-back { background:transparent; color:var(--text_sec); border-color:var(--border_solid); pointer-events:auto;
+      transition:background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.08s; }
+    #btn-gamepage-back:hover { color:var(--accent); border-color:var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent); box-shadow:0 0 12px var(--border); }
+    #btn-gamepage-back:active { background:var(--accent); color:var(--bg); border-color:var(--accent); transform:scale(0.97); box-shadow:0 0 16px var(--accent); }
     /* float the Play/Install button at the panel's bottom-right corner (fixed → never scrolls), above the overlay */
     body.gamepage-overlay #btn-gamepage-play { z-index:9003 !important; right:calc((100vw - min(1080px, 94vw)) / 2 + 28px) !important; bottom:46px !important; }
     /* Leave animations — `.gamepage-overlay-closing` is added (on top of .gamepage-overlay) for the
@@ -3202,7 +3207,7 @@
 
         <!-- Gamepage floating back button — lives outside the scrollable view so it's always at the top -->
         <div id="gamepage-back-bar" style="display:none; position:absolute; top:0; left:0; right:0; z-index:10; padding:15px 20px 24px; background:linear-gradient(to bottom, var(--bg) 50%, transparent 100%); pointer-events:none;">
-          <button id="btn-gamepage-back" style="background:transparent; color:var(--text_sec); border-color:var(--border_solid); pointer-events:auto;" data-i18n="html.btn_back">&lt; BACK TO LIBRARY</button>
+          <button id="btn-gamepage-back" data-i18n="html.btn_back">&lt; BACK TO LIBRARY</button>
         </div>
 
         <!-- ════════ HOME — "Control Room" dashboard (optional start screen) ════════ -->
@@ -5907,6 +5912,15 @@ LOADING...READY.</div>
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Hidden Games</div>
           <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Games you've hidden from the library. Open the manager to unhide them individually.</p>
           <button id="btn-open-hidden-games" style="width:100%; font-size:12px; padding:10px; letter-spacing:1px;" class="primary"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Manage Hidden Games</span></button>
+        </div>
+
+        <div class="tool-card tools-section" data-search="notifications desktop phone kde connect gsconnect now playing install complete finished alert ping">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notifications</div>
+          <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Desktop alerts when an install finishes and when a game starts, with the game's cover. Paired with KDE Connect, they show on your phone too.</p>
+          <div class="segmented-control" id="notify-segmented-control">
+            <button class="segmented-btn notify-btn active" data-val="on">On</button>
+            <button class="segmented-btn notify-btn" data-val="off">Off</button>
+          </div>
         </div>
 
         <div class="tool-card tools-section" data-search="add game custom manual entry library new">

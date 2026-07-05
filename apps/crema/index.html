@@ -205,6 +205,9 @@
     .ggp-btn.ggp-active { border-color: var(--accent); color: var(--accent); }
     .ggp-btn.ggp-focused { border-color: #fff; transform: scale(1.06); box-shadow: 0 0 14px rgba(255,255,255,0.35); }
     .ggp-btn.ggp-active.ggp-focused { border-color: var(--accent); box-shadow: 0 0 14px var(--accent); }
+    /* FREE-to-play pill (mirrors the Manager's) — gamepage bars + gallery cells */
+    .crema-f2p { display:inline-flex; align-items:center; font-size:11px; font-weight:900; letter-spacing:1px; padding:4px 9px; border-radius:5px; background:rgba(12,14,17,0.82); color:#5be27a; border:1px solid rgba(91,226,122,0.55); flex-shrink:0; }
+    .gcell-f2p { font-size:9px; font-weight:900; letter-spacing:0.5px; padding:2px 6px; border-radius:4px; background:rgba(12,14,17,0.82); color:#5be27a; border:1px solid rgba(91,226,122,0.55); flex-shrink:0; align-self:center; }
     #ggp-btn-play { background: var(--accent); color: rgba(0,0,0,0.9); border-color: var(--accent); font-size: 15px; padding: 11px 32px; border-radius: 50px; letter-spacing: 2px; margin-left: auto; transition: background 0.2s, border-color 0.2s; }
     #ggp-btn-play.install-mode { background: #e65100; color: #fff; border-color: #e65100; }
     #ggp-btn-play.ggp-focused { box-shadow: 0 0 22px var(--accent), 0 5px 18px rgba(0,0,0,0.6); transform: scale(1.07); }
@@ -212,6 +215,11 @@
     /* Scrollable body below hero */
     #ggp-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
     #ggp-scroll::-webkit-scrollbar { width: 0; }
+    /* Achievements overlay grid — themed scrollbar (this one stays visible: it's a long list) */
+    #crema-ach-grid::-webkit-scrollbar { width: 10px; }
+    #crema-ach-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.28); border-radius: 5px; margin: 6px 0; }
+    #crema-ach-grid::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 5px; }
+    #crema-ach-grid::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--accent) 80%, #ffffff); }
     #ggp-content { display: flex; gap: 24px; padding: 22px 40px 30px; align-items: flex-start; }
     /* Left column: screenshots + descriptions */
     #ggp-left { flex: 1; min-width: 0; }
@@ -406,10 +414,15 @@
     <!-- ════════ HOME — "Marquee" couch dashboard (optional start screen) ════════ -->
     <style>
       #home-screen { padding:0; }
-      #home-content { flex:1; min-height:0; overflow-y:auto; }
+      #home-content { flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
+      #home-content::-webkit-scrollbar { display:none; }   /* gamepad UI — hidden like every other CREMA scroller */
       .ch-wrap { min-height:100%; box-sizing:border-box; padding:44px 60px 26px; display:flex; flex-direction:column; gap:24px; }
       @keyframes chUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
       .ch-top, .ch-hero, .ch-actions, .ch-rowsec { animation:chUp 0.42s cubic-bezier(0.2,0.8,0.2,1) both; }
+      /* gpu-suspended pauses animations at frame 0 — chUp starts at opacity:0, so a Home
+         rendered while the window is blurred (e.g. right after closing a game) would sit
+         INVISIBLE ("empty Home"). Drop the entry animation entirely while suspended. */
+      body.gpu-suspended .ch-top, body.gpu-suspended .ch-hero, body.gpu-suspended .ch-actions, body.gpu-suspended .ch-rowsec { animation:none !important; }
       .ch-top { display:flex; justify-content:space-between; align-items:flex-end; gap:30px; flex-wrap:wrap; }
       .ch-greet .g1 { font-size:42px; font-weight:900; letter-spacing:1px; color:var(--text_main); }
       .ch-greet .g2 { font-size:15px; letter-spacing:3px; text-transform:uppercase; color:var(--text_dim); margin-top:5px; }
@@ -429,8 +442,19 @@
       .ch-act .at { font-size:19px; font-weight:900; color:var(--text_main); letter-spacing:0.5px; }
       .ch-act .asub { font-size:12.5px; color:var(--text_dim); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
       .ch-act .cov { width:48px; height:64px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+      /* Jukebox action tile — same look as its siblings; the cover + EQ bars carry the flair */
+      .ch-act-jb .at { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:230px; }
+      .jb-cov { width:48px; height:48px; border-radius:10px; object-fit:cover; flex-shrink:0; box-shadow:0 4px 14px rgba(0,0,0,0.45); }
+      .jb-eq { display:flex; align-items:flex-end; gap:3px; height:26px; margin-left:auto; flex-shrink:0; }
+      .jb-eq span { width:5px; background:var(--accent); border-radius:3px; animation:chEq 0.9s ease-in-out infinite; }
+      .jb-eq span:nth-child(2) { animation-delay:0.25s; }
+      .jb-eq span:nth-child(3) { animation-delay:0.5s; }
+      @keyframes chEq { 0%, 100% { height:30%; } 50% { height:100%; } }
       .ch-rowsec h3 { font-size:14px; font-weight:900; letter-spacing:2px; text-transform:uppercase; color:var(--text_dim); margin:0 0 13px; }
-      .ch-row { display:flex; gap:16px; overflow-x:auto; padding-bottom:6px; }
+      /* Padding INSIDE the scrollport (negative margins keep the layout identical) so the
+         focused tile's scale + glow have room instead of being clipped by the row box. */
+      .ch-row { display:flex; gap:16px; overflow-x:auto; padding:16px 14px 18px; margin:-16px -14px -12px; scrollbar-width:none; }
+      .ch-row::-webkit-scrollbar { display:none; }
       .ch-tile { width:140px; flex-shrink:0; cursor:pointer; }
       .ch-tile img, .ch-tile .ph { width:140px; height:186px; object-fit:cover; border-radius:12px; border:3px solid transparent; background:var(--bg_menu); display:block; transition:transform .12s, box-shadow .12s; }
       .ch-tile .tn { font-size:13px; color:var(--text_sec); margin-top:9px; line-height:1.25; max-height:34px; overflow:hidden; }
@@ -465,9 +489,42 @@
       .ch-hero.ch-focus, .ch-act.ch-focus { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 0 30px color-mix(in srgb, var(--accent) 50%, transparent); }
       .ch-tile.ch-focus img { border-color:var(--accent); box-shadow:0 0 24px color-mix(in srgb, var(--accent) 60%, transparent); transform:scale(1.05); }
       .ch-foot { margin-top:auto; font-size:13px; color:var(--text_dim); letter-spacing:1.5px; text-align:center; padding-top:6px; text-transform:uppercase; }
+      /* ── TV Reader — in-app article view (news / your-games-news), themed + gamepad ── */
+      #reader-screen { background:var(--bg); }
+      .rd-head { flex-shrink:0; padding:34px 0 18px; border-bottom:1px solid var(--border); width:min(1060px, 86vw); margin:0 auto; }
+      .rd-kick { font-size:13px; font-weight:900; letter-spacing:3px; text-transform:uppercase; color:var(--accent); margin-bottom:10px; }
+      .rd-title { font-size:38px; font-weight:900; color:var(--text_main); line-height:1.12; }
+      .rd-src { font-size:14px; color:var(--text_dim); letter-spacing:1px; text-transform:uppercase; margin-top:12px; }
+      #reader-scroll { flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-width:none; }
+      #reader-scroll::-webkit-scrollbar { display:none; }
+      .rd-body { width:min(1060px, 86vw); margin:0 auto; padding:26px 0 70px; font-size:24px; line-height:1.72; color:var(--text_sec); }
+      .rd-body p { margin:0 0 22px; }
+      .rd-body h1, .rd-body h2, .rd-body h3, .rd-body h4 { color:var(--text_main); font-weight:900; line-height:1.25; margin:34px 0 16px; }
+      .rd-body h1 { font-size:32px; } .rd-body h2 { font-size:29px; } .rd-body h3, .rd-body h4 { font-size:26px; }
+      .rd-body ul, .rd-body ol { margin:0 0 22px; padding-left:34px; }
+      .rd-body li { margin-bottom:9px; }
+      .rd-body blockquote { border-left:4px solid var(--accent); margin:0 0 22px; padding:6px 0 6px 24px; color:var(--text_main); font-style:italic; }
+      .rd-body img { max-width:100%; height:auto; border-radius:14px; margin:8px 0 22px; display:block; }
+      .rd-body pre { background:var(--bg_panel); border:1px solid var(--border); border-radius:12px; padding:18px; overflow-x:hidden; font-size:18px; white-space:pre-wrap; word-break:break-word; }
+      .rd-body code { color:var(--accent); }
+      .rd-body hr { border:none; border-top:1px solid var(--border); margin:26px 0; }
+      .rd-body strong, .rd-body b { color:var(--text_main); }
+      .rd-status { text-align:center; color:var(--text_dim); font-size:20px; letter-spacing:1px; padding:80px 0; }
+      .rd-foot { flex-shrink:0; font-size:13px; color:var(--text_dim); letter-spacing:1.5px; text-align:center; padding:12px 0 18px; text-transform:uppercase; border-top:1px solid var(--border); }
     </style>
     <div id="home-screen" class="screen blur-target hidden">
       <div id="home-content"></div>
+      <div class="footer" id="home-footer-bar" style="position:relative; z-index:2; padding-bottom:28px;">Loading Hardware Inputs...</div>
+    </div>
+
+    <div id="reader-screen" class="screen hidden">
+      <div class="rd-head">
+        <div class="rd-kick">TV Reader</div>
+        <div class="rd-title" id="rd-title"></div>
+        <div class="rd-src" id="rd-src"></div>
+      </div>
+      <div id="reader-scroll"><div class="rd-body" id="rd-body"></div></div>
+      <div class="rd-foot">D-Pad Scroll &nbsp;&bull;&nbsp; L1/R1 Page &nbsp;&bull;&nbsp; X Open in Browser &nbsp;&bull;&nbsp; B Back</div>
     </div>
 
     <div id="wrapped-screen" class="screen hidden">
@@ -603,8 +660,13 @@
         <img id="ggp-logo-img" src="" alt="">
         <div id="ggp-action-row">
           <div id="ggp-store-badge"></div>
+          <span id="ggp-f2p-pill" class="crema-f2p" style="display:none;">FREE</span>
           <button id="ggp-btn-fav" class="ggp-btn">+ FAV</button>
           <button id="ggp-btn-want" class="ggp-btn">WANT TO PLAY</button>
+          <button id="ggp-btn-playlist" class="ggp-btn">+ PLAYLIST</button>
+          <button id="ggp-btn-hide" class="ggp-btn">HIDE</button>
+          <button id="ggp-btn-steam" class="ggp-btn" style="display:none;">STEAM</button>
+          <button id="ggp-btn-uninstall" class="ggp-btn" style="display:none;">UNINSTALL</button>
           <button id="ggp-btn-trailer" class="ggp-btn" style="display:none;">🎬 WATCH TRAILER</button>
           <button id="ggp-btn-play" class="ggp-btn" style="display:none;">▶ PLAY</button>
         </div>
@@ -664,9 +726,14 @@
       <div id="cfgp-bar">
         <button id="cfgp-btn-back" class="cfgp-btn">← BACK</button>
         <span id="cfgp-store-tag"></span>
+        <span id="cfgp-f2p-pill" class="crema-f2p" style="display:none;">FREE</span>
         <div style="flex:1;"></div>
         <button id="cfgp-btn-fav"  class="cfgp-btn">★ FAV</button>
         <button id="cfgp-btn-want" class="cfgp-btn">WANT</button>
+        <button id="cfgp-btn-playlist" class="cfgp-btn">+ PLAYLIST</button>
+        <button id="cfgp-btn-hide" class="cfgp-btn">HIDE</button>
+        <button id="cfgp-btn-steam" class="cfgp-btn" style="display:none;">STEAM</button>
+        <button id="cfgp-btn-uninstall" class="cfgp-btn" style="display:none;">UNINSTALL</button>
         <button id="cfgp-btn-trailer" class="cfgp-btn" style="display:none;">▶ TRAILER</button>
         <button id="cfgp-btn-play" class="cfgp-btn cfgp-btn-primary" style="display:none;">▶ PLAY</button>
       </div>

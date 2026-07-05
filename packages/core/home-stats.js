@@ -127,8 +127,14 @@ function computeHomeSnapshot(games, opts = {}) {
     // whichever store dominates the backlog (Flatpak/PICO-8/Steam) would monopolise the slot.
     let dailyPick = null;
     const named = games.filter(g => g.Game && String(g.Game).trim()); // never feature a blank/placeholder row
-    const pool = named.filter(g => isInstalled(g) && isBacklog(g));
-    const finalPool = pool.length ? pool : named;
+    // Today's Pick only features the "big" store buckets (Jose's call: they're far more
+    // relevant than Flatpak/PICO-8/itch/apps as a daily highlight).
+    const DAILY_BUCKETS = new Set(['Steam', 'GOG', 'Epic', 'Others', 'Emulation']);
+    // …and only scraped games (must have hero-worthy art — the pick is a full-bleed banner).
+    const hasArt = g => !!(g.HeroArt || g.Screenshot || g.CoverArt);
+    const featured = named.filter(g => DAILY_BUCKETS.has(storeBucket(g.Store)) && hasArt(g));
+    const pool = featured.filter(g => isInstalled(g) && isBacklog(g));
+    const finalPool = pool.length ? pool : (featured.length ? featured : named);
     if (finalPool.length) {
         const byBucket = new Map();
         for (const g of finalPool) {

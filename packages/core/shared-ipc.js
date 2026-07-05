@@ -119,6 +119,19 @@ function registerSharedHandlers(ctx) {
         return _cached('news:' + urls.join('|'), 15 * 60000, () => rss.fetchNews(urls, 14).catch(() => []));
     });
 
+    // Raw page HTML for the in-app TV Reader (CREMA) — extraction/sanitizing happens in
+    // the renderer via DOMParser, so main stays DOM-free. Same fetch path as rss/freebies.
+    ipcMain.handle('fetch-article', async (_, url) => {
+        try {
+            if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false, error: 'bad url' };
+            const { session } = require('electron');
+            const r = await session.defaultSession.fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36' } });
+            if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+            const html = await r.text();
+            return { ok: true, html: html.slice(0, 2500000), url: r.url || url };
+        } catch (e) { return { ok: false, error: e.message }; }
+    });
+
     // Steam patch notes for the games you actually play/own. Cached ~20 min.
     ipcMain.handle('get-game-news', () => _cached('gamenews', 20 * 60000, async () => {
         let games = [];

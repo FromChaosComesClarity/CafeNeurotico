@@ -133,6 +133,7 @@ function openSteamMenu(anchorBtn, appId) {
 let _npTimer = null;
 
 function showNowPlaying(game) {
+    notifyDesktop('Now Playing', game.Game || '', game);   // desktop/phone ping w/ cover
     const modal    = document.getElementById('modal-now-playing');
     const artBg    = document.getElementById('np-art-bg');
     const logoImg  = document.getElementById('np-logo-img');
@@ -322,6 +323,9 @@ async function _pumpDownloadQueue() {
     try { res = await window.api.grinderInstall({ gameId: item.gameId, grinderGameId: item.gid, installDir: item.dir }); }
     catch (e) { res = { ok: false, error: e.message }; }
     const success = !!(res && res.ok);
+    // Desktop/phone ping (KDE Connect mirrors it) — cover art as the notification icon.
+    notifyDesktop(success ? 'Game installed' : 'Install failed', item.name,
+        allGames.find(g => String(g.id) === String(item.gameId)));
     _dlHistory.unshift({ gameId: item.gameId, name: item.name, store: item.store, success, error: success ? null : (res && res.error), at: Date.now() });
     if (_dlHistory.length > 30) _dlHistory.length = 30;
     if (!_dlmOpen) {
@@ -840,6 +844,25 @@ document.querySelectorAll('.kenburns-btn').forEach(btn =>
     btn.addEventListener('click', () => applyKenBurns(btn.dataset.val === 'off')));
 (async () => {
     if (await window.api.getSetting('kenburns_off') === '1') applyKenBurns(true);
+})();
+
+// Desktop notifications (On default / Off): install-complete + Now Playing pings with
+// the game's cover as icon. KDE Connect / GSConnect mirror them to a paired phone.
+let _notifyOff = false;
+function applyNotifyToggle(off) {
+    _notifyOff = off;
+    document.querySelectorAll('.notify-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === (off ? 'off' : 'on')));
+    window.api.setSetting('notify_off', off ? '1' : '');
+}
+function notifyDesktop(title, body, game) {
+    if (_notifyOff) return;
+    window.api.notify({ title, body, icon: (game && game.CoverArt) || '' });
+}
+document.querySelectorAll('.notify-btn').forEach(btn =>
+    btn.addEventListener('click', () => applyNotifyToggle(btn.dataset.val === 'off')));
+(async () => {
+    if (await window.api.getSetting('notify_off') === '1') applyNotifyToggle(true);
 })();
 
 // Clear Gaming History Logic
@@ -9201,6 +9224,7 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
         ['pico8-vis-control', 'behavior'],
         ['freegames-vis-control', 'behavior'],   // Show/Hide toggles live together in Behavior
         ['btn-open-hidden-games', 'behavior'],
+        ['notify-segmented-control', 'behavior'],
         ['btn-backup-zip', 'system'],
         ['btn-clean-images', 'danger'],
     ].forEach(([id, p]) => { const c = card(id), pn = pane(p); if (c && pn) pn.appendChild(c); });

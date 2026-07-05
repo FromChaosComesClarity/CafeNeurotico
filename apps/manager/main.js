@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu, Notification, nativeImage } = require('electron');
 app.setName('cafeneurotico');
 const path = require('path');
 const os = require('os');
@@ -1291,6 +1291,22 @@ ipcMain.handle('set-game-flag', (_, id, field, value) => {
     if (!allowed.includes(field)) return { ok: false };
     db.prepare(`UPDATE games SET ${field}=? WHERE id=?`).run(value, id);
     return { ok: true };
+});
+
+// Desktop notification (freedesktop/DBus via Electron). KDE Connect's notification-sync
+// plugin (or GSConnect) mirrors these to a paired phone — icon included when the phone
+// app has "sync icons" on. `icon` is a games-db art path (baseDir-relative) or absolute.
+ipcMain.handle('notify', (_, { title, body, icon } = {}) => {
+    try {
+        if (!Notification.isSupported()) return { ok: false, error: 'not supported' };
+        let img;
+        if (icon) {
+            const p = path.isAbsolute(icon) ? icon : path.join(baseDir, icon);
+            if (fs.existsSync(p)) { const ni = nativeImage.createFromPath(p); if (!ni.isEmpty()) img = ni; }
+        }
+        new Notification({ title: String(title || 'Cafe Neurotico'), body: String(body || ''), icon: img }).show();
+        return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
 });
 
 ipcMain.handle('update-game', (event, id, data) => {
