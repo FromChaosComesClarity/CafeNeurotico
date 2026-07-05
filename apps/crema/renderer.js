@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "CLASSIC", homeEnabled: true, homeRows: ["recent","gems","played"] };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -180,10 +180,22 @@ const THEMES = {
   "NECROMORPH": {bg: "#030808", bg_panel: "rgba(0, 80, 20, 0.60)", bg_menu: "#040a04", accent: "#80ff20", accent_menu: "#60c010", text_main: "#c8ffc0", text_sec: "#70c060", text_dim: "#306020", border: "rgba(128, 255, 32, 0.22)", border_solid: "#0a2808"},
   "CRIMSON PEAK": {bg: "#120508", bg_panel: "rgba(80, 15, 30, 0.75)", bg_menu: "#1a080c", accent: "#d4904a", accent_menu: "#e0b060", text_main: "#f0e0d8", text_sec: "#c0909a", text_dim: "#7a3848", border: "rgba(212, 144, 74, 0.22)", border_solid: "#5a1520"},
   "LAKESIDE CURSE": {bg: "#0c0a08", bg_panel: "rgba(60, 40, 20, 0.72)", bg_menu: "#141008", accent: "#e09030", accent_menu: "#f0b040", text_main: "#f0e8d0", text_sec: "#b09070", text_dim: "#706050", border: "rgba(224, 144, 48, 0.22)", border_solid: "#402808"},
-  "THE BACKROOMS": {bg: "#1a1810", bg_panel: "rgba(220, 200, 100, 0.10)", bg_menu: "#201e14", accent: "#d4c840", accent_menu: "#f0e050", text_main: "#f0e8c8", text_sec: "#b0a870", text_dim: "#706840", border: "rgba(212, 200, 64, 0.22)", border_solid: "#3a3820"}
+  "THE BACKROOMS": {bg: "#1a1810", bg_panel: "rgba(220, 200, 100, 0.10)", bg_menu: "#201e14", accent: "#d4c840", accent_menu: "#f0e050", text_main: "#f0e8c8", text_sec: "#b0a870", text_dim: "#706840", border: "rgba(212, 200, 64, 0.22)", border_solid: "#3a3820"},
+  // Light & Minimal (synced from the Manager) + Oakanizer imports
+  "PAPER": {bg: "#f9f7f4", bg_panel: "rgba(232,228,222,0.75)", bg_menu: "#eeebe6", accent: "#1a1a1a", accent_menu: "#444444", text_main: "#1a1a1a", text_sec: "#444444", text_dim: "#999999", border: "rgba(0,0,0,0.08)", border_solid: "#cccccc"},
+  "SOLARIZED LIGHT": {bg: "#fdf6e3", bg_panel: "rgba(238,232,213,0.80)", bg_menu: "#eee8d5", accent: "#268bd2", accent_menu: "#2aa198", text_main: "#586e75", text_sec: "#657b83", text_dim: "#93a1a1", border: "rgba(38,139,210,0.20)", border_solid: "#cfc9aa"},
+  "CATPPUCCIN LATTE": {bg: "#eff1f5", bg_panel: "rgba(220,224,232,0.80)", bg_menu: "#e6e9ef", accent: "#8839ef", accent_menu: "#ea76cb", text_main: "#4c4f69", text_sec: "#5c5f77", text_dim: "#9ca0b0", border: "rgba(136,57,239,0.16)", border_solid: "#c4c8da"},
+  "GITHUB LIGHT": {bg: "#ffffff", bg_panel: "rgba(234,238,242,0.80)", bg_menu: "#f6f8fa", accent: "#0969da", accent_menu: "#8250df", text_main: "#1f2328", text_sec: "#656d76", text_dim: "#9198a1", border: "rgba(9,105,218,0.15)", border_solid: "#d0d7de"},
+  "GRUVBOX LIGHT": {bg: "#fbf1c7", bg_panel: "rgba(235,219,178,0.80)", bg_menu: "#f2e5bc", accent: "#af3a03", accent_menu: "#b57614", text_main: "#3c3836", text_sec: "#504945", text_dim: "#a89984", border: "rgba(175,58,3,0.18)", border_solid: "#d5c4a1"},
+  "ROSÉ PINE DAWN": {bg: "#faf4ed", bg_panel: "rgba(242,232,228,0.78)", bg_menu: "#f2e9e1", accent: "#b4637a", accent_menu: "#d7827e", text_main: "#575279", text_sec: "#797593", text_dim: "#9893a5", border: "rgba(180,99,122,0.18)", border_solid: "#dfd9e2"},
+  "NORD LIGHT": {bg: "#eceff4", bg_panel: "rgba(216,222,233,0.78)", bg_menu: "#e5e9f0", accent: "#5e81ac", accent_menu: "#81a1c1", text_main: "#2e3440", text_sec: "#3b4252", text_dim: "#7b8899", border: "rgba(94,129,172,0.20)", border_solid: "#c0cad8"},
+  "DAYBREAK": {bg: "#fff9f0", bg_panel: "rgba(255,236,205,0.75)", bg_menu: "#ffefd8", accent: "#c05b18", accent_menu: "#d47820", text_main: "#3a2510", text_sec: "#6a4520", text_dim: "#b08060", border: "rgba(192,91,24,0.18)", border_solid: "#e8c898"},
+  "OAKANIZER LIGHT": {bg: "#f5f0f8", bg_panel: "rgba(228,219,237,0.75)", bg_menu: "#e4dbed", accent: "#46295a", accent_menu: "#46295a", text_main: "#1e0a30", text_sec: "#6b547b", text_dim: "#907f9c", border: "rgba(70,41,90,0.12)", border_solid: "#c0b4cc"},
+  "OAKANIZER DARK": {bg: "#120a1a", bg_panel: "rgba(35,20,45,0.6)", bg_menu: "#23142d", accent: "#b5a9bd", accent_menu: "#b5a9bd", text_main: "#dad4de", text_sec: "#907f9c", text_dim: "#6b547b", border: "rgba(181,169,189,0.2)", border_solid: "#46295a"}
 };
 const THEME_CATEGORIES = {
-  "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "WIN XP"],
+  "Light & Minimal": ["PAPER", "SOLARIZED LIGHT", "CATPPUCCIN LATTE", "GITHUB LIGHT", "GRUVBOX LIGHT", "ROSÉ PINE DAWN", "NORD LIGHT", "DAYBREAK", "OAKANIZER LIGHT"],
+  "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "WIN XP", "OAKANIZER DARK"],
   "Gaming Legends": ["GAME BOY DMG", "PIP BOY", "SEVASTOPOL", "RIP AND TEAR CLASSIC", "SUPER BROTHERS", "GREEN HILL", "NES", "SNES", "BLOODBORNE", "METROID PRIME", "SILENT HILL", "DIABLO", "HALF-LIFE", "SHOVEL KNIGHT"],
   "Aesthetics": ["EARTHY & ORGANIC", "DOPAMINE BRIGHTS", "RETRO REVIVAL", "VAPORWAVE", "AURORA", "NOIR", "BIOLUMINESCENCE", "BRUTALIST"],
   "Linux Ricing": ["DRACULA", "GRUVBOX", "NORD", "SOLARIZED DARK", "CATPPUCCIN FRAPPÉ", "CATPPUCCIN MACCHIATO", "CATPPUCCIN MOCHA", "TOKYO NIGHT", "EVERFOREST", "ROSÉ PINE", "OXOCARBON", "MATERIAL DARK"],
@@ -390,7 +402,7 @@ function renderHardwareIcons() {
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
   const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.category')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} SORT &nbsp;&nbsp; ${getMappedBtn('SELECT')} PLAYLISTS &nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')} &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
   const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
-  const cfgpF = document.getElementById('cfgp-footer'); if (cfgpF) cfgpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')}`;
+  const cfgpF = document.getElementById('cfgp-footer'); if (cfgpF) cfgpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('WEST')} Details`;
   updateHomeFooter();
 }
 function renderFootersForKeyboard() {
@@ -433,7 +445,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'CLASSIC'; audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'IMMERSIVE'; /* Immersive default for new installs */ audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -1359,6 +1371,8 @@ function handleInput(action) {
     else if (action === 'L1')      { galleryGamepageNavigate(-1); openCremaFlatGamepage(galleryCurrentGame); }
     else if (action === 'R1')      { galleryGamepageNavigate(1);  openCremaFlatGamepage(galleryCurrentGame); }
     else if (action === 'BACK')    { playSound(sfxBack); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
+    else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
+    else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
     else if (action === 'START')   { openOverlay('MAIN_MENU'); }
   }
   else if (gameState === 'OSK') { handleOSKInput(action); }
@@ -1384,6 +1398,13 @@ function handleInput(action) {
     else if (action === 'DOWN') { const g = document.getElementById('crema-ach-grid'); if (g) g.scrollBy({ top:  150, behavior: 'smooth' }); }
     else if ((action === 'L2' || action === 'L3') && Object.keys(_cAchStores).length > 1) { playSound(sfxNav); cAchSwitchStore(-1); }
     else if ((action === 'R2' || action === 'R3') && Object.keys(_cAchStores).length > 1) { playSound(sfxNav); cAchSwitchStore(1); }
+  }
+  else if (gameState === 'CFGP_DESC') {
+    if (action === 'BACK' || action === 'X_BUTTON') { closeCfgpDescOverlay(); }
+    else if (action === 'LEFT')  { if (_cfgpdShots.length > 1) { _cfgpdIdx = (_cfgpdIdx - 1 + _cfgpdShots.length) % _cfgpdShots.length; playSound(sfxNav); _cfgpdShow(); } }
+    else if (action === 'RIGHT') { if (_cfgpdShots.length > 1) { _cfgpdIdx = (_cfgpdIdx + 1) % _cfgpdShots.length; playSound(sfxNav); _cfgpdShow(); } }
+    else if (action === 'UP')    { document.getElementById('cfgpd-text').scrollBy({ top: -140, behavior: 'smooth' }); }
+    else if (action === 'DOWN')  { document.getElementById('cfgpd-text').scrollBy({ top: 140, behavior: 'smooth' }); }
   }
   else if (gameState === 'JUKEBOX' || gameState === 'JUKEBOX_OVERLAY') { handleJukeboxInput(action); }
   else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
@@ -1744,7 +1765,7 @@ function openFreeGamesMenu() {
 }
 
 async function openOverlay(type) {
-  if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') { previousGameState = gameState; }
+  if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
   if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
@@ -2034,6 +2055,14 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
       window.api.saveAudioConfig(audioCfg);
       document.getElementById('overlay-backdrop').classList.add('hidden');
       setBlur(false);
+      // Live-apply: if a gamepage was open behind the menu, swap it to the new style now.
+      if (previousGameState === 'GALLERY_GAMEPAGE' || previousGameState === 'CREMA_FGP') {
+        const g = (previousGameState === 'CREMA_FGP' ? _cfgpGame : galleryCurrentGame) || galleryCurrentGame || _cfgpGame;
+        if (previousGameState === 'CREMA_FGP') { closeCremaFlatGamepage(); }
+        else { document.getElementById('ggp-screen').classList.add('hidden'); clearGalleryMedia(); }
+        if (g) { openSmartGamepage(g); return; }
+        document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); return;
+      }
       gameState = previousGameState;
     }
   }
@@ -3695,6 +3724,14 @@ function updateGalleryGamepageContent(game) {
   const oldBadge = document.getElementById('ggp-store-badge');
   if (oldBadge) oldBadge.style.display = 'none';
 
+  // Store/category logo — top-left corner of the hero
+  const cornerL = document.getElementById('ggp-corner-logo');
+  if (cornerL) {
+    const lg = getGalleryStoreLogo((game.Store || '').split(',')[0]);
+    if (lg) { cornerL.style.webkitMaskImage = `url('${lg}')`; cornerL.style.display = 'block'; }
+    else cornerL.style.display = 'none';
+  }
+
   // Cover art
   const coverEl = document.getElementById('ggp-media-img');
   const coverSrc = game.CoverArt ? convertSafePath(game.CoverArt) : '';
@@ -4063,6 +4100,43 @@ function _cfgpStopKenBurns() {
   document.querySelectorAll('#cfgp-bg .kb-slide').forEach(s => s.remove());
 }
 
+// Full description + screenshots modal (X on the immersive gamepage).
+let _cfgpdShots = [], _cfgpdIdx = 0;
+function openCfgpDescOverlay() {
+  const game = _cfgpGame; if (!game) return;
+  const desc = getLocalizedDescription(game) || '';
+  const steamD = (game.SteamDesc || '').trim();
+  _cfgpdShots = game.Screenshot ? String(game.Screenshot).split('|').filter(x => x.trim()) : [];
+  if (!desc && !steamD && !_cfgpdShots.length) return;
+  playSound(sfxSelect);
+  gameState = 'CFGP_DESC';
+  document.getElementById('cfgpd-title').textContent = game.Game || '';
+  // Short description first, then the full Steam HTML — exactly like the classic gamepage.
+  const txt = document.getElementById('cfgpd-text');
+  txt.innerHTML = '';
+  if (desc) { const d = document.createElement('div'); d.className = 'cfgpd-short'; d.textContent = desc; txt.appendChild(d); }
+  if (steamD) {
+    if (desc) { const div = document.createElement('div'); div.className = 'cfgpd-div'; txt.appendChild(div); }
+    const f = document.createElement('div'); f.className = 'cfgpd-full'; f.innerHTML = steamD; txt.appendChild(f);
+  }
+  if (!desc && !steamD) txt.textContent = t('empty.no_desc');
+  txt.scrollTop = 0;
+  _cfgpdIdx = 0; _cfgpdShow();
+  document.getElementById('cfgp-desc-overlay').classList.remove('hidden');
+}
+function _cfgpdShow() {
+  const wrap = document.getElementById('cfgpd-ss-wrap');
+  if (!_cfgpdShots.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  document.getElementById('cfgpd-ss').src = convertSafePath(_cfgpdShots[_cfgpdIdx]);
+  document.getElementById('cfgpd-count').textContent = _cfgpdShots.length > 1 ? `${_cfgpdIdx + 1} / ${_cfgpdShots.length}` : '';
+}
+function closeCfgpDescOverlay() {
+  playSound(sfxBack);
+  document.getElementById('cfgp-desc-overlay').classList.add('hidden');
+  gameState = 'CREMA_FGP';
+}
+
 async function openCremaFlatGamepage(game) {
   _cfgpGame = game;
   gameState = 'CREMA_FGP';
@@ -4074,17 +4148,48 @@ async function openCremaFlatGamepage(game) {
   // Store tag + title
   document.getElementById('cfgp-store-tag').textContent =
     (game.Store || '').split(',')[0].trim().toUpperCase();
+  // Store/category logo — bottom-right corner
+  const _cCorner = document.getElementById('cfgp-corner-logo');
+  if (_cCorner) {
+    const lg = getGalleryStoreLogo((game.Store || '').split(',')[0]);
+    if (lg) { _cCorner.style.webkitMaskImage = `url('${lg}')`; _cCorner.style.display = 'block'; }
+    else _cCorner.style.display = 'none';
+  }
   document.getElementById('cfgp-title').textContent = game.Game || '';
 
   // Meta pills
   const meta = document.getElementById('cfgp-meta');
   meta.innerHTML = '';
+  // Classic-gamepage info as glass chips (RELEASED / DEVELOPER / GENRE / TIME TO BEAT /
+  // METACRITIC / PROTONDB); the ACHIEVEMENTS chip is appended async once they load.
+  const chips = [];
+  if (game.RELEASED)   chips.push(['RELEASED', game.RELEASED]);
+  if (game.DEV)        chips.push(['DEVELOPER', game.DEV]);
+  if (game.GENRE)      chips.push(['GENRE', String(game.GENRE).split(',')[0].trim()]);
+  if (game.HLTB_Main)  chips.push(['TIME TO BEAT', isFinite(+game.HLTB_Main) ? game.HLTB_Main + ' HOURS' : game.HLTB_Main]);
+  if (game.METACRITIC) chips.push(['METACRITIC', game.METACRITIC]);
+  if (game.ProtonTier) chips.push(['PROTONDB', String(game.ProtonTier).toUpperCase()]);
+  meta.innerHTML = chips.map(([l, v]) => `<div class="cfgp-chip"><div class="cl">${_che(l)}</div><div class="cv">${_che(String(v))}</div></div>`).join('');
+  // Similar games — single dim line under the description
+  const simEl = document.getElementById('cfgp-similar');
+  if (simEl) {
+    const sim = (game.SimilarGames || '').trim();
+    if (sim && sim !== '--') { simEl.style.display = 'block'; simEl.innerHTML = `<span class="sl">SIMILAR</span>${_che(sim.split(',').map(n => n.trim()).filter(Boolean).join(', '))}`; }
+    else simEl.style.display = 'none';
+  }
+  // Achievements: load (fills _cAchAll; the hidden classic container render is harmless),
+  // then append the chip with the mapped view-all glyph. Y opens the overlay from here.
+  galleryCurrentGame = game;   // the ach overlay titles itself from galleryCurrentGame
+  loadCremaAchievements(game).then(() => {
+    if (gameState !== 'CREMA_FGP' || _cfgpGame !== game || !_cAchAll.length) return;
+    document.getElementById('cfgp-ach-chip')?.remove();
+    const unlocked = _cAchAll.filter(a => a.date_unlocked).length;
+    const chip = document.createElement('div');
+    chip.className = 'cfgp-chip'; chip.id = 'cfgp-ach-chip';
+    chip.innerHTML = `<div class="cl">ACHIEVEMENTS</div><div class="cv">${unlocked} / ${_cAchAll.length}&nbsp;&nbsp;<span class="ch-hint">${usingKeyboard ? 'Y' : getMappedBtn('NORTH')} VIEW</span></div>`;
+    meta.appendChild(chip);
+  });
   const pills = [];
-  if (game.GENRE)      pills.push({ t: game.GENRE });
-  if (game.HLTB_Main)  pills.push({ t: (isFinite(+game.HLTB_Main) ? game.HLTB_Main + 'h' : game.HLTB_Main), accent: true });
-  if (game.ProtonTier) pills.push({ t: game.ProtonTier });
-  if (game.METACRITIC) pills.push({ t: 'Metacritic ' + game.METACRITIC, accent: true });
-  if (game.RELEASED)   pills.push({ t: game.RELEASED });
   pills.forEach((p, i) => {
     if (i > 0) { const sep = document.createElement('div'); sep.className = 'cfgp-meta-sep'; meta.appendChild(sep); }
     const span = document.createElement('span');
@@ -4132,9 +4237,24 @@ async function openCremaFlatGamepage(game) {
   // Fav / Want buttons
   _cfgpUpdateBadges(game);
 
-  // Play button
+  // Play / Install button — same logic as the classic gamepage
   const playBtn = document.getElementById('cfgp-btn-play');
-  playBtn.style.display = (game.LaunchCommand && String(game.LaunchCommand).trim()) ? '' : 'none';
+  const _pHasCmd = game.LaunchCommand && String(game.LaunchCommand).trim();
+  const _pInst2 = game.Installed == null || game.Installed == 1;
+  if (_pHasCmd) {
+    playBtn.style.display = '';
+    if (_pInst2) { playBtn.innerText = t('html.btn_play'); playBtn.dataset.installMode = ''; playBtn.classList.remove('install-mode'); }
+    else { playBtn.innerText = `⬇ ${t('status.install')}`; playBtn.dataset.installMode = '1'; playBtn.classList.add('install-mode'); }
+  } else if (isManualCategory(game)) {
+    playBtn.style.display = '';
+    playBtn.innerText = `⬇ ${t('status.install')}`;
+    playBtn.dataset.installMode = 'add_cmd';
+    playBtn.classList.add('install-mode');
+  } else {
+    playBtn.style.display = 'none';
+    playBtn.dataset.installMode = '';
+    playBtn.classList.remove('install-mode');
+  }
 
   // Conditional bar buttons + FREE pill (mirror the Manager's hero row)
   const _cstL = (game.Store || '').toLowerCase();
@@ -4222,10 +4342,17 @@ function _cfgpActivateBtn() {
         : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>MUTE';
     }
   } else if (id === 'cfgp-btn-play') {
-    const _pInst = game.Installed == null || game.Installed == 1;
-    const _pStL = (game.Store || '').toLowerCase();
-    if (!_pInst && _pStL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
-    else { tryLaunch(game); }
+    const mode = btn.dataset.installMode;
+    if (mode === 'add_cmd') {
+      previousGameState = 'CREMA_FGP';
+      document.getElementById('overlay-backdrop').classList.add('hidden');
+      openOSK('LAUNCH_CMD', t('osk.launch_command'), '');
+    } else if (mode === '1') {
+      const stL = (game.Store || '').toLowerCase();
+      if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) { window.api.openGrinderGui(game.Game); }
+      else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+      else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+    } else if (game.LaunchCommand) { tryLaunch(game); }
   }
 }
 
@@ -4235,6 +4362,8 @@ function handleCfgpInput(action) {
   else if (action === 'RIGHT')  { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx + 1); }
   else if (action === 'ACCEPT') _cfgpActivateBtn();
   else if (action === 'BACK')   { playSound(sfxBack); _cfgpActivateBtn.call(null); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
+  else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
+  else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
