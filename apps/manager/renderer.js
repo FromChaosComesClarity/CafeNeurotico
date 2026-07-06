@@ -1868,21 +1868,11 @@ document.getElementById('btn-tools-manual').addEventListener('click', () => { do
 const _welcomeModal = document.getElementById('modal-welcome');
 
 function dismissWelcome() {
-    const picked = document.querySelector('.wlc-layout-btn.selected');
-    applyLayoutMode(picked ? picked.dataset.layout : 'sidebar');
     _welcomeModal.classList.remove('active');
     if (document.getElementById('chk-welcome-noshow').checked) {
         window.api.setSetting('welcome_shown', '1');
     }
 }
-
-// Step 7 layout picker
-document.querySelectorAll('.wlc-layout-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.wlc-layout-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-    });
-});
 
 // Only these two buttons close the modal
 document.getElementById('btn-welcome-done').addEventListener('click', dismissWelcome);
@@ -1897,15 +1887,12 @@ document.getElementById('btn-welcome-manual').addEventListener('click', () => { 
     if (s.found) {
         const total = s.allGames?.length ?? s.installedGames?.length ?? 0;
         statusEl.style.color = '#66bb6a';
-        statusEl.textContent = `✓ GRINDER connected — ${total} game${total !== 1 ? 's' : ''} in library`;
+        statusEl.textContent = total > 0 ? `✓ Connected — ${total} GOG/Epic game${total !== 1 ? 's' : ''} linked` : '✓ Engine ready — sign in to import your libraries';
     } else {
         statusEl.style.color = 'var(--text_dim)';
-        statusEl.textContent = 'GRINDER.AppImage not found — place it in the same folder as CNGM.';
+        statusEl.textContent = 'Open GRINDER once to initialize the GOG/Epic engine.';
     }
-    if (openBtn) {
-        openBtn.style.display = s.found ? '' : 'none';
-        openBtn.addEventListener('click', () => window.api.openGrinder());
-    }
+    if (openBtn) openBtn.addEventListener('click', () => window.api.openGrinder());
 })();
 
 // ── Step 1: Steam sync (inline, no close) ───────────────────────────────────
@@ -1963,37 +1950,8 @@ document.getElementById('btn-welcome-batch').addEventListener('click', async () 
     loadGames();
 });
 
-// ── Step 3: SteamGridDB key (inline, no close) ──────────────────────────────
-document.getElementById('btn-welcome-save-sgdb').addEventListener('click', async () => {
-    const key    = document.getElementById('wlc-sgdb-key').value.trim();
-    const status = document.getElementById('wlc-sgdb-status');
-    if (!key) { status.style.color = '#f57c00'; status.textContent = '⚠ Paste your API key above.'; return; }
-    await window.api.setSetting('steamgriddb_api', key);
-    // Mirror into the SGDB api modal input
-    document.getElementById('sgdb-api-input').value = key;
-    status.style.color = '#66bb6a';
-    status.textContent = '✓ SteamGridDB key saved!';
-});
 
 // ── Step 3: IGDB credentials (inline, no close) ─────────────────────────────
-document.getElementById('btn-welcome-save-igdb').addEventListener('click', async () => {
-    const clientId = document.getElementById('wlc-igdb-client-id').value.trim();
-    const secret   = document.getElementById('wlc-igdb-client-secret').value.trim();
-    const status   = document.getElementById('wlc-igdb-status');
-    if (!clientId || !secret) { status.style.color = '#f57c00'; status.textContent = '⚠ Enter both Client ID and Secret.'; return; }
-    await window.api.setSetting('igdb_client_id', clientId);
-    await window.api.setSetting('igdb_client_secret', secret);
-    await window.api.setSetting('igdb_token', '');
-    await window.api.setSetting('igdb_token_expiry', '0');
-    // Mirror into the Connect modal fields
-    document.getElementById('igdb-client-id').value = clientId;
-    document.getElementById('igdb-client-secret').value = '••••••••';
-    status.style.color = 'var(--text_dim)';
-    status.textContent = 'Testing connection…';
-    const result = await window.api.igdbTest();
-    status.style.color = result.success ? '#66bb6a' : '#ef5350';
-    status.textContent = (result.success ? '✓ ' : '✗ ') + result.message;
-});
 
 // ── Tools menu: re-open welcome screen ──────────────────────────────────────
 document.getElementById('btn-show-welcome').addEventListener('click', () => {

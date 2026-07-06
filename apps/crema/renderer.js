@@ -570,7 +570,7 @@ function renderSetupScreen() {
     : 'HOW WOULD YOU LIKE TO BROWSE?';
   document.getElementById('setup-subtitle').innerText = isPhase1
     ? 'Select the view that greets you every time CREMA opens. You can change this anytime in the System Menu.'
-    : 'Pick your preferred way to browse your game library. You can change this anytime in the System Menu.';
+    : 'Pick your preferred way to browse. Your games, artwork and playlists come from the desktop app and stay in sync automatically.';
 
   // Cards
   const cardsEl = document.getElementById('setup-cards');
@@ -629,7 +629,7 @@ async function completeSetup() {
   window.api.saveAudioConfig(audioCfg);
   window.api.setSetting('setup_complete', '1');
   document.getElementById('setup-screen').classList.add('hidden');
-  transitionToStart();
+  if (audioCfg.homeEnabled) transitionToHome(); else transitionToStart();
   resetIdleTimer();
 }
 
@@ -4425,7 +4425,7 @@ function _setGrinderProgressStep(step, isUninstall) {
 
 function showGrinderConfirm(game) {
     _grinderConfirmGame = game;
-    if (!_grinderInstallDir) _grinderInstallDir = '/home/jose/Games/CafeNeurotico';
+    if (!_grinderInstallDir) _grinderInstallDir = '~/Games/CafeNeurotico';
     document.getElementById('gc-action-title').textContent = 'INSTALL GAME';
     document.getElementById('gc-game-title').textContent = game.Game;
     document.getElementById('gc-dir').textContent = _grinderInstallDir;

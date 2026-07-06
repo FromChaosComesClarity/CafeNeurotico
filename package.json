@@ -58,7 +58,9 @@
       "apps/grinder/**/*",
       "apps/crema/**/*",
       "!**/assets/bin/linux/**",
-      "!apps/crema/assets/wallpapers/**"
+      "!apps/crema/assets/wallpapers/**",
+      "!**/GameManagerConfig/**",
+      "!**/GRINDERConfig/**"
     ],
     "extraResources": [
       {
