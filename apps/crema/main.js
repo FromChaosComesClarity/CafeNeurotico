@@ -83,21 +83,6 @@ const playlistsPath = path.join(configDir, 'playlists.json');
 const imagesDir = path.join(configDir, 'images');
 const trailersDir = path.join(configDir, 'videos');
 const musicDir = path.join(baseDir, 'CREMA_CUSTOM_MUSIC');
-// Wallpapers (272M) are NOT bundled in the AppImage — fetched on first run to this writable dir.
-const wallpapersDir = path.join(configDir, 'CREMA_wallpapers');
-const WALLPAPERS_URL = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/wallpapers-v1/cafeneurotico-wallpapers-v1.tar.gz';
-function ensureWallpapers() {
-    try { if (fs.existsSync(wallpapersDir) && fs.readdirSync(wallpapersDir).some(f => /\.(png|jpe?g|webp)$/i.test(f))) return; } catch {}
-    try { fs.mkdirSync(wallpapersDir, { recursive: true }); } catch {}
-    const tmp = path.join(os.tmpdir(), 'crema-wallpapers.tar.gz');
-    const dl = spawn('curl', ['-fL', '--retry', '3', '-o', tmp, WALLPAPERS_URL], { stdio: 'ignore' });
-    dl.on('close', code => {
-        if (code !== 0) return;
-        spawn('tar', ['-xzf', tmp, '-C', wallpapersDir], { stdio: 'ignore' }).on('close', () => { try { fs.unlinkSync(tmp); } catch {} });
-    });
-    dl.on('error', () => {});
-}
-
 // App Assets (INTERNAL - Uses __dirname so it stays packed inside the AppImage)
 const soundsDir = path.join(__dirname, 'assets', 'sounds');
 
@@ -160,7 +145,6 @@ app.whenReady().then(() => {
             db.prepare(`CREATE TABLE IF NOT EXISTS playlist_games (playlist_id INTEGER NOT NULL, game_id INTEGER NOT NULL, sort_order INTEGER DEFAULT 0, PRIMARY KEY (playlist_id, game_id), FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE, FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE)`).run();
         } catch(e) {}
     } catch (err) {}
-    ensureWallpapers();   // background download on first run (renderer re-fetches when ready)
     createWindow();
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -822,31 +806,12 @@ ipcMain.handle('get-audio-config', () => {
     try {
         if (fs.existsSync(audioCfgPath)) return JSON.parse(fs.readFileSync(audioCfgPath, 'utf8'));
     } catch(e){}
-    // UPDATED DEFAULT SCREENSAVER TO 'CN WALLPAPERS'
-    return { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT" };
+    return { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT" };
 });
 
 ipcMain.on('save-audio-config', (e, cfg) => { try { fs.writeFileSync(audioCfgPath, JSON.stringify(cfg)); } catch(err){} });
 ipcMain.handle('get-custom-music', () => { let playlist = []; try { if (fs.existsSync(musicDir)) { const files = fs.readdirSync(musicDir); for (let f of files) { if (f.toLowerCase().endsWith('.mp3') || f.toLowerCase().endsWith('.wav') || f.toLowerCase().endsWith('.ogg') || f.toLowerCase().endsWith('.flac')) { playlist.push(`file://${path.join(musicDir, f)}`); } } } } catch(e) {} return playlist; });
 ipcMain.handle('get-standard-bgm', (event, mode) => { const safeName = mode.toLowerCase().replace(/-/g, ''); for (let ext of ['wav', 'mp3', 'ogg']) { const p = path.join(soundsDir, `bgm_${safeName}.${ext}`); if (fs.existsSync(p)) return `file://${p}`; } return null; });
-
-// --- NEW IPC: READ CN WALLPAPERS DIRECTORY ---
-ipcMain.handle('get-wallpapers', () => {
-    let wallpapers = [];
-    try {
-        // Writable wallpapers dir (downloaded on first run; see ensureWallpapers)
-        const wpDir = wallpapersDir;
-        if (fs.existsSync(wpDir)) {
-            const files = fs.readdirSync(wpDir);
-            for (let f of files) {
-                if (f.match(/\.(jpg|jpeg|png|webp)$/i)) {
-                    wallpapers.push(`file://${path.join(wpDir, f)}`);
-                }
-            }
-        }
-    } catch(e) {}
-    return wallpapers;
-});
 
 ipcMain.handle('get-audio-metadata', async (e, filePath) => {
     try {

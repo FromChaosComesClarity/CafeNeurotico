@@ -54,8 +54,6 @@ contextBridge.exposeInMainWorld('api', {
                                 // NEW: Force Focus
                                 forceFocus: () => ipcRenderer.send('force-focus'),
 
-                                  // NEW: Wallpapers
-                                  getWallpapers: () => ipcRenderer.invoke('get-wallpapers'),
 
                                 // FIX: Expose Gaming History IPCs for CREMA
                                 updateLastPlayed: (gameName) => ipcRenderer.invoke('update-last-played', gameName),

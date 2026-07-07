@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "CN WALLPAPERS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "MANAGER", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -89,7 +89,6 @@ let activeThemeCategory = ""; let activeTheme = "CREMA (DEFAULT)";
 let hasBooted = false; let idleTimer = null; let screensaverInterval = null; let ssClockInterval = null;
 let screensaverStartTime = 0;
 let availableScreenshots = []; let currentSSGame = null;
-let availableWallpapers = [];
 const delayOptions = [1, 2, 3, 4, 5, 10, 15, 30];
 
 let _grinderConfirmGame = null; let _grinderInstallDir = ''; let _grinderProgressInterval = null; let _grinderProgressActive = false; let _grinderConfirmActive = false;
@@ -445,7 +444,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = rawCfg.screensaver !== undefined ? rawCfg.screensaver : "CN WALLPAPERS"; audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'IMMERSIVE'; /* Immersive default for new installs */ audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = (rawCfg.screensaver === "OFF") ? "OFF" : "SCREENSHOTS"; /* CN WALLPAPERS removed → migrate to SCREENSHOTS */ audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'IMMERSIVE'; /* Immersive default for new installs */ audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -494,19 +493,10 @@ function startScreensaver() {
   screensaverStartTime = Date.now();
   document.getElementById('screensaver-backdrop').classList.remove('hidden');
   updateSSClock(); ssClockInterval = setInterval(updateSSClock, 10000);
-  if (audioCfg.screensaver === 'CN WALLPAPERS') playRandomWallpaper(); else playRandomScreenshot();
+  playRandomScreenshot();
 }
 
 function updateSSUI(game) { if (!game) return; document.getElementById('ss-game-title').innerText = game.Game; const scL = document.getElementById('ss-lbl-y'); scL.style.color = (game.FAV === 'YES') ? 'var(--accent)' : 'var(--text_sec)'; const wtL = document.getElementById('ss-lbl-x'); wtL.style.color = (game.WANT_TO_PLAY === 'YES') ? 'var(--accent)' : 'var(--text_sec)'; const storeContainer = document.getElementById('ss-store-icons'); storeContainer.innerHTML = ''; if (game.Store && String(game.Store).trim() !== "") { const stores = String(game.Store).split(',').map(s => s.trim().toLowerCase().replace(/\s+/g, '_')).filter(s => s !== ""); stores.forEach(s => { const div = document.createElement('div'); div.className = 'store-icon'; div.style.webkitMaskImage = `url('${logoPath(s)}')`; storeContainer.appendChild(div); }); } }
-
-async function playRandomWallpaper() {
-  if (gameState !== 'SCREENSAVER') return; document.getElementById('ss-video').style.display = 'none';
-  const bottomRow = document.getElementById('ss-bottom-row'); if (bottomRow) bottomRow.style.display = 'none';
-  if (availableWallpapers.length === 0) availableWallpapers = await window.api.getWallpapers();
-  const img = document.getElementById('ss-image'); img.style.display = 'block';
-  if (availableWallpapers && availableWallpapers.length > 0) { let wp = availableWallpapers[Math.floor(Math.random() * availableWallpapers.length)]; img.src = wp; }
-  clearTimeout(screensaverInterval); screensaverInterval = setTimeout(playRandomWallpaper, 8000);
-}
 
 function playRandomScreenshot() {
   if (gameState !== 'SCREENSAVER') return; document.getElementById('ss-video').style.display = 'none';
@@ -519,7 +509,7 @@ function playRandomScreenshot() {
 function stopScreensaver() { gameState = previousGameState; document.getElementById('screensaver-backdrop').classList.add('hidden'); const v = document.getElementById('ss-video'); v.pause(); v.removeAttribute('src'); clearTimeout(screensaverInterval); clearInterval(ssClockInterval); if (!isVideoActive() && audioCfg.bgm && audioCfg.bgm_mode !== 'OFF') bgmAudio.play().catch(e=>{}); resetIdleTimer(); }
 
 function handleSSAction(action) {
-  if (audioCfg.screensaver === 'CN WALLPAPERS' || !currentSSGame) return stopScreensaver();
+  if (!currentSSGame) return stopScreensaver();
   if (action === 'LAUNCH') { const cmd = currentSSGame.LaunchCommand; if (cmd) { stopScreensaver(); tryLaunch(currentSSGame); } else { stopScreensaver(); } }
   else if (action === 'FAV') { playSound(sfxSelect); currentSSGame.FAV = currentSSGame.FAV === "YES" ? "NO" : "YES"; window.api.saveDbField({game: currentSSGame.Game, field: 'FAV', value: currentSSGame.FAV}); updateSSUI(currentSSGame); if (gameState === 'MAIN') updateGameSelection(); }
   else if (action === 'WANT') { playSound(sfxSelect); currentSSGame.WANT_TO_PLAY = currentSSGame.WANT_TO_PLAY === "YES" ? "NO" : "YES"; window.api.saveDbField({game: currentSSGame.Game, field: 'WANT_TO_PLAY', value: currentSSGame.WANT_TO_PLAY}); updateSSUI(currentSSGame); if (gameState === 'MAIN') updateGameSelection(); }
@@ -667,7 +657,7 @@ function transitionToHome() {
   gameState = 'HOME';
   _homeOrigin = false;
   clearMediaLoaders(); clearGalleryMedia();
-  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'wrapped-screen', 'reader-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  ['splash-screen', 'start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'cfgp-screen', 'jukebox-screen', 'setup-screen', 'wrapped-screen', 'reader-screen'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
   document.getElementById('overlay-backdrop')?.classList.add('hidden');
   document.getElementById('home-screen').classList.remove('hidden');
   setBlur(false);
@@ -2268,9 +2258,7 @@ function handleScreensaverMenuHorizontal(dir) { if (currentOverlayIndex === 1) {
 function executeScreensaverMenuAction() {
   playSound(sfxSelect);
   if (currentOverlayIndex === 0) {
-    if (audioCfg.screensaver === 'SCREENSHOTS') audioCfg.screensaver = 'CN WALLPAPERS';
-    else if (audioCfg.screensaver === 'CN WALLPAPERS') audioCfg.screensaver = 'OFF';
-    else audioCfg.screensaver = 'SCREENSHOTS';
+    audioCfg.screensaver = (audioCfg.screensaver === 'SCREENSHOTS') ? 'OFF' : 'SCREENSHOTS';
     window.api.saveAudioConfig(audioCfg);
     resetIdleTimer();
     renderScreensaverMenu();
@@ -2349,6 +2337,8 @@ function transitionToStart() {
   document.getElementById('main-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.add('hidden');
   document.getElementById('ggp-screen').classList.add('hidden');
+  document.getElementById('cfgp-screen')?.classList.add('hidden');
+  document.getElementById('jukebox-screen')?.classList.add('hidden');
   document.getElementById('reader-screen')?.classList.add('hidden');
   document.getElementById('home-screen')?.classList.add('hidden');
   document.getElementById('start-screen').classList.remove('hidden');
@@ -2366,7 +2356,7 @@ function updateCategorySelection() {
 function transitionToMain() {
   if ((audioCfg.browseMode || 'LIST') === 'GALLERY') { transitionToGallery(); return; }
   gameState = 'MAIN';
-  ['start-screen', 'gallery-screen', 'ggp-screen', 'home-screen'].forEach(id => {
+  ['start-screen', 'gallery-screen', 'ggp-screen', 'cfgp-screen', 'jukebox-screen', 'reader-screen', 'home-screen'].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
   document.getElementById('main-screen').classList.remove('hidden');
@@ -3229,7 +3219,7 @@ function transitionToGallery() {
   gameState = 'GALLERY';
   galleryCatIndex = currentCategoryIndex;
   galleryQuery = '';
-  ['start-screen','main-screen','jukebox-screen','gallery-screen','ggp-screen','home-screen','reader-screen'].forEach(id => {
+  ['start-screen','main-screen','jukebox-screen','gallery-screen','ggp-screen','cfgp-screen','home-screen','reader-screen'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList[id === 'gallery-screen' ? 'remove' : 'add']('hidden');
   });
@@ -4359,16 +4349,6 @@ function _cfgpActivateBtn() {
 }
 
 // Keyboard/gamepad handler for CREMA_FGP state — wired into the existing input handler
-function handleCfgpInput(action) {
-  if (action === 'LEFT')   { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx - 1); }
-  else if (action === 'RIGHT')  { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx + 1); }
-  else if (action === 'ACCEPT') _cfgpActivateBtn();
-  else if (action === 'BACK')   { playSound(sfxBack); _cfgpActivateBtn.call(null); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
-  else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
-  else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
-  else if (action === 'SELECT_BTN') { if (_cfgpGame) { const gi = galleryGames.findIndex(g => String(g.id) === String(_cfgpGame.id)); if (gi >= 0) { filteredGames = galleryGames; currentGameIndex = gi; } else { filteredGames = [_cfgpGame]; currentGameIndex = 0; } openOverlay("GAME_MENU"); } }
-}
-
 // ══════════════════════════════════════════════════════════════════════════
 // BROWSE MODE MENU
 // ══════════════════════════════════════════════════════════════════════════
