@@ -128,23 +128,32 @@
             <span id="search-count"></span>
             <div class="nav-group-label">Core</div>
             <button class="manual-nav-btn" data-target="man-1">1. Manifesto</button>
-            <button class="manual-nav-btn" data-target="man-2">2. Quick Start</button>
+            <button class="manual-nav-btn" data-target="man-2">2. The Suite at a Glance</button>
+            <button class="manual-nav-btn" data-target="man-3">3. Quick Start</button>
 
-            <div class="nav-group-label">CNGM</div>
-            <button class="manual-nav-btn" data-target="man-3">3. Adding Games</button>
-            <button class="manual-nav-btn" data-target="man-4">4. Views &amp; Navigation</button>
-            <button class="manual-nav-btn" data-target="man-5">5. Installed Status</button>
+            <div class="nav-group-label">The Manager</div>
+            <button class="manual-nav-btn" data-target="man-4">4. Importing Your Games</button>
+            <button class="manual-nav-btn" data-target="man-5">5. The Library</button>
             <button class="manual-nav-btn" data-target="man-6">6. The Gamepage</button>
-            <button class="manual-nav-btn" data-target="man-7">7. Edit &amp; Auto-Fetch</button>
-            <button class="manual-nav-btn" data-target="man-8">8. Media, SGDB &amp; Trailers</button>
-            <button class="manual-nav-btn" data-target="man-9">9. Tools &amp; Settings</button>
+            <button class="manual-nav-btn" data-target="man-7">7. Installs &amp; Downloads</button>
+            <button class="manual-nav-btn" data-target="man-8">8. Scraping &amp; Artwork</button>
+            <button class="manual-nav-btn" data-target="man-9">9. The Home Dashboard</button>
+            <button class="manual-nav-btn" data-target="man-10">10. Playlists, Hidden &amp; F2P</button>
+            <button class="manual-nav-btn" data-target="man-11">11. Control Panel</button>
 
             <div class="nav-group-label">CREMA</div>
-            <button class="manual-nav-btn" data-target="man-10">10. Overview</button>
-            <button class="manual-nav-btn" data-target="man-11">11. Controls</button>
-            <button class="manual-nav-btn" data-target="man-12">12. Gallery &amp; Gamepage</button>
-            <button class="manual-nav-btn" data-target="man-13">13. Scraping</button>
-            <button class="manual-nav-btn" data-target="man-14">14. Music &amp; Atmosphere</button>
+            <button class="manual-nav-btn" data-target="man-12">12. Overview &amp; Setup</button>
+            <button class="manual-nav-btn" data-target="man-13">13. The Home Screen</button>
+            <button class="manual-nav-btn" data-target="man-14">14. Browsing the Library</button>
+            <button class="manual-nav-btn" data-target="man-15">15. The Gamepages</button>
+            <button class="manual-nav-btn" data-target="man-16">16. Controls Reference</button>
+            <button class="manual-nav-btn" data-target="man-17">17. Jukebox &amp; Atmosphere</button>
+            <button class="manual-nav-btn" data-target="man-18">18. Menus &amp; Settings</button>
+
+            <div class="nav-group-label">Engine &amp; Data</div>
+            <button class="manual-nav-btn" data-target="man-19">19. GRINDER</button>
+            <button class="manual-nav-btn" data-target="man-20">20. Your Data &amp; Backups</button>
+            <button class="manual-nav-btn" data-target="man-21">21. Tips &amp; Troubleshooting</button>
         </div>
 
         <div id="manual-content">
@@ -169,367 +178,295 @@
             </div>
 
             <!-- ====== SECTION 2 ====== -->
-            <h2 id="man-2">2. Quick Start</h2>
-            <p>CNGM and CREMA are two apps that share one library database and live in the same folder. CNGM is the desktop manager; CREMA is the fullscreen couch companion. Neither requires system installation &mdash; just run the AppImage.</p>
-
-            <h3>The Welcome &amp; Setup Guide</h3>
-            <p>Every time CNGM launches, it shows a <strong>Welcome &amp; Setup Guide</strong> screen that walks you through the recommended first-run workflow step by step. Each step has live action buttons built right into the panel &mdash; you can sync Heroic, enter your Steam credentials, run a batch fetch, save API keys, and register your system shortcuts all without leaving the screen.</p>
-
+            <h2 id="man-2">2. The Suite at a Glance</h2>
+            <p>Cafe Neurotico is <strong>one AppImage with three faces</strong>. There is nothing to install and nothing extra to download &mdash; every part of the suite ships inside the single file.</p>
             <div class="manual-box">
-                <p class="manual-box-title">What the Welcome Screen Contains</p>
-                <ul style="margin: 0;">
-                    <li><strong>Step 1 &mdash; Connect Your Stores:</strong> Sync Heroic Games (Epic, GOG, Amazon) with one button. Paste your SteamID64 and API Key inline to fetch your Steam library directly from the screen.</li>
-                    <li><strong>Step 2 &mdash; Fetch Artwork &amp; Metadata:</strong> Runs Batch Fetch with an inline progress bar &mdash; no need to open the Tools menu.</li>
-                    <li><strong>Step 3 &mdash; API Keys (Optional):</strong> Paste and save your SteamGridDB key and IGDB credentials directly, with a live connection test for IGDB.</li>
-                    <li><strong>Step 4 &mdash; CREMA Companion:</strong> Explains where to place <code>CREMA.AppImage</code> to activate the fullscreen companion.</li>
-                    <li><strong>Step 5 &mdash; System Menu Shortcuts:</strong> Registers both CNGM and CREMA in your desktop launcher with a single button press.</li>
+                <p class="manual-box-title">The Three Faces</p>
+                <ul style="margin:0;">
+                    <li><strong>The Manager</strong> &mdash; the desktop face. Import, organize, scrape, edit and launch your library with a mouse and keyboard. This is where you are right now.</li>
+                    <li><strong>CREMA</strong> &mdash; the fullscreen, gamepad-first face for the living room. Same library, same artwork, same playlists &mdash; zero configuration, always in sync. Launch it with the coffee-cup button in the titlebar or run the AppImage with <code>--crema</code>.</li>
+                    <li><strong>GRINDER</strong> &mdash; the GOG &amp; Epic engine. It signs in to your accounts, downloads games, configures Proton and launches them. It works silently inside the other two faces; its own window (run with <code>grinder</code>) is there for deep per-game tuning.</li>
                 </ul>
             </div>
+            <p><strong>EmuLatte</strong>, the ROM library manager, is a separate app &mdash; but the suite detects <code>EmuLatte.AppImage</code> sitting in the same folder and integrates it into your app menu and sidebar.</p>
+            <p>All three faces read and write the <strong>same library database</strong>. Mark a favourite on the couch and it is a favourite on the desktop. Install a game from CREMA and the Manager knows immediately.</p>
 
-            <p>The action buttons in the Welcome Screen perform their tasks <strong>without closing the screen</strong>, so you can complete the entire setup in sequence from top to bottom. Only <strong>Let&rsquo;s Go</strong> and <strong>Open User Manual</strong> dismiss it.</p>
-
+            <!-- ====== SECTION 3 ====== -->
+            <h2 id="man-3">3. Quick Start</h2>
+            <p>The <strong>Welcome to the System</strong> screen appears on every launch (until you tell it not to) and walks you through the whole setup in three steps &mdash; each with live buttons, so you never have to leave the screen:</p>
+            <ol>
+                <li><strong>Import your games.</strong> Steam: paste your free API key and SteamID64, hit <em>Fetch Steam Library</em>. GOG &amp; Epic: sign in once inside GRINDER &mdash; after that, new purchases import automatically every time you press <em>Refresh Library</em>. Flatpak, PICO-8 and itch.io games are picked up automatically when you open their filters.</li>
+                <li><strong>Fetch artwork &amp; metadata.</strong> One button scrapes covers, hero art, logos, descriptions, HowLongToBeat and ProtonDB data for everything you just imported.</li>
+                <li><strong>Add to your app menu.</strong> One click registers Cafe Neurotico and CREMA (and EmuLatte, if detected) in GNOME, KDE or any desktop launcher, with proper icons.</li>
+            </ol>
             <div class="tip-box">
-                <p><strong>Don&rsquo;t show again:</strong> A checkbox at the bottom of the Welcome Screen lets you opt out of seeing it on future launches. If you ever want to bring it back, go to <strong>Tools &rarr; System &rarr; Show Welcome &amp; Setup Guide</strong>. This also resets the &ldquo;don&rsquo;t show again&rdquo; flag so the screen appears on the next launch as well.</p>
+                <p><strong>Bring it back anytime:</strong> the Welcome screen lives in <strong>Menu &rarr; System</strong>. Nothing in it is exclusive &mdash; every action also exists in Connect and the Control Panel.</p>
             </div>
-
             <h3>Your Files</h3>
-            <p>On first launch, CNGM creates a <code>GameManagerConfig</code> folder next to the app. Inside:</p>
+            <p>On first launch the app creates a <code>GameManagerConfig</code> folder <strong>next to the AppImage</strong>:</p>
             <ul>
-                <li><code>game_library.db</code> &mdash; your SQLite library database (all your games and metadata)</li>
+                <li><code>games.db</code> &mdash; your entire library database: games, metadata, playlists, settings</li>
                 <li><code>images/</code> &mdash; covers, hero art, logos, icons, screenshots</li>
                 <li><code>trailers/</code> &mdash; locally downloaded MP4 trailers</li>
             </ul>
-            <div class="tip-box">
-                <p><strong>Portability tip:</strong> Back up the entire <code>GameManagerConfig</code> folder and you have your complete library &mdash; artwork, trailers, metadata, everything. Restore it anywhere, run the app, and it all works immediately.</p>
-            </div>
-
-            <h3>Recommended First-Run Workflow</h3>
-            <ol>
-                <li>On first launch, the <strong>Welcome &amp; Setup Guide</strong> appears automatically &mdash; follow the steps there for the fastest setup.</li>
-                <li>Open <strong>Connect</strong> and sync your stores &mdash; Heroic first, then Steam.</li>
-                <li>Open <strong>Tools &rarr; Library</strong> and run <strong>Batch Fetch Missing Data</strong> to pull artwork for all synced games at once.</li>
-                <li>Set up <strong>SteamGridDB</strong> (free API key at steamgriddb.com) and <strong>IGDB</strong> (free Twitch dev key at dev.twitch.tv) in the Connect menu for richer metadata and custom logo art.</li>
-                <li>Place <code>CREMA.AppImage</code> in the same folder as CNGM &mdash; the <em>Go Fullscreen With CREMA</em> button appears automatically at the bottom of the sidebar.</li>
-                <li>Open <strong>Tools &rarr; System</strong> and click <strong>Add to Application Menu</strong> to register both CNGM and CREMA in your desktop launcher with proper icons &mdash; no terminal required.</li>
-            </ol>
-
-            <!-- ====== SECTION 3 ====== -->
-            <h2 id="man-3">3. CNGM &mdash; Adding Games &amp; Store Sync</h2>
-            <p>Click <strong>Connect</strong> in the sidebar to reach the store sync menu. All data is stored locally &mdash; no cloud accounts are required to use the app.</p>
-
-            <h3>Heroic Sync (Epic / GOG / Amazon) &mdash; Recommended</h3>
-            <p>If you use Heroic Games Launcher, this is the best way to import your library. CNGM reads Heroic&rsquo;s local configuration files directly &mdash; no login window, no API key. It imports everything you own, installed or not, <strong>with the correct native launch commands already filled in</strong>.</p>
-            <ul>
-                <li><strong>Sync Heroic Games:</strong> Imports all Epic, GOG, and Amazon libraries from your local Heroic installation in one shot.</li>
-                <li><strong>Refresh Heroic New Games</strong> (in Tools &rarr; Library): Opens Heroic, waits for you to update its library, and auto-syncs when Heroic finishes &mdash; use this after buying a new game in Epic or GOG via Heroic.</li>
-            </ul>
-            <div class="tip-box">
-                <p><strong>Amazon Games</strong> via Heroic are fully supported. If you have Amazon Games connected in Heroic, they appear in CNGM automatically under the <em>Amazon</em> category, with launch commands ready.</p>
-            </div>
-
-            <h3>Steam API Import</h3>
-            <p>Valve&rsquo;s scraping protection makes direct scraping unreliable. The official Steam API is the right way:</p>
-            <ol>
-                <li>Get a free API Key at <code>steamcommunity.com/dev/apikey</code></li>
-                <li>Find your 17-digit <strong>SteamID64</strong> (from your profile URL or steamid.io)</li>
-                <li>Enter both in the Connect menu and click <strong>Fetch Steam Library</strong></li>
-            </ol>
-            <div class="warn-box">
-                <p><strong>Important:</strong> Your Steam profile&rsquo;s <em>Game Details</em> must be set to <strong>Public</strong> for the API to return your game list.</p>
-            </div>
-
-            <h3>IGDB Integration</h3>
-            <p>IGDB (Internet Game Database) enriches metadata with franchise info, ratings, and additional game data. Get free credentials at <code>dev.twitch.tv</code>: register a Twitch developer app and copy the Client ID and Client Secret into the Connect menu. Once set, Auto-Fetch automatically pulls IGDB data alongside Steam data.</p>
-
-            <h3>GOG Direct Login</h3>
-            <p>Opens a secure internal browser login window. Log in and close it &mdash; CNGM will import your owned GOG titles. <strong>However, this method cannot auto-generate launch commands.</strong> You will need to fill them in manually for each game. The strongly recommended alternative is connecting GOG to Heroic and using Heroic Sync, which provides launch commands automatically.</p>
-
-            <h3>Adding Games Manually</h3>
-            <p>Hit <strong>+ Add Game</strong> in the sidebar. Enter the game&rsquo;s title &mdash; a new blank entry is created in the database. From there, open Edit Details and click <strong>&#x2728; Auto-Fetch</strong> to pull all metadata and artwork automatically. For Physical, Emulation, or other non-store games, type any terminal command into the Launch Command field.</p>
-
-            <h3>Advanced: Custom Stores &amp; Tags</h3>
-            <p>The <strong>Store</strong> field is plain text with no restrictions &mdash; you can type anything you want there. This opens up a neat trick: create your own virtual stores for platforms that don&rsquo;t have a dedicated sidebar button, like itch.io, GeForce Now, Xbox Cloud Gaming, Humble Bundle, GamePass, or anything else.</p>
-            <p>The search bar searches <strong>every field</strong> in the database, including Store. So a game with <code>Store: itch.io</code> will appear when you type <code>itch.io</code> in the search box, giving you instant filtered access to all your itch.io games.</p>
-            <div class="tip-box">
-                <p><strong>Recommended pattern:</strong> Use <code>Others, itch.io</code> instead of just <code>itch.io</code>. The comma-separated value means the game still shows under the <strong>Others</strong> sidebar filter (which matches anything containing the word &ldquo;others&rdquo;), and is also searchable by typing <code>itch.io</code>. Using just the custom name alone works fine too &mdash; it will be searchable but won&rsquo;t appear under any sidebar filter button.</p>
-            </div>
-            <div class="warn-box">
-                <p><strong>Avoid accidental keyword matches:</strong> Don&rsquo;t include <code>steam</code>, <code>epic</code>, <code>gog</code>, <code>heroic</code>, <code>amazon</code>, <code>physical</code>, <code>others</code>, <code>emulation</code>, or <code>apps</code> unintentionally in a custom name &mdash; the sidebar filters use a simple text match, so a store named <code>steam-like</code> would show up under the Steam filter.</p>
-            </div>
-
-            <h3>CSV Import / Export</h3>
-            <p>Prefer bulk-adding via spreadsheet? Download the <strong>CSV Template</strong> from Tools &rarr; Library, fill it in, and import it back. All standard fields are supported. Export CSV does the reverse &mdash; dumps your entire library to a spreadsheet for editing or archiving.</p>
+            <p>GRINDER keeps its own data (store logins, install records) in <code>~/.config/grinder/</code> &mdash; per-machine on purpose, since installed games differ between computers.</p>
 
             <!-- ====== SECTION 4 ====== -->
-            <h2 id="man-4">4. CNGM &mdash; Views &amp; Navigation</h2>
-            <p>Three main views, one persistent sidebar. The sidebar filter applies instantly from anywhere &mdash; even from deep inside a Gamepage, clicking a filter button snaps you back to the last grid view you were using without needing to navigate manually.</p>
-
-            <h3>The List View</h3>
-            <p>High-density, spreadsheet-style. Shows launch status, Favs, Want to Play, Store badge, Genre, and Release Year at a glance. Double-click any row to open its Gamepage. If Gaming History is enabled in Tools, your most recently played games are pinned to the top of the list.</p>
-
-            <h3>The Gallery View</h3>
-            <p>Visual cover-art grid. At the top, a dynamic <strong>Hero header</strong> cycles through hero art and screenshots from your currently filtered selection &mdash; a built-in animated screensaver effect using a Ken Burns zoom and crossfade. Your recent games appear first when history tracking is active. Each card shows the game cover, store badge, and an install status dot.</p>
-
-            <h3>Sidebar Filters (See Section)</h3>
+            <h2 id="man-4">4. The Manager &mdash; Importing Your Games</h2>
+            <p>Open <strong>Connect</strong> (the chain-link icon in the side rail, or Control Panel &rarr; Connections). All data stays local; no cloud account is ever required to use the app.</p>
+            <h3>Steam</h3>
             <ul>
-                <li><strong>All Games</strong> &mdash; entire library</li>
-                <li><strong>Installed</strong> &mdash; games currently detected as installed on this machine</li>
-                <li><strong>Favs / Want</strong> &mdash; your personal curation lists</li>
-                <li><strong>Steam / Epic / GOG / Amazon</strong> &mdash; filter by store</li>
-                <li><strong>Physical / Others / Emulation / Apps</strong> &mdash; manual categories for non-store games</li>
+                <li>Get a free API key at <code>steamcommunity.com/dev/apikey</code> and your SteamID64 from your profile URL.</li>
+                <li>Your Steam <strong>Game Details privacy must be set to Public</strong> for the API to list your games.</li>
+                <li>The import includes played free-to-play titles (tagged with a green <span class="key">FREE</span> pill) and even Steam&rsquo;s &ldquo;unvetted&rdquo; small releases that the API normally hides.</li>
+                <li>Playtime (total and last two weeks) is captured on every sync.</li>
             </ul>
-
-            <h3>The CREMA Companion Button</h3>
-            <p>If <code>CREMA.AppImage</code> (any capitalization) is in the same folder as CNGM, a <strong>Go Fullscreen With CREMA</strong> button appears at the bottom of the sidebar. Clicking it minimizes CNGM and launches CREMA as a separate fullscreen process. Both apps access the same <code>game_library.db</code> &mdash; any change in one is immediately reflected in the other.</p>
+            <h3>GOG &amp; Epic</h3>
+            <ul>
+                <li>Open GRINDER once (Connect card or app menu) and sign in to GOG and/or Epic.</li>
+                <li>From then on, <strong>Refresh Library</strong> pulls your full owned list from both stores automatically &mdash; buy a game, hit refresh, it appears (as &ldquo;not installed&rdquo;, ready to install in one click).</li>
+                <li>DLC and soundtracks are filtered out automatically; a GOG/Epic copy of a game you also own on Steam merges into one entry with a launcher picker.</li>
+            </ul>
+            <h3>Flatpak, PICO-8, itch.io</h3>
+            <ul>
+                <li><strong>Flatpak:</strong> clicking the Flatpak filter scans installed apps and even generates cover art from their icons.</li>
+                <li><strong>PICO-8:</strong> point the app at your PICO-8 binary (Control Panel) and your cart folder is scanned; carts get their label art as covers, plus Splore and the BBS browser.</li>
+                <li><strong>itch.io:</strong> sync your owned library through the itch integration in Connect.</li>
+            </ul>
+            <h3>Anything Else</h3>
+            <p><strong>Add Custom Game</strong> (Control Panel &rarr; Library) creates an entry for any game or app. Give it a launch command &mdash; if it runs on Linux, it runs from here. Store-less entries are filed under <em>Others</em> automatically.</p>
 
             <!-- ====== SECTION 5 ====== -->
-            <h2 id="man-5">5. CNGM &mdash; Installed Status</h2>
-            <p>CNGM tracks whether each game is currently installed on your system and reflects it visually everywhere.</p>
-
-            <h3>The Install Dot</h3>
-            <p>A small colored dot overlays every cover card (top-left corner) and list row. <strong>Green</strong> = installed. <strong>Orange</strong> = not installed or status unknown.</p>
-
-            <h3>How Detection Works</h3>
+            <h2 id="man-5">5. The Manager &mdash; The Library</h2>
+            <p>The library has two views &mdash; <strong>Gallery</strong> (cover grid) and <strong>List</strong> (a sortable table) &mdash; plus a persistent icon rail on the left.</p>
+            <h3>The Search Row</h3>
+            <p>Both views share the same search row at the top:</p>
             <ul>
-                <li><strong>Steam games:</strong> Detected by scanning <code>appmanifest_*.acf</code> files across all your configured Steam library folders, including secondary drives. A live file watcher updates statuses automatically when you install or uninstall a game in Steam &mdash; no manual refresh needed.</li>
-                <li><strong>Heroic games (Epic / GOG / Amazon):</strong> Read from Heroic&rsquo;s <code>installed.json</code> files. Run Sync Heroic Games or Check Installed Games to refresh these.</li>
-                <li><strong>Physical / Others / Emulation / Apps:</strong> A game in these categories is considered installed only if it has a Launch Command saved. Adding the command marks it installed immediately.</li>
+                <li><strong>Search</strong> &mdash; instant, searches titles as you type.</li>
+                <li><strong>Category dropdown</strong> &mdash; jump to any store or filter (Steam, GOG, Epic, Flatpak, PICO-8, itch.io, Installed, Favourites, Want to Play&hellip;). Stays in sync with the rail buttons.</li>
+                <li><strong>Sort dropdown</strong> &mdash; A&nbsp;&mdash;&nbsp;Z, Last Played, Favourites First, Want to Play First, Recently Added, Scraped First. Your choice is remembered across restarts. Any sort other than A&mdash;Z hides the &ldquo;Recent Games&rdquo; strip so the whole grid reads in your chosen order.</li>
+                <li><strong>Playlist dropdown</strong> &mdash; jump into any playlist, the Recently Imported feed, or create a new playlist on the spot.</li>
+                <li><strong>Games count</strong> &mdash; live count of what you&rsquo;re looking at.</li>
             </ul>
-
-            <h3>Install / Play Buttons</h3>
-            <p>In Gallery and List view, uninstalled games show an <strong>INSTALL</strong> button. Clicking it:</p>
-            <ul>
-                <li><strong>Steam:</strong> Opens the Steam store install page for that game.</li>
-                <li><strong>Heroic / Epic / GOG / Amazon:</strong> Opens the Heroic install page for that game.</li>
-                <li><strong>Physical / Others / Emulation / Apps:</strong> Opens an Add Command dialog so you can type the launch command directly.</li>
-            </ul>
-            <div class="tip-box">
-                <p><strong>Check Installed Games</strong> in Tools &rarr; Library manually rescans your entire library and updates all statuses at once. Use it after a Heroic library update.</p>
-            </div>
+            <h3>The Side Rail</h3>
+            <p>Icons for All Games, Favourites, Want to Play, store filters, playlists, plus Add Game, Connect, the Control Panel and Refresh Library. Filters combine: stores are OR&rsquo;d, qualifiers (Installed, Favs, Want) are AND&rsquo;d.</p>
+            <h3>Gallery Cards</h3>
+            <p>Each cover carries its information quietly: an <strong>install dot</strong> (green = installed, orange = not), <strong>store badges</strong>, a <span class="key">FREE</span> pill on free-to-play games, hover flags for Favourite / Want / Playlist, and an inline <strong>Play or Install</strong> button. One click opens the gamepage.</p>
+            <div class="tip-box"><p><strong>Ken Burns hero:</strong> the gallery header slowly pans across your library&rsquo;s screenshots. If you&rsquo;re on older hardware, turn it off in Control Panel &rarr; Appearance.</p></div>
 
             <!-- ====== SECTION 6 ====== -->
-            <h2 id="man-6">6. CNGM &mdash; The Gamepage</h2>
-            <p>Double-click any entry to enter the immersive Gamepage &mdash; a premium storefront-style view for that game.</p>
-
-            <h3>What You See</h3>
+            <h2 id="man-6">6. The Manager &mdash; The Gamepage</h2>
+            <p>The gamepage opens as a <strong>floating panel</strong> over your library &mdash; the grid stays blurred behind it, and clicking outside (or the Back button) drops you exactly where you left off, scroll position included.</p>
+            <h3>What&rsquo;s On It</h3>
             <ul>
-                <li><strong>Hero Banner:</strong> A full-width cropped image at the top. The transparent Logo is overlaid at the center.</li>
-                <li><strong>Action Bar:</strong> Play / Install button, Edit Details, Watch Trailer (if downloaded), FAV toggle, and WANT TO PLAY toggle.</li>
-                <li><strong>Stats Panel:</strong> Release year, Developer, Publisher, Genre, HLTB, Metacritic, ProtonDB rating, Co-op info, Player count, Franchise / Series, and Similar Games.</li>
-                <li><strong>Description:</strong> A plain-text summary first, followed by the full rich HTML description pulled from the Steam store page.</li>
-                <li><strong>Screenshots:</strong> An animated Ken Burns slideshow at the bottom. Click any screenshot to enter a fullscreen slideshow. Click the fullscreen view to advance frames.</li>
+                <li><strong>Hero art</strong> with the game&rsquo;s logo, store icons and the store/category logo in the corner.</li>
+                <li><strong>Action row:</strong> Favourite, Want to Play, Add to Playlist (and Remove, when it&rsquo;s in one), <strong>Hide</strong> (eye icon &mdash; removes the game from every view; manage hidden games in the Control Panel), Open in Steam, Uninstall, SPLORE (PICO-8), Watch Trailer, and Edit Details.</li>
+                <li><strong>Floating Play/Install button</strong>, always visible at the bottom right.</li>
+                <li><strong>Metadata column:</strong> achievements ring (press to see the full list), release year, developer, genre, HowLongToBeat, Metacritic, ProtonDB tier, similar games (clickable links when you own them).</li>
+                <li><strong>Description</strong> &mdash; the short summary plus the full Steam page write-up, and a screenshots strip with a slideshow.</li>
+                <li>Click the <strong>box art</strong> to see it full-size in a lightbox.</li>
             </ul>
-
-            <h3>Live Toggles</h3>
-            <p>The <strong>&#x2605; FAV</strong> and <strong>&#x2691; WANT TO PLAY</strong> buttons in the action bar toggle instantly and write directly to the database &mdash; no need to open Edit mode.</p>
-
-            <h3>The Trailer Button</h3>
-            <p>The <strong>&#x1F3AC; WATCH TRAILER</strong> button only appears if a trailer video has been downloaded locally. It never streams from the internet &mdash; if the button is there, the video plays instantly at full quality, entirely offline.</p>
+            <h3>Edit Details</h3>
+            <p>Opens directly on top of the gamepage (same panel, seamless). Every field is yours to change: title, store, launch command, artwork, screenshots, description, franchise, flags. Custom art you set by hand is protected from being overwritten by re-scrapes.</p>
 
             <!-- ====== SECTION 7 ====== -->
-            <h2 id="man-7">7. CNGM &mdash; Edit Details &amp; Auto-Fetch</h2>
-            <p>Click <strong>&#x2699;&#xFE0F; EDIT DETAILS</strong> from any Gamepage. Every field is editable and saved directly to the database on demand.</p>
-
-            <h3>&#x2728; Auto-Fetch</h3>
-            <p>The single most powerful button. It runs a comprehensive scrape and pulls everything it can find in one go:</p>
+            <h2 id="man-7">7. The Manager &mdash; Installs &amp; the Download Manager</h2>
+            <h3>How Installing Works</h3>
             <ul>
-                <li>Cover art, Hero Art, Logo (with SGDB fallback if API key is set), Icon, up to 5 Screenshots</li>
-                <li>Short blurb description and full rich HTML store description</li>
-                <li>Release Year, Developer, Publisher, Genre, Franchise / Series</li>
-                <li>HLTB (HowLongToBeat main story hours)</li>
-                <li>ProtonDB compatibility tier (Platinum, Gold, Silver, Bronze, etc.)</li>
-                <li>Metacritic score, Co-op info, and Player count</li>
+                <li><strong>Steam games</strong> install through the Steam client (<code>steam://install</code>) &mdash; Steam opens and takes over.</li>
+                <li><strong>GOG &amp; Epic games</strong> install <strong>in-process</strong> through the built-in GRINDER engine: pick a folder, see the download size and your free disk space up front, and watch live progress. No external window.</li>
+                <li><strong>Uninstall</strong> (gamepage action row) removes the game files and its Wine prefix.</li>
             </ul>
-
-            <div class="manual-box">
-                <p class="manual-box-title">Step-by-Step: Building the Ultimate Gamepage</p>
-                <ol>
-                    <li><strong>Auto-Fetch first</strong> &mdash; covers ~90% of everything automatically.</li>
-                    <li>If the Hero Art or Logo looks generic, click the <strong>SGDB</strong> button next to those fields to browse stunning custom fan art from SteamGridDB.</li>
-                    <li>Click <strong>&#x25B6; WATCH TRAILER</strong> in the edit bar &mdash; search YouTube, pick the best result, and download it locally with one click.</li>
-                    <li>Save and return to the Gamepage. You now have a fully curated, completely offline, beautiful entry.</li>
-                </ol>
-            </div>
-
-            <h3>HLTB &amp; ProtonDB Live Lookups</h3>
-            <p>The &#x1F50D; icons next to HLTB and ProtonDB fields trigger live API queries. If the lookup succeeds, the value drops into the field automatically. If it fails (unusual title, API momentarily down), CNGM opens a secure internal browser window directly to the search results page &mdash; read the value, close the window, type it in. No dead ends.</p>
-
-            <h3>Asset Management (Left Column)</h3>
-            <p>Each image asset (Cover, Hero, Logo, Icon) has its own row with four options: <strong>Auto</strong> (fetch from Steam CDN), <strong>SGDB</strong> (browse community art), <strong>Local</strong> (pick any file from your disk), and <strong>Delete</strong> (remove the current asset).</p>
-
-            <h3>&#x1F9F9; Clear Meta</h3>
-            <p>Wipes all scraped metadata fields (description, stats, etc.) without touching images or launch commands. Useful when you want to re-scrape a game completely from scratch.</p>
+            <h3>The Download Manager</h3>
+            <p>Start more than one install and they <strong>queue</strong> &mdash; each begins automatically when the previous one finishes. Manage the queue from:</p>
+            <ul>
+                <li>The <strong>downloads icon in the titlebar</strong> (with a live count badge) &mdash; works even when nothing is downloading.</li>
+                <li>The <strong>progress bar</strong> that appears at the top during any download &mdash; click it to open the manager; click outside to return to it.</li>
+            </ul>
+            <p>Inside: the active download with live percentage and a <strong>Cancel</strong> button, the waiting queue (remove anything), and a history of completed installs. Click any game&rsquo;s name to jump to its gamepage.</p>
+            <div class="tip-box"><p><strong>Phone notifications:</strong> with KDE Connect (or GSConnect) paired, the &ldquo;Game installed&rdquo; and &ldquo;Now Playing&rdquo; notifications &mdash; cover art included &mdash; appear on your phone automatically. Toggle in Control Panel &rarr; Behavior.</p></div>
 
             <!-- ====== SECTION 8 ====== -->
-            <h2 id="man-8">8. CNGM &mdash; Media, SGDB &amp; Trailers</h2>
-
-            <h3>SteamGridDB (SGDB)</h3>
-            <p>SteamGridDB is a massive community art archive with custom transparent logos and textless hero backgrounds. Get a free API key at <code>steamgriddb.com</code> and paste it into the Connect menu. Once configured, every <strong>SGDB</strong> button in the Edit screen opens a browsable grid of top-rated art for that asset type.</p>
-            <p>If the auto-search picks the wrong game (e.g., &ldquo;Doom 2016&rdquo; instead of &ldquo;Doom 1993&rdquo;), use the <strong>manual search box</strong> inside the SGDB window to hunt for the exact variation you want. Click an image to download and apply it immediately.</p>
-
-            <h3>YouTube Trailers &amp; The Local Rule</h3>
-            <p>Clicking <strong>&#x25B6; WATCH TRAILER</strong> in the edit bar queries YouTube for the game&rsquo;s trailer. A list of results appears &mdash; pick the best one. CNGM uses <code>yt-dlp</code> internally to download the highest-quality MP4 to your local <code>trailers/</code> folder.</p>
-            <p><strong>The Local Rule:</strong> The <em>&#x1F3AC; WATCH TRAILER</em> button on the Gamepage only appears if the trailer has been downloaded to disk. CNGM never streams from the internet on the Gamepage. If the button is visible, the video plays instantly, offline, at maximum quality.</p>
-            <div class="tip-box">
-                <p><strong>yt-dlp and ffmpeg are bundled inside CNGM</strong> &mdash; no extra installation required. Trailer downloads work out of the box.</p>
-            </div>
+            <h2 id="man-8">8. The Manager &mdash; Scraping &amp; Artwork</h2>
+            <p>Scraping fills your library with covers, hero images, logos, icons, screenshots, descriptions, genres, release years, HowLongToBeat times, Metacritic scores and ProtonDB tiers. Everything downloads to your local <code>images/</code> folder &mdash; no link rot, ever.</p>
+            <ul>
+                <li><strong>Auto-Fetch</strong> (Edit Details) &mdash; one game, one click, everything found.</li>
+                <li><strong>Batch Fetch</strong> (Control Panel &rarr; Library, or the Welcome screen) &mdash; sweeps every game that&rsquo;s missing data. After a Refresh Library, you&rsquo;re offered a scrape of just the new arrivals.</li>
+                <li><strong>SteamGridDB</strong> (free key at <code>steamgriddb.com</code>) &mdash; browse fan-made grids, heroes and logos and pick your favourite per game.</li>
+                <li><strong>IGDB</strong> (free Twitch dev credentials) &mdash; richer metadata and the fallback for non-Steam games.</li>
+                <li><strong>Trailers</strong> &mdash; search YouTube from inside the app and download a local MP4; it plays on the gamepage and in CREMA.</li>
+            </ul>
+            <div class="warn-box"><p><strong>Your art is safe:</strong> re-scraping never overwrites artwork you set manually.</p></div>
 
             <!-- ====== SECTION 9 ====== -->
-            <h2 id="man-9">9. CNGM &mdash; Tools &amp; Settings</h2>
-            <p>Click <strong>Tools</strong> in the sidebar. Cards are organized by function. Use the search bar at the top to jump directly to any setting by keyword.</p>
-
-            <h3>&#x1F3A8; Appearance</h3>
-            <p><strong>Theme Selection</strong> opens the full theme picker organized by category. Live-preview any color scheme instantly without committing. <strong>UI Scale</strong> zooms the entire interface from 50% to 150% &mdash; useful for Steam Deck or 4K displays.</p>
-
-            <h3>&#x1F552; Gaming History</h3>
-            <p>Controls how many recently launched games CNGM pins to the top of the library views (OFF, 5, 10, 15, or 20 recent games). <strong>Clear History</strong> wipes the timestamps without touching any other data. Note: CNGM and CREMA maintain separate history counts, independently configured in each app.</p>
-
-            <h3>&#x2728; Library</h3>
+            <h2 id="man-9">9. The Manager &mdash; The Home Dashboard</h2>
+            <p>An optional start page that greets you before the library: a 2D widget board you can drag, resize and curate. New installs start with <strong>Roulette, Throwback and Continue Playing</strong> up top, <strong>Hidden Gems and Free This Week</strong> in the middle, and double-height <strong>Gaming News and Wishlist</strong> below.</p>
+            <h3>Working the Board</h3>
             <ul>
-                <li><strong>Refresh Heroic New Games:</strong> Opens Heroic Games Launcher, watches for library changes, and auto-syncs when Heroic finishes updating. Use after buying a new game in Epic or GOG via Heroic.</li>
-                <li><strong>Batch Fetch Missing Data:</strong> Scans all five asset types (Cover, Hero, Logo, Icon, Screenshots) for every game and silently pulls whatever is missing from Steam. Run it once after a big sync.</li>
-                <li><strong>Check Installed Games:</strong> Manually rescans Steam appmanifests and Heroic installed files, updating the Installed status for your entire library in one shot.</li>
-                <li><strong>Update Library:</strong> Forces a full library reload from the database, refreshing the current view.</li>
-                <li><strong>Export CSV / Import CSV / CSV Template:</strong> Move your library in and out of spreadsheet format. Template downloads a blank CSV with all correct column headers.</li>
+                <li><strong>Edit Layout</strong> &mdash; drag widgets anywhere, resize from the corner grip, remove with &times;.</li>
+                <li><strong>+ Add Widget</strong> &mdash; every toggle applies instantly; no save button.</li>
+                <li><strong>Reset</strong> &mdash; back to the default arrangement.</li>
+                <li>The house and book icons in the titlebar switch between Home and the library at any time.</li>
             </ul>
+            <h3>The Widget Shelf</h3>
+            <p><strong>Local (no network):</strong> The Daily Grind, Continue Playing, Backlog Weight, Library Overview, Store Breakdown, Proton Readiness, Top Genres, Roulette, Recently Imported / Played, Hidden Gems, Most Played, Couch Night, Franchise Spotlight, Beaten %, Achievement Completion, Throwback, Disk Footprint, Year in Review.</p>
+            <p><strong>Online (strictly opt-in &mdash; zero network calls until you enable them):</strong> Wishlist &amp; Deals (IsThereAnyDeal &mdash; track un-owned games and price cuts), Free This Week (Epic), Gaming News (your own RSS feeds), Your Games &mdash; What&rsquo;s New (Steam patch notes for games you play), Proton Watch (games that climbed to Gold/Platinum).</p>
 
-            <h3>&#x1F5C4;&#xFE0F; System</h3>
+            <!-- ====== SECTION 10 ====== -->
+            <h2 id="man-10">10. Playlists, Hidden Games &amp; Free-to-Play</h2>
+            <h3>Playlists</h3>
             <ul>
-                <li><strong>Backup ZIP:</strong> Packs your entire <code>GameManagerConfig</code> folder &mdash; database, covers, logos, screenshots, trailers &mdash; into a single ZIP archive. This is your complete migration package.</li>
-                <li><strong>Restore ZIP:</strong> Unpacks a backup archive. <em>Warning: this overwrites your current library entirely.</em></li>
-                <li><strong>Add to Application Menu:</strong> Registers both CNGM and CREMA in your desktop launcher (GNOME, KDE, XFCE, etc.). Writes <code>.desktop</code> files, extracts icons, and refreshes the launcher database &mdash; no terminal required. Re-run it if you move the app folder.</li>
-                <li><strong>Show Welcome &amp; Setup Guide:</strong> Reopens the first-run Welcome Screen at any time. Also resets the &ldquo;don&rsquo;t show again&rdquo; flag, so the screen will appear again on the next launch until you opt out again.</li>
+                <li>Create from the rail, the search-row dropdown, or any game&rsquo;s + Playlist button. Order is yours; games can live in many playlists.</li>
+                <li><strong>Recently Imported</strong> is an automatic feed of your newest arrivals (size configurable in Behavior; newest always on top).</li>
+                <li>Playlists appear in CREMA as first-class categories, marked with <code>&#8801;</code>. Changes sync both ways instantly.</li>
             </ul>
-
-            <h3>&#x1F9F9; Cleanup</h3>
-            <ul>
-                <li><strong>Clean Images:</strong> Cross-references every image assigned in the database and deletes orphaned files. Safe and surgical &mdash; nothing assigned to a current game is touched.</li>
-                <li><strong>Clear All Images:</strong> The nuclear option. Wipes all downloaded artwork and screenshots from disk. Your text metadata is preserved, but all visual assets must be re-fetched.</li>
-                <li><strong>Wipe Secure Browser Data:</strong> Clears the internal Chromium cache used by the GOG login window and Steam API popups. First thing to try if a store sync is behaving strangely.</li>
-            </ul>
-
-            <!-- ====== CREMA SECTIONS ====== -->
-
-            <h2 id="man-10">10. CREMA &mdash; Overview</h2>
-            <div class="manual-box">
-                <p class="manual-box-title">What Is CREMA?</p>
-                <p><strong>CREMA</strong> is the sweet foam on top of the coffee. It is CNGM&rsquo;s fullscreen companion app &mdash; laidback, easygoing, and focused purely on fun. Designed for couch play with a gamepad, CREMA presents your library in a bold, beautiful TV-mode interface with ambient music integration. Grab a controller and enjoy.</p>
-            </div>
-
-            <h3>Launching CREMA</h3>
-            <p>Place <code>CREMA.AppImage</code> (any capitalization: <code>.AppImage</code>, <code>.appimage</code>) in the same folder as <code>CNGM.AppImage</code>. A <strong>Go Fullscreen With CREMA</strong> button appears at the bottom of CNGM&rsquo;s sidebar. Clicking it minimizes CNGM and launches CREMA as a separate fullscreen process.</p>
-            <p>CREMA can also be launched independently &mdash; from your desktop launcher, terminal, or as an autostart entry. It always reads from and writes to the shared <code>GameManagerConfig/game_library.db</code> in the same folder, so the library is always in sync.</p>
-
-            <h3>Shared Library</h3>
-            <p>CNGM and CREMA always access the same SQLite database file. Any game you add, scrape, or edit in CNGM is immediately visible in CREMA. Install status updates from Steam are pushed live to both apps simultaneously via a background file watcher &mdash; no manual action required.</p>
+            <h3>Hidden Games</h3>
+            <p>Hide anything via the gamepage&rsquo;s eye button &mdash; it vanishes from every view in both faces, instantly. Unhide from <strong>Control Panel &rarr; Behavior &rarr; Hidden Games</strong> (or CREMA&rsquo;s menu), each game individually.</p>
+            <h3>Free-to-Play</h3>
+            <p>Steam free-to-play titles you&rsquo;ve played are imported and tagged with a green <span class="key">FREE</span> pill (gallery, list and gamepage). Click any pill &mdash; or use Control Panel &rarr; Behavior &mdash; to show or hide them all, or hide just that one game.</p>
 
             <!-- ====== SECTION 11 ====== -->
-            <h2 id="man-11">11. CREMA &mdash; Controls</h2>
-
-            <h3>Gamepad Controls</h3>
-            <table class="controls-table">
-                <thead><tr><th>Button</th><th>Action</th></tr></thead>
-                <tbody>
-                    <tr><td><span class="key">Left Stick / D-Pad</span></td><td>Navigate the game grid and menus</td></tr>
-                    <tr><td><span class="key">A / Cross</span></td><td>Confirm / Open Gamepage / Launch game</td></tr>
-                    <tr><td><span class="key">B / Circle</span></td><td>Back / Close overlay / Return to gallery</td></tr>
-                    <tr><td><span class="key">X / Square</span></td><td>Scrape metadata for the selected game</td></tr>
-                    <tr><td><span class="key">LB / L1</span></td><td>Previous category</td></tr>
-                    <tr><td><span class="key">RB / R1</span></td><td>Next category</td></tr>
-                    <tr><td><span class="key">Start / Menu</span></td><td>Open Sound Settings</td></tr>
-                </tbody>
-            </table>
-
-            <h3>Keyboard Controls</h3>
-            <table class="controls-table">
-                <thead><tr><th>Key</th><th>Action</th></tr></thead>
-                <tbody>
-                    <tr><td><span class="key">Arrow Keys</span></td><td>Navigate the game grid</td></tr>
-                    <tr><td><span class="key">Enter</span></td><td>Confirm / Select / Open Gamepage</td></tr>
-                    <tr><td><span class="key">Escape / Backspace</span></td><td>Back / Close overlay</td></tr>
-                    <tr><td><span class="key">Left / Right</span></td><td>Switch category (when gallery header is focused)</td></tr>
-                    <tr><td><span class="key">, + .</span></td><td>Wake from screensaver (hold both simultaneously)</td></tr>
-                </tbody>
-            </table>
-
-            <h3>The On-Screen Keyboard (OSK)</h3>
-            <p>For Physical, Emulation, Others, or Apps games without a launch command, pressing Play opens the On-Screen Keyboard so you can type the command directly with your gamepad or keyboard. Navigate keys with the D-pad or stick, confirm characters with A / Enter. Press B or Escape to cancel without saving.</p>
-
-            <div class="tip-box">
-                <p><strong>Wake from screensaver:</strong> If CREMA enters its idle screensaver mode, hold <strong>comma (,) and period (.)</strong> simultaneously on the keyboard to wake it instantly back to the gallery.</p>
-            </div>
+            <h2 id="man-11">11. The Manager &mdash; Control Panel</h2>
+            <p>The wrench icon opens the Control Panel &mdash; it lands on a title splash; pick a section on the left or just start typing to <strong>search every setting</strong>.</p>
+            <ul>
+                <li><strong>Appearance</strong> &mdash; Theme Selection (68 themes in 9 families, from Catppuccin to Game Boy), UI scale (50&ndash;150%), Sharp/Round corners, Ken Burns on/off.</li>
+                <li><strong>Library</strong> &mdash; Update Library (full store re-sync), Add Custom Game, batch scraping.</li>
+                <li><strong>Behavior</strong> &mdash; Gaming History, Recently Imported size, PICO-8 / Free-to-Play visibility, Hidden Games manager, desktop &amp; phone Notifications.</li>
+                <li><strong>Connections</strong> &mdash; Steam, GRINDER (GOG/Epic), itch.io, SteamGridDB, IGDB, PICO-8 binary.</li>
+                <li><strong>System</strong> &mdash; full <strong>Backup ZIP</strong> (library + artwork + trailers <em>+ your RetroArch save states</em>), Add to Application Menu, CREMA autostart on login, the Welcome screen.</li>
+                <li><strong>Cleanup</strong> &mdash; clear orphaned images, gaming history, or the nuclear options. Read twice, click once.</li>
+            </ul>
 
             <!-- ====== SECTION 12 ====== -->
-            <h2 id="man-12">12. CREMA &mdash; Gallery &amp; Gamepage</h2>
-
-            <h3>The Gallery</h3>
-            <p>CREMA&rsquo;s main view is a fullscreen cover-art grid. Categories are shown at the top &mdash; navigate between them with LB/RB (gamepad) or Left/Right arrow keys. The grid reloads instantly for the selected category.</p>
-
-            <h3>Available Categories in CREMA</h3>
-            <ul>
-                <li><strong>All Games, Installed</strong> &mdash; full library or just installed games</li>
-                <li><strong>Steam, GOG, Epic, Amazon</strong> &mdash; by store</li>
-                <li><strong>Others, Physical, Emulation, Apps</strong> &mdash; manual categories</li>
-                <li><strong>Want to Play, Favs</strong> &mdash; your personal lists</li>
-            </ul>
-
-            <h3>The Gamepage</h3>
-            <p>Select a game and press A / Enter to open its Gamepage. You&rsquo;ll see:</p>
-            <ul>
-                <li><strong>Hero Banner</strong> &mdash; cinematic, takes up ~40% of screen height. The transparent Logo is overlaid at center.</li>
-                <li><strong>Stats Panel</strong> &mdash; Release Year, HLTB, ProtonDB, Genre, Co-op, Players, Metacritic.</li>
-                <li><strong>Description</strong> &mdash; a short summary of the game.</li>
-                <li><strong>Screenshots</strong> &mdash; animated Ken Burns slideshow. Confirm to enter fullscreen slideshow; confirm again to advance frames.</li>
-                <li><strong>Play / Install Button</strong> &mdash; launches the game. For uninstalled store games, shows Install instead. For manual categories without a command, opens the OSK.</li>
-                <li><strong>Trailer Button</strong> &mdash; appears only if a trailer was downloaded in CNGM. Plays instantly, offline. BGM fades out automatically.</li>
-            </ul>
-
-            <h3>FAV &amp; Want to Play</h3>
-            <p>From the Gamepage menu, you can toggle Favorites and Want to Play. Changes write instantly to the shared database and are reflected in CNGM immediately.</p>
+            <h2 id="man-12">12. CREMA &mdash; Overview &amp; Setup</h2>
+            <p>CREMA is the suite&rsquo;s living-room face: fullscreen, gamepad-first, TV-sized type. It reads the same library as the Manager &mdash; nothing to configure, nothing to copy.</p>
+            <p>Launch it from the Manager&rsquo;s titlebar coffee-cup button, the app menu entry (&ldquo;CREMA (Fullscreen)&rdquo;), or <code>CafeNeurotico.AppImage --crema</code>. It can also autostart on login for HTPC builds (Control Panel &rarr; System).</p>
+            <h3>First Run</h3>
+            <p>A two-step setup asks how you want your <strong>start screen</strong> (Carousel or Grid of categories) and how you like to <strong>browse</strong> (List with a live media panel, or a cover Gallery). Both are changeable anytime in the menu. After that you land on the Home screen.</p>
+            <div class="tip-box"><p><strong>Waking up:</strong> while a game runs, CREMA sleeps behind it. Press <span class="key">START</span> + <span class="key">SELECT</span> (configurable) to bring it back.</p></div>
 
             <!-- ====== SECTION 13 ====== -->
-            <h2 id="man-13">13. CREMA &mdash; Scraping &amp; Metadata</h2>
-            <p>CREMA can scrape metadata for individual games without going through CNGM. The scope matches CNGM&rsquo;s Auto-Fetch: Cover, Hero Art, Logo, HLTB, ProtonDB, Description, Genre, Developer, Publisher, Co-op, Players, Metacritic, Screenshots.</p>
-
-            <h3>How to Scrape</h3>
-            <p>Navigate to a game in the gallery and press <strong>X / Square</strong> (or use the scrape option in the Game Menu). CREMA will:</p>
-            <ol>
-                <li>Search Steam for the game by name. If found, proceed with a full Steam + IGDB scrape.</li>
-                <li>If Steam search finds nothing or the result looks wrong, CREMA automatically offers an <strong>IGDB fallback</strong> &mdash; a search overlay where you can type the correct game name and select from results.</li>
-            </ol>
-
-            <h3>IGDB Fallback</h3>
-            <p>When the Steam search fails, a search overlay appears with results from IGDB. Select the correct entry and CREMA fetches all available metadata. This is especially useful for older games, non-English titles, or games not on Steam at all.</p>
-
-            <div class="warn-box">
-                <p><strong>IGDB credentials required:</strong> The IGDB fallback path requires a Twitch dev API key configured in CNGM&rsquo;s Connect menu. Without it, only Steam-based data is available.</p>
-            </div>
+            <h2 id="man-13">13. CREMA &mdash; The Home Screen</h2>
+            <p>A TV-style hub that greets you on boot (toggleable in the menu): library stats up top, <strong>Today&rsquo;s Pick</strong> as a full-bleed banner (always a scraped game from your main stores), then rows you navigate with the d-pad &mdash; wrap around from bottom to top.</p>
+            <h3>The Actions Row</h3>
+            <ul>
+                <li><strong>Enter Library</strong> and <strong>Surprise Me</strong> (a roulette pick, straight to its gamepage).</li>
+                <li><strong>Continue</strong> &mdash; your last-played game, one press away.</li>
+                <li><strong>Jukebox</strong> &mdash; opens the music player; while a track plays, the tile becomes a live now-playing card with the song&rsquo;s cover art, title, artist and a bouncing equalizer.</li>
+            </ul>
+            <h3>Rows &amp; the TV Reader</h3>
+            <p>Toggleable rows: Recently Imported, Hidden Gems, Recently Played, Most Played, Couch Night, Wishlist, Free This Week, Proton Watch, Gaming News and Your Games News. News articles open in the <strong>TV Reader</strong> &mdash; a clean, themed, big-type reading view with the article&rsquo;s images. Scroll with the d-pad, page with <span class="key">L1</span>/<span class="key">R1</span>, open in a real browser with <span class="key">X</span> if you insist, back with <span class="key">B</span>.</p>
+            <p>Press <span class="key">Y</span> anywhere on Home to jump straight into library search. Opening a game from Home and pressing <span class="key">B</span> brings you back to Home &mdash; not the library.</p>
 
             <!-- ====== SECTION 14 ====== -->
-            <h2 id="man-14">14. CREMA &mdash; Music &amp; Atmosphere</h2>
-            <p>CREMA has a built-in music player for ambient game-room atmosphere. It runs continuously while you browse your library and integrates seamlessly with the rest of the experience.</p>
-
-            <h3>BGM Categories</h3>
-            <p>CREMA ships with curated music organized into genre and mood categories. The default on first launch is <strong>Ambient</strong>. Switch between categories in the Sound Settings overlay (Start button or the on-screen menu icon).</p>
-
-            <h3>Sound Settings Controls</h3>
+            <h2 id="man-14">14. CREMA &mdash; Browsing the Library</h2>
+            <h3>Start Screen</h3>
+            <p>Your categories &mdash; stores, filters and every playlist &mdash; as a horizontal carousel or a grid, each with a live art mosaic. <span class="key">A</span> enters, <span class="key">Y</span> searches within the highlighted category, <span class="key">B</span> returns to Home.</p>
+            <h3>Gallery Browsing</h3>
             <ul>
-                <li>Switch BGM category / style</li>
-                <li>Adjust BGM volume</li>
-                <li>Toggle BGM on or off</li>
-                <li>Adjust sound effects volume</li>
+                <li><span class="key">L1</span>/<span class="key">R1</span> switch categories; d-pad navigates the grid; <span class="key">A</span> opens the gamepage.</li>
+                <li><span class="key">X</span> opens <strong>Sort</strong> &mdash; the same six modes as the desktop (A&mdash;Z, Last Played, Favourites First, Want to Play First, Recently Added, Scraped First), remembered across sessions.</li>
+                <li><span class="key">SELECT</span> opens <strong>Playlists</strong> &mdash; jump to any playlist or create a new one with the on-screen keyboard.</li>
+                <li><span class="key">Y</span> searches; cards show install state, store badges and <span class="key">FREE</span> pills.</li>
+            </ul>
+            <h3>List Browsing</h3>
+            <p>A vertical list with a live media panel: trailer or screenshots on the right, metadata below. <span class="key">X</span> swaps trailer and screenshots; <span class="key">L1</span>/<span class="key">R1</span> jump ten games; <span class="key">L2</span>/<span class="key">R2</span> jump to the ends.</p>
+
+            <!-- ====== SECTION 15 ====== -->
+            <h2 id="man-15">15. CREMA &mdash; The Gamepages</h2>
+            <p>Two styles, switchable live from the menu (Immersive is the default): <strong>Classic</strong> &mdash; hero art on top, scrolling page below with stats, achievements, description and screenshots. <strong>Immersive</strong> &mdash; your screenshots (or the trailer) fill the screen behind a tilted, glowing box art and glass info chips.</p>
+            <h3>Both Pages Offer</h3>
+            <ul>
+                <li><strong>Play / Install</strong> &mdash; installed games launch; GOG/Epic install in-process with folder and size confirmation; Steam games warn you that the desktop Steam client will open.</li>
+                <li>Favourite &bull; Want to Play &bull; <strong>+ Playlist</strong> (toggle membership, create new) &bull; <strong>Hide</strong> &bull; Steam page &bull; Uninstall &bull; Trailer.</li>
+                <li><span class="key">Y</span> &mdash; the full <strong>achievements</strong> overlay (GOG and Steam, filters, per-store switching).</li>
+                <li><span class="key">L1</span>/<span class="key">R1</span> flip to the previous/next game without leaving the page.</li>
+                <li>The store/category logo in a corner, and a <span class="key">FREE</span> pill on free-to-play games.</li>
+            </ul>
+            <h3>Immersive Extras</h3>
+            <p><span class="key">X</span> opens the <strong>details modal</strong>: a large screenshot pane (flip with left/right) above the short summary and the complete Steam description. On the classic page the same content lives on the page itself, with the screenshot banner opening a fullscreen slideshow.</p>
+            <p><span class="key">SELECT</span> opens the game options menu on either page: trailers (download/delete), rename, mark played, playlists, the <strong>Scraping Engine</strong> (fix art and metadata from the couch) and GRINDER install/uninstall.</p>
+
+            <!-- ====== SECTION 16 ====== -->
+            <h2 id="man-16">16. CREMA &mdash; Controls Reference</h2>
+            <p>Defaults for the Xbox layout &mdash; PlayStation and Nintendo glyphs adapt automatically (menu &rarr; Gamepad Icons), and every footer shows the live hints for wherever you are.</p>
+            <table class="controls-table">
+                <tr><th>Input</th><th>Everywhere</th></tr>
+                <tr><td><span class="key">D-Pad</span></td><td>Navigate (Home rows wrap around)</td></tr>
+                <tr><td><span class="key">A</span></td><td>Select / Play</td></tr>
+                <tr><td><span class="key">B</span></td><td>Back (returns to Home when you came from Home)</td></tr>
+                <tr><td><span class="key">START</span></td><td>System menu</td></tr>
+                <tr><td><span class="key">L3</span>/<span class="key">R3</span></td><td>Restart / skip track (custom music mode)</td></tr>
+            </table>
+            <table class="controls-table">
+                <tr><th>Input</th><th>Context</th></tr>
+                <tr><td><span class="key">Y</span></td><td>Search (Home, Start, library) &bull; Achievements (gamepages)</td></tr>
+                <tr><td><span class="key">X</span></td><td>Sort (gallery) &bull; Details modal (immersive page) &bull; Media swap (list) &bull; Open in browser (TV Reader)</td></tr>
+                <tr><td><span class="key">SELECT</span></td><td>Playlists (gallery) &bull; Game options (gamepages, list)</td></tr>
+                <tr><td><span class="key">L1</span>/<span class="key">R1</span></td><td>Categories (browsing) &bull; Prev/next game (gamepages) &bull; Page (reader, lists)</td></tr>
+            </table>
+            <p>Full keyboard support mirrors everything: arrows, <span class="key">Enter</span>, <span class="key">Esc</span>, <span class="key">Y</span>/<span class="key">X</span>/<span class="key">O</span>/<span class="key">M</span>, <span class="key">PgUp</span>/<span class="key">PgDn</span>, <span class="key">[</span>/<span class="key">]</span> for music. Keys are rebindable in menu &rarr; Keybindings.</p>
+
+            <!-- ====== SECTION 17 ====== -->
+            <h2 id="man-17">17. CREMA &mdash; Jukebox &amp; Atmosphere</h2>
+            <h3>Music</h3>
+            <p>Three background modes (menu &rarr; Jukebox Mode): <strong>Ambient</strong> (built-in loops), <strong>Custom</strong> (your own music &mdash; drop MP3/OGG/FLAC/WAV files into the <code>CREMA_CUSTOM_MUSIC</code> folder next to the AppImage), or <strong>Off</strong>. In Custom mode, <span class="key">L3</span>/<span class="key">R3</span> restart or skip tracks from anywhere, and the Home screen&rsquo;s Jukebox tile shows what&rsquo;s playing.</p>
+            <h3>The Jukebox</h3>
+            <p>A full player: browse your tracks and music playlists, search, queue, see embedded cover art, go fullscreen for a now-playing view with a progress bar. Music playlists are separate from game playlists.</p>
+            <h3>Screensaver &amp; Sleep</h3>
+            <p>After a configurable idle delay, the screensaver takes over &mdash; Cafe Neurotico wallpapers or your own game art, with a clock. While a game runs, CREMA sleeps and shows the running game&rsquo;s cover; wake it with <span class="key">START</span>+<span class="key">SELECT</span>.</p>
+
+            <!-- ====== SECTION 18 ====== -->
+            <h2 id="man-18">18. CREMA &mdash; Menus &amp; Settings</h2>
+            <p>Press <span class="key">START</span> anywhere:</p>
+            <ul>
+                <li><strong>Audio</strong> &mdash; Jukebox mode, sound settings (volumes, SFX).</li>
+                <li><strong>Appearance</strong> &mdash; Color Scheme (all 68 suite themes, in the same categories as the desktop; <em>&#9733; Follow The Manager</em> keeps CREMA matched to your desktop theme automatically), Home Screen (startup toggle + row selection), Start Screen mode, Browse mode, Gamepage style (applies live, even inside a gamepage), Screensaver.</li>
+                <li><strong>Controls</strong> &mdash; Keybindings, Gamepad icon set (Xbox / PlayStation / Nintendo), Wake method.</li>
+                <li><strong>Library</strong> &mdash; Gaming History, PICO-8 / Free-to-Play visibility, <strong>Hidden Games</strong> (unhide individually).</li>
+                <li><strong>System</strong> &mdash; About, Quit.</li>
             </ul>
 
-            <h3>Trailer Fade</h3>
-            <p>When you play a trailer from the Gamepage, CREMA automatically fades out the BGM. When the trailer ends or you close the player, the BGM fades smoothly back in. This ensures a seamless, cinematic experience without jarring audio overlap.</p>
+            <!-- ====== SECTION 19 ====== -->
+            <h2 id="man-19">19. GRINDER &mdash; the GOG &amp; Epic Engine</h2>
+            <p>GRINDER does the heavy lifting for DRM-free stores: authentication, downloads, Proton/Wine setup, redistributables, launching and uninstalling. Most of the time you never see it &mdash; the Manager and CREMA drive it silently.</p>
+            <h3>When to Open Its Window</h3>
+            <ul>
+                <li><strong>Signing in</strong> to GOG and Epic (once per machine).</li>
+                <li><strong>Per-game tuning:</strong> Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables.</li>
+                <li>Its own download manager, install log, repair/verify tools and a library view of everything it manages.</li>
+            </ul>
+            <p>GRINDER&rsquo;s data lives in <code>~/.config/grinder/</code> &mdash; logins and install records are per-machine, which is why a fresh copy of the suite still knows your GOG library on the same computer.</p>
+
+            <!-- ====== SECTION 20 ====== -->
+            <h2 id="man-20">20. Your Data &amp; Backups</h2>
+            <table class="controls-table">
+                <tr><th>What</th><th>Where</th><th>Travels with you?</th></tr>
+                <tr><td>Library, metadata, playlists, settings</td><td><code>GameManagerConfig/games.db</code></td><td>Yes &mdash; copy the folder</td></tr>
+                <tr><td>Artwork &amp; trailers</td><td><code>GameManagerConfig/images &amp; trailers</code></td><td>Yes</td></tr>
+                <tr><td>CREMA preferences</td><td><code>GameManagerConfig/audio.json</code></td><td>Yes</td></tr>
+                <tr><td>GOG/Epic logins &amp; installs</td><td><code>~/.config/grinder/</code></td><td>No &mdash; per machine, by design</td></tr>
+                <tr><td>The games themselves</td><td>Wherever you install them</td><td>No</td></tr>
+            </table>
+            <p><strong>Backup ZIP</strong> (Control Panel &rarr; System) packs the whole <code>GameManagerConfig</code> &mdash; and your <strong>RetroArch save states</strong> &mdash; into one dated archive. Restore by unpacking next to the AppImage on any machine.</p>
+
+            <!-- ====== SECTION 21 ====== -->
+            <h2 id="man-21">21. Tips &amp; Troubleshooting</h2>
+            <ul>
+                <li><strong>Steam import returns nothing:</strong> your Steam profile&rsquo;s <em>Game Details</em> must be Public. Double-check the SteamID64 (17 digits).</li>
+                <li><strong>A newly bought GOG/Epic game isn&rsquo;t showing:</strong> hit <strong>Refresh Library</strong> &mdash; it pulls the fresh owned list from both stores. If it still doesn&rsquo;t appear, open GRINDER and confirm you&rsquo;re signed in.</li>
+                <li><strong>A game shows Install instead of Play</strong> (or vice-versa): Refresh Library reconciles install state with GRINDER and Steam.</li>
+                <li><strong>Missing artwork after import:</strong> run Batch Fetch; for stubborn games open Edit Details and scrape with a corrected title, or pick art manually via SteamGridDB.</li>
+                <li><strong>GPU usage while idle:</strong> animations pause automatically when the window loses focus; the Ken Burns effect can also be disabled outright in Appearance.</li>
+                <li><strong>CREMA feels out of sync:</strong> it re-reads the shared database on focus and refresh &mdash; if you edited a lot on the desktop, back out to the Start screen and re-enter.</li>
+                <li><strong>Moved the folder?</strong> Re-run <strong>Add to Application Menu</strong> so the launcher entries point to the new location.</li>
+            </ul>
 
             <div class="manual-footer">
-                <p class="accent-line">=========================================</p>
-                <h3>/// END OF FILE ///</h3>
-                <p class="mono">SYSTEM OPERATIONS CONCLUDED.</p>
-                <p class="mono">COPYRIGHT &copy; CAFE NEUROTICO SYSTEMS.</p>
-                <p class="accent-line" style="margin-top: 15px;">NOW GO PLAY SOME GAMES.</p>
-                <p class="accent-line">=========================================</p>
+                <p class="accent-line">CAFE NEUROTICO</p>
+                <h3>One library. Three faces. Zero cloud.</h3>
+                <p class="mono">The Manager &mdash; CREMA &mdash; GRINDER</p>
+                <p class="mono">Your games, your machine, your data.</p>
             </div>
 
         </div>

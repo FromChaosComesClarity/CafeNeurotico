@@ -401,8 +401,8 @@ function renderHardwareIcons() {
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = getMappedBtn('SOUTH'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = getMappedBtn('NORTH'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = getMappedBtn('WEST');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
   const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.category')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} SORT &nbsp;&nbsp; ${getMappedBtn('SELECT')} PLAYLISTS &nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')} &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
-  const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
-  const cfgpF = document.getElementById('cfgp-footer'); if (cfgpF) cfgpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('WEST')} Details`;
+  const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('SELECT')} Game Options`;
+  const cfgpF = document.getElementById('cfgp-footer'); if (cfgpF) cfgpF.innerHTML = `${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('L1')}${getBtn('R1')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} Achievements &nbsp;&nbsp; ${getMappedBtn('WEST')} Details &nbsp;&nbsp; ${getMappedBtn('SELECT')} Game Options`;
   updateHomeFooter();
 }
 function renderFootersForKeyboard() {
@@ -413,7 +413,7 @@ function renderFootersForKeyboard() {
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = k('Enter'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = k('Y'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = k('X');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('X')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${k('O')} ${t('footer.options')}`;
   const galF = document.getElementById('gallery-footer'); if (galF) galF.innerHTML = `${k('↑')}${k('↓')}${k('←')}${k('→')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('X')} SORT &nbsp;&nbsp; ${k('O')} PLAYLISTS &nbsp;&nbsp; ${k('M')} ${t('footer.menu')} &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}`;
-  const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.page')} &nbsp;&nbsp; ${k('Y')} Achievements &nbsp;&nbsp; ${k('O')} ${t('footer.options')}`;
+  const ggpF = document.getElementById('ggp-footer'); if (ggpF) ggpF.innerHTML = `${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp; ${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp; ${k(',')}${k('.')} ${t('footer.page')} &nbsp;&nbsp; ${k('Y')} Achievements &nbsp;&nbsp; ${k('O')} Game Options`;
   updateHomeFooter();
 }
 function updateJbFsHints() {
@@ -1373,6 +1373,7 @@ function handleInput(action) {
     else if (action === 'BACK')    { playSound(sfxBack); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
     else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
     else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
+    else if (action === 'SELECT_BTN') { if (_cfgpGame) { const gi = galleryGames.findIndex(g => String(g.id) === String(_cfgpGame.id)); if (gi >= 0) { filteredGames = galleryGames; currentGameIndex = gi; } else { filteredGames = [_cfgpGame]; currentGameIndex = 0; } openOverlay("GAME_MENU"); } }
     else if (action === 'START')   { openOverlay('MAIN_MENU'); }
   }
   else if (gameState === 'OSK') { handleOSKInput(action); }
@@ -1470,7 +1471,7 @@ function handleOSKInput(action) {
     else if (oskMode === 'LAUNCH_CMD' || oskMode === 'RENAME_GAME') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openOverlay('GAME_MENU'); }
     else if (oskMode === 'SGDB_API' || oskMode === 'REFINE_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
     else if (oskMode === 'NEW_PLAYLIST' || oskMode === 'NEW_PLAYLIST_ADD' || oskMode === 'JB_SEARCH' || oskMode === 'RENAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); gameState = 'JUKEBOX'; }
-    else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); if (_newPlFromGallery) { _newPlFromGallery = false; gameState = 'GALLERY'; setBlur(false); } else { renderPlaylistAssignMenu(); } }
+    else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); if (_newPlFromGallery) { _newPlFromGallery = false; document.getElementById('cfgp-screen').classList.add('hidden'); document.getElementById('ggp-screen').classList.add('hidden'); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; setBlur(false); } else { renderPlaylistAssignMenu(); } }
     else if (oskMode === 'GALLERY_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; }
     else if (oskMode === 'INSTALL_DIR') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); showGrinderConfirm(_grinderConfirmGame); }
   }
@@ -1508,6 +1509,7 @@ function handleOSKInput(action) {
             const i = categories.indexOf(PLAYLIST_CAT_PREFIX + nm);
             if (i >= 0) { galleryCatIndex = i; galleryIndex = 0; }
             applyGalleryFilter(); renderGalleryGrid();
+            document.getElementById('cfgp-screen').classList.add('hidden'); document.getElementById('ggp-screen').classList.add('hidden'); document.getElementById('gallery-screen').classList.remove('hidden');
             gameState = 'GALLERY'; setBlur(false);
           });
           if (nm) window.api.addPlaylist(nm).then(done); else done();
@@ -2071,7 +2073,7 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
       if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); return; }
       openOverlay("GAME_MENU"); return;
     }
-    if (action === '+ NEW PLAYLIST') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', ''); return; }
+    if (action === '+ NEW PLAYLIST') { _newPlFromGallery = false; document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', ''); return; }
     // The first gamePlaylists.length items map 1:1 to gamePlaylists — toggle by index
     // rather than parsing the (★-prefixed) label.
     if (currentOverlayIndex < gamePlaylists.length && _plAssignGame) {
@@ -4364,6 +4366,7 @@ function handleCfgpInput(action) {
   else if (action === 'BACK')   { playSound(sfxBack); _cfgpActivateBtn.call(null); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
   else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
   else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
+  else if (action === 'SELECT_BTN') { if (_cfgpGame) { const gi = galleryGames.findIndex(g => String(g.id) === String(_cfgpGame.id)); if (gi >= 0) { filteredGames = galleryGames; currentGameIndex = gi; } else { filteredGames = [_cfgpGame]; currentGameIndex = 0; } openOverlay("GAME_MENU"); } }
 }
 
 // ══════════════════════════════════════════════════════════════════════════

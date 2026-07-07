@@ -2706,6 +2706,11 @@
        top of the gamepage at the same size — it's opened from there and returns there (seamless). */
     body.gamepage-overlay #view-gamepage.view,
     body.gamepage-overlay #view-details.view { position:fixed; top:55px; left:0; right:0; margin-left:auto; margin-right:auto; width:min(1080px, 94vw); height:auto; max-height:calc(100vh - 78px); overflow-x:hidden; overflow-y:auto; border-radius:16px; background:var(--bg); box-shadow:0 26px 72px rgba(0,0,0,0.62), 0 0 0 1px var(--border); z-index:9001; animation:gpOverlayFadeIn 0.24s ease both; }
+    /* Edit form must FIT the floating panel: the inner container's 100vh-120px was taller
+       than the panel, pushing the action buttons below the fold. */
+    body.gamepage-overlay #view-details > div:nth-of-type(2) { height: calc(100vh - 210px) !important; }
+    /* Belt & suspenders: the Save/Delete row stays pinned even if content overflows (small screens / UI scale). */
+    body.gamepage-overlay #edit-actions-row { position: sticky; bottom: 0; background: var(--bg); padding-bottom: 12px; z-index: 5; }
     body.gamepage-overlay #view-gamepage::-webkit-scrollbar,
     body.gamepage-overlay #view-details::-webkit-scrollbar { width:11px; }
     /* inset the track 16px top & bottom so the scrollbar never reaches (bleeds into) the panel's rounded corners */
@@ -3110,6 +3115,9 @@
         </button>
         <button class="rail-btn" id="btn-open-tools" title="Tools">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </button>
+        <button class="rail-btn" id="btn-rail-emulatte" title="Launch EmuLatte" style="display:none;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="13" r="1" fill="currentColor"/><circle cx="18" cy="11" r="1" fill="currentColor"/></svg>
         </button>
         <div id="btn-about" class="rail-btn" title="Cafe Neurotico Game Manager" style="cursor:pointer; height:38px; flex-direction:column; gap:1px; margin-top:6px; border-top:1px solid var(--border_solid);">
           <span style="font-size:7px; font-weight:900; color:var(--text_dim); letter-spacing:1px; line-height:1;">CN</span>
@@ -3796,7 +3804,7 @@
               </fieldset>
             </div>
 
-            <div class="row" style="margin-top: auto; padding-top: 10px; flex-shrink: 0;">
+            <div class="row" id="edit-actions-row" style="margin-top: auto; padding-top: 10px; flex-shrink: 0;">
               <button id="btn-auto-fetch" style="flex: 1; background-color: var(--bg_menu); color: var(--accent); padding: 12px; font-weight: bold; border-color: var(--accent);" data-i18n="html.btn_auto_fetch">AUTO-FETCH</button>
               <button id="btn-clear-meta" style="flex: 1; background-color: var(--bg_menu); color: #f57c00; padding: 12px; border-color: #f57c00; font-weight: bold;"><span data-i18n="html.btn_clear_meta">CLEAR META</span></button>
               <button id="btn-save-game" class="primary" style="flex: 1; padding: 12px; font-size: 14px;"><span data-i18n="html.btn_save">SAVE & RETURN</span></button>

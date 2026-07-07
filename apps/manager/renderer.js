@@ -686,6 +686,8 @@ window.api.checkEmuLatte().then(exists => {
         if (topnavEmu) topnavEmu.style.display = '';
         const sbEmu = document.getElementById('btn-launch-emulatte-sb');
         if (sbEmu) sbEmu.style.display = 'flex';
+        const railEmu = document.getElementById('btn-rail-emulatte');
+        if (railEmu) railEmu.style.display = '';
         const cmdEmu = document.getElementById('btn-cmd-emulatte');
         if (cmdEmu) cmdEmu.style.display = 'flex';
     }
@@ -697,6 +699,7 @@ const SUPPORT_URL = 'https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/sup
 document.getElementById('support-cta')?.addEventListener('click', () => window.api.openExternal(SUPPORT_URL));
 document.getElementById('btn-topnav-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-launch-emulatte-sb')?.addEventListener('click', () => window.api.launchEmuLatte());
+document.getElementById('btn-rail-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 
 // Top nav filter scroll arrows
 function updateTopnavFilterArrows() {
