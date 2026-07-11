@@ -772,6 +772,12 @@ ipcMain.handle('open-grinder', (_, gameName) => {
     return { ok: true };
 });
 
+// "Manage Storage: GOG & Epic" → open GRINDER on installed games sorted by size on disk.
+ipcMain.handle('open-grinder-storage', () => {
+    spawnGrinder(['storage']);
+    return { ok: true };
+});
+
 // Auto-sync GRINDER installed status into CNGM library.
 // installedIds = array of GRINDER game IDs that are installed (from grinderStatus).
 // Sets GrinderGameId + Installed=1 for matching GOG/Epic games.

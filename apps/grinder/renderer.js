@@ -239,7 +239,7 @@ function renderGames(games) {
                 </div>
             </div>
             <div class="game-row-sub">
-                ${g.installed && g.install_path ? `<span data-size="${g.id}" class="game-size-badge">…</span>` : ''}
+                ${g.installed && g.install_path ? `<span data-size="${g.id}" class="game-size-badge">${_sizeHuman[g.id] || '…'}</span>` : ''}
                 <span class="game-status ${g.installed ? 'status-installed' : 'status-uninstalled'}">
                     ${g.installed ? '● Installed' : '○ Not installed'}
                 </span>
@@ -251,7 +251,7 @@ function renderGames(games) {
     list.querySelectorAll('.game-row').forEach(row => {
         row.addEventListener('click', () => {
             selectedId = row.dataset.id;
-            renderGames(filterGames());
+            refresh();
         });
     });
 
@@ -267,7 +267,7 @@ function renderGames(games) {
             const result = await window.api.launchGame(id);
             btn.disabled = false;
             _logIndex.add(id);
-            renderGames(filterGames());
+            refresh();
             if (!result.ok) { closeNowPlaying(); setStatus(`Error: ${result.error}`); }
             else setStatus(`Launched via ${result.method}.`);
         });
@@ -343,8 +343,30 @@ function renderGames(games) {
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
-let installFilter = 'all'; // 'all' | 'installed' | 'uninstalled'
-let storeFilter   = 'all'; // 'all' | 'epic' | 'gog' | 'custom'
+let installFilter = 'all';     // 'all' | 'installed' | 'uninstalled'
+let storeFilter   = 'all';     // 'all' | 'epic' | 'gog' | 'custom'
+let sortMode      = 'default'; // 'default' (title) | 'size' (largest on disk first)
+const _sizeBytes  = {};        // id → bytes on disk (from get-all-disk-sizes)
+const _sizeHuman  = {};        // id → formatted size string (cached for instant re-render)
+
+function fmtBytes(n) {
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const u = ['B','KB','MB','GB','TB']; let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return `${n < 10 && i > 0 ? n.toFixed(1) : Math.round(n)} ${u[i]}`;
+}
+
+// Apply the active sort to a filtered list (largest-on-disk first; unknown/uninstalled sink to bottom).
+function sortGames(list) {
+    if (sortMode !== 'size') return list;
+    return [...list].sort((a, b) => {
+        const bytesDiff = (_sizeBytes[b.id] || 0) - (_sizeBytes[a.id] || 0);
+        return bytesDiff !== 0 ? bytesDiff : a.title.localeCompare(b.title);
+    });
+}
+
+// Single entry point for re-rendering the list under the current filter + sort.
+function refresh() { renderGames(sortGames(filterGames())); }
 
 function buildFilterBar() {
     const bar = document.getElementById('filter-bar');
@@ -363,10 +385,18 @@ function buildFilterBar() {
         <button class="filter-btn fi-uninst ${installFilter==='uninstalled'?'active':''}" data-install="uninstalled">○ Not installed</button>
         <div class="filter-sep"></div>
         ${storeButtons}
+        <div class="filter-sep"></div>
+        <button class="filter-btn fi-sort-size ${sortMode==='size'?'active':''}" data-sort="size" title="Sort installed games by size on disk, largest first">⬇ Size</button>
     `;
 
     bar.querySelectorAll('[data-store]').forEach(btn => {
         if (btn.dataset.store === storeFilter) btn.classList.add('active');
+    });
+
+    bar.querySelector('[data-sort="size"]')?.addEventListener('click', (e) => {
+        sortMode = sortMode === 'size' ? 'default' : 'size';
+        e.currentTarget.classList.toggle('active', sortMode === 'size');
+        refresh();
     });
 
     bar.querySelectorAll('[data-install]').forEach(btn => {
@@ -374,7 +404,7 @@ function buildFilterBar() {
             installFilter = btn.dataset.install;
             bar.querySelectorAll('[data-install]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            renderGames(filterGames());
+            refresh();
         });
     });
 
@@ -383,7 +413,7 @@ function buildFilterBar() {
             storeFilter = storeFilter === btn.dataset.store ? 'all' : btn.dataset.store;
             bar.querySelectorAll('[data-store]').forEach(b => b.classList.remove('active'));
             if (storeFilter !== 'all') btn.classList.add('active');
-            renderGames(filterGames());
+            refresh();
         });
     });
 }
@@ -408,7 +438,7 @@ async function loadGames() {
         window.api.getLogIndex().then(ids => { _logIndex = new Set(ids); }),
     ]);
     buildFilterBar();
-    renderGames(filterGames());
+    refresh();
     await loadGameSizes();
 }
 
@@ -416,17 +446,21 @@ async function loadGameSizes() {
     // Single batch IPC — all du calls run in parallel on the main process side,
     // one response comes back, one synchronous DOM pass updates all badges.
     const sizes = await window.api.getAllDiskSizes();
-    for (const { id, size } of sizes) {
-        if (!size) continue;
+    for (const { id, bytes } of sizes) {
+        if (!bytes) continue;
+        _sizeBytes[id] = bytes;
+        _sizeHuman[id] = fmtBytes(bytes);
         const el = document.querySelector(`[data-size="${id}"]`);
-        if (el) el.textContent = size;
+        if (el) el.textContent = _sizeHuman[id];
     }
+    // Sizes weren't known at the initial render — reorder now if sorting by size.
+    if (sortMode === 'size') refresh();
 }
 
 let _searchDebounce = null;
 document.getElementById('search-input').addEventListener('input', () => {
     clearTimeout(_searchDebounce);
-    _searchDebounce = setTimeout(() => renderGames(filterGames()), 150);
+    _searchDebounce = setTimeout(() => refresh(), 150);
 });
 
 document.getElementById('btn-verify-installs')?.addEventListener('click', async () => {
@@ -2312,7 +2346,7 @@ window.api.onCliSetup(id => {
     } else {
         // Game not in library yet (shouldn't happen if CNGM wrote it first, but search as fallback)
         const input = document.getElementById('search-input');
-        if (input) { input.value = id; renderGames(filterGames()); }
+        if (input) { input.value = id; refresh(); }
     }
 });
 
@@ -2327,8 +2361,23 @@ window.api.onCliSearch(term => {
     document.querySelector('.nav-btn[data-view="games"]')?.classList.add('active');
     document.getElementById('view-games').style.display    = 'flex';
     document.getElementById('view-settings').style.display = 'none';
-    renderGames(filterGames());
+    refresh();
     input.focus();
+});
+
+// ── Manage Storage (launched from CN "Manage Storage: GOG & Epic") ───────────
+// Land on the games view showing installed games sorted largest-on-disk first.
+window.api.onCliStorage(() => {
+    installFilter = 'installed';
+    storeFilter   = 'all';
+    sortMode      = 'size';
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+    document.querySelector('.nav-btn[data-view="games"]')?.classList.add('active');
+    document.getElementById('view-games').style.display    = 'flex';
+    document.getElementById('view-settings').style.display = 'none';
+    const s = document.getElementById('search-input'); if (s) s.value = '';
+    buildFilterBar();  // rebuild bar so Installed + Size show active
+    refresh();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('api', {
 
                                 // --- GRINDER ---
                                 openGrinder: (name) => ipcRenderer.invoke('open-grinder', name),
+                                openGrinderStorage: () => ipcRenderer.invoke('open-grinder-storage'),
                                 openGrinderSetup: (game) => ipcRenderer.invoke('open-grinder-setup', game),
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
                                 syncGrinderInstalled: (ids) => ipcRenderer.invoke('sync-grinder-installed', ids),

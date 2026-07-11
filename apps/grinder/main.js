@@ -49,6 +49,7 @@ const searchIdx      = allArgs.indexOf('search');
 const cliSearch      = searchIdx !== -1 ? allArgs.slice(searchIdx + 1).join(' ') : null;
 const setupIdx       = allArgs.indexOf('setup');
 const cliSetupId     = setupIdx  !== -1 ? allArgs[setupIdx  + 1] : null;
+const cliStorage     = allArgs.indexOf('storage') !== -1;  // opened from CN "Manage Storage" → installed games, sorted by size
 const installHIdx    = allArgs.indexOf('install');
 const cliInstall     = installHIdx !== -1 ? allArgs.slice(installHIdx + 1) : null;
 const uninstHIdx     = allArgs.indexOf('uninstall-headless');
@@ -221,6 +222,7 @@ function createWindow() {
         if (!win.isVisible()) win.show();
         if (cliSearch)  win.webContents.send('cli-search', cliSearch);
         if (cliSetupId) win.webContents.send('cli-setup',  cliSetupId);
+        if (cliStorage) win.webContents.send('cli-storage');
     };
     ipcMain.once('renderer-ready', showWin);
     win.once('ready-to-show', () => setTimeout(showWin, 2000));
@@ -264,6 +266,7 @@ if (cliMode) {
             if (pi !== -1 && args[pi + 1]) win?.webContents.send('cli-setup', args[pi + 1]);
             if (args.indexOf('sync-gog')  !== -1) win?.webContents.send('cli-sync', 'gog');
             if (args.indexOf('sync-epic') !== -1) win?.webContents.send('cli-sync', 'epic');
+            if (args.indexOf('storage')   !== -1) win?.webContents.send('cli-storage');
         });
         app.whenReady().then(() => {
             initDb();
@@ -580,10 +583,12 @@ ipcMain.handle('get-all-disk-sizes', () => {
     ).all();
     return Promise.all(installed.map(g => {
         const p = expandTilde(g.install_path);
-        if (!p || !fs.existsSync(p)) return Promise.resolve({ id: g.id, size: null });
+        if (!p || !fs.existsSync(p)) return Promise.resolve({ id: g.id, bytes: null });
         return new Promise(resolve => {
-            exec(`du -sh "${p}" 2>/dev/null`, { timeout: 15000 }, (err, stdout) => {
-                resolve({ id: g.id, size: err ? null : stdout.split('\t')[0].trim() });
+            // -sB1 = summarised disk usage (allocated blocks) in bytes → numeric, sortable.
+            exec(`du -sB1 "${p}" 2>/dev/null`, { timeout: 15000 }, (err, stdout) => {
+                const bytes = err ? null : parseInt((stdout.split('\t')[0] || '').trim(), 10);
+                resolve({ id: g.id, bytes: Number.isFinite(bytes) ? bytes : null });
             });
         });
     }));

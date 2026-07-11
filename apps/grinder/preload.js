@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('api', {
     onRedistProgress:     (cb) => ipcRenderer.on('redist-progress',     (_, d) => cb(d)),
     onCliSetup:           (cb) => ipcRenderer.on('cli-setup', (_, id) => cb(id)),
     onCliSync:            (cb) => ipcRenderer.on('cli-sync',  (_, tab) => cb(tab)),
+    onCliStorage:         (cb) => ipcRenderer.on('cli-storage', () => cb()),
 
     // Destructive actions
     resetGrinder:         () => ipcRenderer.invoke('reset-grinder'),

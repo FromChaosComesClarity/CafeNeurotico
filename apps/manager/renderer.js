@@ -1012,6 +1012,9 @@ document.getElementById('hidden-games-list')?.addEventListener('click', async (e
     renderHiddenGamesList();
 });
 document.getElementById('btn-open-hidden-games')?.addEventListener('click', openHiddenGamesModal);
+// Manage Storage: open GRINDER on installed games sorted by size (GOG/Epic), or Steam's storage settings.
+document.getElementById('btn-storage-grinder')?.addEventListener('click', () => window.api.openGrinderStorage());
+document.getElementById('btn-storage-steam')?.addEventListener('click', () => window.api.openInstallUrl('steam://settings/storage'));
 document.getElementById('btn-close-hidden-games')?.addEventListener('click', () =>
     document.getElementById('modal-hidden-games')?.classList.remove('active'));
 document.getElementById('modal-hidden-games')?.addEventListener('click', (e) => {
@@ -9177,6 +9180,7 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
     const card = (childId) => document.getElementById(childId)?.closest('.tool-card');
     [
         ['btn-update-library', 'library'],
+        ['btn-storage-grinder', 'library'],
         ['btn-tools-add-game', 'library'],
         ['layout-cat-tabs', 'appearance'],
         ['btn-theme-switch', 'appearance'],
