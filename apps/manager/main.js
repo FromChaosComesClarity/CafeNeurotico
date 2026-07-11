@@ -248,6 +248,11 @@ app.whenReady().then(() => {
                 WHEN NEW.date_added IS NULL OR NEW.date_added = 0
                 BEGIN UPDATE games SET date_added = CAST(strftime('%s','now') AS INTEGER) WHERE id = NEW.id; END`).run();
         } catch(e) {}
+        // One-time migration: strip legacy float-formatted Steam appids ("286690.0" → "286690").
+        // These came from an old CSV-era import; the trailing ".0" made sync-steam's SteamAppID
+        // match fail, so every Steam re-sync inserted a bare duplicate row. Normalising keeps
+        // future syncs matching the existing entry. Idempotent (no ".0" left after first run).
+        try { db.prepare("UPDATE games SET SteamAppID = substr(SteamAppID, 1, length(SteamAppID) - 2) WHERE SteamAppID LIKE '%.0'").run(); } catch(e) {}
         // A blank Store leaves a game uncategorizable; file it under "Others" (same bucket GRINDER games use).
         try { db.prepare("UPDATE games SET Store = 'Others' WHERE Store IS NULL OR TRIM(Store) = ''").run(); } catch(e) {}
         try {
@@ -500,6 +505,106 @@ function isSteamGameInstalled(appId) {
     if (!appId || appId === 'None' || appId === '') return false;
     const id = String(appId).replace(/\.0+$/, '');
     return getSteamLibraryPaths().some(dir => fs.existsSync(path.join(dir, `appmanifest_${id}.acf`)));
+}
+
+// Steam tools/runtimes that live as appmanifests but are not games.
+function isSteamInfraApp(name) {
+    return /^(Proton\b|Steam Linux Runtime|Steamworks Common Redistributables)/i.test(name || '');
+}
+
+// Upsert one Steam game (by appid) into the library. Returns 'added' | 'updated' | null.
+// Shared by the Web-API import loop (sync-steam) and the local-appmanifest fallback scan,
+// so both paths get identical dedup/cross-store-merge behaviour.
+function upsertSteamGame(appid, rawName) {
+    appid = String(appid);
+    const name = rawName ? rawName.trim() : 'Unknown Game';
+    if (!name) return null;
+
+    const launchCommand = `steam steam://rungameid/${appid} -silent`;
+    const isInstalled = isSteamGameInstalled(appid) ? 1 : 0;
+
+    // Match only by exact LaunchCommand or SteamAppID — never by game name,
+    // to prevent merging separate store entries (e.g. GOG + Steam of the same title).
+    const existing = db.prepare(
+        "SELECT * FROM games WHERE LaunchCommand = ? OR (SteamAppID = ? AND SteamAppID IS NOT NULL AND SteamAppID != '' AND SteamAppID != 'None')"
+    ).get(launchCommand, appid);
+
+    if (existing) {
+        const existingCmd = existing.LaunchCommand || '';
+        if (/steam:\/\/rungameid/i.test(existingCmd)) {
+            // Pure Steam update — refresh SteamAppID and install status
+            db.prepare("UPDATE games SET SteamAppID=?, Installed=? WHERE id=?")
+              .run(appid, isInstalled, existing.id);
+            // Also check for a sibling non-Steam entry with the same title (pre-existing duplicate)
+            // — if found, merge the Steam launcher into it and delete this Steam-only orphan
+            const sibling = db.prepare(
+                "SELECT * FROM games WHERE LOWER(TRIM(Game))=LOWER(TRIM(?)) AND id != ? AND Store NOT LIKE '%Steam%'"
+            ).get(name, existing.id);
+            if (sibling) {
+                let launchers = [];
+                try { launchers = JSON.parse(sibling.LaunchCommands || '[]'); } catch(e) {}
+                if (launchers.length === 0 && sibling.LaunchCommand) {
+                    launchers.push({ label: guessLauncherLabel(sibling.LaunchCommand), cmd: sibling.LaunchCommand });
+                }
+                if (!launchers.some(l => l.cmd === launchCommand)) {
+                    launchers.push({ label: 'Steam', cmd: launchCommand });
+                }
+                const storeArr = (sibling.Store || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
+                db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
+                  .run(storeArr.join(', '), appid,
+                       Math.max(isInstalled, sibling.Installed || 0),
+                       JSON.stringify(launchers), sibling.id);
+                db.prepare("DELETE FROM games WHERE id=?").run(existing.id);
+            }
+        } else {
+            // Cross-store merge — append Steam launcher to LaunchCommands, keep existing as primary
+            let launchers = [];
+            try { launchers = JSON.parse(existing.LaunchCommands || '[]'); } catch(e) {}
+            if (launchers.length === 0 && existingCmd) {
+                launchers.push({ label: guessLauncherLabel(existingCmd), cmd: existingCmd });
+            }
+            if (!launchers.some(l => l.cmd === launchCommand)) {
+                launchers.push({ label: 'Steam', cmd: launchCommand });
+            }
+            const storeArr = (existing.Store || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
+            db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
+              .run(storeArr.join(', '), appid,
+                   Math.max(isInstalled, existing.Installed || 0),
+                   JSON.stringify(launchers), existing.id);
+        }
+        return 'updated';
+    }
+
+    // Fallback: title match against a non-Steam entry with no SteamAppID yet
+    // (covers the case where GOG/Epic was imported via GRINDER before Steam sync)
+    const titleMatch = db.prepare(
+        "SELECT * FROM games WHERE LOWER(TRIM(Game))=LOWER(TRIM(?)) AND Store NOT LIKE '%Steam%' AND (SteamAppID IS NULL OR SteamAppID='' OR SteamAppID='None')"
+    ).get(name);
+
+    if (titleMatch) {
+        const existingCmd = titleMatch.LaunchCommand || '';
+        let launchers = [];
+        try { launchers = JSON.parse(titleMatch.LaunchCommands || '[]'); } catch(e) {}
+        if (launchers.length === 0 && existingCmd) {
+            launchers.push({ label: guessLauncherLabel(existingCmd), cmd: existingCmd });
+        }
+        if (!launchers.some(l => l.cmd === launchCommand)) {
+            launchers.push({ label: 'Steam', cmd: launchCommand });
+        }
+        const storeArr = (titleMatch.Store || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
+        db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
+          .run(storeArr.join(', '), appid,
+               Math.max(isInstalled, titleMatch.Installed || 0),
+               JSON.stringify(launchers), titleMatch.id);
+        return 'updated';
+    }
+
+    db.prepare("INSERT INTO games (Store, Game, SteamAppID, LaunchCommand, FAV, WANT_TO_PLAY, Installed) VALUES (?, ?, ?, ?, 'NO', 'NO', ?)")
+      .run("Steam", name, appid, launchCommand, isInstalled);
+    return 'added';
 }
 
 // ── Disk footprint scan ──────────────────────────────────────────────────────
@@ -1892,97 +1997,11 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
         let added = 0;
         let updated = 0;
         const games = data.response.games;
-        const insertStmt = db.prepare("INSERT INTO games (Store, Game, SteamAppID, LaunchCommand, FAV, WANT_TO_PLAY) VALUES (?, ?, ?, ?, 'NO', 'NO')");
 
         db.transaction(() => { for (const g of games) {
-            const appid = String(g.appid);
-            const name = g.name ? g.name.trim() : 'Unknown Game';
-            if (!name) continue;
-
-            const launchCommand = `steam steam://rungameid/${appid} -silent`;
-            const isInstalled = isSteamGameInstalled(appid) ? 1 : 0;
-
-            // Match only by exact LaunchCommand or SteamAppID — never by game name,
-            // to prevent merging separate store entries (e.g. GOG + Steam of the same title).
-            const existing = db.prepare(
-                "SELECT * FROM games WHERE LaunchCommand = ? OR (SteamAppID = ? AND SteamAppID IS NOT NULL AND SteamAppID != '' AND SteamAppID != 'None')"
-            ).get(launchCommand, appid);
-
-            if (existing) {
-                const existingCmd = existing.LaunchCommand || '';
-                if (/steam:\/\/rungameid/i.test(existingCmd)) {
-                    // Pure Steam update — refresh SteamAppID and install status
-                    db.prepare("UPDATE games SET SteamAppID=?, Installed=? WHERE id=?")
-                      .run(appid, isInstalled, existing.id);
-                    // Also check for a sibling non-Steam entry with the same title (pre-existing duplicate)
-                    // — if found, merge the Steam launcher into it and delete this Steam-only orphan
-                    const sibling = db.prepare(
-                        "SELECT * FROM games WHERE LOWER(TRIM(Game))=LOWER(TRIM(?)) AND id != ? AND Store NOT LIKE '%Steam%'"
-                    ).get(name, existing.id);
-                    if (sibling) {
-                        let launchers = [];
-                        try { launchers = JSON.parse(sibling.LaunchCommands || '[]'); } catch(e) {}
-                        if (launchers.length === 0 && sibling.LaunchCommand) {
-                            launchers.push({ label: guessLauncherLabel(sibling.LaunchCommand), cmd: sibling.LaunchCommand });
-                        }
-                        if (!launchers.some(l => l.cmd === launchCommand)) {
-                            launchers.push({ label: 'Steam', cmd: launchCommand });
-                        }
-                        const storeArr = (sibling.Store || '').split(',').map(s => s.trim()).filter(Boolean);
-                        if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
-                        db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
-                          .run(storeArr.join(', '), appid,
-                               Math.max(isInstalled, sibling.Installed || 0),
-                               JSON.stringify(launchers), sibling.id);
-                        db.prepare("DELETE FROM games WHERE id=?").run(existing.id);
-                    }
-                } else {
-                    // Cross-store merge — append Steam launcher to LaunchCommands, keep existing as primary
-                    let launchers = [];
-                    try { launchers = JSON.parse(existing.LaunchCommands || '[]'); } catch(e) {}
-                    if (launchers.length === 0 && existingCmd) {
-                        launchers.push({ label: guessLauncherLabel(existingCmd), cmd: existingCmd });
-                    }
-                    if (!launchers.some(l => l.cmd === launchCommand)) {
-                        launchers.push({ label: 'Steam', cmd: launchCommand });
-                    }
-                    const storeArr = (existing.Store || '').split(',').map(s => s.trim()).filter(Boolean);
-                    if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
-                    db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
-                      .run(storeArr.join(', '), appid,
-                           Math.max(isInstalled, existing.Installed || 0),
-                           JSON.stringify(launchers), existing.id);
-                }
-                updated++;
-            } else {
-                // Fallback: title match against a non-Steam entry with no SteamAppID yet
-                // (covers the case where GOG/Epic was imported via GRINDER before Steam sync)
-                const titleMatch = db.prepare(
-                    "SELECT * FROM games WHERE LOWER(TRIM(Game))=LOWER(TRIM(?)) AND Store NOT LIKE '%Steam%' AND (SteamAppID IS NULL OR SteamAppID='' OR SteamAppID='None')"
-                ).get(name);
-
-                if (titleMatch) {
-                    const existingCmd = titleMatch.LaunchCommand || '';
-                    let launchers = [];
-                    try { launchers = JSON.parse(titleMatch.LaunchCommands || '[]'); } catch(e) {}
-                    if (launchers.length === 0 && existingCmd) {
-                        launchers.push({ label: guessLauncherLabel(existingCmd), cmd: existingCmd });
-                    }
-                    if (!launchers.some(l => l.cmd === launchCommand)) {
-                        launchers.push({ label: 'Steam', cmd: launchCommand });
-                    }
-                    const storeArr = (titleMatch.Store || '').split(',').map(s => s.trim()).filter(Boolean);
-                    if (!storeArr.some(s => s.toLowerCase() === 'steam')) storeArr.push('Steam');
-                    db.prepare("UPDATE games SET Store=?, SteamAppID=?, Installed=?, LaunchCommands=? WHERE id=?")
-                      .run(storeArr.join(', '), appid,
-                           Math.max(isInstalled, titleMatch.Installed || 0),
-                           JSON.stringify(launchers), titleMatch.id);
-                    updated++;
-                } else {
-                    db.prepare("INSERT INTO games (Store, Game, SteamAppID, LaunchCommand, FAV, WANT_TO_PLAY, Installed) VALUES (?, ?, ?, ?, 'NO', 'NO', ?)").run("Steam", name, appid, launchCommand, isInstalled);
-                    added++;
-                }
-            }
+            const r = upsertSteamGame(g.appid, g.name);
+            if (r === 'added') added++;
+            else if (r === 'updated') updated++;
         } })();
         // Capture Steam playtime (minutes): playtime_forever (total) + playtime_2weeks (recent).
         const _ptStmt = db.prepare("UPDATE games SET Playtime=?, Playtime2wk=? WHERE SteamAppID=?");
@@ -1993,7 +2012,44 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
             const _ftpStmt = db.prepare("UPDATE games SET FreeToPlay=? WHERE SteamAppID=?");
             db.transaction(() => { for (const g of games) _ftpStmt.run(freeAppids.has(String(g.appid)) ? 1 : 0, String(g.appid)); })();
         }
-        return { success: true, count: added, message: `Imported ${added} new games from Steam.\n(Updated ${updated} existing entries).` };
+
+        // ── Local-install fallback ────────────────────────────────────────────
+        // Steam's Web API omits free games / demos the user has never LAUNCHED
+        // (include_played_free_games only returns *played* free games, and no
+        // parameter lifts that limit), so newly added-but-unplayed free titles &
+        // demos never import. Scan local Steam appmanifests and import any
+        // installed appid the API didn't already return. These are, by definition,
+        // not in the paid set → tag them free-to-play so the FREE pill / hide-free
+        // toggle apply, consistent with API-imported free games.
+        let localAdded = 0;
+        try {
+            const apiIds = new Set(games.map(g => String(g.appid)));
+            db.transaction(() => {
+                for (const dir of getSteamLibraryPaths()) {
+                    let files; try { files = fs.readdirSync(dir); } catch { continue; }
+                    for (const f of files) {
+                        const m = f.match(/^appmanifest_(\d+)\.acf$/); if (!m) continue;
+                        const aid = m[1];
+                        if (apiIds.has(aid)) continue;   // already handled via the Web API
+                        let acf; try { acf = fs.readFileSync(path.join(dir, f), 'utf8'); } catch { continue; }
+                        const nm = acf.match(/"name"\s+"([^"]*)"/);
+                        const nameLocal = nm ? nm[1].trim() : '';
+                        if (!nameLocal || isSteamInfraApp(nameLocal)) continue; // skip Proton / runtimes / redistributables
+                        const r = upsertSteamGame(aid, nameLocal);
+                        if (r === 'added') {
+                            added++; localAdded++;
+                            if (freeSetKnown) db.prepare("UPDATE games SET FreeToPlay=1 WHERE SteamAppID=?").run(aid);
+                        } else if (r === 'updated') {
+                            updated++;
+                        }
+                    }
+                }
+            })();
+        } catch (e) { console.error('Local Steam appmanifest scan failed:', e); }
+
+        let message = `Imported ${added} new games from Steam.\n(Updated ${updated} existing entries).`;
+        if (localAdded) message += `\nIncluded ${localAdded} free/demo game(s) detected from your local Steam install.`;
+        return { success: true, count: added, message };
     } catch (err) {
         return { success: false, message: `Steam API Error: ${err.message}` };
     }
