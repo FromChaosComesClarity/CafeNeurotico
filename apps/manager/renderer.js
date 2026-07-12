@@ -304,8 +304,9 @@ function _dlEsc(s) { const d = document.createElement('div'); d.textContent = s 
 
 // Queue a download (dir/platform already chosen). Starts immediately if nothing is active.
 function enqueueDownload(item) {
-    const dup = (_dlActive && String(_dlActive.gameId) === String(item.gameId)) ||
-                _dlQueue.some(q => String(q.gameId) === String(item.gameId));
+    // DLC jobs carry a distinct dlcKey so they don't collide with the base game's install (or each other).
+    const key = q => String(q.dlcKey || q.gameId);
+    const dup = (_dlActive && key(_dlActive) === key(item)) || _dlQueue.some(q => key(q) === key(item));
     if (dup) { opToast('Already downloading / queued: ' + item.name, _dlActive ? _dlActive.pct : 0); return; }
     _dlQueue.push(item);
     if (_dlActive && !_dlmOpen) opToast(`Queued: ${item.name}  (+${_dlQueue.length} in queue)`, _dlActive.pct || 0);
@@ -320,16 +321,18 @@ async function _pumpDownloadQueue() {
     if (!_dlmOpen) opToast('Installing ' + item.name + '…', 0);
     renderDownloadManager();
     let res;
-    try { res = await window.api.grinderInstall({ gameId: item.gameId, grinderGameId: item.gid, installDir: item.dir }); }
+    try { res = await window.api.grinderInstall({ gameId: item.gameId, grinderGameId: item.gid, installDir: item.dir, dlc: item.dlc, platform: item.platform }); }
     catch (e) { res = { ok: false, error: e.message }; }
     const success = !!(res && res.ok);
+    const cancelled = !success && /cancel/i.test((res && res.error) || '');
     // Desktop/phone ping (KDE Connect mirrors it) — cover art as the notification icon.
-    notifyDesktop(success ? 'Game installed' : 'Install failed', item.name,
+    notifyDesktop(success ? 'Game installed' : (cancelled ? 'Install cancelled' : 'Install failed'), item.name,
         allGames.find(g => String(g.id) === String(item.gameId)));
-    _dlHistory.unshift({ gameId: item.gameId, name: item.name, store: item.store, success, error: success ? null : (res && res.error), at: Date.now() });
+    _dlHistory.unshift({ gameId: item.gameId, name: item.name, store: item.store, success, cancelled, error: success ? null : (res && res.error), at: Date.now() });
     if (_dlHistory.length > 30) _dlHistory.length = 30;
     if (!_dlmOpen) {
         if (success) opToastDone('✓ Installed: ' + item.name);
+        else if (cancelled) { opToast('Cancelled: ' + item.name); setTimeout(opToastHide, 3000); }
         else { opToast('Install failed: ' + item.name); setTimeout(opToastHide, 5000); }
     }
     _dlActive = null;
@@ -458,11 +461,23 @@ async function openGrinderInstall(game) {
     $('gi-cancel').textContent = 'Cancel';
     modal.classList.add('active');
 
+    // Platform choice — only for GOG games that ship BOTH a native Linux and a Windows build.
+    let selectedPlatform;
+    let hasChoice = false;
+    const platRow = $('gi-platform-row');
+    try {
+        const pinfo = await window.api.grinderPlatforms(gid);
+        const avail = pinfo.platforms || [];
+        hasChoice = /^gog_/i.test(gid) && avail.includes('linux') && avail.includes('windows');
+        selectedPlatform = pinfo.platform === 'linux' ? 'linux' : 'windows';
+    } catch { hasChoice = false; }
+    if (platRow) platRow.style.display = hasChoice ? 'flex' : 'none';
+
     const fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1) + ' GB' : (b/1024**2).toFixed(0) + ' MB');
     const refreshSizeInfo = async () => {
         const el = $('gi-sizeinfo'); el.textContent = 'Checking size & free space…';
         const [info, free] = await Promise.all([
-            window.api.getInstallSize(gid).catch(() => null),
+            window.api.getInstallSize(gid, hasChoice ? selectedPlatform : undefined).catch(() => null),
             window.api.getDiskSpace($('gi-dir').value).catch(() => null),
         ]);
         const val = v => `<b style="color:var(--text_main)">${fmtB(v)}</b>`;
@@ -476,7 +491,20 @@ async function openGrinderInstall(game) {
         }
         el.innerHTML = parts.length ? parts.join(' &nbsp;·&nbsp; ') : 'Size info unavailable';
     };
-    refreshSizeInfo();
+
+    if (hasChoice) {
+        const setPlat = p => {
+            selectedPlatform = p;
+            $('gi-plat-linux').classList.toggle('active', p === 'linux');
+            $('gi-plat-windows').classList.toggle('active', p === 'windows');
+            refreshSizeInfo();
+        };
+        $('gi-plat-linux').onclick   = () => setPlat('linux');
+        $('gi-plat-windows').onclick = () => setPlat('windows');
+        setPlat(selectedPlatform);
+    } else {
+        refreshSizeInfo();
+    }
 
     $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); } };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
@@ -484,6 +512,7 @@ async function openGrinderInstall(game) {
         // Hand off to the Download Manager queue: it downloads now (or waits its turn),
         // shows progress in the top toast, and is managed by clicking that toast.
         const item = { gameId: game.id, gid, name: game.Game || '', store: _dlStoreOf(gid), dir: $('gi-dir').value };
+        if (hasChoice) item.platform = selectedPlatform;
         modal.classList.remove('active');
         enqueueDownload(item);
     };
@@ -1017,6 +1046,89 @@ document.getElementById('btn-storage-grinder')?.addEventListener('click', () => 
 document.getElementById('btn-storage-steam')?.addEventListener('click', () => window.api.openInstallUrl('steam://settings/storage'));
 document.getElementById('btn-close-hidden-games')?.addEventListener('click', () =>
     document.getElementById('modal-hidden-games')?.classList.remove('active'));
+
+// ── DLC panel (installed GOG games) ─────────────────────────────────────────
+let _dlcGame = null;
+async function openDlcModal(game) {
+    _dlcGame = game;
+    const modal = document.getElementById('modal-dlc');
+    document.getElementById('dlc-modal-game').textContent = game.Game ? `· ${game.Game}` : '';
+    const statusEl = document.getElementById('dlc-status');
+    document.getElementById('dlc-list').innerHTML = '';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Loading DLCs…';
+    document.getElementById('btn-dlc-install-all').style.display = 'none';
+    document.getElementById('btn-dlc-reset').style.display = 'none';
+    modal.classList.add('active');
+    let res;
+    try { res = await window.api.dlcList(game.GrinderGameId, null); }
+    catch (e) { res = { ok: false, error: e.message, dlcs: [] }; }
+    if (_dlcGame !== game || !modal.classList.contains('active')) return;  // closed / switched while loading
+    renderDlcModal(game, res);
+}
+
+function renderDlcModal(game, res) {
+    const listEl   = document.getElementById('dlc-list');
+    const statusEl = document.getElementById('dlc-status');
+    const allBtn   = document.getElementById('btn-dlc-install-all');
+    const resetBtn = document.getElementById('btn-dlc-reset');
+    listEl.innerHTML = '';
+    const dlcs = (res && res.dlcs) || [];
+    if (!res || !res.ok || !dlcs.length) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = (res && !res.ok) ? (res.error || 'Could not load DLCs.')
+                                                : 'No DLCs to install here. Any DLCs you own for this game are already bundled into the base install.';
+        allBtn.style.display = 'none'; resetBtn.style.display = 'none';
+        return;
+    }
+    statusEl.style.display = 'none';
+    for (const d of dlcs) {
+        const row = document.createElement('div'); row.className = 'dlc-row';
+        const meta = document.createElement('div'); meta.className = 'dlc-meta';
+        const title = document.createElement('div'); title.className = 'dlc-title'; title.textContent = d.title;
+        const sub = document.createElement('div'); sub.className = 'dlc-sub';
+        const sizeStr = d.disk_size > 1024 * 1024 ? ' · ' + _fmtBytes(d.disk_size) : '';
+        sub.textContent = (d.installed ? 'Installed' : 'Not installed') + sizeStr;
+        meta.appendChild(title); meta.appendChild(sub); row.appendChild(meta);
+        // No per-DLC install button: GOG's downloader can't safely install a single DLC (its --dlcs
+        // filter removes tracked files, which can delete the base game). Badges are informational; the
+        // one safe operation is "Install all DLCs" (adds every owned DLC, never removes the base).
+        const badge = document.createElement('div');
+        if (d.installed) { badge.className = 'dlc-installed'; badge.textContent = '✓ INSTALLED'; }
+        else { badge.className = 'dlc-sub'; badge.style.flexShrink = '0'; badge.textContent = 'not installed'; }
+        row.appendChild(badge);
+        listEl.appendChild(row);
+    }
+    const missing = dlcs.filter(d => !d.installed);
+    allBtn.style.display = missing.length ? 'block' : 'none';
+    allBtn.textContent = `Install all DLCs (${missing.length} missing)`;
+    allBtn.onclick = async () => {
+        const ok = await showConfirm(
+            `Install all ${dlcs.length} owned DLC(s) for "${game.Game}"?\n\nGOG installs DLCs as a set, so this downloads every owned DLC for the game (already-installed ones are skipped).`,
+            'Install all DLCs');
+        if (!ok) return;
+        _dlcEnqueue(game, 'all', null, `${game.Game} — all DLCs`); closeDlcModal();
+    };
+    resetBtn.style.display = dlcs.some(d => d.installed) ? 'inline-block' : 'none';
+}
+
+function _dlcEnqueue(game, mode, ids, label) {
+    enqueueDownload({ gameId: game.id, gid: game.GrinderGameId, name: label, store: 'GOG', dir: null,
+        dlc: { mode, ids }, dlcKey: `${game.id}:dlc:${mode}:${(ids || []).join(',')}` });
+}
+function closeDlcModal() { _dlcGame = null; document.getElementById('modal-dlc')?.classList.remove('active'); }
+
+document.getElementById('btn-close-dlc')?.addEventListener('click', closeDlcModal);
+document.getElementById('modal-dlc')?.addEventListener('click', (e) => { if (e.target.id === 'modal-dlc') closeDlcModal(); });
+document.getElementById('btn-dlc-reset')?.addEventListener('click', async () => {
+    const game = _dlcGame; if (!game) return;
+    const ok = await showConfirm(
+        `Reset DLCs for "${game.Game}"?\n\nThis reinstalls the base game with NO DLCs — it re-downloads the entire game. Use this to remove installed DLCs.`,
+        'Reset DLCs', true);
+    if (!ok) return;
+    _dlcEnqueue(game, 'reset', null, `${game.Game} — reinstalling (no DLCs)`);
+    closeDlcModal();
+});
 document.getElementById('modal-hidden-games')?.addEventListener('click', (e) => {
     if (e.target.id === 'modal-hidden-games') e.currentTarget.classList.remove('active');
 });
@@ -7652,6 +7764,18 @@ function openGamepage(game) {
         } else {
             uninstallBtn.style.display = 'none';
             uninstallBtn.onclick = null;
+        }
+    }
+
+    // DLC button — installed GOG games (DLCs merge into the existing install folder)
+    const dlcBtn = document.getElementById('btn-gamepage-dlc');
+    if (dlcBtn) {
+        if (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) {
+            dlcBtn.style.display = 'block';
+            dlcBtn.onclick = (e) => { e.stopPropagation(); openDlcModal(game); };
+        } else {
+            dlcBtn.style.display = 'none';
+            dlcBtn.onclick = null;
         }
     }
 

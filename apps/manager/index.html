@@ -119,6 +119,15 @@
     .hidden-game-row .hg-title { font-weight: bold; font-size: 13px; color: var(--text_main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hidden-game-row .hg-store { font-size: 11px; color: var(--text_dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hidden-game-row .hg-unhide { flex-shrink: 0; font-size: 11px; padding: 6px 12px; font-weight: bold; letter-spacing: 1px; cursor: pointer; }
+    .dlc-row { display: flex; align-items: center; gap: 12px; padding: 9px 11px; background: rgba(0,0,0,0.18); border: 1px solid var(--border); border-radius: 8px; }
+    .dlc-row .dlc-meta { flex: 1; min-width: 0; }
+    .dlc-row .dlc-title { font-weight: bold; font-size: 13px; color: var(--text_main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dlc-row .dlc-sub { font-size: 11px; color: var(--text_dim); }
+    .dlc-row .dlc-installed { flex-shrink: 0; font-size: 11px; font-weight: 900; letter-spacing: 1px; color: #5be27a; display: flex; align-items: center; gap: 5px; }
+    .dlc-row .dlc-install-btn { flex-shrink: 0; font-size: 11px; padding: 6px 14px; font-weight: bold; letter-spacing: 1px; cursor: pointer; }
+    .gi-plat-btn { background: transparent; border: none; color: var(--text_sec); font-size: 11px; font-weight: 900; letter-spacing: 0.5px; padding: 7px 15px; cursor: pointer; font-family: inherit; text-transform: uppercase; transition: background 0.15s, color 0.15s; }
+    .gi-plat-btn.active { background: var(--accent); color: var(--bg); }
+    .gi-plat-btn:not(.active):hover { background: rgba(255,255,255,0.06); color: var(--text_main); }
     .btn-gallery-fav, .btn-gallery-want { width: 26px; height: 26px; border-radius: 5px; border: none; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.35); transition: color 0.15s, background 0.15s; line-height: 1; padding: 0; }
     .btn-gallery-fav:hover { background: rgba(0,0,0,0.75); color: #ffeb3b; }
     .btn-gallery-want:hover { background: rgba(0,0,0,0.75); color: #ff9800; }
@@ -3637,6 +3646,9 @@
                         <button id="btn-gamepage-uninstall" class="btn-hero btn-hero-sq" title="Uninstall" style="display:none; border-color:#ef5350; color:#ef5350;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
+                        <button id="btn-gamepage-dlc" class="btn-hero btn-hero-sq" title="Manage DLCs" style="display:none;">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.44 12.99l-.01.02c-.34.76-.1 1.66.57 2.14l.02.01c.9.64 1.12 1.9.48 2.8l-.44.62c-.64.9-1.9 1.11-2.8.48l-.02-.01a1.78 1.78 0 0 0-2.28.44 1.78 1.78 0 0 0-.35 1.06v.02c0 1.1-.9 2-2 2h-.76c-1.1 0-2-.9-2-2v-.02c-.01-.7-.44-1.32-1.08-1.59a1.78 1.78 0 0 0-1.98.36l-.02.01c-.9.64-2.16.42-2.8-.48l-.44-.62a2.01 2.01 0 0 1 .48-2.8l.02-.01c.67-.48.91-1.38.57-2.14l-.01-.02a1.78 1.78 0 0 0-1.62-1.08H2c-1.1 0-2-.9-2-2v-.76c0-1.1.9-2 2-2h.02c.7-.01 1.32-.44 1.59-1.08"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
                         <button id="btn-gamepage-splore" class="btn-hero btn-hero-sq" title="SPLORE" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="12" rx="4"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
                         </button>
@@ -5947,6 +5959,13 @@ LOADING...READY.</div>
           <input id="gi-dir" type="text" readonly style="flex:1; font-family:monospace; font-size:11px;">
           <button id="gi-change-dir" style="font-size:11px; padding:6px 12px; white-space:nowrap;">Change…</button>
         </div>
+        <div id="gi-platform-row" style="display:none; align-items:center; gap:10px; margin-top:12px;">
+          <p style="font-size:10px; color:var(--accent); font-weight:900; letter-spacing:1px; margin:0; text-transform:uppercase;">Version</p>
+          <div style="display:flex; border:1px solid var(--border_solid); border-radius:8px; overflow:hidden;">
+            <button id="gi-plat-linux" class="gi-plat-btn" title="Install the native Linux build">Linux Native</button>
+            <button id="gi-plat-windows" class="gi-plat-btn" title="Install the Windows build (runs via Proton)">Windows</button>
+          </div>
+        </div>
         <div id="gi-sizeinfo" style="font-size:13px; font-weight:700; color:var(--text_sec); margin-top:10px; min-height:20px; line-height:1.7; text-align:center; background:rgba(0,0,0,0.25); border:1px solid var(--border_solid); border-radius:8px; padding:10px 12px;"></div>
       </div>
       <div id="gi-progress" style="display:none;">
@@ -6081,6 +6100,20 @@ LOADING...READY.</div>
       <div id="hidden-games-empty" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center;">No hidden games. Hide one from its game page or a FREE pill.</div>
       <div id="hidden-games-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px;"></div>
       <button id="btn-close-hidden-games" style="margin-top: 4px; width: 100%;" data-i18n="html.close">Close</button>
+    </div>
+  </div>
+
+  <div id="modal-dlc" class="modal-overlay">
+    <div class="modal-box" style="max-width: 600px; width: 600px; max-height: 84vh; display:flex; flex-direction:column;">
+      <h3 style="margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Manage DLCs <span id="dlc-modal-game" style="opacity:0.6; font-weight:400; text-transform:none; letter-spacing:0;"></span></h3>
+      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.5; margin: 0;">Owned DLCs for this GOG game. GOG installs DLCs as a set — <strong>Install all DLCs</strong> adds every owned DLC (the base game is never removed). Reset DLCs reinstalls the base with none.</p>
+      <div id="dlc-status" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center;"></div>
+      <div id="dlc-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px; margin-top:4px;"></div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-shrink:0;">
+        <button id="btn-dlc-install-all" class="primary" style="flex:1; font-size:12px;">Install all DLCs</button>
+        <button id="btn-dlc-reset" style="font-size:11px; background:transparent; border:1px solid #ef5350; color:#ef5350;" title="Reinstall the base game with no DLCs (full re-download)">Reset DLCs</button>
+        <button id="btn-close-dlc" style="font-size:12px;">Close</button>
+      </div>
     </div>
   </div>
 

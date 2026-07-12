@@ -98,11 +98,26 @@ function which(bin) {
 // Tool paths resolved once — avoids repeated execSync('which ...') on every launch/IPC call
 let _legendary = null, _gogdl = null, _comet = null, _umu = null, _wine = null;
 let _activeInstallProc = null;   // the gogdl/legendary child currently downloading (for cancel)
-// Kill the in-flight headless download, if any. The spawn's close handler then resolves
-// failure, so headlessInstall emits an error event and the caller's _grinderBusy clears.
+let _activeKillTimer   = null;
+let _installCancelled  = false;  // set by cancel → makes the failure message read "cancelled"
+// Kill the in-flight headless download, if any. gogdl/legendary spawn parallel download workers, so a
+// SIGTERM to just the main process often leaves it waiting on them (and the download running) → the
+// close handler never fires and the UI hangs on "Cancelling…". We kill the whole PROCESS GROUP (the
+// children are spawned detached = group leaders) and hard-kill with SIGKILL if it doesn't exit quickly.
+// The spawn's close handler then resolves failure, headlessInstall emits an error event, and the
+// caller's _grinderBusy clears + the queue advances.
 function cancelActiveInstall() {
-    if (_activeInstallProc) { try { _activeInstallProc.kill('SIGTERM'); } catch {} _activeInstallProc = null; return true; }
-    return false;
+    const proc = _activeInstallProc;
+    if (!proc || !proc.pid) return false;
+    _installCancelled = true;
+    const killGroup = (sig) => {
+        try { process.kill(-proc.pid, sig); }        // negative pid = the whole process group
+        catch { try { proc.kill(sig); } catch {} }   // fallback: at least the main child
+    };
+    killGroup('SIGTERM');
+    if (_activeKillTimer) clearTimeout(_activeKillTimer);
+    _activeKillTimer = setTimeout(() => killGroup('SIGKILL'), 3000);  // uncatchable — guarantees exit
+    return true;
 }
 function findLegendary() {
     if (_legendary !== null) return _legendary;
@@ -162,18 +177,42 @@ function syncSharedDb(appId, installed) {
     } catch {}
 }
 
-async function headlessInstall(store, appId, platform, installDir) {
+async function headlessInstall(store, appId, platform, installDir, opts = {}) {
     const title = (() => { try { return db?.prepare("SELECT title FROM games WHERE app_id=? AND store=?").get(appId, store)?.title || appId; } catch { return appId; } })();
     const base = { title, store, appId, done: false };
+    _installCancelled = false;   // fresh run — cleared so a prior cancel doesn't mislabel this one
+    // DLC directives (opts): withDlcs/dlcIds = add DLCs; skipDlcs = base only ("Reset DLCs").
+    // `dlcOp` = any DLC-scoped operation.
+    //
+    // SAFETY (learned the hard way — this caused base-game deletion):
+    //  • NEVER pass --dlc-only: it makes gogdl's target set ONLY the DLC files, so reconciliation
+    //    DELETES every other tracked file, wiping the base game.
+    //  • NEVER pass --dlcs <ids> to filter: that also narrows the target and deletes tracked files
+    //    outside the list. Empirically, `--with-dlcs` (all owned, no filter) reconciles with
+    //    Deleted: 0 — it only ADDS missing DLC files and never removes the base. So every DLC-add
+    //    installs the game's *complete* owned DLC set. Per-DLC selection is not safely possible.
+    //  • --skip-dlcs keeps the base in the target (safe) and strips DLC files (the intended reset).
+    const dlcOp = !!(opts.withDlcs || opts.dlcIds?.length || opts.skipDlcs);
+    const dlcArgs = [];
+    if (opts.skipDlcs)                          dlcArgs.push('--skip-dlcs');
+    else if (opts.withDlcs || opts.dlcIds?.length) dlcArgs.push('--with-dlcs');
 
     if (store === 'gog') {
         const gogdl = findGogdl();
         if (!gogdl) { writeProgress({ ...base, step: 'error', message: 'gogdl not found.', done: true }); return; }
-        const dir = expandTilde(installDir) || path.join(HOME, 'Games', 'CafeNeurotico');
+        // DLC changes / reinstalls target the base game's existing parent folder.
+        let dir;
+        if (dlcOp) {
+            const cur = db?.prepare("SELECT install_path FROM games WHERE app_id=? AND store='gog'").get(appId)?.install_path;
+            dir = cur ? path.dirname(expandTilde(cur)) : (expandTilde(installDir) || path.join(HOME, 'Games', 'CafeNeurotico'));
+        } else {
+            dir = expandTilde(installDir) || path.join(HOME, 'Games', 'CafeNeurotico');
+        }
         try { fs.mkdirSync(dir, { recursive: true }); } catch {}
         try { fs.chmodSync(gogdl, '755'); } catch {}
         const manifestPath = path.join(configDir, 'gogdl', 'manifests', appId);
-        try { fs.rmSync(manifestPath, { force: true }); } catch {}
+        // Keep the manifest for DLC operations (gogdl reconciles against the existing install); wipe it only for a fresh base install.
+        if (!dlcOp) { try { fs.rmSync(manifestPath, { force: true }); } catch {} }
 
         // Refresh GOG token before writing auth config — avoids stale-token failures in headless mode
         writeProgress({ ...base, step: 'auth', percent: 0, message: 'Refreshing authentication...' });
@@ -186,7 +225,8 @@ async function headlessInstall(store, appId, platform, installDir) {
                 const proc = spawn(gogdl, [
                     '--auth-config-path', authPath, 'download', appId,
                     '--platform', plat, '--path', dir, '--lang', 'en-US',
-                ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GOGDL_CONFIG_PATH: configDir } });
+                    ...dlcArgs,
+                ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GOGDL_CONFIG_PATH: configDir }, detached: true });
                 _activeInstallProc = proc;
                 let buf = '';
                 const onData = d => {
@@ -201,8 +241,9 @@ async function headlessInstall(store, appId, platform, installDir) {
                     }
                 };
                 proc.stdout.on('data', onData); proc.stderr.on('data', onData);
-                proc.on('close', code => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(code === 0); });
-                proc.on('error', () => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(false); });
+                const done = ok => { if (_activeInstallProc === proc) _activeInstallProc = null; if (_activeKillTimer) { clearTimeout(_activeKillTimer); _activeKillTimer = null; } resolve(ok); };
+                proc.on('close', code => done(code === 0));
+                proc.on('error', () => done(false));
             });
             return { ok, lastLines };
         };
@@ -221,7 +262,11 @@ async function headlessInstall(store, appId, platform, installDir) {
         const { ok: dlOk, lastLines } = await runGogdlDownload(activePlat);
 
         try { fs.unlinkSync(authPath); } catch {}
-        if (!dlOk) { writeProgress({ ...base, step: 'error', message: lastLines.slice(-2).join(' | ') || 'Download failed.', done: true }); return; }
+        if (!dlOk) { writeProgress({ ...base, step: 'error', message: _installCancelled ? 'Installation cancelled.' : (lastLines.slice(-2).join(' | ') || 'Download failed.'), done: true }); return; }
+
+        // DLC operations reconcile the already-installed base folder (no NEW game dir is created, and the
+        // base's install state / executable are unchanged) → skip new-install detection and finish.
+        if (dlcOp) { writeProgress({ ...base, step: 'done', percent: 100, message: 'DLC changes complete!', done: true }); return; }
 
         const gameInfo = findGogInstallResult(dir, appId, preExistingDirsH);
         if (!gameInfo) { writeProgress({ ...base, step: 'error', message: 'Install verification failed.', done: true }); return; }
@@ -250,7 +295,7 @@ async function headlessInstall(store, appId, platform, installDir) {
         await new Promise(res => { const p = spawn(leg, ['uninstall', appId, '-y'], { stdio: 'ignore' }); p.on('close', res); p.on('error', res); });
 
         const dlOk = await new Promise(resolve => {
-            const proc = spawn(leg, ['install', appId, '--base-path', dir, '-y'], { stdio: ['ignore', 'pipe', 'pipe'] });
+            const proc = spawn(leg, ['install', appId, '--base-path', dir, '-y'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
             _activeInstallProc = proc;
             let buf = '';
             const onData = d => {
@@ -263,10 +308,11 @@ async function headlessInstall(store, appId, platform, installDir) {
                 }
             };
             proc.stdout.on('data', onData); proc.stderr.on('data', onData);
-            proc.on('close', code => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(code === 0); });
-            proc.on('error', () => { if (_activeInstallProc === proc) _activeInstallProc = null; resolve(false); });
+            const done = ok => { if (_activeInstallProc === proc) _activeInstallProc = null; if (_activeKillTimer) { clearTimeout(_activeKillTimer); _activeKillTimer = null; } resolve(ok); };
+            proc.on('close', code => done(code === 0));
+            proc.on('error', () => done(false));
         });
-        if (!dlOk) { writeProgress({ ...base, step: 'error', message: 'Download failed.', done: true }); return; }
+        if (!dlOk) { writeProgress({ ...base, step: 'error', message: _installCancelled ? 'Installation cancelled.' : 'Download failed.', done: true }); return; }
         writeProgress({ ...base, step: 'installing', percent: 100, message: 'Finalizing...' });
         try {
             const game = db?.prepare("SELECT * FROM games WHERE app_id=? AND store='epic'").get(appId);
@@ -906,6 +952,45 @@ async function gogInstallInfo(appId, platform) {
     });
 }
 
+// Owned DLCs for a GOG game via `gogdl info --with-dlcs`. Returns { ok, dlcs:[{id,title,download_size,disk_size}] }.
+async function gogListDlcs(baseAppId, platform) {
+    const gogdl = findGogdl(); if (!gogdl) return { ok: false, error: 'gogdl not found.', dlcs: [] };
+    try { fs.chmodSync(gogdl, '755'); } catch {}
+    await getGogToken().catch(() => {});
+    const authPath = writeGogAuthConfig();
+    return new Promise(resolve => {
+        let out = '';
+        const proc = spawn(gogdl, ['--auth-config-path', authPath, 'info', String(baseAppId),
+            '--platform', platform || 'windows', '--with-dlcs'],
+            { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GOGDL_CONFIG_PATH: configDir } });
+        proc.stdout.on('data', d => out += d);
+        proc.stderr.on('data', d => out += d);
+        proc.on('close', () => {
+            try { fs.unlinkSync(authPath); } catch {}
+            try {
+                const data = JSON.parse(out.split('\n').find(l => l.trim().startsWith('{')));
+                const dlcs = (data.dlcs || []).map(x => {
+                    const sz = (x.size && (x.size['en-US'] || x.size['*'])) || {};
+                    return { id: String(x.id), title: x.title || 'DLC', download_size: sz.download_size || 0, disk_size: sz.disk_size || 0 };
+                });
+                resolve({ ok: true, dlcs });
+            } catch { resolve({ ok: false, error: 'Could not read the DLC list. Make sure you are signed into GOG in GRINDER.', dlcs: [] }); }
+        });
+        proc.on('error', () => { try { fs.unlinkSync(authPath); } catch {} resolve({ ok: false, error: 'gogdl failed to run.', dlcs: [] }); });
+    });
+}
+
+// Which owned DLCs are ACTUALLY installed, from gogdl's manifest HGLdlcs field — the only reliable
+// signal. A completed --with-dlcs install records each installed DLC there (verified). We deliberately
+// do NOT fall back to products[]/depots[]: those hold the full OWNED/planned set whenever --with-dlcs
+// is passed, so they list DLCs that were only planned, not downloaded → false "installed" badges.
+function gogInstalledDlcs(baseAppId) {
+    try {
+        const j = JSON.parse(fs.readFileSync(path.join(configDir, 'gogdl', 'manifests', String(baseAppId)), 'utf8'));
+        return Array.isArray(j.HGLdlcs) ? j.HGLdlcs.map(d => String((d && d.id) ?? d)).filter(Boolean) : [];
+    } catch { return []; }
+}
+
 // Epic download/disk size via legendary info.
 async function epicInstallInfo(appName) {
     const leg = findLegendary(); if (!leg) return null;
@@ -933,4 +1018,5 @@ module.exports = {
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
     getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary, cancelActiveInstall,
+    gogListDlcs, gogInstalledDlcs,
 };

@@ -362,16 +362,29 @@ function grinderDefaultDir() {
 
 // Pre-install: free disk space at a path + download/disk size for a GOG/Epic title (shared engine).
 ipcMain.handle('get-disk-space', (_, p) => grinderEngine.getDiskSpace(p));
-ipcMain.handle('get-install-size', async (_, grinderGameId) => {
+ipcMain.handle('get-install-size', async (_, grinderGameId, reqPlatform) => {
     if (!ensureGrinderEngine()) return null;
     const parsed = parseGrinderId(grinderGameId); if (!parsed) return null;
     if (parsed.store === 'gog') {
-        let platform = null;
-        try { platform = _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store)?.platform; } catch {}
+        let platform = reqPlatform || null;
+        if (!platform) { try { platform = _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store)?.platform; } catch {} }
         return grinderEngine.gogInstallInfo(parsed.appId, platform || 'linux');
     }
     if (parsed.store === 'epic') return grinderEngine.epicInstallInfo(parsed.appId);
     return null;
+});
+
+// Available install platforms for a GOG/Epic game (from grinder.db) → lets CN offer the same
+// Linux-native / Windows choice GRINDER has. Returns { platform (current default), platforms: [...] }.
+ipcMain.handle('grinder-platforms', (_, grinderGameId) => {
+    if (!ensureGrinderEngine()) return { platform: 'windows', platforms: [] };
+    const parsed = parseGrinderId(grinderGameId);
+    if (!parsed) return { platform: 'windows', platforms: [] };
+    try {
+        const row = _grinderEngineDb.prepare("SELECT platform, platforms FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store);
+        const platforms = (row?.platforms || row?.platform || '').split(',').map(s => s.trim()).filter(Boolean);
+        return { platform: row?.platform || 'windows', platforms };
+    } catch { return { platform: 'windows', platforms: [] }; }
 });
 
 // Headless owned-library refresh: pull newly-purchased GOG/Epic titles from the
@@ -389,15 +402,28 @@ ipcMain.handle('grinder-refresh-owned', async () => {
 
 // In-process install of a GOG/Epic game via the shared engine; progress streams
 // to the calling renderer over 'grinder-install-progress'.
-ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, installDir } = {}) => {
+ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, installDir, dlc, platform: reqPlatform } = {}) => {
     if (_grinderBusy) return { ok: false, error: 'Another install/uninstall is in progress.' };
     if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
     const parsed = parseGrinderId(grinderGameId);
     if (!parsed) return { ok: false, error: 'This game cannot be installed in-process (not a GOG/Epic title).' };
-    const platform = (() => {
+    // User picked Linux-native vs Windows: persist it in grinder.db so the install AND future
+    // launches (native vs Proton) both use it, matching GRINDER's own behaviour.
+    if (reqPlatform && parsed.store === 'gog') {
+        try { _grinderEngineDb.prepare("UPDATE games SET platform=? WHERE app_id=? AND store=?").run(reqPlatform, parsed.appId, parsed.store); } catch {}
+    }
+    const platform = reqPlatform || (() => {
         try { return _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store=?").get(parsed.appId, parsed.store)?.platform; }
         catch { return null; }
     })();
+    // DLC directives (from the gamepage DLC panel): mode 'all'|'ids' merge DLCs into the installed
+    // base; mode 'reset' reinstalls the base with no DLCs. Plain installs pass no `dlc`.
+    const opts = {};
+    if (dlc) {
+        if (dlc.mode === 'reset') opts.skipDlcs = true;
+        else if (dlc.mode === 'all') opts.withDlcs = true;
+        else if (Array.isArray(dlc.ids) && dlc.ids.length) opts.dlcIds = dlc.ids.map(String);
+    }
     const dir = installDir || grinderDefaultDir() || undefined;
     _grinderBusy = true;
     // Watch for an error/cancel event so we don't mark a failed or cancelled download as installed.
@@ -407,7 +433,7 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
         try { event.sender.send('grinder-install-progress', data); } catch {}
     };
     try {
-        await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir);
+        await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir, opts);
         if (installErr) return { ok: false, error: installErr };
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=1 WHERE id=?").run(gameId); } catch {} }
         try { event.sender.send('install-status-updated'); } catch {}
@@ -417,6 +443,21 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
     } finally {
         _grinderBusy = false; _grinderProgressCb = null;
     }
+});
+
+// List a GOG game's owned DLCs (via gogdl info --with-dlcs) with per-DLC installed state
+// (read from gogdl's local manifest). Powers the gamepage DLC panel.
+ipcMain.handle('dlc-list', async (_, grinderGameId, platform) => {
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.', dlcs: [] };
+    const parsed = parseGrinderId(grinderGameId);
+    if (!parsed || parsed.store !== 'gog') return { ok: false, error: 'DLCs are only supported for GOG games.', dlcs: [] };
+    const plat = platform || (() => {
+        try { return _grinderEngineDb.prepare("SELECT platform FROM games WHERE app_id=? AND store='gog'").get(parsed.appId)?.platform; } catch { return null; }
+    })() || 'windows';
+    const res = await grinderEngine.gogListDlcs(parsed.appId, plat);
+    const installed = new Set(grinderEngine.gogInstalledDlcs(parsed.appId));
+    res.dlcs = (res.dlcs || []).map(d => ({ ...d, installed: installed.has(String(d.id)) }));
+    return res;
 });
 
 // Cancel the in-flight in-process download (kills gogdl/legendary). The install
