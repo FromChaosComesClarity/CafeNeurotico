@@ -761,10 +761,24 @@ function writeGogAuthConfig() {
 // { loggedIn, total, added, error }.
 async function syncOwnedLibrary() {
     const result = {
-        epic: { loggedIn: false, total: 0, added: 0, error: null },
-        gog:  { loggedIn: false, total: 0, added: 0, error: null },
+        epic: { loggedIn: false, total: 0, added: 0, removed: 0, removedIds: [], error: null },
+        gog:  { loggedIn: false, total: 0, added: 0, removed: 0, removedIds: [], error: null },
     };
     if (!db) return result;
+
+    // Drop store rows the user no longer owns (refunds/removals). Only NOT-installed rows
+    // are pruned — a still-installed title is left alone so its on-disk files are never
+    // orphaned. Guarded by the caller on a non-empty owned list. Returns the removed grinder
+    // ids (store_appid) so the caller can drop the matching CNGM library rows too.
+    const pruneUnowned = (store, ownedSet) => {
+        const removedIds = [];
+        const rows = db.prepare("SELECT id, app_id FROM games WHERE store=? AND installed=0").all(store);
+        const del  = db.prepare("DELETE FROM games WHERE store=? AND app_id=? AND installed=0");
+        db.transaction(() => {
+            for (const r of rows) if (!ownedSet.has(String(r.app_id))) { del.run(store, r.app_id); removedIds.push(r.id); }
+        })();
+        return removedIds;
+    };
 
     // ── Epic (legendary) ──────────────────────────────────────────────────────
     if (findLegendary()) {
@@ -788,6 +802,12 @@ async function syncOwnedLibrary() {
                     return n;
                 });
                 result.epic.added = tx(all);
+                // legendary always lists the FULL owned set → a non-empty list means we can
+                // safely prune Epic titles that dropped out of it (refunds/revoked keys).
+                if (all.length) {
+                    result.epic.removedIds = pruneUnowned('epic', new Set(all.map(g => String(g.app_name))));
+                    result.epic.removed = result.epic.removedIds.length;
+                }
             } catch { result.epic.error = 'Failed to parse legendary output.'; }
         } else {
             // Not logged in / legendary error — surface quietly (loggedIn stays false).
@@ -835,6 +855,13 @@ async function syncOwnedLibrary() {
                 return n;
             });
             result.gog.added = tx(games);
+            // `ids` is GOG's full owned-product list (games + DLCs). A non-empty list lets us
+            // prune GOG rows the user no longer owns (refunds) without risking a purge on a
+            // transient/empty API response.
+            if (ids.length) {
+                result.gog.removedIds = pruneUnowned('gog', new Set(ids.map(String)));
+                result.gog.removed = result.gog.removedIds.length;
+            }
         } catch (e) { result.gog.error = e.message; }
     }
 

@@ -9065,8 +9065,9 @@ async function updateLibraryFlow({ quiet = false } = {}) {
             statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Refreshing GOG/Epic library...', '⚪ GOG/Epic: GRINDER not found');
         } else {
             const parts = [];
-            if (ro.gog?.loggedIn)  parts.push(`GOG +${ro.gog.added || 0}`);
-            if (ro.epic?.loggedIn) parts.push(`Epic +${ro.epic.added || 0}`);
+            const tally = (label, s) => `${label} +${s.added || 0}${s.removed ? ` −${s.removed}` : ''}`;
+            if (ro.gog?.loggedIn)  parts.push(tally('GOG', ro.gog));
+            if (ro.epic?.loggedIn) parts.push(tally('Epic', ro.epic));
             const msg = parts.length ? parts.join(', ') : 'not logged in to GOG/Epic';
             statusEl.innerHTML = statusEl.innerHTML.replace('🔄 Refreshing GOG/Epic library...', `✅ Stores: ${msg}`);
             if ((ro.gog?.added || 0) + (ro.epic?.added || 0) > 0) anySuccess = true;

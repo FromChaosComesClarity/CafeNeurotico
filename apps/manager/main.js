@@ -394,6 +394,20 @@ ipcMain.handle('grinder-refresh-owned', async () => {
     if (!ensureGrinderEngine()) return { available: false };
     try {
         const r = await grinderEngine.syncOwnedLibrary();
+        // Propagate refunds/removals into CNGM's library: syncOwnedLibrary just pruned these ids
+        // from grinder.db, so drop the matching CNGM rows too — or, for a title also on Steam,
+        // strip only the GOG/Epic side. Scoped to THIS run's removed ids (never a broad
+        // grinder.db diff), so pre-existing games.db↔grinder.db drift is never wrongly deleted.
+        const removedIds = [...(r.gog?.removedIds || []), ...(r.epic?.removedIds || [])];
+        if (db && removedIds.length) {
+            const sel = db.prepare("SELECT id, Store, LaunchCommand, LaunchCommands, GrinderGameId FROM games WHERE GrinderGameId=?");
+            db.transaction(() => {
+                for (const gid of removedIds) {
+                    const row = sel.get(gid);
+                    if (row) pruneStoreEntry(row, String(gid).startsWith('epic_') ? 'epic' : 'gog');
+                }
+            })();
+        }
         return { available: true, ...r };
     } catch (e) {
         return { available: true, error: e.message };
@@ -540,6 +554,46 @@ function guessLauncherLabel(cmd) {
     if (/^flatpak run/i.test(cmd))               return 'Flatpak';
     if (cmd.startsWith('grinder://'))             return 'GRINDER';
     return 'Custom';
+}
+
+// Which store a single launch command belongs to (null = manual/custom/emulator/etc.).
+function launcherStore(cmd) {
+    if (/steam:\/\/rungameid/i.test(cmd))        return 'steam';
+    if (/grinder:\/\/launch\/gog\//i.test(cmd))  return 'gog';
+    if (/grinder:\/\/launch\/epic\//i.test(cmd)) return 'epic';
+    return null;
+}
+
+// Remove one store's presence from a library row after that store reports the game gone
+// (Steam uninstall/refund, GOG/Epic refund). For a plain single-store entry the whole row is
+// deleted; for a cross-store entry (same title merged from e.g. Steam + GOG) only the removed
+// store's launcher + tag are stripped and the surviving store(s) keep the row. Returns
+// 'deleted' | 'stripped'. `which` is 'steam' | 'gog' | 'epic'.
+function pruneStoreEntry(row, which) {
+    let launchers = [];
+    try { launchers = JSON.parse(row.LaunchCommands || '[]'); } catch(e) {}
+    if (!launchers.length && row.LaunchCommand) {
+        launchers.push({ label: guessLauncherLabel(row.LaunchCommand), cmd: row.LaunchCommand });
+    }
+    const remaining = launchers.filter(l => launcherStore(l.cmd || '') !== which);
+    // Keep the row only if a DIFFERENT recognised store launcher survives; a leftover
+    // unrecognised/dangling launcher (e.g. a bare grinder://<id> fallback) still deletes.
+    const survives = remaining.some(l => launcherStore(l.cmd || ''));
+
+    if (survives) {
+        let storeArr = (row.Store || '').split(',').map(s => s.trim()).filter(Boolean)
+            .filter(s => s.toLowerCase() !== which);
+        if (!storeArr.length) {
+            const tag = { steam: 'Steam', gog: 'GOG', epic: 'EPIC' };
+            storeArr = [...new Set(remaining.map(l => tag[launcherStore(l.cmd || '')]).filter(Boolean))];
+        }
+        const clearField = which === 'steam' ? 'SteamAppID' : 'GrinderGameId';
+        db.prepare(`UPDATE games SET Store=?, LaunchCommand=?, LaunchCommands=?, ${clearField}=NULL WHERE id=?`)
+          .run(storeArr.join(', '), remaining[0].cmd, JSON.stringify(remaining), row.id);
+        return 'stripped';
+    }
+    db.prepare("DELETE FROM games WHERE id=?").run(row.id);
+    return 'deleted';
 }
 
 function isSteamGameInstalled(appId) {
@@ -887,6 +941,10 @@ ipcMain.handle('sync-all-grinder-games', (_, allGrinderGames, grinderPath) => {
         const placeholders = Array.from(dlcIds).map(() => '?').join(',');
         db.prepare(`DELETE FROM games WHERE GrinderGameId IN (${placeholders})`).run(...dlcIds);
     }
+
+    // NOTE: refund/removal of GOG/Epic titles is handled in the grinder-refresh-owned handler,
+    // which drops from games.db exactly the ids syncOwnedLibrary just pruned from grinder.db —
+    // scoped to this run so pre-existing games.db↔grinder.db drift is never mistaken for a refund.
 
     for (const gg of allGrinderGames) {
         // Never bring DLC/soundtrack/extras into CNGM's library
@@ -2094,8 +2152,39 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
             })();
         } catch (e) { console.error('Local Steam appmanifest scan failed:', e); }
 
+        // ── Removal detection ─────────────────────────────────────────────────
+        // Steam is authoritative for what the user still HAS: owned/played-free games
+        // (the API list) plus anything installed locally (appmanifests, which also
+        // covers demos the API never returns). Any Steam-launcher entry whose appid is
+        // in NEITHER set was uninstalled/refunded and should be dropped. Guarded on a
+        // non-empty API list so a transient failure or 0-game response never purges.
+        let removed = 0;
+        if (games.length) {
+            const presentIds = new Set(games.map(g => String(g.appid)));
+            for (const dir of getSteamLibraryPaths()) {
+                let files; try { files = fs.readdirSync(dir); } catch { continue; }
+                for (const f of files) { const m = f.match(/^appmanifest_(\d+)\.acf$/); if (m) presentIds.add(m[1]); }
+            }
+            // Only rows that are genuinely Steam-launched games — never a manual/physical
+            // entry that merely borrows a SteamAppID for artwork scraping.
+            const steamRows = db.prepare(
+                "SELECT id, Store, LaunchCommand, LaunchCommands, SteamAppID FROM games WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+            ).all();
+            db.transaction(() => {
+                for (const row of steamRows) {
+                    const blob = (row.LaunchCommand || '') + ' ' + (row.LaunchCommands || '');
+                    const mm = blob.match(/steam:\/\/rungameid\/(\d+)/i);
+                    const aid = mm ? mm[1] : String(row.SteamAppID || '').replace(/\.0+$/, '');
+                    if (!aid || presentIds.has(aid)) continue;
+                    pruneStoreEntry(row, 'steam');
+                    removed++;
+                }
+            })();
+        }
+
         let message = `Imported ${added} new games from Steam.\n(Updated ${updated} existing entries).`;
         if (localAdded) message += `\nIncluded ${localAdded} free/demo game(s) detected from your local Steam install.`;
+        if (removed)    message += `\nRemoved ${removed} game(s) no longer in your Steam library.`;
         return { success: true, count: added, message };
     } catch (err) {
         return { success: false, message: `Steam API Error: ${err.message}` };
