@@ -6024,6 +6024,10 @@ LOADING...READY.</div>
       <h3 style="margin:0 0 4px; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Add to Playlist</h3>
       <p id="modal-playlist-picker-game" style="margin:0 0 14px; font-size:12px; font-weight:900; color:var(--text_main);"></p>
       <div id="playlist-picker-list" style="display:flex; flex-direction:column; max-height:280px; overflow-y:auto; border:1px solid var(--border_solid); border-radius:6px; overflow:hidden;"></div>
+      <div style="display:flex; gap:6px; margin-top:10px;">
+        <input type="text" id="playlist-picker-new-name" placeholder="+ New playlist…" style="flex:1; box-sizing:border-box;">
+        <button id="btn-playlist-picker-new" style="padding:0 14px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec); border-radius:6px; cursor:pointer; font-family:inherit; font-weight:900; font-size:11px; white-space:nowrap; letter-spacing:0.5px; transition:border-color 0.15s, color 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)';" onmouseout="this.style.borderColor='var(--border_solid)';this.style.color='var(--text_sec)';">Create &amp; Add</button>
+      </div>
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button id="btn-playlist-add-confirm" style="flex:2; font-weight:bold;" disabled>Add Selected</button>
         <button id="btn-playlist-picker-close" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Close</button>

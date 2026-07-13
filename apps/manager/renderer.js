@@ -1849,34 +1849,37 @@ document.getElementById('btn-gamepage-edit').addEventListener('click', () => {
 // --- SHARED PLAYLIST PICKER ---
 async function openPlaylistPickerForGame(game) {
     document.getElementById('modal-playlist-picker-game').textContent = game.Game;
-    const gamePlaylistIds = await window.api.getGamePlaylists(game.id);
-    const available = allPlaylists.filter(p => !gamePlaylistIds.includes(p.id));
     const list = document.getElementById('playlist-picker-list');
     const confirmBtn = document.getElementById('btn-playlist-add-confirm');
-    confirmBtn.disabled = true;
-    if (!available.length) {
-        const msg = !allPlaylists.length ? 'No playlists yet — create one first.' : 'Game is already in all playlists.';
-        list.innerHTML = `<div class="pl-select-row" style="cursor:default;color:var(--text_dim);">${msg}</div>`;
-    } else {
-        list.innerHTML = available.map(p =>
-            `<div class="pl-select-row" data-id="${p.id}"><span class="pl-row-check">□</span><span>${escHtml(p.name)}</span></div>`
-        ).join('');
-        list.querySelectorAll('.pl-select-row[data-id]').forEach(row => {
-            row.addEventListener('click', () => {
-                row.classList.toggle('pl-selected');
-                row.querySelector('.pl-row-check').textContent = row.classList.contains('pl-selected') ? '■' : '□';
-                confirmBtn.disabled = !list.querySelector('.pl-select-row.pl-selected');
+    const newNameInput = document.getElementById('playlist-picker-new-name');
+    const newBtn = document.getElementById('btn-playlist-picker-new');
+
+    // (Re)render the checkbox list of playlists the game isn't already a member of.
+    async function renderPickerList() {
+        const gamePlaylistIds = await window.api.getGamePlaylists(game.id);
+        const available = allPlaylists.filter(p => !gamePlaylistIds.includes(p.id));
+        confirmBtn.disabled = true;
+        if (!available.length) {
+            const msg = !allPlaylists.length ? 'No playlists yet — create one below.' : 'Game is already in all playlists.';
+            list.innerHTML = `<div class="pl-select-row" style="cursor:default;color:var(--text_dim);">${msg}</div>`;
+        } else {
+            list.innerHTML = available.map(p =>
+                `<div class="pl-select-row" data-id="${p.id}"><span class="pl-row-check">□</span><span>${escHtml(p.name)}</span></div>`
+            ).join('');
+            list.querySelectorAll('.pl-select-row[data-id]').forEach(row => {
+                row.addEventListener('click', () => {
+                    row.classList.toggle('pl-selected');
+                    row.querySelector('.pl-row-check').textContent = row.classList.contains('pl-selected') ? '■' : '□';
+                    confirmBtn.disabled = !list.querySelector('.pl-select-row.pl-selected');
+                });
             });
-        });
+        }
     }
-    confirmBtn.onclick = async () => {
-        const selected = [...list.querySelectorAll('.pl-select-row.pl-selected')];
-        await Promise.all(selected.map(row => window.api.addGameToPlaylist(Number(row.dataset.id), game.id)));
-        // Refresh the current view's game set so it never goes blank. The current view's
-        // membership can't actually change here (the picker only offers playlists the game
-        // isn't already in), but re-pull through the SAME path that built it — crucially the
-        // 'recently-imported' sentinel needs getRecentlyImported, not getPlaylistGames (which
-        // would return [] and leave the gallery empty).
+
+    // Refresh the current view's game set so it never goes blank after a membership change.
+    // Re-pull through the SAME path that built it — crucially the 'recently-imported' sentinel
+    // needs getRecentlyImported, not getPlaylistGames (which would return [] and leave it empty).
+    async function refreshCurrentView() {
         if (currentPlaylistId === 'recently-imported') {
             currentPlaylistGames = await window.api.getRecentlyImported(recentlyImportedCount);
         } else if (currentPlaylistId !== null) {
@@ -1886,8 +1889,34 @@ async function openPlaylistPickerForGame(game) {
         }
         applyFilters();   // always re-render the current grid so the gallery isn't left blank on return
         renderPlaylistPanels();
+    }
+
+    await renderPickerList();
+
+    confirmBtn.onclick = async () => {
+        const selected = [...list.querySelectorAll('.pl-select-row.pl-selected')];
+        await Promise.all(selected.map(row => window.api.addGameToPlaylist(Number(row.dataset.id), game.id)));
+        await refreshCurrentView();
         document.getElementById('modal-add-to-playlist').classList.remove('active');
     };
+
+    // "Add to a new playlist" — create it, assign the game, and keep the modal open so the
+    // freshly-made playlist shows up (already a member) and more can be added in one sitting.
+    newNameInput.value = '';
+    async function createAndAddNewPlaylist() {
+        const name = newNameInput.value.trim();
+        if (!name) { newNameInput.focus(); return; }
+        const newId = await window.api.addPlaylist(name);
+        if (newId) await window.api.addGameToPlaylist(Number(newId), game.id);
+        newNameInput.value = '';
+        await loadPlaylists();        // refresh allPlaylists + side panels / dropdowns
+        await refreshCurrentView();
+        await renderPickerList();     // reflect the new membership in the picker
+        newNameInput.focus();
+    }
+    newBtn.onclick = createAndAddNewPlaylist;
+    newNameInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); createAndAddNewPlaylist(); } };
+
     document.getElementById('modal-add-to-playlist').classList.add('active');
 }
 
