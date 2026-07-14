@@ -602,6 +602,90 @@ function isSteamGameInstalled(appId) {
     return getSteamLibraryPaths().some(dir => fs.existsSync(path.join(dir, `appmanifest_${id}.acf`)));
 }
 
+// ── Locate a game's on-disk install folder (Browse Local Files) ───────────────
+// Steam → appmanifest "installdir" under steamapps/common; GOG/Epic → grinder.db
+// install_path; everything else (custom / emulator / others) → an absolute path
+// pulled out of its launch command(s). Returns an existing directory, or null.
+function grinderDbPath() {
+    const home = os.homedir();
+    const cands = [
+        path.join(home, '.config', 'grinder', 'grinder.db'),
+        path.join(home, '.config', 'GRINDER', 'grinder.db'),
+        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
+    ];
+    return cands.find(p => fs.existsSync(p)) || null;
+}
+function expandTilde(p) {
+    return (p && p.startsWith('~')) ? path.join(os.homedir(), p.slice(1)) : p;
+}
+// Best-effort: pull a real folder out of a custom / emulator launch command.
+function folderFromLaunchCommand(cmd) {
+    if (!cmd) return null;
+    // URL-scheme launchers (steam://, grinder://, itch://, pico8-cart:) carry no local
+    // path. `flatpak run …` is NOT excluded: an emulator command such as
+    // `flatpak run org.libretro.RetroArch -L core rom` still yields the ROM's folder,
+    // while `flatpak run …hgl "grinder://…"` has no path token and falls through to null.
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(cmd) || /^pico8-cart:/i.test(cmd)) return null;
+    const tokens = cmd.match(/"[^"]+"|'[^']+'|\S+/g) || [];
+    let best = null;
+    for (let tok of tokens) {
+        tok = tok.replace(/^["']|["']$/g, '');
+        if (!(tok.startsWith('/') || tok.startsWith('~'))) continue;   // skip flags, VAR=…, bare binaries
+        const p = expandTilde(tok);
+        try { const st = fs.statSync(p); best = st.isDirectory() ? p : path.dirname(p); } catch {}
+    }
+    return best;   // last existing path wins (the game exe/content usually trails the runner)
+}
+function resolveGameFolder(game) {
+    if (!game) return null;
+    // 1. Steam — appmanifest installdir → steamapps/common/<installdir>
+    const appid = game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '') : '';
+    if (appid && appid !== 'None') {
+        for (const dir of getSteamLibraryPaths()) {
+            const manifest = path.join(dir, `appmanifest_${appid}.acf`);
+            if (!fs.existsSync(manifest)) continue;
+            try {
+                const m = fs.readFileSync(manifest, 'utf8').match(/"installdir"\s+"([^"]+)"/i);
+                if (m) { const gd = path.join(dir, 'common', m[1]); if (fs.existsSync(gd)) return gd; }
+            } catch {}
+        }
+    }
+    // 2. GOG / Epic — grinder.db install_path (only when actually installed)
+    if (game.GrinderGameId) {
+        const gpath = grinderDbPath();
+        if (gpath) {
+            try {
+                const gdb = new Database(gpath, { readonly: true, timeout: 5000 });
+                const row = gdb.prepare("SELECT install_path FROM games WHERE id=? AND installed=1").get(String(game.GrinderGameId));
+                gdb.close();
+                const ip = expandTilde((row && row.install_path) || '');
+                if (ip && fs.existsSync(ip)) return ip;
+            } catch {}
+        }
+    }
+    // 3. Custom / emulator / others — derive from the launch command(s)
+    const cmds = [];
+    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) cmds.push(l.cmd); } catch {}
+    if (game.LaunchCommand) cmds.push(game.LaunchCommand);
+    for (const c of cmds) { const d = folderFromLaunchCommand(c); if (d) return d; }
+    return null;
+}
+// Renderer asks whether a browsable folder exists (to show/hide the hero button).
+ipcMain.handle('resolve-game-folder', (e, gameId) => {
+    if (!db) return null;
+    try { return resolveGameFolder(db.prepare("SELECT SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId)); }
+    catch { return null; }
+});
+// Open the game's install folder in the system file manager.
+ipcMain.handle('open-game-folder', (e, gameId) => {
+    if (!db) return { ok: false };
+    let game; try { game = db.prepare("SELECT SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return { ok: false }; }
+    const folder = resolveGameFolder(game);
+    if (!folder) return { ok: false };
+    shell.openPath(folder);
+    return { ok: true, folder };
+});
+
 // Steam tools/runtimes that live as appmanifests but are not games.
 function isSteamInfraApp(name) {
     return /^(Proton\b|Steam Linux Runtime|Steamworks Common Redistributables)/i.test(name || '');

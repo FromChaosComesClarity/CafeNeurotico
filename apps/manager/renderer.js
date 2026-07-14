@@ -3810,6 +3810,15 @@ async function openFlatDetail(game) {
     document.getElementById('fdo-desc').textContent = getLocalizedDescription(game) || '';
     document.getElementById('btn-fdo-launch').style.display = game.LaunchCommand ? '' : 'none';
 
+    // Browse Local Files — only when the install folder can be located on disk.
+    const fdoBrowse = document.getElementById('btn-fdo-browse');
+    if (fdoBrowse) {
+        fdoBrowse.style.display = 'none';
+        window.api.resolveGameFolder(game.id).then(folder => {
+            if (_flatDetailGame && _flatDetailGame.id === game.id && folder) fdoBrowse.style.display = '';
+        });
+    }
+
     const coverSrc = game.CoverArt ? getSafePath(game.CoverArt) : '';
     const coverWrap = document.getElementById('fdo-cover-wrap');
     coverWrap.style.display = coverSrc ? '' : 'none';
@@ -3892,6 +3901,12 @@ document.getElementById('btn-fdo-want').addEventListener('click', () => {
 
 document.getElementById('btn-fdo-playlist').addEventListener('click', () => {
     if (_flatDetailGame) openPlaylistPickerForGame(_flatDetailGame);
+});
+
+document.getElementById('btn-fdo-browse').addEventListener('click', async () => {
+    if (!_flatDetailGame) return;
+    const res = await window.api.openGameFolder(_flatDetailGame.id);
+    if (!res || !res.ok) showAlert('Could not locate this game\'s install folder on disk.');
 });
 
 document.getElementById('btn-fdo-trailer').addEventListener('click', () => {
@@ -7816,6 +7831,25 @@ function openGamepage(game) {
     } else {
         sploreBtn.style.display = 'none';
         sploreBtn.onclick = null;
+    }
+
+    // Browse Local Files button — shown whenever the game's install folder can be
+    // located on disk (Steam, GOG/Epic, or a custom/emulator command with a real path).
+    const browseBtn = document.getElementById('btn-gamepage-browse');
+    if (browseBtn) {
+        browseBtn.style.display = 'none';
+        browseBtn.onclick = null;
+        window.api.resolveGameFolder(game.id).then(folder => {
+            if (currentGameId !== game.id) return;   // gamepage moved on while resolving
+            if (folder) {
+                browseBtn.style.display = 'block';
+                browseBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const res = await window.api.openGameFolder(game.id);
+                    if (!res || !res.ok) showAlert('Could not locate this game\'s install folder on disk.');
+                };
+            }
+        });
     }
 
     // Trailer button — always visible; plays local trailer or opens download flow

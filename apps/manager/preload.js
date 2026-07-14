@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('api', {
                                 openInstallUrl: (url) => ipcRenderer.invoke('open-install-url', url),
                                 openExternal: (url) => ipcRenderer.invoke('open-install-url', url),
                                 checkAllInstallStatus: () => ipcRenderer.invoke('check-all-install-status'),
+                                resolveGameFolder: (id) => ipcRenderer.invoke('resolve-game-folder', id),
+                                openGameFolder: (id) => ipcRenderer.invoke('open-game-folder', id),
                                 setLaunchCommand: (id, cmd) => ipcRenderer.invoke('set-launch-command', id, cmd),
                                 onInstallStatusUpdated: (cb) => ipcRenderer.on('install-status-updated', () => cb()),
                                 scanFlatpak: () => ipcRenderer.invoke('scan-flatpak'),
