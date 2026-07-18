@@ -49,6 +49,60 @@ function init(ctx = {}) {
 // Allow the DB handle to be (re)attached after init (grinder opens it in initDb).
 function setDb(handle) { db = handle; }
 
+// Create the grinder.db schema if it isn't there yet, so any face can bootstrap a
+// fresh database (e.g. headless GOG/Epic sign-in on a clean install) without ever
+// opening the GRINDER GUI. Mirrors GRINDER's own initDb schema + column migrations;
+// every statement is IF-NOT-EXISTS / guarded, so it's safe to run on an existing db.
+function ensureSchema(handle = db) {
+    if (!handle) return;
+    handle.exec(`
+        CREATE TABLE IF NOT EXISTS games (
+            id           TEXT PRIMARY KEY,
+            title        TEXT NOT NULL,
+            store        TEXT NOT NULL DEFAULT 'custom',
+            app_id       TEXT,
+            install_path TEXT,
+            executable   TEXT,
+            prefix_path  TEXT,
+            proton_path  TEXT,
+            installed    INTEGER DEFAULT 0,
+            version      TEXT,
+            notes        TEXT,
+            added_at     INTEGER DEFAULT (strftime('%s','now'))
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT
+        );
+    `);
+    for (const sql of [
+        "ALTER TABLE games ADD COLUMN platform TEXT",
+        "ALTER TABLE games ADD COLUMN platforms TEXT",
+        "ALTER TABLE games ADD COLUMN custom_env TEXT",
+        "ALTER TABLE games ADD COLUMN winetricks TEXT",
+        "ALTER TABLE games ADD COLUMN use_esync INTEGER DEFAULT 1",
+        "ALTER TABLE games ADD COLUMN use_fsync INTEGER DEFAULT 1",
+        "ALTER TABLE games ADD COLUMN use_dxvk_nvapi INTEGER DEFAULT 0",
+        "ALTER TABLE games ADD COLUMN use_battleye INTEGER DEFAULT 0",
+        "ALTER TABLE games ADD COLUMN use_eac INTEGER DEFAULT 0",
+        "ALTER TABLE games ADD COLUMN launch_target TEXT",
+        "ALTER TABLE games ADD COLUMN launch_args TEXT",
+        "ALTER TABLE games ADD COLUMN is_dlc INTEGER DEFAULT 0",
+        "ALTER TABLE games ADD COLUMN custom_exe TEXT",
+    ]) { try { handle.prepare(sql).run(); } catch {} }
+    try { handle.exec(`CREATE TABLE IF NOT EXISTS achievements (
+        app_id         TEXT NOT NULL,
+        key            TEXT NOT NULL,
+        name           TEXT,
+        description    TEXT,
+        image_locked   TEXT,
+        image_unlocked TEXT,
+        date_unlocked  TEXT,
+        visible        INTEGER DEFAULT 1,
+        PRIMARY KEY (app_id, key)
+    )`); } catch {}
+}
+
 // Progress sink — callers inject the real destination via init({ onProgress }).
 function writeProgress(data) { _onProgress(data); }
 
@@ -753,6 +807,84 @@ function writeGogAuthConfig() {
     return authPath;
 }
 
+// ── Headless sign-in ────────────────────────────────────────────────────────────
+// The interactive OAuth window is owned by the calling face's main process; these
+// functions take the extracted auth code and do the token exchange / CLI auth. That
+// lets GOG and Epic sign-in work identically whether it happens inside GRINDER or
+// headlessly from the Manager / CREMA — so the average user never has to open the
+// GRINDER GUI to connect their stores.
+
+// Exchange a GOG OAuth `code` for tokens, persist them in grinder.db and return the
+// signed-in account name. Mirrors GRINDER's gog-login handler.
+async function gogExchangeCode(code) {
+    if (!db) return { ok: false, error: 'GRINDER database not available.' };
+    try {
+        const res = await fetch('https://auth.gog.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id:     GOG_CLIENT_ID,
+                client_secret: GOG_CLIENT_SECRET,
+                grant_type:    'authorization_code',
+                code,
+                redirect_uri:  GOG_REDIRECT_URI,
+            }).toString(),
+        });
+        const data = await res.json();
+        if (!data.access_token) return { ok: false, error: `No token returned: ${JSON.stringify(data)}` };
+        const set = (k, v) => db.prepare("INSERT OR REPLACE INTO settings VALUES (?,?)").run(k, v);
+        set('gog_access_token',  data.access_token);
+        set('gog_refresh_token', data.refresh_token);
+        set('gog_token_expiry',  String(Date.now() + data.expires_in * 1000));
+        let username = null;
+        try {
+            const user = await gogFetch('https://embed.gog.com/userData.json', data.access_token);
+            if (user.userId) set('gog_user_id', String(user.userId));
+            username = user.username || null;
+        } catch {}
+        return { ok: true, username };
+    } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Current GOG sign-in state (refreshes the access token if it has expired).
+async function gogStatus() {
+    const token = await getGogToken();
+    if (!token) return { loggedIn: false };
+    try {
+        const user = await gogFetch('https://embed.gog.com/userData.json', token);
+        return { loggedIn: true, username: user.username || null };
+    } catch { return { loggedIn: false }; }
+}
+
+// Drop stored GOG tokens (sign out).
+function gogLogout() {
+    if (!db) return { ok: false };
+    try {
+        for (const k of ['gog_access_token', 'gog_refresh_token', 'gog_token_expiry', 'gog_user_id'])
+            db.prepare("DELETE FROM settings WHERE key=?").run(k);
+        return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Hand an Epic OAuth `code` to legendary so it stores its own credentials.
+async function epicAuthCode(code) {
+    const leg = findLegendary();
+    if (!leg) return { ok: false, error: 'legendary not found.' };
+    const r = await runLegendary(['auth', '--code', code]);
+    return { ok: r.ok, error: r.ok ? null : (r.stderr || r.error || 'legendary auth failed.') };
+}
+
+// Current Epic sign-in state (via legendary status). Mirrors GRINDER's legendary-status.
+async function epicStatus() {
+    const r = await runLegendary(['status']);
+    if (!r.ok && r.error) return { loggedIn: false, error: r.error };
+    const text     = (r.stdout || '') + (r.stderr || '');
+    const loggedIn = !text.includes('<not logged in>');
+    const account  = text.match(/Epic account:\s*(.+)/)?.[1]?.trim() || null;
+    const games    = parseInt(text.match(/Games available:\s*(\d+)/)?.[1] || '0');
+    return { loggedIn, account: loggedIn ? account : null, games };
+}
+
 // Headless owned-library refresh. Pulls the full owned-games list from the GOG
 // and Epic store APIs into grinder.db (installed=0 = imported, NOT installed), so
 // any face can pick up newly-purchased titles without opening the GRINDER GUI.
@@ -1037,7 +1169,7 @@ async function epicInstallInfo(appName) {
 }
 
 module.exports = {
-    init, setDb, writeProgress,
+    init, setDb, ensureSchema, writeProgress,
     sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
     which, findLegendary, findGogdl, findComet, findUmu, findWineCached, findRuntime,
     GOG_CLIENT_ID, GOG_CLIENT_SECRET, GOG_REDIRECT_URI,
@@ -1046,4 +1178,5 @@ module.exports = {
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
     getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary, cancelActiveInstall,
     gogListDlcs, gogInstalledDlcs,
+    gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
 };

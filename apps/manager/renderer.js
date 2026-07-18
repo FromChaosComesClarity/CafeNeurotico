@@ -2025,21 +2025,68 @@ function dismissWelcome() {
 document.getElementById('btn-welcome-done').addEventListener('click', dismissWelcome);
 document.getElementById('btn-welcome-manual').addEventListener('click', () => { dismissWelcome(); window.api.openManual(); });
 
-// Welcome screen — GRINDER status check
-(async () => {
-    const statusEl = document.getElementById('wlc-grinder-status');
-    const openBtn  = document.getElementById('btn-welcome-open-grinder');
-    if (!statusEl) return;
-    const s = await window.api.grinderStatus();
-    if (s.found) {
-        const total = s.allGames?.length ?? s.installedGames?.length ?? 0;
-        statusEl.style.color = '#66bb6a';
-        statusEl.textContent = total > 0 ? `✓ Connected — ${total} GOG/Epic game${total !== 1 ? 's' : ''} linked` : '✓ Engine ready — sign in to import your libraries';
-    } else {
+// Welcome screen — headless GOG/Epic sign-in.
+// No GRINDER window: sign-in happens in-place and the owned library imports right away.
+
+// Pull newly-authorized GOG/Epic games into CNGM's library (same path as Refresh Library).
+async function importStoreLibrary() {
+    try {
+        await window.api.grinderRefreshOwned();
+        const gs = await window.api.grinderStatus();
+        if (gs.found && gs.allGames?.length) await window.api.syncAllGrinderGames(gs.allGames, gs.path);
+        await loadGames();
+    } catch (e) { console.warn('[store-import]', e); }
+}
+
+// Render "✓ GOG — name · ○ Epic not connected" into the given status element.
+async function renderStoreAuthStatus(statusEl) {
+    if (!statusEl) return { gog: false, epic: false };
+    statusEl.style.color = 'var(--text_dim)';
+    statusEl.textContent = 'Checking sign-in…';
+    const [gog, epic] = await Promise.all([
+        window.api.gogAuthStatus().catch(() => ({ loggedIn: false })),
+        window.api.epicAuthStatus().catch(() => ({ loggedIn: false })),
+    ]);
+    const parts = [
+        gog.loggedIn  ? `✓ GOG${gog.username ? ' — ' + gog.username : ''}`  : '○ GOG not connected',
+        epic.loggedIn ? `✓ Epic${epic.account ? ' — ' + epic.account : ''}` : '○ Epic not connected',
+    ];
+    statusEl.style.color = (gog.loggedIn || epic.loggedIn) ? '#66bb6a' : 'var(--text_dim)';
+    statusEl.innerHTML = parts.join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+    return { gog: gog.loggedIn, epic: epic.loggedIn };
+}
+
+// Run a store sign-in from a button, import the library on success, refresh the status line.
+async function runStoreLogin(store, btn, statusEl) {
+    if (!btn || !statusEl) return;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Opening sign-in…';
+    let r;
+    try { r = store === 'gog' ? await window.api.gogLogin() : await window.api.epicLogin(); }
+    catch (e) { r = { ok: false, error: e.message }; }
+    btn.disabled = false;
+    btn.textContent = orig;
+    if (r && r.ok) {
         statusEl.style.color = 'var(--text_dim)';
-        statusEl.textContent = 'Open GRINDER once to initialize the GOG/Epic engine.';
+        statusEl.textContent = 'Importing your library…';
+        await importStoreLibrary();
+        await renderStoreAuthStatus(statusEl);
+    } else {
+        await renderStoreAuthStatus(statusEl);
+        if (r && r.error && r.error !== 'cancelled') {
+            statusEl.style.color = '#ef5350';
+            statusEl.textContent = '✗ ' + r.error;
+        }
     }
-    if (openBtn) openBtn.addEventListener('click', () => window.api.openGrinder());
+}
+
+(() => {
+    const statusEl = document.getElementById('wlc-grinder-status');
+    if (!statusEl) return;
+    document.getElementById('btn-welcome-login-gog')?.addEventListener('click',  (e) => runStoreLogin('gog',  e.currentTarget, statusEl));
+    document.getElementById('btn-welcome-login-epic')?.addEventListener('click', (e) => runStoreLogin('epic', e.currentTarget, statusEl));
+    renderStoreAuthStatus(statusEl);
 })();
 
 // ── Step 1: Steam sync (inline, no close) ───────────────────────────────────
@@ -9286,25 +9333,17 @@ async function checkGrinderConnect() {
     const statusEl = document.getElementById('grinder-connect-status');
     const openBtn  = document.getElementById('btn-open-grinder-tool');
     if (!statusEl) return;
-    statusEl.textContent = 'Checking…';
-    statusEl.style.color = 'var(--text_dim)';
+    // The Advanced "open GRINDER" button only appears once the engine data dir exists.
     const s = await window.api.grinderStatus();
-    if (!s.found) {
-        statusEl.textContent = 'GRINDER.AppImage not found — place it in the same folder as CNGM.';
-        if (openBtn) openBtn.style.display = 'none';
-    } else if (s.error) {
-        statusEl.textContent = `⚠ ${s.error}`;
-        statusEl.style.color = '#f57c00';
-        if (openBtn) openBtn.style.display = '';
-    } else {
-        const total = s.allGames?.length ?? s.installedGames.length;
-        const inst  = s.installedGames.length;
-        statusEl.textContent = `✓ Connected — ${total} game${total !== 1 ? 's' : ''} in GRINDER (${inst} installed)`;
-        statusEl.style.color = '#66bb6a';
-        if (openBtn) openBtn.style.display = '';
-    }
+    if (openBtn) openBtn.style.display = s.found ? '' : 'none';
+    // What users actually care about here is whether their stores are connected.
+    await renderStoreAuthStatus(statusEl);
 }
 
+document.getElementById('btn-connect-login-gog')?.addEventListener('click',  (e) =>
+    runStoreLogin('gog',  e.currentTarget, document.getElementById('grinder-connect-status')));
+document.getElementById('btn-connect-login-epic')?.addEventListener('click', (e) =>
+    runStoreLogin('epic', e.currentTarget, document.getElementById('grinder-connect-status')));
 document.getElementById('btn-open-grinder-tool')?.addEventListener('click', () => window.api.openGrinder());
 
 // ── GRINDER row in detail panel ────────────────────────────────────────────────

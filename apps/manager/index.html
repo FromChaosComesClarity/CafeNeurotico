@@ -5523,9 +5523,12 @@ LOADING...READY.</div>
 
           <div style="border-top: 1px solid var(--border_solid); margin: 10px 0;"></div>
 
-          <p style="margin: 0 0 8px; color: var(--text_sec); font-size: 11px; line-height: 1.6;"><strong style="color:#a78bfa;">GOG &amp; Epic</strong> — sign in once inside <strong style="color: var(--accent);">GRINDER</strong> (built into the suite). After that, new purchases import automatically every time you hit <em>Refresh Library</em>.</p>
-          <button id="btn-welcome-open-grinder" style="width: 100%; background: transparent; border: 1px solid var(--accent); color: var(--accent);">Open GRINDER to Sign In</button>
-          <div id="wlc-grinder-status" style="font-size: 12px; font-weight: bold; min-height: 16px; text-align: center; margin-top: 4px;"></div>
+          <p style="margin: 0 0 8px; color: var(--text_sec); font-size: 11px; line-height: 1.6;"><strong style="color:#a78bfa;">GOG &amp; Epic</strong> — sign in once and your libraries import automatically. New purchases show up every time you hit <em>Refresh Library</em>.</p>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-welcome-login-gog"  style="flex: 1; background: transparent; border: 1px solid #a78bfa; color: #a78bfa;">Sign in to GOG</button>
+            <button id="btn-welcome-login-epic" style="flex: 1; background: transparent; border: 1px solid #a78bfa; color: #a78bfa;">Sign in to Epic</button>
+          </div>
+          <div id="wlc-grinder-status" style="font-size: 12px; font-weight: bold; min-height: 16px; text-align: center; margin-top: 6px;"></div>
 
           <p style="margin: 8px 0 0; color: var(--text_dim); font-size: 10.5px; line-height: 1.5; font-style: italic; text-align: center;">Flatpak, PICO-8 and itch.io are picked up automatically — and you can add anything else by hand.</p>
         </div>
@@ -5598,14 +5601,18 @@ LOADING...READY.</div>
       <!-- Scrollable cards -->
       <div id="connect-cards-container" style="flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 12px;">
 
-        <!-- GRINDER — primary for GOG & Epic -->
-        <div class="tool-card connect-section" data-search="grinder gog epic install launcher proton umu wine configure setup">
-          <div class="tool-card-title" style="color: var(--accent);">GRINDER &mdash; GOG &amp; Epic</div>
-          <p style="font-size: 11px; color: var(--text_sec); margin: 0 0 8px; line-height: 1.6;">Built into the suite — installs, configures Proton and launches your GOG and Epic games. Sign in once inside GRINDER and new purchases import automatically on every <em>Refresh Library</em>.</p>
-          <div id="grinder-connect-status" style="font-size:11px; color:var(--text_dim); min-height:16px; text-align:center;"></div>
-          <div class="row" style="margin-top:8px; gap:6px;">
-            <button id="btn-open-grinder-tool" style="display:none; flex:1; font-size:11px;">Open GRINDER</button>
-            <button id="btn-check-grinder" style="flex:1; font-size:11px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Check Connection</button>
+        <!-- GOG & Epic — headless sign-in (GRINDER is the under-the-hood engine) -->
+        <div class="tool-card connect-section" data-search="grinder gog epic install launcher proton umu wine configure setup sign in login connect account">
+          <div class="tool-card-title" style="color: #a78bfa;">GOG &amp; Epic</div>
+          <p style="font-size: 11px; color: var(--text_sec); margin: 0 0 8px; line-height: 1.6;">Sign in once and your libraries import automatically — new purchases arrive on every <em>Refresh Library</em>. Games install and launch through the built-in engine; you never have to open it.</p>
+          <div class="row" style="gap:6px;">
+            <button id="btn-connect-login-gog"  style="flex:1; font-size:11px; background:transparent; border:1px solid #a78bfa; color:#a78bfa;">Sign in to GOG</button>
+            <button id="btn-connect-login-epic" style="flex:1; font-size:11px; background:transparent; border:1px solid #a78bfa; color:#a78bfa;">Sign in to Epic</button>
+          </div>
+          <div id="grinder-connect-status" style="font-size:11px; color:var(--text_dim); min-height:16px; text-align:center; margin-top:8px;"></div>
+          <div class="row" style="margin-top:6px; gap:6px;">
+            <button id="btn-open-grinder-tool" style="display:none; flex:1; font-size:10px; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim);">Advanced: open GRINDER</button>
+            <button id="btn-check-grinder" style="flex:1; font-size:10px; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim);">Check Connection</button>
           </div>
         </div>
 

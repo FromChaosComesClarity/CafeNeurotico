@@ -131,6 +131,12 @@ contextBridge.exposeInMainWorld('api', {
                                 openGrinderStorage: () => ipcRenderer.invoke('open-grinder-storage'),
                                 openGrinderSetup: (game) => ipcRenderer.invoke('open-grinder-setup', game),
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
+                                // --- headless GOG/Epic sign-in (no GRINDER window) ---
+                                gogLogin:       () => ipcRenderer.invoke('gog-login'),
+                                gogAuthStatus:  () => ipcRenderer.invoke('gog-auth-status'),
+                                gogLogout:      () => ipcRenderer.invoke('gog-logout'),
+                                epicLogin:      () => ipcRenderer.invoke('epic-login'),
+                                epicAuthStatus: () => ipcRenderer.invoke('epic-auth-status'),
                                 syncGrinderInstalled: (ids) => ipcRenderer.invoke('sync-grinder-installed', ids),
                                 syncAllGrinderGames: (games, p) => ipcRenderer.invoke('sync-all-grinder-games', games, p),
                                 grinderRefreshOwned: () => ipcRenderer.invoke('grinder-refresh-owned'),

@@ -318,21 +318,37 @@ const grinderEngine = require('../../packages/core/grinder-engine.js');
 let _grinderEngineDb = null;
 let _grinderProgressCb = null;   // set per install/uninstall to route progress to the renderer
 let _grinderBusy = false;        // serialize install/uninstall (one at a time)
-function ensureGrinderEngine() {
+// createIfMissing: when true (headless sign-in), bootstrap a fresh grinder.db so
+// GOG/Epic can be connected without ever opening the GRINDER GUI. Read-only callers
+// (status checks, install/refresh) leave it false and simply no-op if there's no db.
+function ensureGrinderEngine(createIfMissing = false) {
     if (_grinderEngineDb) return true;
     const home = os.homedir();
-    const gdbPath = [
+    let gdbPath = [
         path.join(home, '.config', 'grinder', 'grinder.db'),
         path.join(home, '.config', 'GRINDER', 'grinder.db'),
         path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
     ].find(p => fs.existsSync(p));
-    if (!gdbPath) return false;
+    // No grinder.db yet (fresh install, GRINDER GUI never opened). Create one so
+    // GOG/Epic sign-in and library import can happen headlessly — GRINDER stays a
+    // power-user tool the average user never has to open. Schema is created below.
+    let created = false;
+    if (!gdbPath) {
+        if (!createIfMissing) return false;
+        gdbPath = app.isPackaged
+            ? path.join(home, '.config', 'grinder', 'grinder.db')
+            : path.join(baseDir, 'GRINDERConfig', 'grinder.db');
+        try { fs.mkdirSync(path.dirname(gdbPath), { recursive: true }); }
+        catch (e) { console.error('[grinder-engine] could not create GRINDER data dir:', e); return false; }
+        created = true;
+    }
     const gConfigDir  = path.dirname(gdbPath);
     const engineBinDir = app.isPackaged
         ? path.join(process.resourcesPath, 'assets', 'bin', 'linux')
         : path.join(__dirname, 'assets', 'bin', 'linux');
     try {
         _grinderEngineDb = new Database(gdbPath, { timeout: 5000 });
+        if (created) _grinderEngineDb.pragma('journal_mode = WAL');   // match GRINDER's own initDb
     } catch (e) { console.error('[grinder-engine] DB open failed:', e); _grinderEngineDb = null; return false; }
     grinderEngine.init({
         configDir:   gConfigDir,
@@ -344,6 +360,7 @@ function ensureGrinderEngine() {
         db:          _grinderEngineDb,
         onProgress:  (data) => { try { _grinderProgressCb && _grinderProgressCb(data); } catch {} },
     });
+    if (created) grinderEngine.ensureSchema(_grinderEngineDb);   // fresh db → create tables (no-op otherwise)
     return true;
 }
 
@@ -412,6 +429,92 @@ ipcMain.handle('grinder-refresh-owned', async () => {
     } catch (e) {
         return { available: true, error: e.message };
     }
+});
+
+// ── Headless store sign-in ──────────────────────────────────────────────────────
+// Open the GOG/Epic OAuth window ourselves, capture the auth code and let the shared
+// engine finish the exchange (tokens stored in grinder.db). No GRINDER window ever
+// appears — the average user connects their stores without meeting GRINDER at all.
+
+ipcMain.handle('gog-login', () => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data not available.' };
+    const AUTH_URL = `https://auth.gog.com/auth?client_id=${grinderEngine.GOG_CLIENT_ID}` +
+        `&layout=client2&redirect_uri=${encodeURIComponent(grinderEngine.GOG_REDIRECT_URI)}&response_type=code`;
+    const parentWin = BrowserWindow.getFocusedWindow();
+    return new Promise(resolve => {
+        let resolved = false;
+        const authWin = new BrowserWindow({
+            parent: parentWin || undefined, modal: !!parentWin,
+            width: 600, height: 800, title: 'Sign in to GOG',
+            webPreferences: { nodeIntegration: false, contextIsolation: true },
+        });
+        authWin.setMenu(null);
+        authWin.loadURL(AUTH_URL);
+        async function tryExtract() {
+            if (resolved) return;
+            const m = authWin.webContents.getURL().match(/[?&]code=([^&\s]+)/);
+            if (!m) return;
+            resolved = true;
+            try { authWin.close(); } catch {}
+            resolve(await grinderEngine.gogExchangeCode(m[1]));
+        }
+        authWin.webContents.on('did-navigate',         tryExtract);
+        authWin.webContents.on('did-navigate-in-page', tryExtract);
+        authWin.on('closed', () => { if (!resolved) resolve({ ok: false, error: 'cancelled' }); });
+    });
+});
+
+ipcMain.handle('gog-auth-status', () => {
+    if (!ensureGrinderEngine()) return { loggedIn: false };
+    return grinderEngine.gogStatus();
+});
+
+ipcMain.handle('gog-logout', () => {
+    if (!ensureGrinderEngine()) return { ok: false };
+    return grinderEngine.gogLogout();
+});
+
+ipcMain.handle('epic-login', () => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data not available.' };
+    // legendary.gl/epiclogin is maintained by the legendary team and always uses the
+    // current valid Epic client ID — avoids hardcoding one that can be revoked.
+    const AUTH_URL = 'https://legendary.gl/epiclogin';
+    const parentWin = BrowserWindow.getFocusedWindow();
+    return new Promise(resolve => {
+        let resolved = false;
+        const authWin = new BrowserWindow({
+            parent: parentWin || undefined, modal: !!parentWin,
+            width: 560, height: 800, title: 'Sign in to Epic Games',
+            webPreferences: { nodeIntegration: false, contextIsolation: true },
+        });
+        authWin.setMenu(null);
+        // Force a fresh load so we always get a new (unexpired) authorization code.
+        authWin.loadURL(AUTH_URL, { extraHeaders: 'Cache-Control: no-cache\nPragma: no-cache\n' });
+        async function tryExtract() {
+            if (resolved) return;
+            try {
+                const text = await authWin.webContents.executeJavaScript('document.body.innerText');
+                // Epic exposes the code in several shapes depending on the flow — try each.
+                const m = text.match(/"redirectUrl"\s*:\s*"[^"]*[?&]code=([^"&\s]+)/) ||
+                          text.match(/"authorizationCode"\s*:\s*"([^"]+)"/) ||
+                          text.match(/"exchangeCode"\s*:\s*"([^"]+)"/);
+                if (!m) return;
+                resolved = true;
+                try { authWin.close(); } catch {}
+                resolve(await grinderEngine.epicAuthCode(m[1]));
+            } catch {}
+        }
+        authWin.webContents.on('did-finish-load',     tryExtract);
+        authWin.webContents.on('did-navigate',         tryExtract);
+        authWin.webContents.on('did-navigate-in-page', tryExtract);
+        setTimeout(tryExtract, 1500);
+        authWin.on('closed', () => { if (!resolved) resolve({ ok: false, error: 'cancelled' }); });
+    });
+});
+
+ipcMain.handle('epic-auth-status', () => {
+    if (!ensureGrinderEngine()) return { loggedIn: false };
+    return grinderEngine.epicStatus();
 });
 
 // In-process install of a GOG/Epic game via the shared engine; progress streams
