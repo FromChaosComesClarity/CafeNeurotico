@@ -803,7 +803,7 @@ const AdmZip = require('adm-zip');
 
 // GOG installer-script {tokens} → real dirs under the Wine prefix / install dir.
 // (Distinct from GOG's *cloud* <?…?> token set — do NOT mix the two.)
-const SAVE_WIN_TOKENS = {
+const GOG_SAVE_TOKENS = {
     '{app}':          (c) => c.install,
     '{userdocs}':     (c) => path.join(c.win, 'Documents'),
     '{userappdata}':  (c) => path.join(c.win, 'AppData', 'Roaming'),
@@ -811,12 +811,13 @@ const SAVE_WIN_TOKENS = {
     '{supportDir}':   (c) => path.join(c.install || '', '__redist'),
     '{productID}':    (c) => String(c.appId || ''),
 };
-function resolveSaveToken(tmpl, ctx) {
-    const m = String(tmpl).match(/^\{[a-zA-Z]+\}/);
-    if (!m || !SAVE_WIN_TOKENS[m[0]]) return null;
-    const root = SAVE_WIN_TOKENS[m[0]](ctx);
+function resolveGogToken(tmpl, ctx) {
+    const t = String(tmpl).replace(/\\/g, '/');                     // GOG uses '/', but normalise any '\' defensively
+    const m = t.match(/^\{[a-zA-Z]+\}/);
+    if (!m || !GOG_SAVE_TOKENS[m[0]]) return null;
+    const root = GOG_SAVE_TOKENS[m[0]](ctx);
     if (!root) return null;
-    return path.normalize(root + String(tmpl).slice(m[0].length));   // collapses the /../ sibling hops
+    return path.normalize(root + t.slice(m[0].length));             // collapses the /../ sibling hops
 }
 
 // Wine's "Windows" user home inside a prefix (Proton uses "steamuser").
@@ -877,13 +878,15 @@ const EPIC_SAVE_TOKENS = {
     usersavedgames: (c) => path.join(c.win, 'Saved Games'),
 };
 function resolveEpicToken(tmpl, ctx) {
-    const out = String(tmpl).replace(/\{([a-zA-Z]+)\}/g, (m, name) => {
+    // Epic CloudSaveFolder values are Windows paths that may use '\' separators; normalise to '/'
+    // first, since path.normalize on Linux treats '\' as a literal filename character.
+    const out = String(tmpl).replace(/\\/g, '/').replace(/\{([a-zA-Z]+)\}/g, (m, name) => {
         const fn = EPIC_SAVE_TOKENS[name.toLowerCase()];
         const v = fn && fn(ctx);
         return v ? v : m;
     });
     if (/\{[a-zA-Z]+\}/.test(out)) return null;              // an unknown token remained → bail
-    return path.normalize(out.replace(/[\\/]+$/, ''));       // drop any trailing slash the template had
+    return path.normalize(out.replace(/\/+$/, ''));          // drop any trailing slash the template had
 }
 
 // Does a directory contain at least one file (walked, budget-capped)? Drops empty Wine stubs.
@@ -963,8 +966,21 @@ function classifySaveDir(dir, win, install) {
     return { root: 'abs', rel: abs };
 }
 
-// ctx: { platform, prefix, install, appId, title, override } → ranked save-dir candidates.
-function resolveGogSaveDirs(ctx) {
+// A "shared root" that must never be treated as one game's save folder or wiped on restore:
+// the prefix user-home, the install root, or a top-level profile folder (Documents, AppData\*,
+// Saved Games, …). Anything shallower than a game-specific subfolder qualifies.
+function isSharedSaveRoot(dir, win, install) {
+    const abs = path.resolve(dir);
+    if (win && abs === path.resolve(win)) return true;
+    if (install && abs === path.resolve(install)) return true;
+    if (win) for (const r of SAVE_WIN_ROOTS) if (abs === path.resolve(win, ...r.split('/'))) return true;
+    const cls = classifySaveDir(dir, win, install);
+    if (cls.root === 'abs') return true;                       // outside the known prefix/install → unsafe
+    return !cls.rel || cls.rel.split(path.sep).length < 2;     // top-level directly under winhome/install
+}
+
+// ctx: { store, platform, prefix, install, appId, epicId, override } → ranked save-dir candidates.
+function resolveSaveDirs(ctx) {
     const win = ctx.platform === 'windows' ? winUserHome(ctx.prefix) : null;
     const mk = (dir, source, confidence) => {
         const { root, rel } = classifySaveDir(dir, win, ctx.install);
@@ -987,12 +1003,16 @@ function resolveGogSaveDirs(ctx) {
                 const full = resolveEpicToken(tmpl, { win, install: ctx.install, epicId: ctx.epicId });
                 if (full) {
                     resolved.push(full);
-                    // Epic's {EpicID} leaf is a cloud-sync convention Proton games rarely create → fall back to the game folder.
+                    // Epic's {EpicID} leaf is a cloud-sync convention Proton games rarely create → fall back to the
+                    // game folder, but never to a shared root (e.g. a bare {AppData}/{EpicID} would strip to AppData\Local).
                     const segs = String(tmpl).replace(/[\\/]+$/, '').split(/[\\/]/);
-                    if (/^\{[a-zA-Z]+\}$/.test(segs[segs.length - 1])) resolved.push(path.dirname(full));
+                    if (/^\{[a-zA-Z]+\}$/.test(segs[segs.length - 1])) {
+                        const parent = path.dirname(full);
+                        if (!isSharedSaveRoot(parent, win, ctx.install)) resolved.push(parent);
+                    }
                 }
             } else {
-                const d = resolveSaveToken(tmpl, { win, install: ctx.install, appId: ctx.appId });
+                const d = resolveGogToken(tmpl, { win, install: ctx.install, appId: ctx.appId });
                 if (d) resolved.push(d);
             }
             // Must stay within prefix/install; take the first that exists (authoritative, even if empty).
@@ -1037,7 +1057,7 @@ function saveSafeName(s) { return String(s || 'game').replace(/[/\\:*?"<>|]+/g, 
 ipcMain.handle('gog-saves-resolve', (_, gameId) => {
     const c = saveGameContext(gameId);
     if (!c || !c.supported) return { ok: true, supported: false, candidates: [] };
-    const r = resolveGogSaveDirs(c.ctx);
+    const r = resolveSaveDirs(c.ctx);
     let backups = [];
     try { backups = db.prepare("SELECT path, created, bytes, source FROM save_backups WHERE game_id=? ORDER BY created DESC LIMIT 20").all(gameId); } catch {}
     backups = backups.filter(b => { try { return fs.existsSync(b.path); } catch { return false; } });
@@ -1122,6 +1142,15 @@ ipcMain.handle('gog-restore-commit', async (_, gameId, zipPath) => {
             try { db.prepare("INSERT INTO save_backups (game_id, path, created, bytes, source) VALUES (?,?,?,?,?)").run(gameId, sp, Date.now(), fs.statSync(sp).size, 'pre-restore'); } catch {}
         }
     } catch (e) { return { ok: false, error: 'Could not make a safety snapshot: ' + e.message }; }
+    // True replace: wipe each target folder first so files that exist only in the CURRENT saves
+    // don't linger (the "overwrites" the confirm promised). The pre-restore snapshot above makes
+    // this recoverable. Never wipe a shared root (a legacy/over-broad backup) — merge into it instead.
+    const win = c.ctx.platform === 'windows' ? winUserHome(c.ctx.prefix) : null;
+    for (const t of targets) {
+        if (fs.existsSync(t) && !isSharedSaveRoot(t, win, c.ctx.install)) {
+            try { fs.rmSync(t, { recursive: true, force: true }); } catch {}
+        }
+    }
     // Extract each dir_i into its target (guarded against zip path-traversal).
     let restored = 0;
     try {

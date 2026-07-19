@@ -345,12 +345,7 @@ ipcMain.handle('uninstall-game-files', async (_, id) => {
         }
     }
 
-    const prefixPath = expandTilde(game.prefix_path) || (() => {
-        const legacy = path.join(prefixesDir, id);
-        if (fs.existsSync(legacy)) return legacy;
-        const safeName = (game.title || id).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || id;
-        return path.join(prefixesDir, safeName);
-    })();
+    const prefixPath = grinderEngine.prefixPathForGame(game);
     if (fs.existsSync(prefixPath)) {
         try { fs.rmSync(prefixPath, { recursive: true, force: true }); }
         catch (e) { errors.push(`Prefix: ${e.message}`); }
@@ -1032,12 +1027,9 @@ ipcMain.handle('legendary-import', (_, games) => {
 ipcMain.handle('get-game-prefix', (_, gameId) => {
     const game = db.prepare('SELECT * FROM games WHERE id=?').get(gameId);
     if (!game) return null;
-    const explicit = expandTilde(game.prefix_path);
-    if (explicit && fs.existsSync(explicit)) return explicit;
-    const legacy = path.join(prefixesDir, gameId);
-    if (fs.existsSync(legacy)) return legacy;
-    const safe = (game.title || gameId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || gameId;
-    return path.join(prefixesDir, safe);
+    // Single source of truth (grinder-engine); requireExplicitExists keeps the GUI's
+    // "return the prefix only if it actually exists" behaviour.
+    return grinderEngine.prefixPathForGame(game, { requireExplicitExists: true });
 });
 
 // Winetricks: detect and run
@@ -1104,10 +1096,7 @@ ipcMain.handle('run-exe-on-prefix', async (_, gameId) => {
     if (!game) return { ok: false, error: 'Game not found' };
 
     const exe = result.filePaths[0];
-    const prefix = expandTilde(game.prefix_path) || (() => {
-        const safeName = (game.title || gameId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || gameId;
-        return path.join(prefixesDir, safeName);
-    })();
+    const prefix = grinderEngine.prefixPathForGame(game);
     const proton = expandTilde(game.proton_path)
         || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || '';
     fs.mkdirSync(prefix, { recursive: true });
@@ -1154,10 +1143,7 @@ ipcMain.handle('run-exe-in-game-folder', async (_, gameId) => {
     if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
 
     const exe = result.filePaths[0];
-    const prefix = expandTilde(game.prefix_path) || (() => {
-        const safeName = (game.title || gameId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || gameId;
-        return path.join(prefixesDir, safeName);
-    })();
+    const prefix = grinderEngine.prefixPathForGame(game);
     const proton = expandTilde(game.proton_path)
         || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || '';
     fs.mkdirSync(prefix, { recursive: true });
@@ -1481,10 +1467,7 @@ ipcMain.handle('gogdl-install', (event, appId, platform, installDir, isDlc = fal
                 // Auto-install compatibility files right after a successful GOG install
                 const game = db.prepare("SELECT * FROM games WHERE app_id=? AND store='gog'").get(appId);
                 if (game) {
-                    const prefixPath = expandTilde(game.prefix_path) || (() => {
-                        const safeName = (game.title || game.id).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || game.id;
-                        return path.join(prefixesDir, safeName);
-                    })();
+                    const prefixPath = grinderEngine.prefixPathForGame(game);
                     const protonPath = game.proton_path
                         || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value;
                     send('\n─── Auto-installing compatibility files ───\n');

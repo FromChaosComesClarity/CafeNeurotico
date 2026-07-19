@@ -407,16 +407,20 @@ async function headlessUninstall(store, appId) {
 }
 
 // Single source of truth for a game's Wine prefix path (used by launch, install
-// redist, uninstall — and by the Manager's save-game resolver). Mirrors the
-// historical logic: an explicit prefix_path wins; else a legacy dir named by the
-// grinder row id if one exists; else a sanitized-title dir under prefixesDir.
-function prefixPathForGame(game) {
+// redist, uninstall, the GRINDER GUI, and the Manager's save-game resolver).
+// An explicit prefix_path wins; else a legacy dir named by the grinder row id if
+// one exists; else a sanitized dir under prefixesDir. The fallback base is app_id
+// (what install-time creation uses when a title is missing), so lookup matches
+// creation. Pass { requireExplicitExists: true } to make a set-but-missing
+// prefix_path fall through instead of being returned (GUI "where is it?" semantics).
+function prefixPathForGame(game, opts = {}) {
     const explicit = expandTilde(game.prefix_path);
-    if (explicit) return explicit;
+    if (explicit && (!opts.requireExplicitExists || fs.existsSync(explicit))) return explicit;
     const id = String(game.id || '');
     const legacy = id && path.join(prefixesDir, id);
     if (legacy && fs.existsSync(legacy)) return legacy;
-    const safeName = (game.title || id).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || id;
+    const base = String(game.title || game.app_id || id);
+    const safeName = base.replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || String(game.app_id || id);
     return path.join(prefixesDir, safeName);
 }
 
