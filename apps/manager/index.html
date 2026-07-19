@@ -6139,7 +6139,7 @@ LOADING...READY.</div>
   <div id="modal-saves" class="modal-overlay">
     <div class="modal-box" style="max-width: 620px; width: 620px; max-height: 84vh; display:flex; flex-direction:column;">
       <h3 style="margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Save Manager <span id="saves-modal-game" style="opacity:0.6; font-weight:400; text-transform:none; letter-spacing:0;"></span></h3>
-      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.5; margin: 0;">Back up this GOG game's saves to a portable <strong>.zip</strong> you can keep or move to another PC, then restore them any time. Restoring always snapshots your current saves first. <a href="#" id="saves-learn-more" style="color:var(--accent); font-weight:800; letter-spacing:1px; font-size:11px; white-space:nowrap; text-decoration:none;">LEARN MORE&nbsp;›</a></p>
+      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.5; margin: 0;">Back up this game's saves to a portable <strong>.zip</strong> you can keep or move to another PC, then restore them any time. Restoring always snapshots your current saves first. <a href="#" id="saves-learn-more" style="color:var(--accent); font-weight:800; letter-spacing:1px; font-size:11px; white-space:nowrap; text-decoration:none;">LEARN MORE&nbsp;›</a></p>
       <div id="saves-override-note" style="display:none; font-size:11px; color:var(--text_dim); margin-top:2px;"></div>
       <div id="saves-status" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center; line-height:1.6;"></div>
       <div id="saves-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px; margin-top:6px;"></div>
@@ -6171,12 +6171,12 @@ LOADING...READY.</div>
         </style>
 
         <h4>Why this exists</h4>
-        <p>GOG Galaxy — and its cloud saves — doesn't run on Linux, so your GOG save files normally have no backup at all. The Save Manager finds a game's saves, packs them into a portable <strong>.zip</strong>, and restores them whenever you need. Steam and its own cloud aren't covered here; this is GOG-only.</p>
+        <p>Neither GOG Galaxy nor the Epic Games launcher runs on Linux, so your GOG and Epic save files normally have no backup at all. The Save Manager finds a game's saves, packs them into a portable <strong>.zip</strong>, and restores them whenever you need. It covers <strong>GOG and Epic</strong> — Steam has its own cloud saves, so it isn't included here.</p>
 
         <h4>How saves are located</h4>
         <p>When you open the Save Manager it shows one or more save folders, each with a small tag:</p>
         <ul>
-          <li><span class="sm-badge" style="color:#5be27a;">from GOG</span> — GOG's own installer declared this location. The most reliable.</li>
+          <li><span class="sm-badge" style="color:#5be27a;">from GOG</span> / <span class="sm-badge" style="color:#5be27a;">from Epic</span> — the store itself declared this location. The most reliable.</li>
           <li><span class="sm-badge" style="color:var(--text_dim);">detected</span> — found by scanning the game's Wine prefix (the usual save spots).</li>
           <li><span class="sm-badge" style="color:var(--accent);">you chose this</span> — a folder you picked yourself with <em>Locate saves…</em>.</li>
         </ul>
@@ -6202,7 +6202,7 @@ LOADING...READY.</div>
         <h4>Can't find your saves? Locate them yourself</h4>
         <p>If detection comes up empty or points at the wrong folder, press <strong>Locate saves…</strong>. The folder picker opens <em>inside</em> the game's Windows environment, here:</p>
         <p><code>~/.config/grinder/prefixes/&lt;Game&gt;/drive_c/users/steamuser/</code></p>
-        <p>From there, GOG saves are almost always in one of these — open them and look for the folder holding the actual save files:</p>
+        <p>From there, saves are almost always in one of these — open them and look for the folder holding the actual save files:</p>
         <ul>
           <li><code>Documents\My Games\&lt;Game&gt;</code></li>
           <li><code>Saved Games\&lt;Game or Studio&gt;</code></li>
@@ -6211,8 +6211,8 @@ LOADING...READY.</div>
         </ul>
         <p>Select the folder that contains the save files and confirm. Your choice is remembered for that game; you can switch back later with <em>“Use auto-detect instead.”</em></p>
 
-        <h4>Native-Linux GOG games</h4>
-        <p>Games installed as native Linux builds have no Windows prefix, so they can't be auto-detected. Use <strong>Locate saves…</strong> and point at wherever the game stores them — commonly under <code>~/.local/share</code>, <code>~/.config</code>, or the game's install folder.</p>
+        <h4>Native-Linux games</h4>
+        <p>Some GOG games install as native Linux builds (Epic titles always run through Proton). A native build has no Windows prefix, so it can't be auto-detected — use <strong>Locate saves…</strong> and point at wherever the game stores them, commonly under <code>~/.local/share</code>, <code>~/.config</code>, or the game's install folder.</p>
 
         <h4>Your saves are safe</h4>
         <ul>

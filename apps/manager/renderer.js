@@ -1144,8 +1144,8 @@ async function openSavesModal(game) {
 }
 
 function _fmtSaveDate(ts) { try { return new Date(ts).toLocaleString(); } catch { return ''; } }
-function _saveBadge(src) {
-    if (src === 'script') return { text: 'from GOG', color: '#5be27a', sub: 'declared by GOG' };
+function _saveBadge(src, store) {
+    if (src === 'store')  return { text: store === 'epic' ? 'from Epic' : 'from GOG', color: '#5be27a', sub: store === 'epic' ? 'declared by Epic' : 'declared by GOG' };
     if (src === 'manual') return { text: 'you chose this', color: 'var(--accent)', sub: 'your chosen folder' };
     return { text: 'detected', color: 'var(--text_dim)', sub: 'detected in the Wine prefix' };
 }
@@ -1195,7 +1195,7 @@ function renderSavesModal(game, res) {
         cb.style.flexShrink = '0'; cb.style.width = '16px'; cb.style.height = '16px';
         const meta = document.createElement('div'); meta.className = 'dlc-meta';
         const title = document.createElement('div'); title.className = 'dlc-title'; title.textContent = c.label;
-        const b = _saveBadge(c.source);
+        const b = _saveBadge(c.source, res && res.store);
         const sub = document.createElement('div'); sub.className = 'dlc-sub'; sub.textContent = b.sub;
         meta.appendChild(title); meta.appendChild(sub);
         const badge = document.createElement('div'); badge.className = 'dlc-sub'; badge.style.flexShrink = '0'; badge.style.color = b.color; badge.style.fontWeight = '700'; badge.textContent = b.text;
@@ -4024,9 +4024,9 @@ async function openFlatDetail(game) {
         });
     }
 
-    // Save Manager — installed GOG games only.
+    // Save Manager — installed GOG & Epic games.
     const fdoSaves = document.getElementById('btn-fdo-saves');
-    if (fdoSaves) fdoSaves.style.display = (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) ? '' : 'none';
+    if (fdoSaves) fdoSaves.style.display = (/^(gog|epic)_/i.test(game.GrinderGameId || '') && game.Installed == 1) ? '' : 'none';
 
     const coverSrc = game.CoverArt ? getSafePath(game.CoverArt) : '';
     const coverWrap = document.getElementById('fdo-cover-wrap');
@@ -8036,10 +8036,10 @@ function openGamepage(game) {
         }
     }
 
-    // Save Manager button — installed GOG games (locate/back up/restore saves)
+    // Save Manager button — installed GOG & Epic games (locate/back up/restore saves)
     const savesBtn = document.getElementById('btn-gamepage-saves');
     if (savesBtn) {
-        if (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) {
+        if (/^(gog|epic)_/i.test(game.GrinderGameId || '') && game.Installed == 1) {
             savesBtn.style.display = 'block';
             savesBtn.onclick = (e) => { e.stopPropagation(); openSavesModal(game); };
         } else {

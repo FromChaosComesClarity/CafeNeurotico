@@ -850,6 +850,42 @@ function scriptSavePaths(installDir) {
     return out;
 }
 
+// ── Epic (legendary) authoritative source: CloudSaveFolder from the game metadata ──
+// legendary uses the standard ~/.config/legendary (confirmed against GRINDER).
+const legendaryDir = () => path.join(os.homedir(), '.config', 'legendary');
+function epicAccountId() {
+    try { const u = JSON.parse(fs.readFileSync(path.join(legendaryDir(), 'user.json'), 'utf8')); return u.account_id || u.accountId || ''; } catch { return ''; }
+}
+// Epic declares its save folder as a template in metadata/<appId>.json (parallel to GOG's .script).
+function epicCloudSaveFolders(appId) {
+    if (!appId) return [];
+    try {
+        const d = JSON.parse(fs.readFileSync(path.join(legendaryDir(), 'metadata', `${appId}.json`), 'utf8'));
+        const v = d && d.metadata && d.metadata.customAttributes && d.metadata.customAttributes.CloudSaveFolder && d.metadata.customAttributes.CloudSaveFolder.value;
+        return v ? [v] : [];
+    } catch { return []; }
+}
+// Epic CloudSaveFolder {tokens}. {AppData} = AppData\Local (verified); case-insensitive; a template
+// may hold several tokens, e.g. {AppData}/Remedy/AlanWake2/{EpicID}.
+const EPIC_SAVE_TOKENS = {
+    installdir:     (c) => c.install,
+    epicid:         (c) => c.epicId,
+    appdata:        (c) => path.join(c.win, 'AppData', 'Local'),
+    localappdata:   (c) => path.join(c.win, 'AppData', 'Local'),
+    userdir:        (c) => path.join(c.win, 'Documents'),
+    userprofile:    (c) => c.win,
+    usersavedgames: (c) => path.join(c.win, 'Saved Games'),
+};
+function resolveEpicToken(tmpl, ctx) {
+    const out = String(tmpl).replace(/\{([a-zA-Z]+)\}/g, (m, name) => {
+        const fn = EPIC_SAVE_TOKENS[name.toLowerCase()];
+        const v = fn && fn(ctx);
+        return v ? v : m;
+    });
+    if (/\{[a-zA-Z]+\}/.test(out)) return null;              // an unknown token remained → bail
+    return path.normalize(out.replace(/[\\/]+$/, ''));       // drop any trailing slash the template had
+}
+
 // Does a directory contain at least one file (walked, budget-capped)? Drops empty Wine stubs.
 function dirHasFiles(dir, budget = 400) {
     const stack = [dir];
@@ -868,7 +904,7 @@ function dirHasFiles(dir, budget = 400) {
 const SAVE_DOC_STUBS = new Set(['downloads','music','pictures','videos','desktop','contacts','links',
     'searches','favorites','my music','my pictures','my videos','onedrive','nethood','printhood',
     'templates','start menu','sendto','recent','application data','local settings']);
-const SAVE_LOCAL_NOISE = /^(dxvk|temp|inetcache|microsoft|packages|connecteddevicesplatform|d3dscache|d3d12|crashdumps|gog\.com|comms|history|iconcache|virtualstore|programs|nvidia|amd)$/i;
+const SAVE_LOCAL_NOISE = /^(dxvk|temp|inetcache|microsoft|packages|connecteddevicesplatform|d3dscache|d3d12|crashdumps|gog\.com|comms|history|iconcache|virtualstore|programs|nvidia|amd|epic games|epicgameslauncher|easyanticheat|battleye)$/i;
 const SAVE_WIN_ROOTS = ['Saved Games', 'Documents/My Games', 'AppData/LocalLow', 'AppData/Roaming', 'AppData/Local', 'Documents'];
 
 // Tier 2: scan the Wine user profile, denylisting stubs and requiring real content.
@@ -943,11 +979,25 @@ function resolveGogSaveDirs(ctx) {
     }
     const cands = [];
     if (ctx.platform === 'windows' && win) {
-        for (const tmpl of scriptSavePaths(ctx.install)) {                 // 1. .script (authoritative)
-            const d = resolveSaveToken(tmpl, { win, install: ctx.install, appId: ctx.appId });
-            if (!d) continue;
-            if (classifySaveDir(d, win, ctx.install).root === 'abs') continue;   // guard: stay within prefix/install
-            if (fs.existsSync(d)) cands.push(mk(d, 'script', 0.95));            // exists ⇒ authoritative, even if empty
+        // 1. Authoritative store template — GOG .script savePath / Epic CloudSaveFolder.
+        const templates = ctx.store === 'epic' ? epicCloudSaveFolders(ctx.appId) : scriptSavePaths(ctx.install);
+        for (const tmpl of templates) {
+            const resolved = [];   // candidate absolute paths, best first
+            if (ctx.store === 'epic') {
+                const full = resolveEpicToken(tmpl, { win, install: ctx.install, epicId: ctx.epicId });
+                if (full) {
+                    resolved.push(full);
+                    // Epic's {EpicID} leaf is a cloud-sync convention Proton games rarely create → fall back to the game folder.
+                    const segs = String(tmpl).replace(/[\\/]+$/, '').split(/[\\/]/);
+                    if (/^\{[a-zA-Z]+\}$/.test(segs[segs.length - 1])) resolved.push(path.dirname(full));
+                }
+            } else {
+                const d = resolveSaveToken(tmpl, { win, install: ctx.install, appId: ctx.appId });
+                if (d) resolved.push(d);
+            }
+            // Must stay within prefix/install; take the first that exists (authoritative, even if empty).
+            const pick = resolved.find(d => classifySaveDir(d, win, ctx.install).root !== 'abs' && fs.existsSync(d));
+            if (pick) cands.push(mk(pick, 'store', 0.95));
         }
         if (!cands.length) for (const h of scanWinProfile(win))       cands.push(mk(h.dir, 'detected', 0.5));  // 2.
         if (!cands.length) for (const h of scanInstallDir(ctx.install)) cands.push(mk(h.dir, 'detected', 0.5)); // 3.
@@ -956,7 +1006,7 @@ function resolveGogSaveDirs(ctx) {
     }
     const uniq = [], seen = new Set();
     for (const c of cands) { const k = path.resolve(c.dir); if (seen.has(k)) continue; seen.add(k); uniq.push(c); }
-    uniq.forEach((c, i) => { c.checked = c.source === 'script' ? dirHasFiles(c.dir) : i === 0; });   // pre-check non-empty script hits / strongest heuristic
+    uniq.forEach((c, i) => { c.checked = c.source === 'store' ? dirHasFiles(c.dir) : i === 0; });   // pre-check non-empty authoritative hits / strongest heuristic
     return { native: ctx.platform !== 'windows', candidates: uniq, override: '' };
 }
 
@@ -964,15 +1014,19 @@ function resolveGogSaveDirs(ctx) {
 function saveGameContext(gameId) {
     if (!db) return null;
     let row; try { row = db.prepare("SELECT id, Game, GrinderGameId, SaveDirOverride, SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return null; }
-    if (!row || !/^gog_/i.test(String(row.GrinderGameId || ''))) return { gog: false };
-    if (!ensureGrinderEngine()) return { gog: false };
-    let grow; try { grow = _grinderEngineDb.prepare("SELECT id, title, prefix_path, install_path, platform, store, app_id FROM games WHERE id=?").get(String(row.GrinderGameId)); } catch {}
-    if (!grow) return { gog: false };
+    const gid = String(row?.GrinderGameId || '');
+    if (!row || !/^(gog|epic)_/i.test(gid)) return { supported: false };
+    if (!ensureGrinderEngine()) return { supported: false };
+    let grow; try { grow = _grinderEngineDb.prepare("SELECT id, title, prefix_path, install_path, platform, store, app_id FROM games WHERE id=?").get(gid); } catch {}
+    if (!grow) return { supported: false };
+    const store   = /^epic_/i.test(gid) ? 'epic' : 'gog';
     const prefix  = grinderEngine.prefixPathForGame(grow);
     const install = expandTilde(grow.install_path || '') || resolveGameFolder(row) || '';
-    return { gog: true, row, grow, ctx: {
-        platform: grow.platform || 'windows', prefix, install,
+    // Epic on Linux is always Proton (no native builds) — treat blank platform as 'windows'.
+    return { supported: true, store, row, grow, ctx: {
+        store, platform: grow.platform || 'windows', prefix, install,
         appId: grow.app_id, title: grow.title || row.Game, override: row.SaveDirOverride || '',
+        epicId: store === 'epic' ? epicAccountId() : '',
     } };
 }
 
@@ -982,18 +1036,18 @@ function saveSafeName(s) { return String(s || 'game').replace(/[/\\:*?"<>|]+/g, 
 // Resolve the save location(s) + prior backups for the gamepage Saves panel.
 ipcMain.handle('gog-saves-resolve', (_, gameId) => {
     const c = saveGameContext(gameId);
-    if (!c || !c.gog) return { ok: true, gog: false, candidates: [] };
+    if (!c || !c.supported) return { ok: true, supported: false, candidates: [] };
     const r = resolveGogSaveDirs(c.ctx);
     let backups = [];
     try { backups = db.prepare("SELECT path, created, bytes, source FROM save_backups WHERE game_id=? ORDER BY created DESC LIMIT 20").all(gameId); } catch {}
     backups = backups.filter(b => { try { return fs.existsSync(b.path); } catch { return false; } });
-    return { ok: true, gog: true, native: r.native, title: c.ctx.title, candidates: r.candidates, override: r.override, backups };
+    return { ok: true, supported: true, store: c.store, native: r.native, title: c.ctx.title, candidates: r.candidates, override: r.override, backups };
 });
 
 // Back up the user-checked save folder(s) to a portable .zip (read-only on the saves).
 ipcMain.handle('gog-backup-saves', async (_, gameId, dirs) => {
     const c = saveGameContext(gameId);
-    if (!c || !c.gog) return { ok: false, error: 'Not a GOG game.' };
+    if (!c || !c.supported) return { ok: false, error: 'Saves aren\'t supported for this game.' };
     const win = c.ctx.platform === 'windows' ? winUserHome(c.ctx.prefix) : null;
     const chosen = (Array.isArray(dirs) ? dirs : []).filter(d => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
     if (!chosen.length) return { ok: false, error: 'No save folders selected.' };
@@ -1035,7 +1089,7 @@ function saveRestoreTargets(zipPath, c) {
 // shows its OWN themed confirm (not a native message box) before committing.
 ipcMain.handle('gog-restore-preview', async (_, gameId, zipPath) => {
     const c = saveGameContext(gameId);
-    if (!c || !c.gog) return { ok: false, error: 'Not a GOG game.' };
+    if (!c || !c.supported) return { ok: false, error: 'Saves aren\'t supported for this game.' };
     let src = zipPath;
     if (!src) {
         const { canceled, filePaths } = await dialog.showOpenDialog({ title: 'Restore Saves', properties: ['openFile'], filters: [{ name: 'Zip archive', extensions: ['zip'] }] });
@@ -1050,7 +1104,7 @@ ipcMain.handle('gog-restore-preview', async (_, gameId, zipPath) => {
 // Restore step 2 — snapshot the CURRENT saves, then overwrite. Called after the themed confirm.
 ipcMain.handle('gog-restore-commit', async (_, gameId, zipPath) => {
     const c = saveGameContext(gameId);
-    if (!c || !c.gog) return { ok: false, error: 'Not a GOG game.' };
+    if (!c || !c.supported) return { ok: false, error: 'Saves aren\'t supported for this game.' };
     if (!zipPath) return { ok: false, error: 'No backup specified.' };
     const r = saveRestoreTargets(zipPath, c);
     if (r.error) return { ok: false, error: r.error };
@@ -1102,8 +1156,8 @@ ipcMain.handle('gog-delete-backup', (_, gameId, backupPath) => {
 ipcMain.handle('gog-set-save-override', async (_, gameId) => {
     if (!db) return { ok: false };
     const c = saveGameContext(gameId);
-    const win = c && c.gog && c.ctx.platform === 'windows' ? winUserHome(c.ctx.prefix) : null;
-    const startAt = (win && fs.existsSync(win)) ? win : (c && c.gog && c.ctx.install && fs.existsSync(c.ctx.install) ? c.ctx.install : undefined);
+    const win = c && c.supported && c.ctx.platform === 'windows' ? winUserHome(c.ctx.prefix) : null;
+    const startAt = (win && fs.existsSync(win)) ? win : (c && c.supported && c.ctx.install && fs.existsSync(c.ctx.install) ? c.ctx.install : undefined);
     const opts = { title: 'Locate Save Folder', properties: ['openDirectory'] };
     if (startAt) opts.defaultPath = startAt;
     const { canceled, filePaths } = await dialog.showOpenDialog(opts);
