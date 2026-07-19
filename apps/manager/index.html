@@ -3649,6 +3649,9 @@
                         <button id="btn-gamepage-dlc" class="btn-hero btn-hero-sq" title="Manage DLCs" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.44 12.99l-.01.02c-.34.76-.1 1.66.57 2.14l.02.01c.9.64 1.12 1.9.48 2.8l-.44.62c-.64.9-1.9 1.11-2.8.48l-.02-.01a1.78 1.78 0 0 0-2.28.44 1.78 1.78 0 0 0-.35 1.06v.02c0 1.1-.9 2-2 2h-.76c-1.1 0-2-.9-2-2v-.02c-.01-.7-.44-1.32-1.08-1.59a1.78 1.78 0 0 0-1.98.36l-.02.01c-.9.64-2.16.42-2.8-.48l-.44-.62a2.01 2.01 0 0 1 .48-2.8l.02-.01c.67-.48.91-1.38.57-2.14l-.01-.02a1.78 1.78 0 0 0-1.62-1.08H2c-1.1 0-2-.9-2-2v-.76c0-1.1.9-2 2-2h.02c.7-.01 1.32-.44 1.59-1.08"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
+                        <button id="btn-gamepage-saves" class="btn-hero btn-hero-sq" title="Save Manager" style="display:none;">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        </button>
                         <button id="btn-gamepage-splore" class="btn-hero btn-hero-sq" title="SPLORE" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="12" rx="4"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
                         </button>
@@ -5394,6 +5397,7 @@ LOADING...READY.</div>
       <button id="btn-fdo-want" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>WANT</button>
       <button id="btn-fdo-playlist" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="22" y1="6" x2="16" y2="6"/></svg>PLAYLIST</button>
       <button id="btn-fdo-browse" class="fl-btn fl-btn-ghost" style="display:none;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>FILES</button>
+      <button id="btn-fdo-saves" class="fl-btn fl-btn-ghost" style="display:none;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>SAVES</button>
       <button id="btn-fdo-trailer" class="fl-btn fl-btn-ghost">▶ TRAILER</button>
       <button id="btn-fdo-edit" class="fl-btn fl-btn-ghost">EDIT</button>
       <button id="btn-fdo-launch" class="fl-btn fl-btn-primary">▶ PLAY</button>
@@ -6128,6 +6132,97 @@ LOADING...READY.</div>
         <button id="btn-dlc-install-all" class="primary" style="flex:1; font-size:12px;">Install all DLCs</button>
         <button id="btn-dlc-reset" style="font-size:11px; background:transparent; border:1px solid #ef5350; color:#ef5350;" title="Reinstall the base game with no DLCs (full re-download)">Reset DLCs</button>
         <button id="btn-close-dlc" style="font-size:12px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-saves" class="modal-overlay">
+    <div class="modal-box" style="max-width: 620px; width: 620px; max-height: 84vh; display:flex; flex-direction:column;">
+      <h3 style="margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Save Manager <span id="saves-modal-game" style="opacity:0.6; font-weight:400; text-transform:none; letter-spacing:0;"></span></h3>
+      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.5; margin: 0;">Back up this GOG game's saves to a portable <strong>.zip</strong> you can keep or move to another PC, then restore them any time. Restoring always snapshots your current saves first. <a href="#" id="saves-learn-more" style="color:var(--accent); font-weight:800; letter-spacing:1px; font-size:11px; white-space:nowrap; text-decoration:none;">LEARN MORE&nbsp;›</a></p>
+      <div id="saves-override-note" style="display:none; font-size:11px; color:var(--text_dim); margin-top:2px;"></div>
+      <div id="saves-status" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center; line-height:1.6;"></div>
+      <div id="saves-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px; margin-top:6px;"></div>
+      <div id="saves-backups" style="overflow-y:auto;"></div>
+      <div style="display:flex; gap:8px; margin-top:12px; flex-shrink:0; align-items:center;">
+        <button id="btn-saves-backup" class="primary" style="flex:1; font-size:12px;">Back Up Now</button>
+        <button id="btn-saves-restore" style="font-size:12px;" title="Restore from a backup .zip">Restore…</button>
+        <button id="btn-saves-locate" style="font-size:11px;" title="Manually pick this game's save folder">Locate saves…</button>
+        <button id="btn-close-saves" style="font-size:12px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-saves-help" class="modal-overlay" style="z-index:20010;">
+    <div class="modal-box" style="width:min(720px,95vw); max-height:88vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div style="padding:22px 26px 16px; border-bottom:1px solid var(--border); flex-shrink:0;">
+        <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px; font-size:19px;">Save Manager — Guide</h3>
+        <p style="font-size:14px; color:var(--text_dim); line-height:1.55; margin:9px 0 0;">Everything you need to back up and restore your GOG saves on Linux — including how to find saves the app can't detect on its own.</p>
+      </div>
+      <div style="overflow-y:auto; padding:20px 26px 10px; font-size:15px; color:var(--text_sec); line-height:1.7;">
+        <style>
+          #modal-saves-help h4 { color:var(--text_main); font-size:15px; text-transform:uppercase; letter-spacing:1.4px; margin:22px 0 9px; }
+          #modal-saves-help h4:first-child { margin-top:0; }
+          #modal-saves-help p { margin:0 0 11px; }
+          #modal-saves-help ul { margin:0 0 11px; padding-left:20px; }
+          #modal-saves-help li { margin:5px 0; }
+          #modal-saves-help code { background:rgba(0,0,0,0.28); border:1px solid var(--border); border-radius:4px; padding:1px 6px; font-size:13.5px; color:var(--text_main); word-break:break-all; }
+          #modal-saves-help .sm-badge { display:inline-block; font-weight:800; letter-spacing:0.5px; font-size:14px; }
+        </style>
+
+        <h4>Why this exists</h4>
+        <p>GOG Galaxy — and its cloud saves — doesn't run on Linux, so your GOG save files normally have no backup at all. The Save Manager finds a game's saves, packs them into a portable <strong>.zip</strong>, and restores them whenever you need. Steam and its own cloud aren't covered here; this is GOG-only.</p>
+
+        <h4>How saves are located</h4>
+        <p>When you open the Save Manager it shows one or more save folders, each with a small tag:</p>
+        <ul>
+          <li><span class="sm-badge" style="color:#5be27a;">from GOG</span> — GOG's own installer declared this location. The most reliable.</li>
+          <li><span class="sm-badge" style="color:var(--text_dim);">detected</span> — found by scanning the game's Wine prefix (the usual save spots).</li>
+          <li><span class="sm-badge" style="color:var(--accent);">you chose this</span> — a folder you picked yourself with <em>Locate saves…</em>.</li>
+        </ul>
+        <p>If it says <em>“No saves found yet”</em> and you <strong>have</strong> played the game, its saves live somewhere unusual — jump to <strong>“Can't find your saves?”</strong> below.</p>
+
+        <h4>Backing up</h4>
+        <ul>
+          <li>Tick the folder(s) you want (some games split saves across two folders — all ticked ones go into one zip).</li>
+          <li>Press <strong>Back Up Now</strong> and choose where to save the <code>.zip</code>.</li>
+          <li>Keep that zip anywhere — an external drive, cloud storage, or copy it to another PC.</li>
+        </ul>
+
+        <h4>Restoring</h4>
+        <ul>
+          <li>Press <strong>Restore…</strong> to pick any backup zip, or press <strong>Restore</strong> next to one listed under “Previous backups”.</li>
+          <li>Before anything is overwritten, your <em>current</em> saves are packed into an automatic <strong>pre-restore snapshot</strong> — so a restore is always undoable.</li>
+          <li>Restoring on a <strong>different PC</strong> works too: the folders are re-homed to that machine's prefix automatically.</li>
+        </ul>
+
+        <h4>Managing backups</h4>
+        <p>Each entry under “Previous backups” has a <strong>Delete</strong> button that removes only that <code>.zip</code> file. Your live saves are never touched by deleting a backup.</p>
+
+        <h4>Can't find your saves? Locate them yourself</h4>
+        <p>If detection comes up empty or points at the wrong folder, press <strong>Locate saves…</strong>. The folder picker opens <em>inside</em> the game's Windows environment, here:</p>
+        <p><code>~/.config/grinder/prefixes/&lt;Game&gt;/drive_c/users/steamuser/</code></p>
+        <p>From there, GOG saves are almost always in one of these — open them and look for the folder holding the actual save files:</p>
+        <ul>
+          <li><code>Documents\My Games\&lt;Game&gt;</code></li>
+          <li><code>Saved Games\&lt;Game or Studio&gt;</code></li>
+          <li><code>AppData\Roaming\&lt;Studio&gt;</code>, <code>AppData\Local\&lt;Studio&gt;</code>, or <code>AppData\LocalLow\&lt;Studio&gt;</code></li>
+          <li>Some older games save <strong>inside the game's own install folder</strong> — look for a <code>Save</code>, <code>SAVE</code> or <code>SAVEGAME</code> subfolder there.</li>
+        </ul>
+        <p>Select the folder that contains the save files and confirm. Your choice is remembered for that game; you can switch back later with <em>“Use auto-detect instead.”</em></p>
+
+        <h4>Native-Linux GOG games</h4>
+        <p>Games installed as native Linux builds have no Windows prefix, so they can't be auto-detected. Use <strong>Locate saves…</strong> and point at wherever the game stores them — commonly under <code>~/.local/share</code>, <code>~/.config</code>, or the game's install folder.</p>
+
+        <h4>Your saves are safe</h4>
+        <ul>
+          <li>Backing up <strong>only reads</strong> your saves — it never changes them.</li>
+          <li>Restoring always snapshots the current saves first.</li>
+          <li>Nothing is ever deleted unless you press <strong>Delete</strong> on a backup.</li>
+        </ul>
+      </div>
+      <div style="padding:12px 24px; border-top:1px solid var(--border); flex-shrink:0; display:flex; justify-content:flex-end;">
+        <button id="btn-close-saves-help" class="primary" style="font-size:12px;">Got it</button>
       </div>
     </div>
   </div>

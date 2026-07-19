@@ -1120,6 +1120,164 @@ function closeDlcModal() { _dlcGame = null; document.getElementById('modal-dlc')
 
 document.getElementById('btn-close-dlc')?.addEventListener('click', closeDlcModal);
 document.getElementById('modal-dlc')?.addEventListener('click', (e) => { if (e.target.id === 'modal-dlc') closeDlcModal(); });
+
+// ── Save Manager (installed GOG games) ──────────────────────────────────────
+// Locate a GOG game's saves, back them up to a portable .zip, restore them.
+let _savesGame = null;
+async function openSavesModal(game) {
+    _savesGame = game;
+    const modal = document.getElementById('modal-saves');
+    document.getElementById('saves-modal-game').textContent = game.Game ? `· ${game.Game}` : '';
+    const statusEl = document.getElementById('saves-status');
+    document.getElementById('saves-list').innerHTML = '';
+    document.getElementById('saves-backups').innerHTML = '';
+    document.getElementById('saves-override-note').style.display = 'none';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Locating saves…';
+    document.getElementById('btn-saves-backup').style.display = 'none';
+    modal.classList.add('active');
+    let res;
+    try { res = await window.api.savesResolve(game.id); }
+    catch (e) { res = { ok: false, error: e.message, candidates: [] }; }
+    if (_savesGame !== game || !modal.classList.contains('active')) return;   // closed / switched while loading
+    renderSavesModal(game, res);
+}
+
+function _fmtSaveDate(ts) { try { return new Date(ts).toLocaleString(); } catch { return ''; } }
+function _saveBadge(src) {
+    if (src === 'script') return { text: 'from GOG', color: '#5be27a', sub: 'declared by GOG' };
+    if (src === 'manual') return { text: 'you chose this', color: 'var(--accent)', sub: 'your chosen folder' };
+    return { text: 'detected', color: 'var(--text_dim)', sub: 'detected in the Wine prefix' };
+}
+
+function renderSavesModal(game, res) {
+    const listEl    = document.getElementById('saves-list');
+    const statusEl  = document.getElementById('saves-status');
+    const backupsEl = document.getElementById('saves-backups');
+    const noteEl    = document.getElementById('saves-override-note');
+    const backupBtn = document.getElementById('btn-saves-backup');
+    const restoreBtn= document.getElementById('btn-saves-restore');
+    const locateBtn = document.getElementById('btn-saves-locate');
+    listEl.innerHTML = ''; backupsEl.innerHTML = '';
+
+    // Restore (from any backup zip) and Locate are always available.
+    restoreBtn.style.display = 'inline-block';
+    restoreBtn.onclick = () => doSavesRestore(game, null);
+    locateBtn.style.display = 'inline-block';
+
+    // Manual-override note + "use auto-detect" escape hatch.
+    if (res && res.override) {
+        noteEl.style.display = 'block';
+        noteEl.innerHTML = 'Using a folder you picked. <a href="#" id="saves-clear-override" style="color:var(--accent);">Use auto-detect instead</a>';
+        noteEl.querySelector('#saves-clear-override').onclick = async (e) => {
+            e.preventDefault();
+            await window.api.savesClearOverride(game.id);
+            openSavesModal(game);
+        };
+    } else { noteEl.style.display = 'none'; }
+
+    const cands = (res && res.candidates) || [];
+    if (!cands.length) {
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = res && res.native
+            ? 'Native Linux game — its save location can\'t be auto-detected.<br>Use <strong>Locate saves…</strong> to point at the folder.'
+            : (!res || !res.ok) ? ('Could not read this game\'s saves.' + (res && res.error ? '<br>' + res.error : ''))
+            : 'No saves found yet — play the game first, then come back.<br>If it saves somewhere unusual, use <strong>Locate saves…</strong>.';
+        backupBtn.style.display = 'none';
+        renderSaveBackups(game, (res && res.backups) || [], backupsEl);   // history still usable
+        return;
+    }
+    statusEl.style.display = 'none';
+
+    for (const c of cands) {
+        const row = document.createElement('label'); row.className = 'dlc-row'; row.style.cursor = 'pointer'; row.title = c.dir;
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'save-cand'; cb.checked = !!c.checked; cb.dataset.dir = c.dir;
+        cb.style.flexShrink = '0'; cb.style.width = '16px'; cb.style.height = '16px';
+        const meta = document.createElement('div'); meta.className = 'dlc-meta';
+        const title = document.createElement('div'); title.className = 'dlc-title'; title.textContent = c.label;
+        const b = _saveBadge(c.source);
+        const sub = document.createElement('div'); sub.className = 'dlc-sub'; sub.textContent = b.sub;
+        meta.appendChild(title); meta.appendChild(sub);
+        const badge = document.createElement('div'); badge.className = 'dlc-sub'; badge.style.flexShrink = '0'; badge.style.color = b.color; badge.style.fontWeight = '700'; badge.textContent = b.text;
+        row.appendChild(cb); row.appendChild(meta); row.appendChild(badge);
+        listEl.appendChild(row);
+    }
+
+    backupBtn.style.display = 'block';
+    backupBtn.textContent = 'Back Up Now';
+    backupBtn.onclick = () => doSavesBackup(game);
+    renderSaveBackups(game, (res && res.backups) || [], backupsEl);
+}
+
+function renderSaveBackups(game, backups, el) {
+    el.innerHTML = '';
+    if (!backups.length) return;
+    const h = document.createElement('div'); h.className = 'dlc-sub'; h.style.margin = '12px 0 6px'; h.style.textTransform = 'uppercase'; h.style.letterSpacing = '1px'; h.textContent = 'Previous backups';
+    el.appendChild(h);
+    for (const b of backups.slice(0, 8)) {
+        const row = document.createElement('div'); row.className = 'dlc-row';
+        const meta = document.createElement('div'); meta.className = 'dlc-meta';
+        const t = document.createElement('div'); t.className = 'dlc-title'; t.textContent = String(b.path).split('/').pop(); t.title = b.path;
+        const s = document.createElement('div'); s.className = 'dlc-sub';
+        s.textContent = `${_fmtSaveDate(b.created)}${b.bytes ? ' · ' + _fmtBytes(b.bytes) : ''}${b.source === 'pre-restore' ? ' · safety snapshot' : ''}`;
+        meta.appendChild(t); meta.appendChild(s);
+        const rb = document.createElement('button'); rb.className = 'dlc-install-btn'; rb.textContent = 'Restore'; rb.style.flexShrink = '0';
+        rb.onclick = () => doSavesRestore(game, b.path);
+        const del = document.createElement('button'); del.className = 'dlc-install-btn'; del.textContent = 'Delete'; del.style.flexShrink = '0';
+        del.style.background = 'transparent'; del.style.border = '1px solid #ef5350'; del.style.color = '#ef5350';
+        del.title = 'Delete this backup file';
+        del.onclick = async () => {
+            const ok = await showConfirm(`Delete this backup file?\n\n${b.path}\n\nThis only removes the .zip — your live saves are untouched.`, 'Delete', true);
+            if (!ok) return;
+            const r = await window.api.savesDeleteBackup(game.id, b.path);
+            if (r && r.ok) { if (_savesGame === game) openSavesModal(game); }
+            else showAlert('Could not delete the backup: ' + ((r && r.error) || 'unknown error'));
+        };
+        row.appendChild(meta); row.appendChild(rb); row.appendChild(del);
+        el.appendChild(row);
+    }
+}
+
+async function doSavesBackup(game) {
+    const dirs = Array.from(document.querySelectorAll('#saves-list input.save-cand:checked')).map(cb => cb.dataset.dir);
+    if (!dirs.length) { showAlert('Select at least one save folder to back up.'); return; }
+    const btn = document.getElementById('btn-saves-backup');
+    const prev = btn.textContent; btn.disabled = true; btn.textContent = 'Backing up…';
+    let res; try { res = await window.api.savesBackup(game.id, dirs); } catch (e) { res = { ok: false, error: e.message }; }
+    btn.disabled = false; btn.textContent = prev;
+    if (res && res.ok) { showAlert(`Backed up ${res.dirs} folder(s) to:\n${res.path}`); if (_savesGame === game) openSavesModal(game); }
+    else if (res && !res.canceled) showAlert('Backup failed: ' + (res.error || 'unknown error'));
+}
+
+async function doSavesRestore(game, zipPath) {
+    // Step 1: resolve targets (opens a native file picker only when no backup was passed).
+    let pv; try { pv = await window.api.savesRestorePreview(game.id, zipPath || null); } catch (e) { pv = { ok: false, error: e.message }; }
+    if (!pv || !pv.ok) { if (pv && !pv.canceled) showAlert('Restore failed: ' + (pv.error || 'unknown error')); return; }
+    // Step 2: our OWN themed confirm (native message box replaced).
+    const ok = await showConfirm(
+        `Restore saves for ${pv.title}?\n\nThis overwrites the current save folder(s):\n\n${pv.targets.join('\n')}\n\nA safety snapshot of your current saves is made first.`,
+        'Restore');
+    if (!ok) return;
+    // Step 3: commit (snapshot + extract).
+    let res; try { res = await window.api.savesRestoreCommit(game.id, pv.zipPath); } catch (e) { res = { ok: false, error: e.message }; }
+    if (res && res.ok) { showAlert(`Restored ${res.restored} file(s).\nA safety snapshot of your previous saves was made first.`); if (_savesGame === game) openSavesModal(game); }
+    else if (res && !res.canceled) showAlert('Restore failed: ' + (res.error || 'unknown error'));
+}
+
+function closeSavesModal() { _savesGame = null; document.getElementById('modal-saves')?.classList.remove('active'); }
+document.getElementById('btn-close-saves')?.addEventListener('click', closeSavesModal);
+document.getElementById('modal-saves')?.addEventListener('click', (e) => { if (e.target.id === 'modal-saves') closeSavesModal(); });
+document.getElementById('btn-saves-locate')?.addEventListener('click', async () => {
+    if (!_savesGame) return;
+    const res = await window.api.savesSetOverride(_savesGame.id);
+    if (res && res.ok) openSavesModal(_savesGame);
+    else if (res && res.error) showAlert('Could not set the save folder: ' + res.error);
+});
+
+// Save Manager — dedicated help/guide modal (opened by "LEARN MORE").
+document.getElementById('saves-learn-more')?.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('modal-saves-help')?.classList.add('active'); });
+document.getElementById('btn-close-saves-help')?.addEventListener('click', () => document.getElementById('modal-saves-help')?.classList.remove('active'));
+document.getElementById('modal-saves-help')?.addEventListener('click', (e) => { if (e.target.id === 'modal-saves-help') document.getElementById('modal-saves-help')?.classList.remove('active'); });
 document.getElementById('btn-dlc-reset')?.addEventListener('click', async () => {
     const game = _dlcGame; if (!game) return;
     const ok = await showConfirm(
@@ -3866,6 +4024,10 @@ async function openFlatDetail(game) {
         });
     }
 
+    // Save Manager — installed GOG games only.
+    const fdoSaves = document.getElementById('btn-fdo-saves');
+    if (fdoSaves) fdoSaves.style.display = (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) ? '' : 'none';
+
     const coverSrc = game.CoverArt ? getSafePath(game.CoverArt) : '';
     const coverWrap = document.getElementById('fdo-cover-wrap');
     coverWrap.style.display = coverSrc ? '' : 'none';
@@ -3954,6 +4116,10 @@ document.getElementById('btn-fdo-browse').addEventListener('click', async () => 
     if (!_flatDetailGame) return;
     const res = await window.api.openGameFolder(_flatDetailGame.id);
     if (!res || !res.ok) showAlert('Could not locate this game\'s install folder on disk.');
+});
+
+document.getElementById('btn-fdo-saves').addEventListener('click', () => {
+    if (_flatDetailGame) openSavesModal(_flatDetailGame);
 });
 
 document.getElementById('btn-fdo-trailer').addEventListener('click', () => {
@@ -7867,6 +8033,18 @@ function openGamepage(game) {
         } else {
             dlcBtn.style.display = 'none';
             dlcBtn.onclick = null;
+        }
+    }
+
+    // Save Manager button — installed GOG games (locate/back up/restore saves)
+    const savesBtn = document.getElementById('btn-gamepage-saves');
+    if (savesBtn) {
+        if (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) {
+            savesBtn.style.display = 'block';
+            savesBtn.onclick = (e) => { e.stopPropagation(); openSavesModal(game); };
+        } else {
+            savesBtn.style.display = 'none';
+            savesBtn.onclick = null;
         }
     }
 

@@ -331,7 +331,7 @@ async function headlessInstall(store, appId, platform, installDir, opts = {}) {
             if (game) {
                 db.prepare("UPDATE games SET installed=1, install_path=?, executable=? WHERE id=?").run(gameInfo.install_path, gameInfo.executable, game.id);
                 writeProgress({ ...base, step: 'redist', percent: 0, message: 'Checking compatibility files...' });
-                const prefixPath = expandTilde(game.prefix_path) || path.join(prefixesDir, (game.title || appId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || appId);
+                const prefixPath = prefixPathForGame(game);
                 const protonPath = game.proton_path || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value;
                 const fakeSender = { send: (_ch, data) => { const line = typeof data === 'object' ? (data.line || '') : String(data); if (line.trim()) writeProgress({ ...base, step: 'redist', percent: 0, message: line.trim().slice(0, 120) }); } };
                 await runRedist(fakeSender, 'x', appId, platform || 'windows', prefixPath, protonPath);
@@ -391,8 +391,7 @@ async function headlessUninstall(store, appId) {
         if (safe) { try { fs.rmSync(installPath, { recursive: true, force: true }); } catch {} }
     }
     writeProgress({ ...base, step: 'uninstalling', percent: 50, message: 'Removing Wine prefix...' });
-    const safeName = (game.title || appId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || appId;
-    const prefixPath = expandTilde(game.prefix_path) || path.join(prefixesDir, safeName);
+    const prefixPath = prefixPathForGame(game);
     if (fs.existsSync(prefixPath)) { try { fs.rmSync(prefixPath, { recursive: true, force: true }); } catch {} }
 
     if (store === 'epic') {
@@ -407,6 +406,20 @@ async function headlessUninstall(store, appId) {
     writeProgress({ ...base, step: 'done', percent: 100, message: 'Game uninstalled.', done: true });
 }
 
+// Single source of truth for a game's Wine prefix path (used by launch, install
+// redist, uninstall — and by the Manager's save-game resolver). Mirrors the
+// historical logic: an explicit prefix_path wins; else a legacy dir named by the
+// grinder row id if one exists; else a sanitized-title dir under prefixesDir.
+function prefixPathForGame(game) {
+    const explicit = expandTilde(game.prefix_path);
+    if (explicit) return explicit;
+    const id = String(game.id || '');
+    const legacy = id && path.join(prefixesDir, id);
+    if (legacy && fs.existsSync(legacy)) return legacy;
+    const safeName = (game.title || id).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || id;
+    return path.join(prefixesDir, safeName);
+}
+
 async function launchGame(gameId) {
     const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
     if (!game)           throw new Error(`Game "${gameId}" not found in GRINDER database.`);
@@ -419,12 +432,7 @@ async function launchGame(gameId) {
         if (eq > 0) customEnv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
     }
 
-    const prefix = expandTilde(game.prefix_path) || (() => {
-        const legacy = path.join(prefixesDir, gameId);
-        if (fs.existsSync(legacy)) return legacy;
-        const safeName = (game.title || gameId).replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || gameId;
-        return path.join(prefixesDir, safeName);
-    })();
+    const prefix = prefixPathForGame(game);
     const proton = expandTilde(game.proton_path)
         || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value
         || '';
@@ -1173,7 +1181,7 @@ module.exports = {
     sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
     which, findLegendary, findGogdl, findComet, findUmu, findWineCached, findRuntime,
     GOG_CLIENT_ID, GOG_CLIENT_SECRET, GOG_REDIRECT_URI,
-    syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary,
+    syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary, prefixPathForGame,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
     getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary, cancelActiveInstall,
