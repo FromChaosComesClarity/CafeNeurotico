@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "CUSTOM", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "CUSTOM", uiFont: "Poppins", fontSource: "MANAGER", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -246,15 +246,29 @@ function applyTheme(themeName) {
 }
 
 // ── INTERFACE FONT ────────────────────────────────────────────────────────────
-// Shared with the Manager through the `ui_font` setting, so the whole suite matches. A "Systems"
-// theme carries its own era font, which wins for as long as that theme is active.
-let _uiFont = '';
+// Same six faces the Manager offers, all bundled locally (see index.html @font-face).
+// audioCfg.fontSource === 'MANAGER' mirrors the Manager's `ui_font` setting (the default, so the
+// suite matches out of the box); picking a font here switches to 'CUSTOM', exactly like themes.
+// A "Systems" theme carries its own era font, which wins for as long as that theme is active.
+const UI_FONTS = ['Poppins', 'Raleway', 'Sora', 'Inter', 'Fraunces', 'Chicago', 'PxPlus IBM VGA8'];
+const FONT_LABELS = { 'Chicago': 'CHICAGOFLF' };   // display name where it differs from the family
+const fontLabel = f => FONT_LABELS[f] || f.toUpperCase();
+let _uiFont = '';   // the resolved family — whatever CREMA is currently painting with
+
 function applyUiFont() {
   const themeFont = THEMES[activeTheme] && THEMES[activeTheme].font;
   document.documentElement.style.setProperty('--ui-font', `'${themeFont || _uiFont || 'Poppins'}'`);
 }
-async function loadUiFont() {
-  try { _uiFont = (await window.api.getSetting('ui_font')) || ''; } catch (e) { _uiFont = ''; }
+async function resolveAndApplyFont() {
+  if ((audioCfg.fontSource || 'MANAGER') === 'MANAGER') {
+    try {
+      const f = await window.api.getSetting('ui_font');
+      _uiFont = (f && UI_FONTS.includes(f)) ? f : 'Poppins';
+      applyUiFont();
+      return;
+    } catch (e) {}
+  }
+  _uiFont = UI_FONTS.includes(audioCfg.uiFont) ? audioCfg.uiFont : 'Poppins';
   applyUiFont();
 }
 
@@ -494,7 +508,7 @@ function renderFooters() {
 
 async function initAudio() {
   let rawCfg = await window.api.getAudioConfig();
-  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = (rawCfg.screensaver === "OFF") ? "OFF" : "SCREENSHOTS"; /* CN WALLPAPERS removed → migrate to SCREENSHOTS */ audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'MANAGER' ? 'MANAGER' : 'CUSTOM'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'IMMERSIVE'; /* Immersive default for new installs */ audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
+  if (rawCfg) { audioCfg.bgm = rawCfg.bgm !== undefined ? rawCfg.bgm : true; audioCfg.sfx = rawCfg.sfx !== undefined ? rawCfg.sfx : true; audioCfg.vol = rawCfg.vol !== undefined ? rawCfg.vol : 0.3; audioCfg.bgm_mode = rawCfg.bgm_mode !== undefined ? rawCfg.bgm_mode : "AMBIENT"; audioCfg.screensaver = (rawCfg.screensaver === "OFF") ? "OFF" : "SCREENSHOTS"; /* CN WALLPAPERS removed → migrate to SCREENSHOTS */ audioCfg.screensaverDelay = rawCfg.screensaverDelay !== undefined ? rawCfg.screensaverDelay : 3; audioCfg.gamepadLayout = rawCfg.gamepadLayout !== undefined ? rawCfg.gamepadLayout : "XBOX"; audioCfg.wakeMethod = rawCfg.wakeMethod !== undefined ? rawCfg.wakeMethod : "START + SELECT"; if (rawCfg.theme && THEMES[rawCfg.theme]) { activeTheme = rawCfg.theme; audioCfg.theme = rawCfg.theme; } audioCfg.themeSource = rawCfg.themeSource === 'MANAGER' ? 'MANAGER' : 'CUSTOM'; audioCfg.fontSource = rawCfg.fontSource === 'CUSTOM' ? 'CUSTOM' : 'MANAGER'; audioCfg.uiFont = rawCfg.uiFont || 'Poppins'; audioCfg.startScreenMode = (rawCfg.startScreenMode === 'GRID') ? 'GRID' : 'CAROUSEL'; /* legacy 'STATIC' (vertical list) removed → carousel */ audioCfg.browseMode = rawCfg.browseMode || 'LIST'; audioCfg.gamepageStyle = rawCfg.gamepageStyle || 'IMMERSIVE'; /* Immersive default for new installs */ audioCfg.homeEnabled = rawCfg.homeEnabled !== false; /* ON by default for new installs */ audioCfg.homeRows = Array.isArray(rawCfg.homeRows) ? rawCfg.homeRows : ["recent","gems","played"]; }
   baseDir = await window.api.getBaseDir();
   const bp = `assets/sounds`;
   sfxNav = new Audio(`${bp}/nav.wav`); sfxSelect = new Audio(`${bp}/select.wav`); sfxBack = new Audio(`${bp}/back.wav`);
@@ -1106,7 +1120,7 @@ async function boot() {
   currentLang = await window.api.getSetting('language') || 'en';
   strings = await window.api.getStrings(currentLang);
   applyI18nToDOM();
-  updateAppScale(); await initAudio(); await loadUiFont(); await resolveAndApplyTheme(); renderHardwareIcons();
+  updateAppScale(); await initAudio(); await resolveAndApplyFont(); await resolveAndApplyTheme(); renderHardwareIcons();
   const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
   _cremaHidePico8 = (await window.api.getSetting('crema_hide_pico8')) === '1';
   _cremaHideFree = (await window.api.getSetting('crema_hide_free')) === '1';
@@ -1451,7 +1465,7 @@ function handleInput(action) {
   else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
     else if (action === 'BACK') {
-      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
+      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'FONTS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAME_SCRAPE_MENU' || gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
@@ -1705,8 +1719,11 @@ async function refreshDatabase() {
   await loadGamePlaylists();
   // Stay in sync if The Manager changed its theme while CREMA is open (no reflow when unchanged).
   if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
-  // The interface font is a suite-wide setting, so it follows regardless of themeSource.
-  try { const f = (await window.api.getSetting('ui_font')) || ''; if (f !== _uiFont) { _uiFont = f; applyUiFont(); } } catch (e) {}
+  // Follow a font change made on the desktop, but only while set to follow The Manager.
+  if ((audioCfg.fontSource || 'MANAGER') === 'MANAGER') {
+    try { const f = await window.api.getSetting('ui_font'); const next = (f && UI_FONTS.includes(f)) ? f : 'Poppins';
+          if (next !== _uiFont) { _uiFont = next; applyUiFont(); } } catch (e) {}
+  }
 
   availableScreenshots = [];
   for (let g of allGames) {
@@ -1753,7 +1770,14 @@ function renderGenericOverlay(title, items, hintText = "") {
   overlayItems.forEach((item, i) => {
     const div = document.createElement('div');
     if (isOverlaySection(item)) { div.className = 'overlay-section'; div.innerText = item.slice(1); }
-    else { div.className = 'overlay-item'; div.innerText = item; div.id = `overlay-${i}`; }
+    else {
+      div.className = 'overlay-item'; div.innerText = item; div.id = `overlay-${i}`;
+      // In the font picker, show each face in itself — you pick a font by looking at it.
+      if (gameState === 'FONTS') {
+        const fam = UI_FONTS.find(f => fontLabel(f) === String(item).replace('★ ', ''));
+        if (fam) div.style.fontFamily = `'${fam}', sans-serif`;
+      }
+    }
     lst.appendChild(div);
   });
 
@@ -1812,7 +1836,7 @@ async function openOverlay(type) {
   if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
     const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdItems = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? [] : [t('game_menu.add_launch')]; /* EDIT LAUNCH COMMAND removed for release */ const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
@@ -2036,6 +2060,7 @@ function executeOverlayAction() {
     else if (action === t('menu.gamepad_icons')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openGamepadMenu(); }
     else if (action === t('menu.wake_method')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openWakeMethodMenu(); }
     else if (action === t('menu.color_scheme')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openThemeCategoryMenu(); }
+    else if (action === 'INTERFACE FONT') { document.getElementById('overlay-backdrop').classList.add('hidden'); openFontMenu(); }
     else if (action === t('menu.screensaver')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openScreensaverMenu(); }
 else if (action === t('menu.history')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openHistoryMenu(); }
     else if (action === 'PICO-8 GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openPico8Menu(); }
@@ -2055,6 +2080,22 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
   }
   else if (gameState === 'THEME_CATS') { if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); } else if (String(action).replace("★ ", "") === FOLLOW_MANAGER_LABEL) { audioCfg.themeSource = 'MANAGER'; window.api.saveAudioConfig(audioCfg); resolveAndApplyTheme().then(openThemeCategoryMenu); } else { openThemeMenu(action); } }
   else if (gameState === 'THEMES') { if (action === t('common.back')) { openThemeCategoryMenu(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.theme = raw; audioCfg.themeSource = 'CUSTOM'; window.api.saveAudioConfig(audioCfg); applyTheme(raw); openThemeCategoryMenu(); } }
+  else if (gameState === 'FONTS') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); }
+    else if (String(action).replace("★ ", "") === FOLLOW_MANAGER_LABEL) {
+      audioCfg.fontSource = 'MANAGER'; window.api.saveAudioConfig(audioCfg);
+      resolveAndApplyFont().then(openFontMenu);
+    } else if (action) {
+      const label = String(action).replace("★ ", "");
+      const picked = UI_FONTS.find(f => fontLabel(f) === label);
+      if (picked) {
+        audioCfg.uiFont = picked; audioCfg.fontSource = 'CUSTOM';
+        window.api.saveAudioConfig(audioCfg);
+        _uiFont = picked; applyUiFont();
+      }
+      openFontMenu();
+    }
+  }
   else if (gameState === 'MUSIC_STYLE') { if (action === t('common.back')) { openSoundOverlay(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.bgm_mode = raw; window.api.saveAudioConfig(audioCfg); applyBgmMode(); openSoundOverlay(); } }
   else if (gameState === 'GAMEPAD_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); }
@@ -2327,6 +2368,16 @@ function executeScreensaverMenuAction() {
 
 function openThemeCategoryMenu() { gameState = 'THEME_CATS'; const follow = (audioCfg.themeSource === 'MANAGER' ? '★ ' : '') + FOLLOW_MANAGER_LABEL; let cats = [follow, '§BY CATEGORY', ...Object.keys(THEME_CATEGORIES)]; cats.push(t('common.back_to_menu')); renderGenericOverlay("THEME CATEGORIES", cats); }
 function openThemeMenu(category) { gameState = 'THEMES'; activeThemeCategory = category; let themes = THEME_CATEGORIES[category].map(th => th === activeTheme ? "★ " + th : th); themes.push(t('common.back')); renderGenericOverlay(category.toUpperCase(), themes); }
+// Interface Font — same shape as the theme picker: "follow The Manager" on top, then the faces.
+// The starred row is whichever is actually in force, so the current font is always visible.
+function openFontMenu() {
+  gameState = 'FONTS';
+  const following = (audioCfg.fontSource || 'MANAGER') === 'MANAGER';
+  const rows = [(following ? '★ ' : '') + FOLLOW_MANAGER_LABEL, '§BY FONT'];
+  UI_FONTS.forEach(f => rows.push((!following && _uiFont === f ? '★ ' : '') + fontLabel(f)));
+  rows.push(t('common.back_to_menu'));
+  renderGenericOverlay('INTERFACE FONT', rows);
+}
 function openGamepadMenu() {
   gameState = 'GAMEPAD_MENU';
   let layouts = ["XBOX LAYOUT", "PS LAYOUT", "N LAYOUT"];
