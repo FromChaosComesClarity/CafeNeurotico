@@ -874,6 +874,7 @@ function applyKenBurns(off) {
 }
 document.querySelectorAll('.kenburns-btn').forEach(btn =>
     btn.addEventListener('click', () => applyKenBurns(btn.dataset.val === 'off')));
+document.getElementById('ui-font-select')?.addEventListener('change', (e) => setUiFont(e.target.value));
 (async () => {
     if (await window.api.getSetting('kenburns_off') === '1') applyKenBurns(true);
 })();
@@ -2931,7 +2932,7 @@ function enhanceSelect(sel) {
     sel.parentNode.insertBefore(wrap, sel.nextSibling);
     const labelEl = btn.querySelector('.cust-sel-label');
 
-    const syncLabel = () => { const o = sel.options[sel.selectedIndex]; labelEl.textContent = o ? o.textContent : ''; };
+    const syncLabel = () => { const o = sel.options[sel.selectedIndex]; labelEl.textContent = o ? o.textContent : ''; labelEl.style.fontFamily = (o && o.style.fontFamily) || ''; };
 
     let listEl = null;
     const api = { close };
@@ -2971,6 +2972,7 @@ function enhanceSelect(sel) {
             const item = document.createElement('div');
             item.className = 'cust-sel-item' + (i === sel.selectedIndex ? ' sel' : '');
             item.textContent = o.textContent;
+            if (o.style.fontFamily) item.style.fontFamily = o.style.fontFamily;   // preview each option in its own face
             item.addEventListener('mousedown', e => {
                 e.preventDefault();
                 try {
@@ -3004,6 +3006,7 @@ function enhanceSelect(sel) {
 enhanceSelect(document.getElementById('gallery-category'));
 enhanceSelect(document.getElementById('gallery-sort'));
 enhanceSelect(document.getElementById('gallery-playlist'));
+enhanceSelect(document.getElementById('ui-font-select'));   // themed Interface Font dropdown (Appearance)
 
 // Playlist dropdown — options rebuilt from allPlaylists (called from renderPlaylistPanels,
 // so create/delete/rename and filter changes all keep it current). innerHTML swap triggers
@@ -8549,7 +8552,7 @@ async function igdbSsSearchAndPick(query) {
     results.forEach(game => {
         const btn = document.createElement('button');
         btn.textContent = game.year ? `${game.name} (${game.year})` : game.name;
-        btn.style.cssText = 'background:var(--bg_menu); color:var(--text_main); border:1px solid var(--border_solid); padding:5px 10px; border-radius:4px; font-size:11px; cursor:pointer; font-family:Raleway,sans-serif; font-weight:700;';
+        btn.style.cssText = 'background:var(--bg_menu); color:var(--text_main); border:1px solid var(--border_solid); padding:5px 10px; border-radius:4px; font-size:11px; cursor:pointer; font-family:var(--ui-font,Raleway),sans-serif; font-weight:700;';
         btn.addEventListener('mouseover', () => { btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)'; });
         btn.addEventListener('mouseout',  () => { btn.style.borderColor = 'var(--border_solid)'; btn.style.color = 'var(--text_main)'; });
         btn.addEventListener('click', () => igdbSsLoadScreenshots(game));
@@ -9931,10 +9934,32 @@ const THEMES = {
     "MOCHA": {bg: "#1a1210", bg_panel: "rgba(36, 24, 19, 0.6)", bg_menu: "#241813", accent: "#c98a5e", accent_menu: "#c98a5e", text_main: "#f0dfcf", text_sec: "#c7a98f", text_dim: "#8a6a54", border: "rgba(201, 138, 94, 0.2)", border_solid: "#4a3226"},
     "FLAT WHITE": {bg: "#f6f1e9", bg_panel: "rgba(253, 250, 244, 0.75)", bg_menu: "#fdfaf4", accent: "#8a5a2b", accent_menu: "#8a5a2b", text_main: "#33291f", text_sec: "#6b5a48", text_dim: "#a4917a", border: "rgba(138, 90, 43, 0.12)", border_solid: "#e0d4c0"},
     "MATCHA": {bg: "#12160f", bg_panel: "rgba(26, 32, 21, 0.6)", bg_menu: "#1a2015", accent: "#9bbf6b", accent_menu: "#9bbf6b", text_main: "#e6efd8", text_sec: "#b3c79b", text_dim: "#6d8556", border: "rgba(155, 191, 107, 0.2)", border_solid: "#33422a"},
+
+    // Systems (imported from LatteWrite) — retro-OS palettes; each carries its era `font` (applied as --ui-font while active)
+    "MS-DOS": {bg: "#0a0a0a", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffffff", accent_menu: "#ffffff", text_main: "#d2d2d2", text_sec: "#a2a2a2", text_dim: "#7e7e7e", border: "rgba(255, 255, 255, 0.25)", border_solid: "#4a4a4a", font: 'PxPlus IBM VGA8'},
+    "COMMODORE 64": {bg: "#0000aa", bg_panel: "rgba(0, 0, 170, 0.6)", bg_menu: "#0000aa", accent: "#b9b6ff", accent_menu: "#b9b6ff", text_main: "#d0ccff", text_sec: "#9e9beb", text_dim: "#7976db", border: "rgba(185, 182, 255, 0.25)", border_solid: "#4341c5", font: 'C64 Pro Mono'},
+    "MACOS 1.0": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
+    "CLASSIC MACOS": {bg: "#cfcfcf", bg_panel: "rgba(228, 228, 228, 0.6)", bg_menu: "#e4e4e4", accent: "#2b2b9c", accent_menu: "#2b2b9c", text_main: "#000000", text_sec: "#323232", text_dim: "#575757", border: "rgba(43, 43, 156, 0.25)", border_solid: "#8d8d8d", font: 'Chicago'},
+    "WINDOWS 95": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+    "AMIGA WORKBENCH": {bg: "#a6a6a6", bg_panel: "rgba(178, 178, 178, 0.6)", bg_menu: "#b2b2b2", accent: "#2b5db0", accent_menu: "#2b5db0", text_main: "#000000", text_sec: "#282828", text_dim: "#464646", border: "rgba(43, 93, 176, 0.25)", border_solid: "#717171", font: 'BigBlue Terminal'},
+    "WINDOWS XP": {bg: "#ece9d8", bg_panel: "rgba(244, 243, 239, 0.6)", bg_menu: "#f4f3ef", accent: "#2f6fd6", accent_menu: "#2f6fd6", text_main: "#000000", text_sec: "#393834", text_dim: "#63625b", border: "rgba(47, 111, 214, 0.25)", border_solid: "#a09e93", font: 'Inter'},
+    "BEOS": {bg: "#d8d8d0", bg_panel: "rgba(234, 234, 226, 0.6)", bg_menu: "#eaeae2", accent: "#2855b0", accent_menu: "#2855b0", text_main: "#000000", text_sec: "#343432", text_dim: "#5b5b57", border: "rgba(40, 85, 176, 0.25)", border_solid: "#93938d", font: 'Inter'},
+    "NEXTSTEP": {bg: "#dedede", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#26408b", accent_menu: "#26408b", text_main: "#000000", text_sec: "#353535", text_dim: "#5d5d5d", border: "rgba(38, 64, 139, 0.25)", border_solid: "#979797", font: 'Inter'},
+    "ZX SPECTRUM": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#00d8d8", accent_menu: "#00d8d8", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(0, 216, 216, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+    "ATARI ST": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#007000", accent_menu: "#007000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 112, 0, 0.25)", border_solid: "#adadad", font: 'PxPlus IBM VGA8'},
+    "AMBER CRT": {bg: "#140d00", bg_panel: "rgba(20, 13, 0, 0.6)", bg_menu: "#140d00", accent: "#ffcc44", accent_menu: "#ffcc44", text_main: "#ffb000", text_sec: "#c78900", text_dim: "#9c6c00", border: "rgba(255, 204, 68, 0.25)", border_solid: "#5f4100", font: 'PxPlus IBM VGA8'},
+    "GREEN CRT": {bg: "#001400", bg_panel: "rgba(0, 20, 0, 0.6)", bg_menu: "#001400", accent: "#7dff9e", accent_menu: "#7dff9e", text_main: "#37ff6a", text_sec: "#2ac751", text_dim: "#209c3d", border: "rgba(125, 255, 158, 0.25)", border_solid: "#125f22", font: 'PxPlus IBM VGA8'},
+    "TELETEXT": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffff00", accent_menu: "#ffff00", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(255, 255, 0, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+    "WINDOWS 3.1": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+    "OS/2 WARP": {bg: "#cececa", bg_panel: "rgba(214, 214, 208, 0.6)", bg_menu: "#d6d6d0", accent: "#00337f", accent_menu: "#00337f", text_main: "#000000", text_sec: "#313130", text_dim: "#575755", border: "rgba(0, 51, 127, 0.25)", border_solid: "#8c8c89", font: 'Inter'},
+    "IBM 3270": {bg: "#051005", bg_panel: "rgba(5, 16, 5, 0.6)", bg_menu: "#051005", accent: "#66ff66", accent_menu: "#66ff66", text_main: "#33cc33", text_sec: "#289f28", text_dim: "#207d20", border: "rgba(102, 255, 102, 0.25)", border_solid: "#144c14", font: 'BigBlue Terminal'},
+    "SOLARIS CDE": {bg: "#aeb6c2", bg_panel: "rgba(188, 196, 208, 0.6)", bg_menu: "#bcc4d0", accent: "#33518a", accent_menu: "#33518a", text_main: "#000000", text_sec: "#2a2c2f", text_dim: "#494c51", border: "rgba(51, 81, 138, 0.25)", border_solid: "#767c84", font: 'Inter'},
+    "RISC OS": {bg: "#d7d7c8", bg_panel: "rgba(232, 232, 220, 0.6)", bg_menu: "#e8e8dc", accent: "#005a9c", accent_menu: "#005a9c", text_main: "#000000", text_sec: "#343430", text_dim: "#5a5a54", border: "rgba(0, 90, 156, 0.25)", border_solid: "#929288", font: 'Inter'},
+    "GEOS": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
 };
 
 const THEME_CATEGORIES = {
-    "Originals & System": ["DARK GRAY", "CREMA", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "WIN XP", "OAKANIZER DARK"],
+    "Originals & System": ["DARK GRAY", "CREMA", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "OAKANIZER DARK"],
     "BrewBalance": ["BREWBALANCE DARK", "BREWBALANCE LIGHT", "MOCHA", "FLAT WHITE", "MATCHA"],
     "Light & Minimal": ["PAPER", "SOLARIZED LIGHT", "CATPPUCCIN LATTE", "GITHUB LIGHT", "GRUVBOX LIGHT", "ROSÉ PINE DAWN", "NORD LIGHT", "DAYBREAK", "OAKANIZER LIGHT"],
     "Gaming Legends": ["GAME BOY DMG", "PIP BOY", "SEVASTOPOL", "RIP AND TEAR CLASSIC", "SUPER BROTHERS", "GREEN HILL", "NES", "SNES", "BLOODBORNE", "METROID PRIME", "SILENT HILL", "DIABLO", "HALF-LIFE", "SHOVEL KNIGHT"],
@@ -9942,17 +9967,45 @@ const THEME_CATEGORIES = {
     "Linux Ricing": ["DRACULA", "GRUVBOX", "NORD", "SOLARIZED DARK", "CATPPUCCIN FRAPPÉ", "CATPPUCCIN MACCHIATO", "CATPPUCCIN MOCHA", "TOKYO NIGHT", "EVERFOREST", "ROSÉ PINE", "OXOCARBON", "MATERIAL DARK"],
     "Sci-Fi Universes": ["N7", "TRON LEGACY", "DEAD SPACE", "COLONY SHIP", "NECROMORPH"],
     "Horror Realm": ["CRIMSON PEAK", "LAKESIDE CURSE", "THE BACKROOMS"],
-    "PSIII Colors": ["PSIII CLASSIC", "PSIII RED", "PSIII GREEN", "PSIII BLUE", "PSIII PURPLE", "PSIII GOLD", "PSIII SILVER"]
+    "PSIII Colors": ["PSIII CLASSIC", "PSIII RED", "PSIII GREEN", "PSIII BLUE", "PSIII PURPLE", "PSIII GOLD", "PSIII SILVER"],
+    "Systems": ["MS-DOS", "COMMODORE 64", "MACOS 1.0", "CLASSIC MACOS", "WINDOWS 95", "AMIGA WORKBENCH", "WINDOWS XP", "BEOS", "NEXTSTEP", "ZX SPECTRUM", "ATARI ST", "AMBER CRT", "GREEN CRT", "TELETEXT", "WINDOWS 3.1", "OS/2 WARP", "IBM 3270", "SOLARIS CDE", "RISC OS", "GEOS"]
 };
 
-let activeTheme = "CREMA";
+let activeTheme = "MOCHA";   // default color scheme (BrewBalance · Mocha)
+
+// Interface font: the user's font-picker choice (family name); '' = default Raleway.
+// A theme may carry its own era `font` which wins while that theme is active.
+let _uiFont = '';
+function _uiFontVal(name) { return `'${name || 'Poppins'}'`; }   // Poppins is the default interface font
+function applyUiFont() {
+    const themeFont = THEMES[activeTheme] && THEMES[activeTheme].font;
+    document.documentElement.style.setProperty('--ui-font', _uiFontVal(themeFont || _uiFont));
+}
+function setUiFont(name) {
+    _uiFont = name || '';
+    window.api.setSetting('ui_font', _uiFont);
+    applyUiFont();
+}
+
+// A light theme (bg luminance > 0.5) → buttons highlight with the accent on hover instead of
+// the global "invert to text_main" (which is near-black on light themes → looks broken).
+function _isLightBg(hex) {
+    try {
+        const c = String(hex).replace('#', ''); const n = c.length === 3 ? c.split('').map(x => x + x).join('') : c;
+        const [r, g, b] = [0, 2, 4].map(i => { const v = parseInt(n.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+        return (0.2126 * r + 0.7152 * g + 0.0722 * b) > 0.5;
+    } catch { return false; }
+}
 
 function applyTheme(themeName) {
     const tConfig = THEMES[themeName];
     if (!tConfig) return;
     const root = document.documentElement;
-    Object.keys(tConfig).forEach(key => root.style.setProperty(`--${key}`, tConfig[key]));
+    Object.keys(tConfig).forEach(key => { if (key !== 'font') root.style.setProperty(`--${key}`, tConfig[key]); });
     activeTheme = themeName;
+    document.body.classList.toggle('sys-xp', themeName === 'WINDOWS XP');   // light chrome text on the Luna-blue titlebar+rail
+    document.body.classList.toggle('theme-light', _isLightBg(tConfig.bg));  // accent hover instead of near-black invert
+    applyUiFont();                         // theme's era font wins; otherwise the picker's ui_font
     window.api.setSetting('cngm_theme', themeName);
     try { localStorage.setItem('cngm_theme_cache', JSON.stringify(tConfig)); } catch(e) {}
 }
@@ -10033,6 +10086,10 @@ function renderThemesInCategory(category) {
     });
 }
 
+window.api.getSetting('ui_font').then(f => {   // re-resolve --ui-font regardless of load order vs applyTheme
+    _uiFont = f || ''; applyUiFont();
+    const sel = document.getElementById('ui-font-select'); if (sel) sel.value = _uiFont || 'Poppins';
+});
 window.api.getSetting('cngm_theme').then(saved => {
     applyTheme(saved && THEMES[saved] ? saved : activeTheme);
     window.api.signalReady();

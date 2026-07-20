@@ -432,6 +432,18 @@ ipcMain.handle('get-cngm-theme', () => {
     } catch { return null; }
 });
 
+// GRINDER follows the Manager's interface font (games.db setting ui_font).
+ipcMain.handle('get-ui-font', () => {
+    const cngmDb = path.join(appImageDir, 'GameManagerConfig', 'games.db');
+    if (!fs.existsSync(cngmDb)) return null;
+    try {
+        const db2 = new Database(cngmDb, { readonly: true });
+        const row = db2.prepare("SELECT value FROM settings WHERE key='ui_font'").get();
+        db2.close();
+        return row?.value || null;
+    } catch { return null; }
+});
+
 // Environment checks
 ipcMain.handle('check-tools', () => {
     const leg   = findLegendary();

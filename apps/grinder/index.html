@@ -9,6 +9,17 @@
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Regular.ttf') format('truetype'); font-weight: 400; }
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Bold.ttf') format('truetype'); font-weight: 700; }
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Black.ttf') format('truetype'); font-weight: 900; }
+    /* Interface-font picker faces + Systems-theme era fonts (bundled locally, no remote fonts) */
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Regular.ttf') format('truetype'); font-weight: 400; }
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Bold.ttf') format('truetype'); font-weight: 700; }
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Black.ttf') format('truetype'); font-weight: 900; }
+    @font-face { font-family: 'Sora'; src: url('assets/fonts/Sora.ttf') format('truetype'); font-weight: 100 800; }
+    @font-face { font-family: 'Inter'; src: url('assets/fonts/Inter.ttf') format('truetype'); font-weight: 100 900; }
+    @font-face { font-family: 'Fraunces'; src: url('assets/fonts/Fraunces.ttf') format('truetype'); font-weight: 100 900; }
+    @font-face { font-family: 'Chicago'; src: url('assets/fonts/ChicagoFLF.ttf') format('truetype'); font-weight: 400; }
+    @font-face { font-family: 'PxPlus IBM VGA8'; src: url('assets/fonts/PxPlusIBMVGA8.ttf') format('truetype'); font-weight: 400; size-adjust: 150%; }
+    @font-face { font-family: 'C64 Pro Mono'; src: url('assets/fonts/C64ProMono.ttf') format('truetype'); font-weight: 400; }
+    @font-face { font-family: 'BigBlue Terminal'; src: url('assets/fonts/BigBlueTerminal.ttf') format('truetype'); font-weight: 400; size-adjust: 125%; }
   </style>
   <script>
     /* Apply cached theme instantly — eliminates flash */
@@ -22,14 +33,22 @@
   </script>
   <style>
     :root {
-      --bg: #1a0f0a; --bg_panel: rgba(67,40,24,0.35); --bg_menu: #2d1a10;
-      --accent: #d4813a; --accent_menu: #d4813a;
-      --text_main: #f5e8d0; --text_sec: #c4a882; --text_dim: #8B7355;
-      --border: rgba(212,129,58,0.15); --border_solid: #8B5A2B;
+      --bg: #1a1210; --bg_panel: rgba(36, 24, 19, 0.6); --bg_menu: #241813;
+      --accent: #c98a5e; --accent_menu: #c98a5e;
+      --text_main: #f0dfcf; --text_sec: #c7a98f; --text_dim: #8a6a54;
+      --border: rgba(201, 138, 94, 0.2); --border_solid: #4a3226;
+      --ui-font: 'Poppins';   /* default; follows the Manager's interface font / a theme's era font */
     }
 
+    /* Windows XP Systems theme — paint the titlebar the classic Luna blue with light text; the rest of the UI
+       uses the theme's light bg_menu so panels/text stay readable. */
+    body.sys-xp #titlebar { background: #245dda !important; border-bottom: 1px solid #16409a !important; }
+    body.sys-xp .titlebar-brand,
+    body.sys-xp .titlebar-brand span,
+    body.sys-xp .win-btn { color: #eef4ff !important; }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Raleway', sans-serif; background: var(--bg); color: var(--text_main);
+    body { font-family: var(--ui-font, 'Raleway'), sans-serif; background: var(--bg); color: var(--text_main);
            display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
     /* ── Titlebar ── */
@@ -57,13 +76,13 @@
     .nav-btn { background: transparent; border: 1px solid transparent; color: var(--text_sec);
                text-align: left; padding: 9px 10px; font-size: 11px; font-weight: 900;
                letter-spacing: 1px; text-transform: uppercase; border-radius: 5px;
-               cursor: pointer; font-family: 'Raleway', sans-serif; transition: 0.2s; }
+               cursor: pointer; font-family: var(--ui-font, 'Raleway'), sans-serif; transition: 0.2s; }
     .nav-btn:hover, .nav-btn.active { background: var(--border_solid); color: var(--text_main); border-color: var(--accent); }
 
     .sidebar-action-btn { background: transparent; border: 1px solid transparent; color: var(--text_dim);
                           text-align: left; padding: 6px 10px 6px 16px; font-size: 10px; font-weight: 900;
                           letter-spacing: 1px; text-transform: uppercase; border-radius: 5px;
-                          cursor: pointer; font-family: 'Raleway', sans-serif; transition: 0.2s; width: 100%; }
+                          cursor: pointer; font-family: var(--ui-font, 'Raleway'), sans-serif; transition: 0.2s; width: 100%; }
     .sidebar-action-btn:hover { color: var(--text_main); border-color: var(--border_solid); background: rgba(255,255,255,0.04); }
     .sidebar-action-btn:disabled { opacity: 0.5; cursor: default; }
     .sidebar-action-btn.action-epic { color: #4a9eff; }
@@ -87,10 +106,10 @@
                      border-bottom: 1px solid var(--border_solid); flex-shrink: 0; background: rgba(0,0,0,0.15); }
     #games-toolbar input { flex: 1; background: var(--bg_panel); border: 1px solid var(--border_solid);
                            color: var(--text_main); padding: 7px 12px; border-radius: 5px;
-                           font-family: 'Raleway', sans-serif; font-size: 12px; outline: none; }
+                           font-family: var(--ui-font, 'Raleway'), sans-serif; font-size: 12px; outline: none; }
     #games-toolbar input:focus { border-color: var(--accent); }
     #games-toolbar button { background: var(--accent); border: none; color: var(--bg);
-                            padding: 7px 14px; border-radius: 5px; font-family: 'Raleway', sans-serif;
+                            padding: 7px 14px; border-radius: 5px; font-family: var(--ui-font, 'Raleway'), sans-serif;
                             font-weight: 900; font-size: 11px; letter-spacing: 1px; cursor: pointer; transition: 0.2s; }
     #games-toolbar button:hover { filter: brightness(1.15); }
 
@@ -112,7 +131,7 @@
     .badge-custom { background: rgba(139,90,43,0.15); color: var(--text_dim); border: 1px solid var(--border_solid); }
 
     .store-tab { flex: 1; padding: 8px; background: transparent; border: none; border-bottom: 2px solid transparent;
-                 color: var(--text_dim); font-family: 'Raleway', sans-serif; font-weight: 900; font-size: 11px;
+                 color: var(--text_dim); font-family: var(--ui-font, 'Raleway'), sans-serif; font-weight: 900; font-size: 11px;
                  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: 0.15s; }
     .store-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .store-tab:hover:not(.active) { color: var(--text_sec); }
@@ -126,7 +145,7 @@
                        border: 1px solid var(--border_solid); letter-spacing: 0.5px; flex-shrink: 0; }
 
     .game-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .game-actions button { border: none; border-radius: 4px; padding: 4px 10px; font-family: 'Raleway', sans-serif;
+    .game-actions button { border: none; border-radius: 4px; padding: 4px 10px; font-family: var(--ui-font, 'Raleway'), sans-serif;
                            font-size: 10px; font-weight: 900; cursor: pointer; letter-spacing: 0.5px; transition: 0.15s; }
     .btn-launch    { background: var(--accent); color: var(--bg); }
     .btn-launch:hover    { filter: brightness(1.15); }
@@ -151,12 +170,12 @@
     .setting-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
     .setting-row label { font-size: 11px; font-weight: 700; color: var(--text_sec); text-transform: uppercase; letter-spacing: 1px; }
     .setting-row input { background: var(--bg_panel); border: 1px solid var(--border_solid); color: var(--text_main);
-                         padding: 8px 12px; border-radius: 5px; font-family: 'Raleway', sans-serif;
+                         padding: 8px 12px; border-radius: 5px; font-family: var(--ui-font, 'Raleway'), sans-serif;
                          font-size: 12px; outline: none; }
     .setting-row input:focus { border-color: var(--accent); }
     .setting-row p { font-size: 11px; color: var(--text_dim); line-height: 1.5; }
     .btn-save-settings { background: var(--accent); border: none; color: var(--bg); padding: 9px 20px;
-                         border-radius: 5px; font-family: 'Raleway', sans-serif; font-weight: 900;
+                         border-radius: 5px; font-family: var(--ui-font, 'Raleway'), sans-serif; font-weight: 900;
                          font-size: 12px; cursor: pointer; letter-spacing: 1.5px; text-transform: uppercase; transition: 0.2s; }
     .btn-save-settings:hover { filter: brightness(1.15); }
 
@@ -173,12 +192,12 @@
     .modal-row { display: flex; flex-direction: column; gap: 5px; }
     .modal-row label { font-size: 10px; font-weight: 900; color: var(--text_dim); text-transform: uppercase; letter-spacing: 1px; }
     .modal-row input, .modal-row select { background: var(--bg); border: 1px solid var(--border_solid); color: var(--text_main);
-                                          padding: 8px 10px; border-radius: 5px; font-family: 'Raleway', sans-serif;
+                                          padding: 8px 10px; border-radius: 5px; font-family: var(--ui-font, 'Raleway'), sans-serif;
                                           font-size: 12px; outline: none; }
     .modal-row input:focus, .modal-row select:focus { border-color: var(--accent); }
     .modal-row select option { background: var(--bg_menu); }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
-    .modal-actions button { border: none; border-radius: 5px; padding: 9px 18px; font-family: 'Raleway', sans-serif;
+    .modal-actions button { border: none; border-radius: 5px; padding: 9px 18px; font-family: var(--ui-font, 'Raleway'), sans-serif;
                             font-weight: 900; font-size: 11px; letter-spacing: 1px; cursor: pointer; transition: 0.2s; }
     .btn-confirm { background: var(--accent); color: var(--bg); text-transform: uppercase; letter-spacing: 1.5px; }
     .btn-confirm:hover { filter: brightness(1.15); }
@@ -227,7 +246,7 @@
       border-bottom: 1px solid var(--border_solid); background: rgba(0,0,0,0.12); flex-shrink: 0;
     }
     .filter-btn {
-      font-family: 'Raleway', sans-serif; font-weight: 900; font-size: 10px;
+      font-family: var(--ui-font, 'Raleway'), sans-serif; font-weight: 900; font-size: 10px;
       letter-spacing: 0.8px; text-transform: uppercase;
       padding: 3px 10px; border-radius: 12px;
       border: 1px solid var(--border_solid); background: transparent;
@@ -269,7 +288,7 @@
           <label id="install-dir-label">Install Directory</label>
           <div style="display:flex; gap:8px;">
             <input id="install-dir-input" placeholder="~/Games" style="flex:1;">
-            <button id="btn-browse-install-dir" style="flex-shrink:0; padding:8px 14px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec); border-radius:5px; cursor:pointer; font-family:Raleway,sans-serif; font-size:14px; font-weight:700;">Browse</button>
+            <button id="btn-browse-install-dir" style="flex-shrink:0; padding:8px 14px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec); border-radius:5px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif; font-size:14px; font-weight:700;">Browse</button>
           </div>
           <p id="install-dir-hint" style="font-size:14px; color:var(--text_dim); margin:4px 0 0; line-height:1.5;">The game will be installed inside a subfolder here. Make sure you have enough disk space.</p>
         </div>
@@ -301,7 +320,7 @@
           </div>
         </div>
         <div id="install-log" style="flex:1; background:rgba(0,0,0,0.5); border:1px solid var(--border_solid); border-radius:5px; padding:10px; font-family:monospace; font-size:13px; color:var(--text_sec); white-space:pre-wrap; overflow-y:auto; max-height:220px; line-height:1.6;"></div>
-        <button class="btn-danger modal-actions" id="btn-install-cancel-running" style="padding:9px 18px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;">Cancel Download</button>
+        <button class="btn-danger modal-actions" id="btn-install-cancel-running" style="padding:9px 18px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;">Cancel Download</button>
       </div>
 
       <!-- Done panel -->
@@ -333,15 +352,15 @@
             GRINDER uses <strong>legendary</strong> to manage your Epic Games library.<br>
             Log in once and your library syncs automatically.
           </p>
-          <button id="btn-epic-login" style="background:#0078f2; border:none; color:#fff; padding:10px 20px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:15px; letter-spacing:1px; cursor:pointer; width:100%; margin-bottom:10px;">Login to Epic Games</button>
+          <button id="btn-epic-login" style="background:#0078f2; border:none; color:#fff; padding:10px 20px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:15px; letter-spacing:1px; cursor:pointer; width:100%; margin-bottom:10px;">Login to Epic Games</button>
           <div id="login-output" style="display:none; background:rgba(0,0,0,0.5); border:1px solid var(--border_solid); border-radius:5px; padding:10px; font-family:monospace; font-size:14px; color:#66bb6a; white-space:pre-wrap; max-height:120px; overflow-y:auto; line-height:1.5;"></div>
         </div>
         <div id="epic-loading" style="display:none; text-align:center; padding:30px 0; color:var(--text_dim); font-size:13px; font-weight:900; letter-spacing:2px;">FETCHING LIBRARY...</div>
         <div id="import-games-panel" style="display:none; flex-direction:column; flex:1; overflow:hidden; gap:10px;">
           <div style="display:flex; align-items:center; gap:10px;">
             <span id="import-account" style="font-size:14px; color:#66bb6a; font-weight:700;"></span>
-            <button id="btn-import-select-all" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:Raleway,sans-serif;">Select All</button>
-            <button id="btn-import-select-none" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:Raleway,sans-serif;">None</button>
+            <button id="btn-import-select-all" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif;">Select All</button>
+            <button id="btn-import-select-none" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif;">None</button>
             <span id="import-sel-count" style="font-size:14px; color:var(--text_dim); margin-left:auto;"></span>
           </div>
           <div id="import-game-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px; max-height:300px;"></div>
@@ -359,15 +378,15 @@
           <p style="font-size:16px; color:var(--text_sec); margin:0 0 16px; line-height:1.65;">
             Log in with your GOG account. GRINDER fetches your library directly from the GOG API.
           </p>
-          <button id="btn-gog-login" style="background:#9b59d9; border:none; color:#fff; padding:10px 20px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:15px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; width:100%; margin-bottom:10px;">Login to GOG</button>
+          <button id="btn-gog-login" style="background:#9b59d9; border:none; color:#fff; padding:10px 20px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:15px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; width:100%; margin-bottom:10px;">Login to GOG</button>
           <div id="gog-login-output" style="display:none; background:rgba(0,0,0,0.5); border:1px solid var(--border_solid); border-radius:5px; padding:10px; font-family:monospace; font-size:14px; color:#66bb6a; white-space:pre-wrap; max-height:120px; overflow-y:auto; line-height:1.5;"></div>
         </div>
         <div id="gog-loading" style="display:none; text-align:center; padding:30px 0; color:var(--text_dim); font-size:13px; font-weight:900; letter-spacing:2px;">FETCHING LIBRARY...</div>
         <div id="gog-games-panel" style="display:none; flex-direction:column; flex:1; overflow:hidden; gap:10px;">
           <div style="display:flex; align-items:center; gap:10px;">
             <span id="gog-account" style="font-size:14px; color:#66bb6a; font-weight:700;"></span>
-            <button id="btn-gog-select-all" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:Raleway,sans-serif;">Select All</button>
-            <button id="btn-gog-select-none" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:Raleway,sans-serif;">None</button>
+            <button id="btn-gog-select-all" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif;">Select All</button>
+            <button id="btn-gog-select-none" style="font-size:13px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_sec); border-radius:3px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif;">None</button>
             <span id="gog-sel-count" style="font-size:14px; color:var(--text_dim); margin-left:auto;"></span>
           </div>
           <div id="gog-game-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px; max-height:300px;"></div>
@@ -484,14 +503,14 @@
       <!-- GOG Compat Files (GOG only) -->
       <div id="edit-gog-compat" style="display:none; border-top:1px solid var(--border_solid); padding-top:14px; flex-direction:column; gap:8px;">
         <span style="font-size:10px; font-weight:900; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px;">GOG Compatibility</span>
-        <button id="btn-install-redist" style="background:rgba(155,89,217,0.15); border:1px solid #9b59d9; color:#c792ea; padding:9px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; align-self:flex-start; transition:0.2s;" title="Download and install GOG compatibility files (VC++, DirectX, etc.) into this game's Wine prefix">Install Compat. Files</button>
+        <button id="btn-install-redist" style="background:rgba(155,89,217,0.15); border:1px solid #9b59d9; color:#c792ea; padding:9px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; align-self:flex-start; transition:0.2s;" title="Download and install GOG compatibility files (VC++, DirectX, etc.) into this game's Wine prefix">Install Compat. Files</button>
         <span style="font-size:11px; color:var(--text_dim); line-height:1.5;">Downloads and runs GOG redistribs (VC++, DirectX, etc.) into this game's Wine prefix via gogdl.</span>
       </div>
 
       <!-- Verify & Repair (GOG and Epic only) -->
       <div id="edit-verify-repair" style="display:none; border-top:1px solid var(--border_solid); padding-top:14px; flex-direction:column; gap:8px;">
         <span style="font-size:10px; font-weight:900; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px;">Integrity</span>
-        <button id="btn-verify-repair" style="background:rgba(33,150,243,0.12); border:1px solid rgba(33,150,243,0.4); color:#64b5f6; padding:9px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; align-self:flex-start; transition:0.2s;" title="Check all game files against the store manifest and re-download anything missing or corrupted">Verify &amp; Repair</button>
+        <button id="btn-verify-repair" style="background:rgba(33,150,243,0.12); border:1px solid rgba(33,150,243,0.4); color:#64b5f6; padding:9px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; align-self:flex-start; transition:0.2s;" title="Check all game files against the store manifest and re-download anything missing or corrupted">Verify &amp; Repair</button>
         <span style="font-size:11px; color:var(--text_dim); line-height:1.5;">Checks all files against the store manifest and re-downloads anything missing or corrupted. Requires an active store login.</span>
       </div>
 
@@ -499,7 +518,7 @@
       <div id="edit-achievements" style="display:none; border-top:1px solid var(--border_solid); padding-top:14px; flex-direction:column; gap:10px;">
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="font-size:10px; font-weight:900; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px; flex:1;">Achievements</span>
-          <button id="btn-sync-achievements" style="background:rgba(101,180,101,0.12); border:1px solid rgba(101,180,101,0.4); color:#82c882; padding:6px 13px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:11px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:0.2s;">Sync Now</button>
+          <button id="btn-sync-achievements" style="background:rgba(101,180,101,0.12); border:1px solid rgba(101,180,101,0.4); color:#82c882; padding:6px 13px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:11px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:0.2s;">Sync Now</button>
         </div>
         <div id="achievements-status" style="font-size:11px; color:var(--text_dim); font-style:italic; display:none;"></div>
         <div id="achievements-summary" style="font-size:12px; color:var(--text_sec); display:none;"></div>
@@ -579,8 +598,8 @@
       <div id="view-games">
         <div id="games-toolbar">
           <input id="search-input" placeholder="Search games..." autocomplete="off">
-          <button id="btn-verify-installs" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_dim); padding:7px 14px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.2s;" title="Check all installed games and reset any with missing files">Refresh &amp; Check Size</button>
-          <button id="btn-open-dlm" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_dim); padding:7px 14px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.2s;" title="Download Manager &amp; Install Log">Downloads</button>
+          <button id="btn-verify-installs" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_dim); padding:7px 14px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.2s;" title="Check all installed games and reset any with missing files">Refresh &amp; Check Size</button>
+          <button id="btn-open-dlm" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_dim); padding:7px 14px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.2s;" title="Download Manager &amp; Install Log">Downloads</button>
         </div>
         <div id="filter-bar"></div>
         <div id="games-list"></div>
@@ -604,16 +623,16 @@
         <div class="settings-section">
           <h3>Epic Games (Legendary)</h3>
           <div id="s-legendary-status" style="font-size:15px; color:var(--text_sec); margin-bottom:10px;">Checking...</div>
-          <button id="btn-s-epic-login" style="display:none; background:#0078f2; border:none; color:#fff; padding:8px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Login to Epic</button>
-          <button id="btn-s-epic-logout" style="display:none; background:rgba(198,40,40,0.12); border:1px solid #c62828; color:#ef5350; padding:8px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Logout</button>
+          <button id="btn-s-epic-login" style="display:none; background:#0078f2; border:none; color:#fff; padding:8px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Login to Epic</button>
+          <button id="btn-s-epic-logout" style="display:none; background:rgba(198,40,40,0.12); border:1px solid #c62828; color:#ef5350; padding:8px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Logout</button>
         </div>
 
         <div class="settings-section">
           <h3>GOG</h3>
           <div id="s-gog-status" style="font-size:15px; color:var(--text_sec); margin-bottom:10px;">Checking...</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="btn-s-gog-login" style="display:none; background:#9b59d9; border:none; color:#fff; padding:8px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1px;">Login to GOG</button>
-            <button id="btn-s-gog-logout" style="display:none; background:rgba(198,40,40,0.12); border:1px solid #c62828; color:#ef5350; padding:8px 16px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Logout</button>
+            <button id="btn-s-gog-login" style="display:none; background:#9b59d9; border:none; color:#fff; padding:8px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1px;">Login to GOG</button>
+            <button id="btn-s-gog-logout" style="display:none; background:rgba(198,40,40,0.12); border:1px solid #c62828; color:#ef5350; padding:8px 16px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:14px; cursor:pointer; letter-spacing:1.5px; text-transform:uppercase;">Logout</button>
           </div>
           <div id="s-gogdl-status" style="font-size:14px; margin-top:4px;"></div>
         </div>
@@ -630,7 +649,7 @@
           <h3>Install GE-Proton</h3>
           <p style="font-size:14px; color:var(--text_dim); margin-bottom:12px; line-height:1.6;">Download and install GE-Proton directly from the <strong style="color:var(--text_sec)">GloriousEggroll</strong> GitHub releases. Installs to <code style="font-size:13px;background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">compatibilitytools.d</code> and is immediately available in the Proton scanner above.</p>
           <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-            <select id="proton-dl-select" style="flex:1; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); padding:7px 10px; border-radius:5px; font-family:Raleway,sans-serif; font-size:14px; cursor:pointer;">
+            <select id="proton-dl-select" style="flex:1; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); padding:7px 10px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-size:14px; cursor:pointer;">
               <option value="">— Load versions —</option>
             </select>
             <button class="btn-save-settings" id="btn-proton-dl-load" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_sec); white-space:nowrap;">Fetch Versions</button>
@@ -642,7 +661,7 @@
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span id="proton-dl-msg" style="font-size:13px; color:var(--text_sec); font-family:monospace;"></span>
-              <button id="btn-proton-dl-cancel" style="font-size:12px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_dim); border-radius:3px; cursor:pointer; font-family:Raleway,sans-serif;">Cancel</button>
+              <button id="btn-proton-dl-cancel" style="font-size:12px; padding:3px 10px; border:1px solid var(--border_solid); background:transparent; color:var(--text_dim); border-radius:3px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif;">Cancel</button>
             </div>
           </div>
           <div id="proton-dl-status" style="font-size:13px; min-height:16px; margin-top:4px;"></div>
@@ -748,7 +767,7 @@
           <button id="btn-afolder-browse" class="btn-cancel" style="padding:8px 12px; font-size:12px; white-space:nowrap; flex-shrink:0;">Browse</button>
         </div>
         <div style="margin-top:10px;">
-          <button id="btn-afolder-scan" style="background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:5px; padding:7px 18px; font-family:Raleway,sans-serif; font-weight:900; font-size:10px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:0.15s;">Scan Folder</button>
+          <button id="btn-afolder-scan" style="background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:5px; padding:7px 18px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:10px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:0.15s;">Scan Folder</button>
         </div>
       </div>
 
@@ -802,7 +821,7 @@
                 <div id="dlm-active-store" style="font-size:9px; font-weight:900; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;"></div>
                 <div id="dlm-active-title" style="font-size:18px; font-weight:900; color:var(--text_main); letter-spacing:0.3px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
               </div>
-              <button id="dlm-btn-cancel-active" style="flex-shrink:0; padding:6px 14px; background:rgba(239,83,80,0.1); border:1px solid #ef5350; color:#ef5350; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.15s; white-space:nowrap;">Cancel</button>
+              <button id="dlm-btn-cancel-active" style="flex-shrink:0; padding:6px 14px; background:rgba(239,83,80,0.1); border:1px solid #ef5350; color:#ef5350; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:900; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.15s; white-space:nowrap;">Cancel</button>
             </div>
             <!-- Progress bar -->
             <div style="width:100%; background:rgba(0,0,0,0.5); border-radius:5px; height:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); margin-bottom:12px;">
@@ -832,7 +851,7 @@
         <div id="dlm-history-section" style="display:none; flex-direction:column; gap:8px;">
           <div style="display:flex; align-items:center; justify-content:space-between;">
             <div style="font-size:9px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase;">Completed</div>
-            <button id="dlm-btn-clear-all" style="font-size:9px; font-weight:900; color:var(--text_dim); background:transparent; border:1px solid var(--border_solid); border-radius:4px; padding:3px 10px; cursor:pointer; font-family:Raleway,sans-serif; letter-spacing:1.5px; text-transform:uppercase; transition:0.15s;">Clear All</button>
+            <button id="dlm-btn-clear-all" style="font-size:9px; font-weight:900; color:var(--text_dim); background:transparent; border:1px solid var(--border_solid); border-radius:4px; padding:3px 10px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif; letter-spacing:1.5px; text-transform:uppercase; transition:0.15s;">Clear All</button>
           </div>
           <div id="dlm-history-list" style="display:flex; flex-direction:column; gap:4px;"></div>
         </div>
@@ -857,7 +876,7 @@
           <div id="log-modal-title" style="font-size:16px; font-weight:900; color:var(--text_main); letter-spacing:0.5px;"></div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button id="btn-log-copy" style="background:rgba(255,255,255,0.06); border:1px solid var(--border_solid); color:var(--text_sec); padding:6px 14px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:700; font-size:12px; letter-spacing:1px; cursor:pointer; text-transform:uppercase;">Copy</button>
+          <button id="btn-log-copy" style="background:rgba(255,255,255,0.06); border:1px solid var(--border_solid); color:var(--text_sec); padding:6px 14px; border-radius:5px; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:700; font-size:12px; letter-spacing:1px; cursor:pointer; text-transform:uppercase;">Copy</button>
           <button id="btn-log-close" style="background:transparent; border:none; color:var(--text_dim); font-size:20px; cursor:pointer; padding:4px 8px; line-height:1;">✕</button>
         </div>
       </div>

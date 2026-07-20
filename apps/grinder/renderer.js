@@ -79,12 +79,33 @@ const CNGM_THEMES = {
     "MOCHA": {bg: "#1a1210", bg_panel: "rgba(36, 24, 19, 0.6)", bg_menu: "#241813", accent: "#c98a5e", accent_menu: "#c98a5e", text_main: "#f0dfcf", text_sec: "#c7a98f", text_dim: "#8a6a54", border: "rgba(201, 138, 94, 0.2)", border_solid: "#4a3226"},
     "FLAT WHITE": {bg: "#f6f1e9", bg_panel: "rgba(253, 250, 244, 0.75)", bg_menu: "#fdfaf4", accent: "#8a5a2b", accent_menu: "#8a5a2b", text_main: "#33291f", text_sec: "#6b5a48", text_dim: "#a4917a", border: "rgba(138, 90, 43, 0.12)", border_solid: "#e0d4c0"},
     "MATCHA": {bg: "#12160f", bg_panel: "rgba(26, 32, 21, 0.6)", bg_menu: "#1a2015", accent: "#9bbf6b", accent_menu: "#9bbf6b", text_main: "#e6efd8", text_sec: "#b3c79b", text_dim: "#6d8556", border: "rgba(155, 191, 107, 0.2)", border_solid: "#33422a"},
+
+    "MS-DOS": {bg: "#0a0a0a", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffffff", accent_menu: "#ffffff", text_main: "#d2d2d2", text_sec: "#a2a2a2", text_dim: "#7e7e7e", border: "rgba(255, 255, 255, 0.25)", border_solid: "#4a4a4a", font: 'PxPlus IBM VGA8'},
+    "COMMODORE 64": {bg: "#0000aa", bg_panel: "rgba(0, 0, 170, 0.6)", bg_menu: "#0000aa", accent: "#b9b6ff", accent_menu: "#b9b6ff", text_main: "#d0ccff", text_sec: "#9e9beb", text_dim: "#7976db", border: "rgba(185, 182, 255, 0.25)", border_solid: "#4341c5", font: 'C64 Pro Mono'},
+    "MACOS 1.0": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
+    "CLASSIC MACOS": {bg: "#cfcfcf", bg_panel: "rgba(228, 228, 228, 0.6)", bg_menu: "#e4e4e4", accent: "#2b2b9c", accent_menu: "#2b2b9c", text_main: "#000000", text_sec: "#323232", text_dim: "#575757", border: "rgba(43, 43, 156, 0.25)", border_solid: "#8d8d8d", font: 'Chicago'},
+    "WINDOWS 95": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+    "AMIGA WORKBENCH": {bg: "#a6a6a6", bg_panel: "rgba(178, 178, 178, 0.6)", bg_menu: "#b2b2b2", accent: "#2b5db0", accent_menu: "#2b5db0", text_main: "#000000", text_sec: "#282828", text_dim: "#464646", border: "rgba(43, 93, 176, 0.25)", border_solid: "#717171", font: 'BigBlue Terminal'},
+    "WINDOWS XP": {bg: "#ece9d8", bg_panel: "rgba(244, 243, 239, 0.6)", bg_menu: "#f4f3ef", accent: "#2f6fd6", accent_menu: "#2f6fd6", text_main: "#000000", text_sec: "#393834", text_dim: "#63625b", border: "rgba(47, 111, 214, 0.25)", border_solid: "#a09e93", font: 'Inter'},
+    "BEOS": {bg: "#d8d8d0", bg_panel: "rgba(234, 234, 226, 0.6)", bg_menu: "#eaeae2", accent: "#2855b0", accent_menu: "#2855b0", text_main: "#000000", text_sec: "#343432", text_dim: "#5b5b57", border: "rgba(40, 85, 176, 0.25)", border_solid: "#93938d", font: 'Inter'},
+    "NEXTSTEP": {bg: "#dedede", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#26408b", accent_menu: "#26408b", text_main: "#000000", text_sec: "#353535", text_dim: "#5d5d5d", border: "rgba(38, 64, 139, 0.25)", border_solid: "#979797", font: 'Inter'},
+    "ZX SPECTRUM": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#00d8d8", accent_menu: "#00d8d8", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(0, 216, 216, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+    "ATARI ST": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#007000", accent_menu: "#007000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 112, 0, 0.25)", border_solid: "#adadad", font: 'PxPlus IBM VGA8'},
+    "AMBER CRT": {bg: "#140d00", bg_panel: "rgba(20, 13, 0, 0.6)", bg_menu: "#140d00", accent: "#ffcc44", accent_menu: "#ffcc44", text_main: "#ffb000", text_sec: "#c78900", text_dim: "#9c6c00", border: "rgba(255, 204, 68, 0.25)", border_solid: "#5f4100", font: 'PxPlus IBM VGA8'},
+    "GREEN CRT": {bg: "#001400", bg_panel: "rgba(0, 20, 0, 0.6)", bg_menu: "#001400", accent: "#7dff9e", accent_menu: "#7dff9e", text_main: "#37ff6a", text_sec: "#2ac751", text_dim: "#209c3d", border: "rgba(125, 255, 158, 0.25)", border_solid: "#125f22", font: 'PxPlus IBM VGA8'},
+    "TELETEXT": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffff00", accent_menu: "#ffff00", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(255, 255, 0, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+    "WINDOWS 3.1": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+    "OS/2 WARP": {bg: "#cececa", bg_panel: "rgba(214, 214, 208, 0.6)", bg_menu: "#d6d6d0", accent: "#00337f", accent_menu: "#00337f", text_main: "#000000", text_sec: "#313130", text_dim: "#575755", border: "rgba(0, 51, 127, 0.25)", border_solid: "#8c8c89", font: 'Inter'},
+    "IBM 3270": {bg: "#051005", bg_panel: "rgba(5, 16, 5, 0.6)", bg_menu: "#051005", accent: "#66ff66", accent_menu: "#66ff66", text_main: "#33cc33", text_sec: "#289f28", text_dim: "#207d20", border: "rgba(102, 255, 102, 0.25)", border_solid: "#144c14", font: 'BigBlue Terminal'},
+    "SOLARIS CDE": {bg: "#aeb6c2", bg_panel: "rgba(188, 196, 208, 0.6)", bg_menu: "#bcc4d0", accent: "#33518a", accent_menu: "#33518a", text_main: "#000000", text_sec: "#2a2c2f", text_dim: "#494c51", border: "rgba(51, 81, 138, 0.25)", border_solid: "#767c84", font: 'Inter'},
+    "RISC OS": {bg: "#d7d7c8", bg_panel: "rgba(232, 232, 220, 0.6)", bg_menu: "#e8e8dc", accent: "#005a9c", accent_menu: "#005a9c", text_main: "#000000", text_sec: "#343430", text_dim: "#5a5a54", border: "rgba(0, 90, 156, 0.25)", border_solid: "#929288", font: 'Inter'},
+    "GEOS": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
 };
 
-window.api.getCngmTheme().then(name => {
-    const t = name && CNGM_THEMES[name];
+Promise.all([window.api.getCngmTheme(), window.api.getUiFont()]).then(([name, uiFont]) => {
+    const t = (name && CNGM_THEMES[name]) || CNGM_THEMES['MOCHA'];   // default color scheme (BrewBalance · Mocha)
+    const s = document.documentElement.style;
     if (t) {
-        const s = document.documentElement.style;
         s.setProperty('--bg',           t.bg);
         s.setProperty('--bg_panel',     t.bg_panel);
         s.setProperty('--bg_menu',      t.bg_menu);
@@ -95,6 +116,9 @@ window.api.getCngmTheme().then(name => {
         s.setProperty('--border',       t.border);
         s.setProperty('--border_solid', t.border_solid);
     }
+    // Follow the Manager's interface font; a theme's own era font wins while active.
+    s.setProperty('--ui-font', `'${(t && t.font) || uiFont || 'Poppins'}'`);
+    document.body.classList.toggle('sys-xp', name === 'WINDOWS XP');   // light titlebar text on the Luna-blue chrome
     window.api.signalReady();
 });
 
@@ -236,8 +260,8 @@ function renderGames(games) {
                 <span class="game-title">${g.title}</span>
                 <div class="game-actions">
                     ${g.installed  ? `<button class="btn-launch" data-launch="${g.id}">▶ Launch</button>` : ''}
-                    ${!g.installed && g.store === 'epic' ? `<button class="btn-install-game" data-install="${g.id}" style="background:#0078f2;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:Raleway,sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
-                    ${!g.installed && g.store === 'gog'  ? `<button class="btn-install-game" data-install="${g.id}" style="background:#9b59d9;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:Raleway,sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
+                    ${!g.installed && g.store === 'epic' ? `<button class="btn-install-game" data-install="${g.id}" style="background:#0078f2;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:var(--ui-font,Raleway),sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
+                    ${!g.installed && g.store === 'gog'  ? `<button class="btn-install-game" data-install="${g.id}" style="background:#9b59d9;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:var(--ui-font,Raleway),sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
                     <button class="btn-edit" data-edit="${g.id}">Edit</button>
                     ${_logIndex.has(g.id) ? `<button class="btn-see-log" data-see-log="${g.id}">See Log</button>` : ''}
                     ${g.installed ? `<button class="btn-uninstall" data-uninstall="${g.id}">Uninstall</button>` : ''}
@@ -617,7 +641,7 @@ function renderAfolderResults(libraryMatches, detected) {
         const exeOpts = exes.length > 0
             ? `<div class="modal-row" style="margin:10px 0 0;">
                 <label>Executable <span style="font-size:11px; font-weight:400; color:var(--text_dim);">(relative to folder)</span></label>
-                <select id="afolder-exe-sel" style="background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:5px; padding:7px 10px; font-family:Raleway,sans-serif; font-size:13px; width:100%;">
+                <select id="afolder-exe-sel" style="background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:5px; padding:7px 10px; font-family:var(--ui-font,Raleway),sans-serif; font-size:13px; width:100%;">
                     <option value="">Leave blank — set later</option>
                     ${exes.map(e => `<option value="${e}" ${e === exes[0] ? 'selected' : ''}>${e}</option>`).join('')}
                 </select>
@@ -1085,7 +1109,7 @@ async function beginRepair(game) {
     cancelBtn.disabled    = false;
     cancelBtn.textContent = 'Cancel';
     cancelBtn.className   = 'btn-danger modal-actions';
-    cancelBtn.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
+    cancelBtn.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
     cancelBtn.onclick = null;
 
     if (!installModalMinimized) modalInstall.classList.add('active');
@@ -1114,7 +1138,7 @@ async function beginRepair(game) {
         const cb = document.getElementById('btn-install-cancel-running');
         cb.textContent  = 'Close';
         cb.className    = 'btn-cancel';
-        cb.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
+        cb.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
         cb.onclick = closeInstallModal;
         setStatus(`Repair of ${game.title} failed.`);
         activeInstallGame = null;
@@ -1306,7 +1330,7 @@ function renderDlmModal() {
                     <div style="font-size:13px; font-weight:700; color:var(--text_sec); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.game.title}</div>
                     <div style="font-size:10px; color:${sc}; margin-top:2px; letter-spacing:0.5px; font-weight:700;">${sl} · Waiting</div>
                 </div>
-                <button class="btn-dlm-cancel-queue" data-idx="${idx}" style="flex-shrink:0; padding:4px 10px; background:rgba(255,255,255,0.04); border:1px solid var(--border_solid); color:var(--text_dim); border-radius:4px; font-family:Raleway,sans-serif; font-weight:900; font-size:10px; letter-spacing:1px; cursor:pointer; text-transform:uppercase; transition:0.15s;">✕ Remove</button>
+                <button class="btn-dlm-cancel-queue" data-idx="${idx}" style="flex-shrink:0; padding:4px 10px; background:rgba(255,255,255,0.04); border:1px solid var(--border_solid); color:var(--text_dim); border-radius:4px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:10px; letter-spacing:1px; cursor:pointer; text-transform:uppercase; transition:0.15s;">✕ Remove</button>
             </div>`;
         }).join('');
         list.querySelectorAll('.btn-dlm-cancel-queue').forEach(btn => {
@@ -1340,7 +1364,7 @@ function renderDlmModal() {
                         <span style="font-size:10px; color:${col}; font-weight:700; letter-spacing:0.5px;">· ${statusText}</span>
                     </div>
                 </div>
-                <button class="btn-dlm-remove-history" data-idx="${idx}" style="flex-shrink:0; padding:4px 8px; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim); border-radius:4px; font-family:Raleway,sans-serif; font-weight:900; font-size:10px; cursor:pointer; transition:0.15s;" title="Remove from history">✕</button>
+                <button class="btn-dlm-remove-history" data-idx="${idx}" style="flex-shrink:0; padding:4px 8px; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim); border-radius:4px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:10px; cursor:pointer; transition:0.15s;" title="Remove from history">✕</button>
             </div>`;
         }).join('');
         list.querySelectorAll('.btn-dlm-remove-history').forEach(btn => {
@@ -1569,7 +1593,7 @@ async function beginInstall(game, dir, platform) {
     cancelBtn.disabled    = false;
     cancelBtn.textContent = 'Cancel Download';
     cancelBtn.className   = 'btn-danger modal-actions';
-    cancelBtn.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
+    cancelBtn.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
     cancelBtn.onclick = null;
 
     updateInstallQueueBadge();
@@ -1657,7 +1681,7 @@ async function beginInstall(game, dir, platform) {
         const cb = document.getElementById('btn-install-cancel-running');
         cb.textContent = 'Close';
         cb.className   = 'btn-cancel';
-        cb.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:Raleway,sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
+        cb.style.cssText = 'padding:9px 18px; border-radius:5px; font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:14px; cursor:pointer; align-self:flex-start;';
         cb.onclick = closeInstallModal;
         setStatus(`Installation of ${game.title} failed.`);
         activeInstallGame = null;
@@ -2068,14 +2092,14 @@ function renderProtonList(versions) {
     container.innerHTML = versions.map(v => {
         const canDelete = v.path.includes('compatibilitytools.d');
         const delBtn = canDelete
-            ? `<button onclick="deleteProton('${v.path.replace(/'/g, "\\'")}')" style="font-size:10px;font-weight:900;padding:3px 8px;border:1px solid #c62828;background:rgba(198,40,40,0.10);color:#ef5350;border-radius:3px;cursor:pointer;font-family:Raleway,sans-serif;" title="Uninstall this Proton version">Delete</button>`
+            ? `<button onclick="deleteProton('${v.path.replace(/'/g, "\\'")}')" style="font-size:10px;font-weight:900;padding:3px 8px;border:1px solid #c62828;background:rgba(198,40,40,0.10);color:#ef5350;border-radius:3px;cursor:pointer;font-family:var(--ui-font,Raleway),sans-serif;" title="Uninstall this Proton version">Delete</button>`
             : '';
         return `
         <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:5px;border:1px solid var(--border_solid);">
             <span style="font-size:10px;font-weight:900;color:var(--accent);min-width:80px;">${TYPE_LABEL[v.type] ?? v.type}</span>
             <span style="flex:1;font-size:12px;color:var(--text_main);">${v.name}</span>
             <span style="font-size:10px;color:var(--text_dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;" title="${v.path}">${v.path}</span>
-            <button onclick="setDefaultProton('${v.path.replace(/'/g, "\\'")}')" style="font-size:10px;font-weight:900;padding:3px 8px;border:1px solid var(--border_solid);background:transparent;color:var(--text_sec);border-radius:3px;cursor:pointer;font-family:Raleway,sans-serif;${v.path===defaultPath?'border-color:var(--accent);color:var(--accent);':''}">${v.path===defaultPath?'✓ Default':'Set Default'}</button>
+            <button onclick="setDefaultProton('${v.path.replace(/'/g, "\\'")}')" style="font-size:10px;font-weight:900;padding:3px 8px;border:1px solid var(--border_solid);background:transparent;color:var(--text_sec);border-radius:3px;cursor:pointer;font-family:var(--ui-font,Raleway),sans-serif;${v.path===defaultPath?'border-color:var(--accent);color:var(--accent);':''}">${v.path===defaultPath?'✓ Default':'Set Default'}</button>
             ${delBtn}
         </div>`;
     }).join('');
