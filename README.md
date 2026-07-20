@@ -1,6 +1,6 @@
 <div align="center">
 
-# ☕ Cafe Neurotico
+# Cafe Neurotico
 
 ### *your Linux game library, brewed into one app*
 
@@ -30,7 +30,7 @@ cafeneurotico@linux:~$ ./brew
 
 ---
 
-## ☕ Today's brew — one shot, three notes
+## Today's brew — one shot, three notes
 
 | | | |
 |---|---|---|
@@ -43,7 +43,7 @@ Three apps that used to ship separately are now **one Electron binary with three
 [GRINDER](https://github.com/shampoo-is-a-lie/GRINDER) ·
 [CREMA](https://github.com/shampoo-is-a-lie/CREMA).
 
-## 🫖 The three faces
+## The three faces
 
 | Pour it like this | …and you get |
 |-------------------|--------------|
@@ -53,7 +53,7 @@ Three apps that used to ship separately are now **one Electron binary with three
 
 All three read and write the **same database**. Favourite a game on the couch, it's favourited on the desktop.
 
-## 🍩 What's in the cup
+## What's in the cup
 
 **One library, every store.** Steam (API + a local scan that catches the free games and demos Steam's API hides), GOG and Epic (signed in from inside the app — no browser dance, no external launcher), Flatpak, itch.io, PICO-8, emulators, and anything else you can start from a command line. Refresh adds new purchases *and* removes what you refunded.
 
@@ -71,13 +71,15 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 **Local-only, portable, backupable.** Everything lives in a `GameManagerConfig` folder next to the AppImage. Put it on a thumb drive, take your library to another machine. No account, no telemetry, no cloud.
 
-## 🍪 The rest of the ecosystem
+## The rest of the ecosystem
 
-**[EmuLatte](https://github.com/shampoo-is-a-lie/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up, adds it to the app menu and the icon rail, and shows your ROM library under an **Emulation** category in both the Manager and CREMA. Management stays in EmuLatte — the suite only reads.
+**[EmuLatte](https://github.com/shampoo-is-a-lie/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up and adds it to the app menu and the icon rail.
+
+Your ROM library stays in EmuLatte — Cafe Neurotico doesn't absorb it. You choose which games cross over by **exporting them to Cafe Neurotico from inside EmuLatte**, and only those arrive, as ordinary library entries filed under **Emulation** that play and scrape like anything else. Curate the collection in EmuLatte; promote the handful you actually want on the shelf.
 
 **[CafeNeuroticoClock](https://github.com/shampoo-is-a-lie/CafeNeuroticoClock)** — a desk clock that runs a slideshow of your library's art.
 
-## 🔧 Grind your own
+## Grind your own
 
 ```sh
 git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
@@ -103,17 +105,17 @@ cafeneurotico/
 
 **Requirements:** a 64-bit Linux desktop, and FUSE for the AppImage. The Steam import needs a free Steam API key; SteamGridDB and IGDB scraping need their own free keys. Everything else works out of the box.
 
-## 📖 Documentation
+## Documentation
 
 The full manual ships **inside the app** — 22 searchable sections under Menu → Manual, covering every face, the complete CREMA control reference, save backups and troubleshooting.
 
-## ☕ Tip the barista
+## Tip the barista
 
 If Cafe Neurotico organized your gaming life, consider buying me a coffee — it keeps the pot warm.
 **"more caffeine is `more good`."**
 
-- ☕ **Ko-fi (Intl):** <https://ko-fi.com/cafeneurotico>
-- 🇧🇷 **PIX (Brazil):** `b734a9e2-e479-42f9-abd6-c88d1b8b880e`
+- **Ko-fi (Intl):** <https://ko-fi.com/cafeneurotico>
+- **PIX (Brazil):** `b734a9e2-e479-42f9-abd6-c88d1b8b880e`
 
 If you do, [let me know](mailto:shampooisalie@gmail.com) so I can thank you personally! :)
 
