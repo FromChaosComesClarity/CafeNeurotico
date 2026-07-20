@@ -4,10 +4,14 @@
 
 ### *your Linux game library, brewed into one app*
 
-![status](https://img.shields.io/badge/status-brewing-ffb000?style=flat-square)
+![version](https://img.shields.io/badge/version-1.0.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
+
+**[Download the AppImage](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/latest)** ·
+[Website](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/) ·
+[Support](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/support.html)
 
 </div>
 
@@ -20,8 +24,8 @@ cafeneurotico@linux:~$ ./brew
 [ ok ] pouring fullscreen interface.... CREMA
 [ ok ] blending into one shot.......... done
 
-▓▓ CAFE NEUROTICO ▓▓
-> three faces, one binary. brewing…
+▓▓ CAFE NEUROTICO 1.0 ▓▓
+> three faces, one binary. served.
 ```
 
 ---
@@ -30,7 +34,7 @@ cafeneurotico@linux:~$ ./brew
 
 | | | |
 |---|---|---|
-| **Manager** | your whole Linux game library, one shelf | *(formerly CNGM)* |
+| **The Manager** | your whole Linux game library, one shelf | *(formerly CNGM)* |
 | **GRINDER** | roasts & installs your GOG / Epic games | *the robot barista* |
 | **CREMA** | the fullscreen, gamepad-first crema on top | *the bon vivant* |
 
@@ -43,31 +47,65 @@ Three apps that used to ship separately are now **one Electron binary with three
 
 | Pour it like this | …and you get |
 |-------------------|--------------|
-| `cafeneurotico` | **Manager** — windowed library hub |
+| `cafeneurotico` | **The Manager** — windowed library hub |
 | `cafeneurotico grinder <cmd>` | **GRINDER** — GOG/Epic install/launch engine (+ GUI) |
 | `cafeneurotico --crema` | **CREMA** — fullscreen, gamepad interface |
 
-```
-cafeneurotico/
-├── main.js          # single Electron entry — argv dispatch + window factory
-├── packages/core/   # shared engine + IPC (db, metadata, grinder, trailers, settings)
-└── apps/
-    ├── manager/     # Manager face
-    ├── grinder/     # GRINDER engine + GUI
-    └── crema/       # CREMA fullscreen face
-```
+All three read and write the **same database**. Favourite a game on the couch, it's favourited on the desktop.
+
+## 🍩 What's in the cup
+
+**One library, every store.** Steam (API + a local scan that catches the free games and demos Steam's API hides), GOG and Epic (signed in from inside the app — no browser dance, no external launcher), Flatpak, itch.io, PICO-8, emulators, and anything else you can start from a command line. Refresh adds new purchases *and* removes what you refunded.
+
+**Install and launch, in-process.** GOG and Epic games download through the built-in GRINDER engine with live progress, a queue, disk-space checks, and a Linux-or-Windows build choice for the games that ship both. Per-game Proton version, prefix, winetricks and env vars when you want them; a verbose **Play with Log** window when a game refuses to start.
+
+**Artwork that stays put.** Covers, hero art, logos, screenshots, descriptions, HowLongToBeat, Metacritic and ProtonDB tiers, scraped from Steam, SteamGridDB and IGDB and stored **locally**. No link rot when a storefront changes its API. Trailers download as real MP4 files.
+
+**Save games, handled honestly.** Locate → zip → restore, for installed GOG and Epic games. Backups are portable ZIPs with a manifest, so one made on your desktop restores correctly on your laptop. A snapshot is taken before every restore. Nothing is uploaded anywhere.
+
+**A living-room mode that isn't an afterthought.** CREMA is fullscreen, gamepad-first, TV-typography: carousel or grid start screen, immersive or classic gamepages, achievements, a jukebox for your own music, an on-screen keyboard, and a screensaver built from your own screenshots.
+
+**92 themes across 10 families** — Catppuccin, Gruvbox, Nord, Dracula, Game Boy, Pip-Boy, BrewBalance, and twenty faithful retro-OS palettes (MS-DOS, Commodore 64, Amiga Workbench, BeOS, NeXTSTEP, Windows 3.1/95/XP, ZX Spectrum, Teletext…) each with its own era typeface. Plus six bundled interface fonts. Shared by all three faces.
+
+**A dashboard if you want one.** An optional drag-and-drop widget board: roulette, backlog weight, throwback, achievement completion, disk footprint, and strictly opt-in online widgets (deals, Epic freebies, RSS gaming news, Steam patch notes) that make **zero network calls until you enable them**.
+
+**Local-only, portable, backupable.** Everything lives in a `GameManagerConfig` folder next to the AppImage. Put it on a thumb drive, take your library to another machine. No account, no telemetry, no cloud.
+
+## 🍪 The rest of the ecosystem
+
+**[EmuLatte](https://github.com/shampoo-is-a-lie/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up, adds it to the app menu and the icon rail, and shows your ROM library under an **Emulation** category in both the Manager and CREMA. Management stays in EmuLatte — the suite only reads.
+
+**[CafeNeuroticoClock](https://github.com/shampoo-is-a-lie/CafeNeuroticoClock)** — a desk clock that runs a slideshow of your library's art.
 
 ## 🔧 Grind your own
 
 ```sh
+git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
+cd CafeNeurotico
 npm install          # deps + rebuilds better-sqlite3; pulls the helper binaries (GitHub Release)
 npm start            # run the Manager face
 npm run start:crema  # run the CREMA face
 npm run dist         # build CafeNeurotico.AppImage
 ```
 
-> Helper binaries (ffmpeg / yt-dlp / gogdl / legendary / comet) and CREMA's wallpaper pack
-> are fetched from this repo's GitHub Releases — keeping the repo and the AppImage lean.
+```
+cafeneurotico/
+├── main.js          # single Electron entry — argv dispatch + window factory
+├── packages/core/   # shared engine + IPC (db, metadata, grinder, trailers, settings)
+└── apps/
+    ├── manager/     # The Manager face
+    ├── grinder/     # GRINDER engine + GUI
+    └── crema/       # CREMA fullscreen face
+```
+
+> Helper binaries (ffmpeg / yt-dlp / gogdl / legendary / comet) are fetched from this repo's
+> GitHub Releases — keeping the repo and the AppImage lean.
+
+**Requirements:** a 64-bit Linux desktop, and FUSE for the AppImage. The Steam import needs a free Steam API key; SteamGridDB and IGDB scraping need their own free keys. Everything else works out of the box.
+
+## 📖 Documentation
+
+The full manual ships **inside the app** — 22 searchable sections under Menu → Manual, covering every face, the complete CREMA control reference, save backups and troubleshooting.
 
 ## ☕ Tip the barista
 
@@ -83,7 +121,7 @@ If you do, [let me know](mailto:shampooisalie@gmail.com) so I can thank you pers
 
 <div align="center">
 
-**▸ now brewing as ONE app · coming soon**
+**▸ one library · three faces · zero cloud**
 
 Built by J.R.A. · `shampooisalie@gmail.com` · GPL-3.0-or-later
 

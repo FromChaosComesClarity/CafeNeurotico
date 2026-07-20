@@ -2163,6 +2163,11 @@ document.getElementById('btn-remove-from-pl-close')?.addEventListener('click', (
 ['btn-about', 'btn-about-sb'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', () => document.getElementById('modal-about').classList.add('active')));
 document.getElementById('btn-close-about').addEventListener('click', () => { document.getElementById('modal-about').classList.remove('active'); });
+// Stamp the suite version into the About dialog (from package.json via app.getVersion()).
+window.api.getAppVersion?.().then(v => {
+    const el = document.getElementById('about-version');
+    if (el && v) el.textContent = `VERSION ${v}`;
+}).catch(() => {});
 
 // --- MANUAL (opens as separate window) ---
 document.addEventListener('click', (e) => { if (e.target.id === 'btn-open-manual') { document.getElementById('modal-about').classList.remove('active'); window.api.openManual(); } });
@@ -2287,17 +2292,24 @@ document.getElementById('btn-welcome-batch').addEventListener('click', async () 
     btn.disabled = true;
     progressWrap.style.display = 'block';
     progressFill.style.width = '0%';
+    // Mirror progress to the always-visible top toast (cpTask* → op-toast) so it keeps going —
+    // and stays visible — after the user leaves the Welcome screen.
+    cpTaskStart('Fetching media…', false);
     for (let i = 0; i < toFetch.length; i++) {
         const g = toFetch[i];
+        const pct = Math.round(((i + 1) / toFetch.length) * 100);
         statusEl.style.color = 'var(--text_dim)';
-        statusEl.textContent = `Fetching ${i + 1} / ${toFetch.length}: ${g.Game}…`;
-        progressFill.style.width = `${Math.round(((i + 1) / toFetch.length) * 100)}%`;
+        statusEl.innerHTML = `Fetching ${i + 1} / ${toFetch.length}: ${g.Game}…` +
+            `<br><span style="opacity:0.72; font-size:11px;">You can leave this screen — fetching keeps running in the background, with progress in the bar at the top.</span>`;
+        progressFill.style.width = `${pct}%`;
+        cpTaskProgress(pct, `Fetching media ${i + 1}/${toFetch.length} · ${g.Game}`);
         await window.api.autoFetch(g.id, g.Game, g.SteamAppID);
         await new Promise(r => setTimeout(r, 500));
     }
     progressFill.style.width = '100%';
     statusEl.style.color = '#66bb6a';
     statusEl.textContent = `✓ Finished fetching ${toFetch.length} games!`;
+    cpTaskEnd('Media fetch complete');
     setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width = '0%'; }, 3000);
     btn.disabled = false;
     loadGames();
@@ -3115,6 +3127,24 @@ document.getElementById('search-bar')?.addEventListener('input', _debouncedApply
 document.getElementById('btn-add-game-sb')?.addEventListener('click', () =>
     document.getElementById('btn-add-game').click());
 
+// Lowercased search text for a game: the title plus the metadata people actually search by.
+// Searching every column instead (the old `Object.values(game).some(...)`) matched the multi-KB
+// Steam descriptions and the artwork file paths — on an 887-game library "wit" returned 503 games
+// (424 of them only because "with" appears in their description) when 10 have it in the title,
+// and the gallery then rebuilt all 503 cards on every keystroke.
+// Cached on the object under a Symbol, so it stays out of Object.values / JSON / IPC round-trips.
+// Game objects are replaced wholesale on every loadGames(), so the cache can't go stale.
+const _SEARCH_BLOB = Symbol('searchBlob');
+function searchBlob(game) {
+    let blob = game[_SEARCH_BLOB];
+    if (blob === undefined) {
+        blob = [game.Game, game.Store, game.DEV, game.PUB, game.GENRE, game.Franchise, game.Tags]
+            .filter(Boolean).join(' ').toLowerCase();
+        Object.defineProperty(game, _SEARCH_BLOB, { value: blob, enumerable: false, configurable: true });
+    }
+    return blob;
+}
+
 function applyFilters() {
     const query = (document.getElementById('cmd-search-input')?.value || document.getElementById('gallery-search')?.value || document.getElementById('search-bar')?.value || document.getElementById('topnav-search')?.value || document.getElementById('split-search')?.value || '').toLowerCase();
 
@@ -3170,7 +3200,7 @@ function applyFilters() {
         }
 
         if (!query) return true;
-        return Object.values(game).some(val => String(val).toLowerCase().includes(query));
+        return searchBlob(game).includes(query);
     });
 
     if (query) {
@@ -6087,8 +6117,10 @@ function openAmigaGamepage(game) {
         document.getElementById('btn-slideshow-next').onclick = () => { idx = (idx + 1) % screens.length; update(); };
         document.getElementById('btn-slideshow-close').onclick = () => modalSs.classList.remove('active');
     };
-    document.getElementById('amiga-gp-close').onclick    = () => gp.classList.remove('open');
-    document.getElementById('amiga-gp-close').onclick    = () => gp.classList.remove('open');
+    // Titlebar close gadget and the footer Cancel button (distinct ids — they used to share
+    // "amiga-gp-close", so getElementById only ever found the gadget and Cancel did nothing).
+    document.getElementById('amiga-gp-close').onclick     = () => gp.classList.remove('open');
+    document.getElementById('amiga-gp-cancel').onclick    = () => gp.classList.remove('open');
     gp.classList.add('open');
 }
 
@@ -9861,6 +9893,8 @@ const THEMES = {
     "MOVIESFLIX": {bg: "#141414", bg_panel: "rgba(255, 255, 255, 0.07)", bg_menu: "#000000", accent: "#e50914", accent_menu: "#e50914", text_main: "#ffffff", text_sec: "#b3b3b3", text_dim: "#6d6d6d", border: "rgba(229, 9, 20, 0.30)", border_solid: "#404040"},
     "SNOW": {bg: "#0a1628", bg_panel: "rgba(32, 68, 110, 0.65)", bg_menu: "#0f2040", accent: "#93d0f0", accent_menu: "#b8e4f8", text_main: "#e8f4ff", text_sec: "#8bbbd8", text_dim: "#4a7898", border: "rgba(147, 208, 240, 0.18)", border_solid: "#1c4060"},
 
+    // Retired from the picker when the "Systems" family landed (superseded by "WINDOWS XP"),
+    // but kept defined so configs still set to it keep resolving instead of falling back.
     "WIN XP": {bg: "#003399", bg_panel: "rgba(236, 233, 216, 0.2)", bg_menu: "#0054E3", accent: "#ffd700", accent_menu: "#ffd700", text_main: "#FFFFFF", text_sec: "#ECE9D8", text_dim: "#99B4D1", border: "rgba(236, 233, 216, 0.4)", border_solid: "#4fcc3a"},
 
     "PSIII CLASSIC": {bg: "#000000", bg_panel: "rgba(25, 25, 25, 0.7)", bg_menu: "#111111", accent: "#dcdcdc", accent_menu: "#ffffff", text_main: "#ffffff", text_sec: "#aaaaaa", text_dim: "#666666", border: "rgba(255, 255, 255, 0.2)", border_solid: "#444444"},
@@ -9973,7 +10007,7 @@ const THEME_CATEGORIES = {
 
 let activeTheme = "MOCHA";   // default color scheme (BrewBalance · Mocha)
 
-// Interface font: the user's font-picker choice (family name); '' = default Raleway.
+// Interface font: the user's font-picker choice (family name); '' = the Poppins default.
 // A theme may carry its own era `font` which wins while that theme is active.
 let _uiFont = '';
 function _uiFontVal(name) { return `'${name || 'Poppins'}'`; }   // Poppins is the default interface font

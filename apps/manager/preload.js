@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('api', {
                                 selectLocalImage: (id, type) => ipcRenderer.invoke('select-local-image', id, type),
                                 getSetting: (k) => ipcRenderer.invoke('get-setting', k),
                                 setSetting: (k, v) => ipcRenderer.invoke('set-setting', k, v),
+                                getAppVersion: () => ipcRenderer.invoke('get-app-version'),
                                 getHomeStats: (opts) => ipcRenderer.invoke('get-home-stats', opts),
                                 getRandomGame: (c) => ipcRenderer.invoke('get-random-game', c),
                                 itadSearch: (q) => ipcRenderer.invoke('itad-search', q),

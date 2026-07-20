@@ -408,6 +408,31 @@ ipcMain.handle('launch-game', async (_, gameId) => {
     }
 });
 
+// "Play with Log" — verbose launch that streams the game's stdout/stderr live to the renderer
+// (for troubleshooting problematic titles). The game itself is spawned detached exactly like a
+// normal launch; only its output is piped here.
+const _logWatched = new Set();   // game ids whose log modal is currently open
+ipcMain.handle('launch-game-verbose', async (event, gameId) => {
+    const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
+    _logWatched.add(gameId);
+    // Once the user closes the modal we stop forwarding: a chatty Proton title would otherwise
+    // push tens of thousands of IPC messages at a renderer that just discards them.
+    const onOutput = line => {
+        if (!_logWatched.has(gameId)) return;
+        try { event.sender.send('game-log-line', { id: gameId, line: String(line) }); } catch {}
+    };
+    try {
+        const result = await launchGame(gameId, { onOutput });
+        if (game) appendGameLog(game, result.method, null);
+        return result;
+    } catch (e) {
+        onOutput(`[launch error] ${e.message}`);
+        if (game) appendGameLog(game, null, e.message);
+        return { ok: false, error: e.message };
+    }
+});
+ipcMain.handle('stop-game-log', (_, gameId) => { _logWatched.delete(gameId); return true; });
+
 // Settings
 ipcMain.handle('get-setting', (_, key) => db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value ?? null);
 ipcMain.handle('set-setting', (_, key, value) => { db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)").run(key, value); return true; });

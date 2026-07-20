@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('api', {
     deleteGame:          (id)     => ipcRenderer.invoke('delete-game', id),
     uninstallGameFiles:  (id)     => ipcRenderer.invoke('uninstall-game-files', id),
     launchGame: (id)     => ipcRenderer.invoke('launch-game', id),
+    launchGameVerbose: (id) => ipcRenderer.invoke('launch-game-verbose', id),
+    stopGameLog: (id)    => ipcRenderer.invoke('stop-game-log', id),
+    onGameLogLine: (cb)  => ipcRenderer.on('game-log-line', (_, d) => cb(d)),
 
     // Settings
     getSetting:    (k)    => ipcRenderer.invoke('get-setting', k),

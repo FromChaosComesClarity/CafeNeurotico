@@ -130,6 +130,8 @@ const THEMES = {
   "GREEN BOX": {bg: "#0e0e0e", bg_panel: "rgba(82, 176, 67, 0.10)", bg_menu: "#111111", accent: "#52b043", accent_menu: "#107C10", text_main: "#ffffff", text_sec: "#a8d8a4", text_dim: "#3d8030", border: "rgba(82, 176, 67, 0.22)", border_solid: "#1a3d1a"},
   "MOVIESFLIX": {bg: "#141414", bg_panel: "rgba(255, 255, 255, 0.07)", bg_menu: "#000000", accent: "#e50914", accent_menu: "#e50914", text_main: "#ffffff", text_sec: "#b3b3b3", text_dim: "#6d6d6d", border: "rgba(229, 9, 20, 0.30)", border_solid: "#404040"},
   "SNOW": {bg: "#0a1628", bg_panel: "rgba(32, 68, 110, 0.65)", bg_menu: "#0f2040", accent: "#93d0f0", accent_menu: "#b8e4f8", text_main: "#e8f4ff", text_sec: "#8bbbd8", text_dim: "#4a7898", border: "rgba(147, 208, 240, 0.18)", border_solid: "#1c4060"},
+  // Retired from the picker when the "Systems" family landed (superseded by "WINDOWS XP"),
+  // but kept defined so configs still set to it keep resolving instead of falling back.
   "WIN XP": {bg: "#0055e5", bg_panel: "rgba(236, 233, 216, 0.3)", bg_menu: "#003399", accent: "#ffd700", accent_menu: "#ffd700", text_main: "#ffffff", text_sec: "#ece9d8", text_dim: "#c0c0c0", border: "rgba(255, 255, 255, 0.3)", border_solid: "#4fcc3a"},
   "PSIII CLASSIC": {bg: "#000000", bg_panel: "rgba(25, 25, 25, 0.7)", bg_menu: "#111111", accent: "#dcdcdc", accent_menu: "#ffffff", text_main: "#ffffff", text_sec: "#aaaaaa", text_dim: "#666666", border: "rgba(255, 255, 255, 0.2)", border_solid: "#444444"},
   "PSIII RED": {bg: "#2b0000", bg_panel: "rgba(40, 0, 0, 0.7)", bg_menu: "#1a0000", accent: "#ff4d4d", accent_menu: "#ff4d4d", text_main: "#ffffff", text_sec: "#ffcccc", text_dim: "#cc6666", border: "rgba(255, 77, 77, 0.2)", border_solid: "#800000"},
@@ -196,10 +198,31 @@ const THEMES = {
   "BREWBALANCE LIGHT": {bg: "#fbf7ef", bg_panel: "rgba(243, 235, 221, 0.75)", bg_menu: "#f3ebdd", accent: "#b5651d", accent_menu: "#b5651d", text_main: "#2a241c", text_sec: "#7c6b53", text_dim: "#9a8a72", border: "rgba(181, 101, 29, 0.12)", border_solid: "#d6c6ab"},
   "MOCHA": {bg: "#1a1210", bg_panel: "rgba(36, 24, 19, 0.6)", bg_menu: "#241813", accent: "#c98a5e", accent_menu: "#c98a5e", text_main: "#f0dfcf", text_sec: "#c7a98f", text_dim: "#8a6a54", border: "rgba(201, 138, 94, 0.2)", border_solid: "#4a3226"},
   "FLAT WHITE": {bg: "#f6f1e9", bg_panel: "rgba(253, 250, 244, 0.75)", bg_menu: "#fdfaf4", accent: "#8a5a2b", accent_menu: "#8a5a2b", text_main: "#33291f", text_sec: "#6b5a48", text_dim: "#a4917a", border: "rgba(138, 90, 43, 0.12)", border_solid: "#e0d4c0"},
-  "MATCHA": {bg: "#12160f", bg_panel: "rgba(26, 32, 21, 0.6)", bg_menu: "#1a2015", accent: "#9bbf6b", accent_menu: "#9bbf6b", text_main: "#e6efd8", text_sec: "#b3c79b", text_dim: "#6d8556", border: "rgba(155, 191, 107, 0.2)", border_solid: "#33422a"}
+  "MATCHA": {bg: "#12160f", bg_panel: "rgba(26, 32, 21, 0.6)", bg_menu: "#1a2015", accent: "#9bbf6b", accent_menu: "#9bbf6b", text_main: "#e6efd8", text_sec: "#b3c79b", text_dim: "#6d8556", border: "rgba(155, 191, 107, 0.2)", border_solid: "#33422a"},
+  // Systems (imported from LatteWrite) — retro-OS palettes; each carries its era `font` (applied as --ui-font while active)
+  "MS-DOS": {bg: "#0a0a0a", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffffff", accent_menu: "#ffffff", text_main: "#d2d2d2", text_sec: "#a2a2a2", text_dim: "#7e7e7e", border: "rgba(255, 255, 255, 0.25)", border_solid: "#4a4a4a", font: 'PxPlus IBM VGA8'},
+  "COMMODORE 64": {bg: "#0000aa", bg_panel: "rgba(0, 0, 170, 0.6)", bg_menu: "#0000aa", accent: "#b9b6ff", accent_menu: "#b9b6ff", text_main: "#d0ccff", text_sec: "#9e9beb", text_dim: "#7976db", border: "rgba(185, 182, 255, 0.25)", border_solid: "#4341c5", font: 'C64 Pro Mono'},
+  "MACOS 1.0": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
+  "CLASSIC MACOS": {bg: "#cfcfcf", bg_panel: "rgba(228, 228, 228, 0.6)", bg_menu: "#e4e4e4", accent: "#2b2b9c", accent_menu: "#2b2b9c", text_main: "#000000", text_sec: "#323232", text_dim: "#575757", border: "rgba(43, 43, 156, 0.25)", border_solid: "#8d8d8d", font: 'Chicago'},
+  "WINDOWS 95": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+  "AMIGA WORKBENCH": {bg: "#a6a6a6", bg_panel: "rgba(178, 178, 178, 0.6)", bg_menu: "#b2b2b2", accent: "#2b5db0", accent_menu: "#2b5db0", text_main: "#000000", text_sec: "#282828", text_dim: "#464646", border: "rgba(43, 93, 176, 0.25)", border_solid: "#717171", font: 'BigBlue Terminal'},
+  "WINDOWS XP": {bg: "#ece9d8", bg_panel: "rgba(244, 243, 239, 0.6)", bg_menu: "#f4f3ef", accent: "#2f6fd6", accent_menu: "#2f6fd6", text_main: "#000000", text_sec: "#393834", text_dim: "#63625b", border: "rgba(47, 111, 214, 0.25)", border_solid: "#a09e93", font: 'Inter'},
+  "BEOS": {bg: "#d8d8d0", bg_panel: "rgba(234, 234, 226, 0.6)", bg_menu: "#eaeae2", accent: "#2855b0", accent_menu: "#2855b0", text_main: "#000000", text_sec: "#343432", text_dim: "#5b5b57", border: "rgba(40, 85, 176, 0.25)", border_solid: "#93938d", font: 'Inter'},
+  "NEXTSTEP": {bg: "#dedede", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#26408b", accent_menu: "#26408b", text_main: "#000000", text_sec: "#353535", text_dim: "#5d5d5d", border: "rgba(38, 64, 139, 0.25)", border_solid: "#979797", font: 'Inter'},
+  "ZX SPECTRUM": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#00d8d8", accent_menu: "#00d8d8", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(0, 216, 216, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+  "ATARI ST": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#007000", accent_menu: "#007000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 112, 0, 0.25)", border_solid: "#adadad", font: 'PxPlus IBM VGA8'},
+  "AMBER CRT": {bg: "#140d00", bg_panel: "rgba(20, 13, 0, 0.6)", bg_menu: "#140d00", accent: "#ffcc44", accent_menu: "#ffcc44", text_main: "#ffb000", text_sec: "#c78900", text_dim: "#9c6c00", border: "rgba(255, 204, 68, 0.25)", border_solid: "#5f4100", font: 'PxPlus IBM VGA8'},
+  "GREEN CRT": {bg: "#001400", bg_panel: "rgba(0, 20, 0, 0.6)", bg_menu: "#001400", accent: "#7dff9e", accent_menu: "#7dff9e", text_main: "#37ff6a", text_sec: "#2ac751", text_dim: "#209c3d", border: "rgba(125, 255, 158, 0.25)", border_solid: "#125f22", font: 'PxPlus IBM VGA8'},
+  "TELETEXT": {bg: "#000000", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffff00", accent_menu: "#ffff00", text_main: "#ffffff", text_sec: "#c2c2c2", text_dim: "#949494", border: "rgba(255, 255, 0, 0.25)", border_solid: "#525252", font: 'BigBlue Terminal'},
+  "WINDOWS 3.1": {bg: "#c0c0c0", bg_panel: "rgba(192, 192, 192, 0.6)", bg_menu: "#c0c0c0", accent: "#000080", accent_menu: "#000080", text_main: "#000000", text_sec: "#2e2e2e", text_dim: "#515151", border: "rgba(0, 0, 128, 0.25)", border_solid: "#838383", font: 'Inter'},
+  "OS/2 WARP": {bg: "#cececa", bg_panel: "rgba(214, 214, 208, 0.6)", bg_menu: "#d6d6d0", accent: "#00337f", accent_menu: "#00337f", text_main: "#000000", text_sec: "#313130", text_dim: "#575755", border: "rgba(0, 51, 127, 0.25)", border_solid: "#8c8c89", font: 'Inter'},
+  "IBM 3270": {bg: "#051005", bg_panel: "rgba(5, 16, 5, 0.6)", bg_menu: "#051005", accent: "#66ff66", accent_menu: "#66ff66", text_main: "#33cc33", text_sec: "#289f28", text_dim: "#207d20", border: "rgba(102, 255, 102, 0.25)", border_solid: "#144c14", font: 'BigBlue Terminal'},
+  "SOLARIS CDE": {bg: "#aeb6c2", bg_panel: "rgba(188, 196, 208, 0.6)", bg_menu: "#bcc4d0", accent: "#33518a", accent_menu: "#33518a", text_main: "#000000", text_sec: "#2a2c2f", text_dim: "#494c51", border: "rgba(51, 81, 138, 0.25)", border_solid: "#767c84", font: 'Inter'},
+  "RISC OS": {bg: "#d7d7c8", bg_panel: "rgba(232, 232, 220, 0.6)", bg_menu: "#e8e8dc", accent: "#005a9c", accent_menu: "#005a9c", text_main: "#000000", text_sec: "#343430", text_dim: "#5a5a54", border: "rgba(0, 90, 156, 0.25)", border_solid: "#929288", font: 'Inter'},
+  "GEOS": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
 };
 const THEME_CATEGORIES = {
-  "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "WIN XP", "OAKANIZER DARK"],
+  "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "OAKANIZER DARK"],
   "BrewBalance": ["BREWBALANCE DARK", "BREWBALANCE LIGHT", "MOCHA", "FLAT WHITE", "MATCHA"],
   "Light & Minimal": ["PAPER", "SOLARIZED LIGHT", "CATPPUCCIN LATTE", "GITHUB LIGHT", "GRUVBOX LIGHT", "ROSÉ PINE DAWN", "NORD LIGHT", "DAYBREAK", "OAKANIZER LIGHT"],
   "Gaming Legends": ["GAME BOY DMG", "PIP BOY", "SEVASTOPOL", "RIP AND TEAR CLASSIC", "SUPER BROTHERS", "GREEN HILL", "NES", "SNES", "BLOODBORNE", "METROID PRIME", "SILENT HILL", "DIABLO", "HALF-LIFE", "SHOVEL KNIGHT"],
@@ -207,20 +230,40 @@ const THEME_CATEGORIES = {
   "Linux Ricing": ["DRACULA", "GRUVBOX", "NORD", "SOLARIZED DARK", "CATPPUCCIN FRAPPÉ", "CATPPUCCIN MACCHIATO", "CATPPUCCIN MOCHA", "TOKYO NIGHT", "EVERFOREST", "ROSÉ PINE", "OXOCARBON", "MATERIAL DARK"],
   "Sci-Fi Universes": ["N7", "TRON LEGACY", "DEAD SPACE", "COLONY SHIP", "NECROMORPH"],
   "Horror Realm": ["CRIMSON PEAK", "LAKESIDE CURSE", "THE BACKROOMS"],
-  "PSIII Colors": ["PSIII CLASSIC", "PSIII RED", "PSIII GREEN", "PSIII BLUE", "PSIII PURPLE", "PSIII GOLD", "PSIII SILVER"]
+  "PSIII Colors": ["PSIII CLASSIC", "PSIII RED", "PSIII GREEN", "PSIII BLUE", "PSIII PURPLE", "PSIII GOLD", "PSIII SILVER"],
+  "Systems": ["MS-DOS", "COMMODORE 64", "MACOS 1.0", "CLASSIC MACOS", "WINDOWS 95", "AMIGA WORKBENCH", "WINDOWS XP", "BEOS", "NEXTSTEP", "ZX SPECTRUM", "ATARI ST", "AMBER CRT", "GREEN CRT", "TELETEXT", "WINDOWS 3.1", "OS/2 WARP", "IBM 3270", "SOLARIS CDE", "RISC OS", "GEOS"]
 };
 
 function updateAppScale() { const wrapper = document.getElementById('app-scale-wrapper'); if (!wrapper) return; const scaleX = window.innerWidth / 1920; const scaleY = window.innerHeight / 1080; const scale = Math.min(scaleX, scaleY); wrapper.style.transform = `scale(${scale})`; wrapper.style.left = `${(window.innerWidth - (1920 * scale)) / 2}px`; wrapper.style.top = `${(window.innerHeight - (1080 * scale)) / 2}px`; } window.addEventListener('resize', updateAppScale);
 function setBlur(enable) { document.querySelectorAll('.blur-target').forEach(el => el.classList.toggle('is-blurred', enable)); }
 function isVideoActive() { const vid = document.getElementById('video-player'); return vid && !vid.paused && vid.src && vid.src.includes('file://'); }
-function applyTheme(themeName) { activeTheme = THEMES[themeName] ? themeName : "CREMA (DEFAULT)"; const t = THEMES[activeTheme]; const root = document.documentElement; Object.keys(t).forEach(key => root.style.setProperty(`--${key}`, t[key])); }
+function applyTheme(themeName) {
+  activeTheme = THEMES[themeName] ? themeName : "CREMA (DEFAULT)";
+  const t = THEMES[activeTheme]; const root = document.documentElement;
+  // `font` is not a colour token — it's the theme's era typeface, applied through --ui-font below.
+  Object.keys(t).forEach(key => { if (key !== 'font') root.style.setProperty(`--${key}`, t[key]); });
+  applyUiFont();
+}
+
+// ── INTERFACE FONT ────────────────────────────────────────────────────────────
+// Shared with the Manager through the `ui_font` setting, so the whole suite matches. A "Systems"
+// theme carries its own era font, which wins for as long as that theme is active.
+let _uiFont = '';
+function applyUiFont() {
+  const themeFont = THEMES[activeTheme] && THEMES[activeTheme].font;
+  document.documentElement.style.setProperty('--ui-font', `'${themeFont || _uiFont || 'Poppins'}'`);
+}
+async function loadUiFont() {
+  try { _uiFont = (await window.api.getSetting('ui_font')) || ''; } catch (e) { _uiFont = ''; }
+  applyUiFont();
+}
 
 // ── THEME INHERITANCE (follow The Manager) ─────────────────────────────────────
 // The Manager stores its chosen theme in the shared games.db under the setting key
-// 'cngm_theme'. When audioCfg.themeSource === 'MANAGER' (the default), CREMA mirrors
-// it; picking a theme by hand switches to 'CUSTOM'. Most theme names are identical
-// across both faces; the only special cases are The Manager's "CREMA" (== CREMA's
-// "CREMA (DEFAULT)") and the ~8 light themes CREMA doesn't ship (→ graceful fallback).
+// 'cngm_theme'. When audioCfg.themeSource === 'MANAGER', CREMA mirrors it; picking a theme by
+// hand switches to 'CUSTOM' (the default for new installs, so CREMA opens on its own look).
+// All three faces ship the same theme set; the only name difference is The Manager's "CREMA",
+// which is CREMA's "CREMA (DEFAULT)".
 const FOLLOW_MANAGER_LABEL = 'FOLLOW THE MANAGER';
 function mapManagerThemeToCrema(name) {
   if (!name) return null;
@@ -228,7 +271,7 @@ function mapManagerThemeToCrema(name) {
   return THEMES[name] ? name : null;
 }
 async function resolveAndApplyTheme() {
-  if ((audioCfg.themeSource || 'MANAGER') === 'MANAGER') {
+  if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') {
     try {
       const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme'));
       if (mapped) { applyTheme(mapped); return; }
@@ -402,7 +445,7 @@ function getMappedBtn(logicalBtn) {
 }
 function renderHardwareIcons() {
   const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp;&nbsp; ${getMappedBtn('START')} ${t('footer.menu')}`;
-  const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.media')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')} &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
+  const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getBtn('dpad_left')}${getBtn('dpad_right')} ${t('footer.page')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.media')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} Game Options &nbsp;&nbsp; ${getBtn('L3')}${getBtn('R3')} ${t('footer.music')}`;
   const prmpt = document.getElementById('mini-prompt'); if (prmpt) prmpt.innerHTML = t('footer.trailer', {btn: getMappedBtn('WEST')});
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = getMappedBtn('SOUTH'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = getMappedBtn('NORTH'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = getMappedBtn('WEST');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${getBtn('dpad_up')}${getBtn('dpad_down')}${getBtn('L1')}${getBtn('R1')} ${t('footer.navigate')} &nbsp;&nbsp; ${getMappedBtn('SOUTH')} ${t('footer.play')} &nbsp;&nbsp; ${getMappedBtn('EAST')} ${t('footer.back')} &nbsp;&nbsp; ${getMappedBtn('NORTH')} ${t('footer.search')} &nbsp;&nbsp; ${getMappedBtn('WEST')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${getMappedBtn('SELECT')} ${t('footer.options')}`;
@@ -414,7 +457,7 @@ function renderHardwareIcons() {
 function renderFootersForKeyboard() {
   const k = getKey;
   const startF = document.getElementById('start-footer'); if (startF) startF.innerHTML = `${k('↑')}${k('↓')} ${t('footer.navigate')} &nbsp;&nbsp;&nbsp; ${k('Enter')} ${t('footer.select')} &nbsp;&nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp;&nbsp; ${k('M')} ${t('footer.menu')}`;
-  const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('←')}${k('→')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('X')} ${t('footer.media')} &nbsp;&amp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('O')} ${t('footer.options')} &nbsp;&nbsp; ${k('M')} ${t('footer.menu')} &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}`;
+  const mainF = document.getElementById('main-footer'); if (mainF) mainF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('←')}${k('→')} ${t('footer.category')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('X')} ${t('footer.media')} &nbsp;&amp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('O')} Game Options &nbsp;&nbsp; ${k('M')} ${t('footer.menu')} &nbsp;&nbsp; ${k('[')}${k(']')} ${t('footer.music')}`;
   const prmpt = document.getElementById('mini-prompt'); if (prmpt) prmpt.innerHTML = t('footer.trailer', {btn: k('X')});
   const ssA = document.getElementById('ss-btn-a'); if (ssA) ssA.innerHTML = k('Enter'); const ssY = document.getElementById('ss-btn-y'); if (ssY) ssY.innerHTML = k('Y'); const ssX = document.getElementById('ss-btn-x'); if (ssX) ssX.innerHTML = k('X');
   const jbF = document.getElementById('jb-footer'); if (jbF) jbF.innerHTML = `${k('↑')}${k('↓')}${k('PgUp')}${k('PgDn')} ${t('footer.navigate')} &nbsp;&nbsp; ${k('Enter')} ${t('footer.play')} &nbsp;&nbsp; ${k('Esc')} ${t('footer.back')} &nbsp;&nbsp; ${k('Y')} ${t('footer.search')} &nbsp;&nbsp; ${k('X')} ${t('footer.fullscreen')} &nbsp;&nbsp; ${k('O')} ${t('footer.options')}`;
@@ -1063,7 +1106,7 @@ async function boot() {
   currentLang = await window.api.getSetting('language') || 'en';
   strings = await window.api.getStrings(currentLang);
   applyI18nToDOM();
-  updateAppScale(); await initAudio(); await resolveAndApplyTheme(); renderHardwareIcons();
+  updateAppScale(); await initAudio(); await loadUiFont(); await resolveAndApplyTheme(); renderHardwareIcons();
   const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
   _cremaHidePico8 = (await window.api.getSetting('crema_hide_pico8')) === '1';
   _cremaHideFree = (await window.api.getSetting('crema_hide_free')) === '1';
@@ -1661,7 +1704,9 @@ async function refreshDatabase() {
   allGames = res.games || [];
   await loadGamePlaylists();
   // Stay in sync if The Manager changed its theme while CREMA is open (no reflow when unchanged).
-  if ((audioCfg.themeSource || 'MANAGER') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
+  if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
+  // The interface font is a suite-wide setting, so it follows regardless of themeSource.
+  try { const f = (await window.api.getSetting('ui_font')) || ''; if (f !== _uiFont) { _uiFont = f; applyUiFont(); } } catch (e) {}
 
   availableScreenshots = [];
   for (let g of allGames) {

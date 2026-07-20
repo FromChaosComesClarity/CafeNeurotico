@@ -1733,7 +1733,7 @@
     #beos-content { flex:1; min-height:0; display:flex; flex-direction:row; }
     /* Left nav panel */
     #beos-nav { width:155px; flex-shrink:0; background:#c4c4c4; border-right:2px solid #888; overflow-y:auto; display:flex; flex-direction:column; padding:4px 0; scrollbar-width:thin; }
-    #beos-nav-title { font-size:10px; font-weight:bold; color:#555; padding:4px 8px 2px; text-transform:uppercase; letter-spacing:0.5px; }
+    .beos-nav-title { font-size:10px; font-weight:bold; color:#555; padding:4px 8px 2px; text-transform:uppercase; letter-spacing:0.5px; }
     .beos-nav-item { padding:3px 8px 3px 16px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; color:#000; }
     .beos-nav-item:hover { background:#2855b0; color:#fff; }
     .beos-nav-item.beos-nav-active { background:#2855b0; color:#fff; }
@@ -2067,7 +2067,7 @@
     #nx-dock-logo span.y { color:#ddaa00; }
     #nx-dock-logo span.c { color:#22aacc; }
     #nx-dock-logo span.w { color:#fff; }
-    #nx-dock-sep { width:42px; height:1px; background:#333; flex-shrink:0; }
+    .nx-dock-sep { width:42px; height:1px; background:#333; flex-shrink:0; }
     /* Dock tiles: white/light square icons, NeXT icon style */
     .nx-dock-btn { width:52px; height:52px; background:#fff; border:1px solid #999; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; gap:2px; flex-shrink:0; box-shadow:1px 1px 4px rgba(0,0,0,0.5); }
     .nx-dock-btn:hover { background:#eef2ff; border-color:#2244aa; }
@@ -5048,16 +5048,16 @@
       <!-- Dock: dark strip on right, white square icon tiles -->
       <div id="nx-dock">
         <div id="nx-dock-logo" title="About CNGM"><span class="r">N</span><span class="y">e</span><span class="c">X</span><span class="w">T</span></div>
-        <div id="nx-dock-sep"></div>
+        <div class="nx-dock-sep"></div>
         <div class="nx-dock-btn" id="nx-dk-add"><div class="nx-dock-btn-icon">🖥</div><div class="nx-dock-btn-label">Add Game</div></div>
         <div class="nx-dock-btn" id="nx-dk-refresh"><div class="nx-dock-btn-icon">🔄</div><div class="nx-dock-btn-label">Refresh</div></div>
         <div class="nx-dock-btn" id="nx-dk-connect"><div class="nx-dock-btn-icon">🌐</div><div class="nx-dock-btn-label">Connect</div></div>
         <div class="nx-dock-btn" id="nx-dk-tools"><div class="nx-dock-btn-icon">🔧</div><div class="nx-dock-btn-label">Tools</div></div>
-        <div id="nx-dock-sep"></div>
+        <div class="nx-dock-sep"></div>
         <div class="nx-dock-btn" id="nx-dk-crema"><div class="nx-dock-btn-icon">🎮</div><div class="nx-dock-btn-label">CREMA</div></div>
         <div class="nx-dock-btn" id="nx-dk-grinder"><div class="nx-dock-btn-icon">⚙️</div><div class="nx-dock-btn-label">GRINDER</div></div>
         <div class="nx-dock-btn" id="nx-dk-emulatte"><div class="nx-dock-btn-icon">👾</div><div class="nx-dock-btn-label">EmuLatte</div></div>
-        <div id="nx-dock-sep"></div>
+        <div class="nx-dock-sep"></div>
         <div class="nx-dock-btn" id="nx-dk-playlists"><div class="nx-dock-btn-icon">📋</div><div class="nx-dock-btn-label">Playlists</div></div>
         <div class="nx-dock-btn" id="nx-dk-about"><div class="nx-dock-btn-icon">ℹ️</div><div class="nx-dock-btn-label">About</div></div>
       </div>
@@ -5129,13 +5129,13 @@
           <div id="beos-content">
             <!-- Left nav panel -->
             <div id="beos-nav">
-              <div id="beos-nav-title">Library</div>
+              <div class="beos-nav-title">Library</div>
               <div class="beos-nav-item beos-nav-active" data-bf="all">📂 All Games</div>
               <div class="beos-nav-item" data-bf="installed">✅ Installed</div>
               <div class="beos-nav-item" data-bf="favs">⭐ Favourites</div>
               <div class="beos-nav-item" data-bf="want">🔖 Want to Play</div>
               <div class="beos-nav-sep"></div>
-              <div id="beos-nav-title" style="font-size:10px;font-weight:bold;color:#555;padding:4px 8px 2px;text-transform:uppercase;letter-spacing:.5px;">By Store</div>
+              <div class="beos-nav-title">By Store</div>
               <div class="beos-nav-item" data-bf="steam">🎮 Steam</div>
               <div class="beos-nav-item" data-bf="gog">🟣 GOG</div>
               <div class="beos-nav-item" data-bf="epic">🔵 Epic</div>
@@ -5322,7 +5322,7 @@
           <button class="amiga-btn" id="amiga-gp-trailer">Trailer</button>
           <button class="amiga-btn" id="amiga-gp-screenshots" style="display:none">Screenshots</button>
           <button class="amiga-btn" id="amiga-gp-edit">Edit Info</button>
-          <button class="amiga-btn" id="amiga-gp-close">Cancel</button>
+          <button class="amiga-btn" id="amiga-gp-cancel">Cancel</button>
         </div>
       </div>
     </div>
@@ -5507,6 +5507,7 @@ LOADING...READY.</div>
     <div class="modal-box" style="text-align: center;">
       <h2 style="margin: 0; color: var(--text_main); font-weight: 900; letter-spacing: 2px;">CAFE NEUROTICO</h2>
       <h3 style="margin: 0; color: var(--accent); font-weight: 900; letter-spacing: 4px;">GAMING SUITE</h3>
+      <p id="about-version" style="font-size: 11px; color: var(--text_dim); margin: 6px 0 0; letter-spacing: 2px; font-weight: 700;"></p>
 
       <p style="font-size: 13px; color: var(--text_sec); margin: 15px 0 5px 0;" data-i18n="html.about_tagline">One app, many faces — a whole gaming ecosystem brewed under one roof.</p>
 

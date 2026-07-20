@@ -424,7 +424,10 @@ function prefixPathForGame(game, opts = {}) {
     return path.join(prefixesDir, safeName);
 }
 
-async function launchGame(gameId) {
+async function launchGame(gameId, opts = {}) {
+    // opts.onOutput(line) → "Play with Log": pipe the game's stdout/stderr live (for troubleshooting
+    // problematic titles) instead of the normal detached/ignored spawn.
+    const onOutput = typeof opts.onOutput === 'function' ? opts.onOutput : null;
     const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
     if (!game)           throw new Error(`Game "${gameId}" not found in GRINDER database.`);
     if (!game.installed) throw new Error(`"${game.title}" is not marked as installed.`);
@@ -538,8 +541,26 @@ async function launchGame(gameId) {
         }
     }
 
-    const spawnGame = (cmd, args, opts) => {
-        const proc = spawn(cmd, args, opts);
+    // Verbose mode: pipe the child's output to onOutput line by line. The child still gets
+    // `detached: true` + unref() exactly like a normal launch, so the game keeps running (and
+    // survives quitting Cafe Neurotico) whether or not anyone is watching the log — piping only
+    // changes where its output goes, never its lifetime.
+    const streamOutput = (proc, header) => {
+        onOutput(header);
+        let tail = '';   // carry the partial last line across chunk boundaries
+        const feed = d => {
+            const parts = (tail + d).split(/\r?\n/);
+            tail = parts.pop() ?? '';
+            for (const l of parts) if (l) onOutput(l);
+        };
+        proc.stdout?.on('data', feed); proc.stderr?.on('data', feed);
+        proc.on('close', c => { if (tail) onOutput(tail); onOutput(`\n[process exited — code ${c}]`); });
+        proc.on('error', e => onOutput(`[spawn error] ${e.message}`));
+    };
+
+    const spawnGame = (cmd, args, o) => {
+        const proc = spawn(cmd, args, onOutput ? { ...o, detached: true, stdio: ['ignore', 'pipe', 'pipe'] } : o);
+        if (onOutput) streamOutput(proc, `$ ${cmd} ${args.join(' ')}\n`);
         if (cometProc) proc.once('exit', () => { try { cometProc.kill('SIGTERM'); } catch {} });
         proc.unref();
         if (cometProc) cometProc.unref();
@@ -550,7 +571,13 @@ async function launchGame(gameId) {
         if (game.store === 'epic') {
             const legendary = findLegendary();
             if (legendary) {
-                spawn(legendary, ['launch', game.app_id], { detached: true, stdio: 'ignore' }).unref();
+                if (onOutput) {
+                    const p = spawn(legendary, ['launch', game.app_id], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+                    streamOutput(p, `$ ${legendary} launch ${game.app_id}\n`);
+                    p.unref();
+                } else {
+                    spawn(legendary, ['launch', game.app_id], { detached: true, stdio: 'ignore' }).unref();
+                }
                 return { ok: true, method: 'legendary' };
             }
             throw new Error('Cannot launch: exe not found, umu-run not available, and legendary not found.');

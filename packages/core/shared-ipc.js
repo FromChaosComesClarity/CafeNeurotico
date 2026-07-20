@@ -39,6 +39,9 @@ function registerSharedHandlers(ctx) {
 
     ipcMain.handle('get-basedir', () => baseDir);
 
+    // Suite version (package.json) — shown in the About dialog of every face.
+    ipcMain.handle('get-app-version', () => { try { return require('electron').app.getVersion(); } catch { return ''; } });
+
     ipcMain.handle('get-games', () => {
         if (!db) return { games: [] };
         try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; }

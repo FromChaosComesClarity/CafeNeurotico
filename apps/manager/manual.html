@@ -152,8 +152,9 @@
 
             <div class="nav-group-label">Engine &amp; Data</div>
             <button class="manual-nav-btn" data-target="man-19">19. GRINDER</button>
-            <button class="manual-nav-btn" data-target="man-20">20. Your Data &amp; Backups</button>
-            <button class="manual-nav-btn" data-target="man-21">21. Tips &amp; Troubleshooting</button>
+            <button class="manual-nav-btn" data-target="man-20">20. Save Games</button>
+            <button class="manual-nav-btn" data-target="man-21">21. Your Data &amp; Backups</button>
+            <button class="manual-nav-btn" data-target="man-22">22. Tips &amp; Troubleshooting</button>
         </div>
 
         <div id="manual-content">
@@ -195,7 +196,7 @@
             <h2 id="man-3">3. Quick Start</h2>
             <p>The <strong>Welcome to the System</strong> screen appears on every launch (until you tell it not to) and walks you through the whole setup in three steps &mdash; each with live buttons, so you never have to leave the screen:</p>
             <ol>
-                <li><strong>Import your games.</strong> Steam: paste your free API key and SteamID64, hit <em>Fetch Steam Library</em>. GOG &amp; Epic: sign in once inside GRINDER &mdash; after that, new purchases import automatically every time you press <em>Refresh Library</em>. Flatpak, PICO-8 and itch.io games are picked up automatically when you open their filters.</li>
+                <li><strong>Import your games.</strong> Steam: paste your free API key and SteamID64, hit <em>Fetch Steam Library</em>. GOG &amp; Epic: press <em>Sign in</em> right here &mdash; a store login window opens, you log in, and it closes itself. After that, new purchases import automatically every time you press <em>Refresh Library</em>. Flatpak, PICO-8 and itch.io games are picked up automatically when you open their filters.</li>
                 <li><strong>Fetch artwork &amp; metadata.</strong> One button scrapes covers, hero art, logos, descriptions, HowLongToBeat and ProtonDB data for everything you just imported.</li>
                 <li><strong>Add to your app menu.</strong> One click registers Cafe Neurotico and CREMA (and EmuLatte, if detected) in GNOME, KDE or any desktop launcher, with proper icons.</li>
             </ol>
@@ -219,14 +220,18 @@
                 <li>Get a free API key at <code>steamcommunity.com/dev/apikey</code> and your SteamID64 from your profile URL.</li>
                 <li>Your Steam <strong>Game Details privacy must be set to Public</strong> for the API to list your games.</li>
                 <li>The import includes played free-to-play titles (tagged with a green <span class="key">FREE</span> pill) and even Steam&rsquo;s &ldquo;unvetted&rdquo; small releases that the API normally hides.</li>
+                <li><strong>Free games and demos you never launched</strong> are invisible to Steam&rsquo;s API entirely. The Manager works around it by also reading your local Steam install folders, so anything actually installed on this machine gets imported whether Steam admits to owning it or not.</li>
                 <li>Playtime (total and last two weeks) is captured on every sync.</li>
             </ul>
             <h3>GOG &amp; Epic</h3>
             <ul>
-                <li>Open GRINDER once (Connect card or app menu) and sign in to GOG and/or Epic.</li>
+                <li><strong>Sign in without leaving the Manager.</strong> The Welcome screen and Connect both have GOG and Epic sign-in buttons: press one, the store&rsquo;s own login page opens in a window, and it closes itself the moment you&rsquo;re authenticated. You never have to open GRINDER for this &mdash; it&rsquo;s tucked away behind <em>Advanced</em> now.</li>
                 <li>From then on, <strong>Refresh Library</strong> pulls your full owned list from both stores automatically &mdash; buy a game, hit refresh, it appears (as &ldquo;not installed&rdquo;, ready to install in one click).</li>
                 <li>DLC and soundtracks are filtered out automatically; a GOG/Epic copy of a game you also own on Steam merges into one entry with a launcher picker.</li>
             </ul>
+            <h3>Games That Leave</h3>
+            <p>Refresh Library doesn&rsquo;t only add. If you refunded a GOG or Epic game, or uninstalled a Steam demo you never owned, it now <strong>disappears from your library too</strong> instead of lingering as a dead entry forever. Games you own on more than one store lose only the store you parted with &mdash; the entry itself stays, with the remaining launcher.</p>
+            <div class="tip-box"><p><strong>Nothing you curated is at risk:</strong> only genuinely un-owned store entries are removed. Custom games, emulator entries and anything you added by hand are never touched by a refresh.</p></div>
             <h3>Flatpak, PICO-8, itch.io</h3>
             <ul>
                 <li><strong>Flatpak:</strong> clicking the Flatpak filter scans installed apps and even generates cover art from their icons.</li>
@@ -261,6 +266,9 @@
             <ul>
                 <li><strong>Hero art</strong> with the game&rsquo;s logo, store icons and the store/category logo in the corner.</li>
                 <li><strong>Action row:</strong> Favourite, Want to Play, Add to Playlist (and Remove, when it&rsquo;s in one), <strong>Hide</strong> (eye icon &mdash; removes the game from every view; manage hidden games in the Control Panel), Open in Steam, Uninstall, SPLORE (PICO-8), Watch Trailer, and Edit Details.</li>
+                <li><strong>Browse Local Files</strong> (folder icon) &mdash; opens the game&rsquo;s install folder in your file manager. It works out where the game actually lives for Steam, GOG, Epic and even emulator entries (following the ROM path out of the launch command), and simply doesn&rsquo;t appear for games that aren&rsquo;t installed.</li>
+                <li><strong>DLC panel</strong> &mdash; installed GOG games list their owned DLC, with badges for what&rsquo;s already on disk and a one-press <em>Install all DLCs</em>.</li>
+                <li><strong>Save Manager</strong> &mdash; finds, backs up and restores your save games. See section 20.</li>
                 <li><strong>Floating Play/Install button</strong>, always visible at the bottom right.</li>
                 <li><strong>Metadata column:</strong> achievements ring (press to see the full list), release year, developer, genre, HowLongToBeat, Metacritic, ProtonDB tier, similar games (clickable links when you own them).</li>
                 <li><strong>Description</strong> &mdash; the short summary plus the full Steam page write-up, and a screenshots strip with a slideshow.</li>
@@ -275,6 +283,8 @@
             <ul>
                 <li><strong>Steam games</strong> install through the Steam client (<code>steam://install</code>) &mdash; Steam opens and takes over.</li>
                 <li><strong>GOG &amp; Epic games</strong> install <strong>in-process</strong> through the built-in GRINDER engine: pick a folder, see the download size and your free disk space up front, and watch live progress. No external window.</li>
+                <li><strong>Linux or Windows build?</strong> For the GOG games that ship both, the install dialog lets you choose &mdash; native Linux, or the Windows build run through Proton. Your choice is remembered per game.</li>
+                <li><strong>Cancel</strong> really cancels: the whole download process tree is stopped, not just the parent, so a cancelled install doesn&rsquo;t sit there half-finished.</li>
                 <li><strong>Uninstall</strong> (gamepage action row) removes the game files and its Wine prefix.</li>
             </ul>
             <h3>The Download Manager</h3>
@@ -316,7 +326,7 @@
             <h2 id="man-10">10. Playlists, Hidden Games &amp; Free-to-Play</h2>
             <h3>Playlists</h3>
             <ul>
-                <li>Create from the rail, the search-row dropdown, or any game&rsquo;s + Playlist button. Order is yours; games can live in many playlists.</li>
+                <li>Create from the rail, the search-row dropdown, or any game&rsquo;s + Playlist button &mdash; that picker has a <strong>&ldquo;+ New playlist&hellip;&rdquo;</strong> box built in, so you can invent a playlist and drop the game into it in one go, even if you had none to begin with. Order is yours; games can live in many playlists.</li>
                 <li><strong>Recently Imported</strong> is an automatic feed of your newest arrivals (size configurable in Behavior; newest always on top).</li>
                 <li>Playlists appear in CREMA as first-class categories, marked with <code>&#8801;</code>. Changes sync both ways instantly.</li>
             </ul>
@@ -329,13 +339,18 @@
             <h2 id="man-11">11. The Manager &mdash; Control Panel</h2>
             <p>The wrench icon opens the Control Panel &mdash; it lands on a title splash; pick a section on the left or just start typing to <strong>search every setting</strong>.</p>
             <ul>
-                <li><strong>Appearance</strong> &mdash; Theme Selection (68 themes in 9 families, from Catppuccin to Game Boy), UI scale (50&ndash;150%), Sharp/Round corners, Ken Burns on/off.</li>
-                <li><strong>Library</strong> &mdash; Update Library (full store re-sync), Add Custom Game, batch scraping.</li>
+                <li><strong>Appearance</strong> &mdash; Theme Selection (<strong>92 themes in 10 families</strong>, from Catppuccin to Game Boy to a shelf of retro operating systems), <strong>Interface Font</strong> (Poppins, Sora, Inter, Fraunces, Chicago or PxPlus IBM VGA8 &mdash; all bundled, nothing fetched from the web), UI scale (50&ndash;150%), Sharp/Round corners, Ken Burns on/off.</li>
+                <li><strong>Library</strong> &mdash; Update Library (full store re-sync), Add Custom Game, batch scraping, <strong>Manage Storage</strong> (see below).</li>
                 <li><strong>Behavior</strong> &mdash; Gaming History, Recently Imported size, PICO-8 / Free-to-Play visibility, Hidden Games manager, desktop &amp; phone Notifications.</li>
                 <li><strong>Connections</strong> &mdash; Steam, GRINDER (GOG/Epic), itch.io, SteamGridDB, IGDB, PICO-8 binary.</li>
                 <li><strong>System</strong> &mdash; full <strong>Backup ZIP</strong> (library + artwork + trailers <em>+ your RetroArch save states</em>), Add to Application Menu, CREMA autostart on login, the Welcome screen.</li>
                 <li><strong>Cleanup</strong> &mdash; clear orphaned images, gaming history, or the nuclear options. Read twice, click once.</li>
             </ul>
+            <h3>Themes &amp; the Interface Font</h3>
+            <p>All <strong>92 themes are shared by all three faces</strong> &mdash; the Manager, CREMA and GRINDER draw from the same set, so a look you like on the desktop is the same look on the TV. The families are Originals &amp; System, BrewBalance, Light &amp; Minimal, Gaming Legends, Aesthetics, Linux Ricing, Sci-Fi Universes, Horror Realm, PSIII Colors and <strong>Systems</strong> &mdash; twenty faithful retro-OS palettes (MS-DOS, Commodore 64, Windows 3.1 / 95 / XP, Amiga Workbench, BeOS, NeXTSTEP, ZX Spectrum, Atari ST, classic Mac OS, OS/2 Warp, IBM 3270, Solaris CDE, RISC OS, GEOS, amber and green CRT, Teletext). Each Systems theme brings its own era typeface along for the ride.</p>
+            <p>The <strong>Interface Font</strong> setting changes the type across the whole suite independently of colour. New installs start on <strong>Poppins</strong> with the <strong>BrewBalance &middot; Mocha</strong> colour scheme.</p>
+            <h3>Manage Storage</h3>
+            <p>Control Panel &rarr; Library &rarr; <strong>Manage Storage</strong> answers &ldquo;what is eating my disk?&rdquo;. The <strong>GOG &amp; Epic</strong> button opens GRINDER showing only installed games, sorted biggest-first, so the space hogs are at the top and one click uninstalls them. The <strong>Steam</strong> button hands you over to Steam&rsquo;s own storage manager.</p>
 
             <!-- ====== SECTION 12 ====== -->
             <h2 id="man-12">12. CREMA &mdash; Overview &amp; Setup</h2>
@@ -421,7 +436,7 @@
             <p>Press <span class="key">START</span> anywhere:</p>
             <ul>
                 <li><strong>Audio</strong> &mdash; Jukebox mode, sound settings (volumes, SFX).</li>
-                <li><strong>Appearance</strong> &mdash; Color Scheme (all 68 suite themes, in the same categories as the desktop; <em>&#9733; Follow The Manager</em> keeps CREMA matched to your desktop theme automatically), Home Screen (startup toggle + row selection), Start Screen mode, Browse mode, Gamepage style (applies live, even inside a gamepage), Screensaver.</li>
+                <li><strong>Appearance</strong> &mdash; Color Scheme (all 92 suite themes, in the same ten categories as the desktop; <em>&#9733; Follow The Manager</em> keeps CREMA matched to your desktop theme automatically), Home Screen (startup toggle + row selection), Start Screen mode, Browse mode, Gamepage style (applies live, even inside a gamepage), Screensaver. CREMA also picks up the <strong>Interface Font</strong> you chose on the desktop, so the whole suite reads the same.</li>
                 <li><strong>Controls</strong> &mdash; Keybindings, Gamepad icon set (Xbox / PlayStation / Nintendo), Wake method.</li>
                 <li><strong>Library</strong> &mdash; Gaming History, PICO-8 / Free-to-Play visibility, <strong>Hidden Games</strong> (unhide individually).</li>
                 <li><strong>System</strong> &mdash; About, Quit.</li>
@@ -430,31 +445,61 @@
             <!-- ====== SECTION 19 ====== -->
             <h2 id="man-19">19. GRINDER &mdash; the GOG &amp; Epic Engine</h2>
             <p>GRINDER does the heavy lifting for DRM-free stores: authentication, downloads, Proton/Wine setup, redistributables, launching and uninstalling. Most of the time you never see it &mdash; the Manager and CREMA drive it silently.</p>
+            <div class="tip-box"><p><strong>You no longer sign in here.</strong> GOG and Epic logins happen directly in the Manager&rsquo;s Welcome and Connect screens. GRINDER&rsquo;s window is for tuning, not setup.</p></div>
             <h3>When to Open Its Window</h3>
             <ul>
-                <li><strong>Signing in</strong> to GOG and Epic (once per machine).</li>
                 <li><strong>Per-game tuning:</strong> Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables.</li>
+                <li><strong>&ldquo;&#9654; Log&rdquo; &mdash; Play with Log.</strong> Next to every installed game&rsquo;s Launch button. It starts the game exactly as normal but streams everything the game and Wine print into a live window &mdash; the first thing to reach for when a title refuses to start. Copy the log with one button. Closing the window doesn&rsquo;t disturb the game.</li>
+                <li><strong>&ldquo;&#11015; Size&rdquo; sort</strong> &mdash; order the library by how much disk each install actually occupies. This is what Manage Storage opens.</li>
+                <li><strong>DLC:</strong> list, install and reset the DLC of your installed GOG games.</li>
                 <li>Its own download manager, install log, repair/verify tools and a library view of everything it manages.</li>
             </ul>
+            <div class="warn-box"><p><strong>GOG DLC is installed as a set.</strong> GOG&rsquo;s downloader cannot safely add one DLC on its own &mdash; asking it to will delete the base game. So the DLC panel always reinstalls the game together with all the DLC you own, which is slower but never destroys anything.</p></div>
             <p>GRINDER&rsquo;s data lives in <code>~/.config/grinder/</code> &mdash; logins and install records are per-machine, which is why a fresh copy of the suite still knows your GOG library on the same computer.</p>
 
             <!-- ====== SECTION 20 ====== -->
-            <h2 id="man-20">20. Your Data &amp; Backups</h2>
+            <h2 id="man-20">20. Save Games &mdash; Backup &amp; Restore</h2>
+            <p>Installed GOG and Epic games get a <strong>Save Manager</strong> panel on their gamepage. GOG and Epic have no save-sync worth the name on Linux, so the suite gives you the honest version: find the saves, zip them up, put them back.</p>
+            <div class="tip-box"><p>This is a desktop-face feature &mdash; it lives on the Manager&rsquo;s gamepage, not in CREMA.</p></div>
+            <h3>Finding Your Saves</h3>
+            <p>Save files hide in genuinely awful places &mdash; somewhere inside a Wine prefix, under a numeric account folder, or right next to the game. The Save Manager tries three things in order:</p>
+            <ol>
+                <li><strong>The store&rsquo;s own answer.</strong> GOG ships a save path inside each game&rsquo;s manifest and Epic publishes a cloud-save folder; when either exists, that is used, account ID and all.</li>
+                <li><strong>The Wine prefix.</strong> Failing that, it searches the game&rsquo;s prefix in the usual places (Documents, AppData, Saved Games), skipping the empty scaffolding Wine creates for every prefix.</li>
+                <li><strong>The install folder</strong> &mdash; where older games have always kept them.</li>
+            </ol>
+            <p>If all three come up empty, use <strong>Locate saves&hellip;</strong> and point at the folder yourself; your choice is remembered. And &ldquo;no saves yet&rdquo; is a perfectly normal answer for a game you haven&rsquo;t played.</p>
+            <h3>Backing Up</h3>
+            <p>Tick the folders you want and press <strong>Back Up</strong>. You get a dated <strong>ZIP with a manifest</strong> inside it recording where every file came from. Because the manifest travels with the archive, a backup made on one PC restores correctly on another, even with a different username, a different install path or a different account folder.</p>
+            <h3>Restoring</h3>
+            <ul>
+                <li>Pick a backup and confirm &mdash; the panel tells you exactly what it&rsquo;s about to overwrite.</li>
+                <li><strong>A snapshot of the current saves is taken first, automatically</strong>, and filed alongside your other backups. If a restore turns out to be the wrong move, the state you just replaced is still sitting there.</li>
+                <li>Restore is a true replace, so a save the game deleted stays deleted &mdash; with a guard that refuses to wipe a folder shared by several games.</li>
+                <li>Delete any backup you no longer want from the same list.</li>
+            </ul>
+            <p>Backups are ordinary ZIP files &mdash; copy them to a drive, a NAS or a cloud folder yourself. Nothing is uploaded anywhere on your behalf. <strong>LEARN MORE</strong> in the panel explains the whole flow in-app.</p>
+
+            <!-- ====== SECTION 21 ====== -->
+            <h2 id="man-21">21. Your Data &amp; Backups</h2>
             <table class="controls-table">
                 <tr><th>What</th><th>Where</th><th>Travels with you?</th></tr>
                 <tr><td>Library, metadata, playlists, settings</td><td><code>GameManagerConfig/games.db</code></td><td>Yes &mdash; copy the folder</td></tr>
                 <tr><td>Artwork &amp; trailers</td><td><code>GameManagerConfig/images &amp; trailers</code></td><td>Yes</td></tr>
                 <tr><td>CREMA preferences</td><td><code>GameManagerConfig/audio.json</code></td><td>Yes</td></tr>
                 <tr><td>GOG/Epic logins &amp; installs</td><td><code>~/.config/grinder/</code></td><td>No &mdash; per machine, by design</td></tr>
+                <tr><td>Save-game backup ZIPs</td><td><code>GameManagerConfig/save_backups/</code></td><td>Yes &mdash; and portable between PCs</td></tr>
                 <tr><td>The games themselves</td><td>Wherever you install them</td><td>No</td></tr>
             </table>
             <p><strong>Backup ZIP</strong> (Control Panel &rarr; System) packs the whole <code>GameManagerConfig</code> &mdash; and your <strong>RetroArch save states</strong> &mdash; into one dated archive. Restore by unpacking next to the AppImage on any machine.</p>
 
-            <!-- ====== SECTION 21 ====== -->
-            <h2 id="man-21">21. Tips &amp; Troubleshooting</h2>
+            <!-- ====== SECTION 22 ====== -->
+            <h2 id="man-22">22. Tips &amp; Troubleshooting</h2>
             <ul>
                 <li><strong>Steam import returns nothing:</strong> your Steam profile&rsquo;s <em>Game Details</em> must be Public. Double-check the SteamID64 (17 digits).</li>
-                <li><strong>A newly bought GOG/Epic game isn&rsquo;t showing:</strong> hit <strong>Refresh Library</strong> &mdash; it pulls the fresh owned list from both stores. If it still doesn&rsquo;t appear, open GRINDER and confirm you&rsquo;re signed in.</li>
+                <li><strong>A newly bought GOG/Epic game isn&rsquo;t showing:</strong> hit <strong>Refresh Library</strong> &mdash; it pulls the fresh owned list from both stores. If it still doesn&rsquo;t appear, open Connect and check the GOG/Epic cards still say you&rsquo;re signed in; store tokens do expire, and signing in again takes a few seconds.</li>
+                <li><strong>A game won&rsquo;t start and says nothing useful:</strong> open GRINDER, find it, and press <strong>&#9654; Log</strong> instead of Launch. The verbose window shows what Wine or the game actually complained about &mdash; usually a missing dependency you can install from the same screen&rsquo;s winetricks.</li>
+                <li><strong>A game vanished after Refresh Library:</strong> that&rsquo;s the removal check &mdash; the store no longer reports you as owning it (refunded, or a demo you uninstalled). Re-buy or reinstall it and the next refresh brings it back.</li>
                 <li><strong>A game shows Install instead of Play</strong> (or vice-versa): Refresh Library reconciles install state with GRINDER and Steam.</li>
                 <li><strong>Missing artwork after import:</strong> run Batch Fetch; for stubborn games open Edit Details and scrape with a corrected title, or pick art manually via SteamGridDB.</li>
                 <li><strong>GPU usage while idle:</strong> animations pause automatically when the window loses focus; the Ken Burns effect can also be disabled outright in Appearance.</li>

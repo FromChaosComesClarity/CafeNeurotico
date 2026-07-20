@@ -12,6 +12,8 @@ const CNGM_THEMES = {
     "GREEN BOX": {bg:"#0e0e0e",bg_panel:"rgba(82,176,67,0.10)",bg_menu:"#111111",accent:"#52b043",text_main:"#ffffff",text_sec:"#a8d8a4",text_dim:"#3d8030",border:"rgba(82,176,67,0.22)",border_solid:"#1a3d1a"},
     "MOVIESFLIX": {bg:"#141414",bg_panel:"rgba(255,255,255,0.07)",bg_menu:"#000000",accent:"#e50914",text_main:"#ffffff",text_sec:"#b3b3b3",text_dim:"#6d6d6d",border:"rgba(229,9,20,0.30)",border_solid:"#404040"},
     "SNOW": {bg:"#0a1628",bg_panel:"rgba(32,68,110,0.65)",bg_menu:"#0f2040",accent:"#93d0f0",text_main:"#e8f4ff",text_sec:"#8bbbd8",text_dim:"#4a7898",border:"rgba(147,208,240,0.18)",border_solid:"#1c4060"},
+    // Retired from the picker when the "Systems" family landed (superseded by "WINDOWS XP"),
+    // but kept defined so configs still set to it keep resolving instead of falling back.
     "WIN XP": {bg:"#003399",bg_panel:"rgba(236,233,216,0.2)",bg_menu:"#0054E3",accent:"#ffd700",text_main:"#FFFFFF",text_sec:"#ECE9D8",text_dim:"#99B4D1",border:"rgba(236,233,216,0.4)",border_solid:"#4fcc3a"},
     "PSIII CLASSIC": {bg:"#000000",bg_panel:"rgba(25,25,25,0.7)",bg_menu:"#111111",accent:"#dcdcdc",text_main:"#ffffff",text_sec:"#aaaaaa",text_dim:"#666666",border:"rgba(255,255,255,0.2)",border_solid:"#444444"},
     "PSIII RED": {bg:"#2b0000",bg_panel:"rgba(40,0,0,0.7)",bg_menu:"#1a0000",accent:"#ff4d4d",text_main:"#ffffff",text_sec:"#ffcccc",text_dim:"#cc6666",border:"rgba(255,77,77,0.2)",border_solid:"#800000"},
@@ -260,6 +262,7 @@ function renderGames(games) {
                 <span class="game-title">${g.title}</span>
                 <div class="game-actions">
                     ${g.installed  ? `<button class="btn-launch" data-launch="${g.id}">▶ Launch</button>` : ''}
+                    ${g.installed  ? `<button class="btn-launch-log" data-launch-log="${g.id}" title="Play with Log — verbose launch for troubleshooting problematic titles">▶ Log</button>` : ''}
                     ${!g.installed && g.store === 'epic' ? `<button class="btn-install-game" data-install="${g.id}" style="background:#0078f2;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:var(--ui-font,Raleway),sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
                     ${!g.installed && g.store === 'gog'  ? `<button class="btn-install-game" data-install="${g.id}" style="background:#9b59d9;border:none;color:#fff;border-radius:4px;padding:4px 10px;font-family:var(--ui-font,Raleway),sans-serif;font-weight:900;font-size:10px;cursor:pointer;letter-spacing:0.5px;">↓ Install</button>` : ''}
                     <button class="btn-edit" data-edit="${g.id}">Edit</button>
@@ -300,6 +303,15 @@ function renderGames(games) {
             refresh();
             if (!result.ok) { closeNowPlaying(); setStatus(`Error: ${result.error}`); }
             else setStatus(`Launched via ${result.method}.`);
+        });
+    });
+
+    // Play with Log — verbose launch, streams stdout/stderr into a live log modal.
+    list.querySelectorAll('[data-launch-log]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.launchLog;
+            openPlayLog(allGames.find(g => g.id === id)?.title || 'Game', id);
         });
     });
 
@@ -2333,6 +2345,62 @@ function showAlert(title, msg) {
         modal.onclick  = (e) => { if (e.target === modal) done(); };
     });
 }
+
+// ── Play with Log (verbose launch) ────────────────────────────────────────────
+// Proton/DXVK are extremely chatty, so the log is a capped ring buffer flushed on a frame rather
+// than `textContent +=` per line (which re-serialised the whole node for every one of what can be
+// tens of thousands of lines). Only the last MAX_PLAY_LOG_LINES are kept — that's the tail you
+// actually need for troubleshooting, and memory stays flat however long the game runs.
+const MAX_PLAY_LOG_LINES = 2000;
+let _playLogId = null;
+let _playLogLines = [];
+let _playLogDropped = 0;
+let _playLogFlush = null;
+
+function openPlayLog(title, id) {
+    _playLogId = id;
+    const modal = document.getElementById('modal-play-log');
+    if (!modal) return;
+    _playLogLines = []; _playLogDropped = 0;
+    document.getElementById('play-log-title').textContent = title ? `· ${title}` : '';
+    document.getElementById('play-log-body').textContent = '';
+    modal.classList.add('active');
+    window.api.launchGameVerbose(id).then(r => { if (r && !r.ok && r.error) appendPlayLog(`[launch failed] ${r.error}`); });
+}
+
+function appendPlayLog(line) {
+    _playLogLines.push(line);
+    if (_playLogLines.length > MAX_PLAY_LOG_LINES) {
+        _playLogDropped += _playLogLines.length - MAX_PLAY_LOG_LINES;
+        _playLogLines = _playLogLines.slice(-MAX_PLAY_LOG_LINES);
+    }
+    if (_playLogFlush) return;
+    _playLogFlush = requestAnimationFrame(() => {
+        _playLogFlush = null;
+        const pre = document.getElementById('play-log-body');
+        if (!pre) return;
+        const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+        const header = _playLogDropped ? `[…${_playLogDropped} earlier lines trimmed…]\n` : '';
+        pre.textContent = header + _playLogLines.join('\n');
+        if (atBottom) pre.scrollTop = pre.scrollHeight;
+    });
+}
+
+function closePlayLog() {
+    if (_playLogId) window.api.stopGameLog?.(_playLogId);   // stop the stream; the game keeps running detached
+    _playLogId = null;
+    if (_playLogFlush) { cancelAnimationFrame(_playLogFlush); _playLogFlush = null; }
+    _playLogLines = []; _playLogDropped = 0;
+    document.getElementById('modal-play-log')?.classList.remove('active');
+}
+window.api.onGameLogLine(d => { if (d && d.id === _playLogId) appendPlayLog(d.line); });
+document.getElementById('btn-play-log-close')?.addEventListener('click', closePlayLog);
+document.getElementById('btn-play-log-done')?.addEventListener('click', closePlayLog);
+document.getElementById('modal-play-log')?.addEventListener('click', e => { if (e.target.id === 'modal-play-log') closePlayLog(); });
+document.getElementById('btn-play-log-copy')?.addEventListener('click', () => {
+    const t = document.getElementById('play-log-body')?.textContent || '';
+    navigator.clipboard?.writeText(t).then(() => setStatus('Log copied.'), () => {});
+});
 
 // ── Now Playing popup ─────────────────────────────────────────────────────────
 let _npTimer = null;

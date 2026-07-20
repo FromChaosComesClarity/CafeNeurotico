@@ -4,17 +4,31 @@
   <meta charset="UTF-8">
   <title>Cafe Crema</title>
   <style>
-    /* Raleway bundled locally (no network dependency) — files in assets/fonts/. */
+    /* All fonts bundled locally (no network dependency) — files in assets/fonts/. */
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Regular.ttf') format('truetype'); font-weight: 400; }
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Bold.ttf') format('truetype'); font-weight: 700; }
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Black.ttf') format('truetype'); font-weight: 900; }
+    /* Interface-font picker choices (shared with the Manager via the `ui_font` setting) */
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Regular.ttf') format('truetype'); font-weight: 400; }
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Bold.ttf') format('truetype'); font-weight: 700; }
+    @font-face { font-family: 'Poppins'; src: url('assets/fonts/Poppins-Black.ttf') format('truetype'); font-weight: 900; }
+    @font-face { font-family: 'Sora'; src: url('assets/fonts/Sora.ttf') format('truetype'); }
+    @font-face { font-family: 'Inter'; src: url('assets/fonts/Inter.ttf') format('truetype'); }
+    @font-face { font-family: 'Fraunces'; src: url('assets/fonts/Fraunces.ttf') format('truetype'); }
+    @font-face { font-family: 'Chicago'; src: url('assets/fonts/ChicagoFLF.ttf') format('truetype'); }
+    @font-face { font-family: 'PxPlus IBM VGA8'; src: url('assets/fonts/PxPlusIBMVGA8.ttf') format('truetype'); }
+    /* Era fonts carried by the "Systems" themes */
+    @font-face { font-family: 'BigBlue Terminal'; src: url('assets/fonts/BigBlueTerminal.ttf') format('truetype'); }
+    @font-face { font-family: 'C64 Pro Mono'; src: url('assets/fonts/C64ProMono.ttf') format('truetype'); }
     :root {
+      /* Set by applyUiFont() — the picked interface font, or the active theme's era font. */
+      --ui-font: 'Poppins';
       --bg: #2C1E16; --bg_panel: rgba(67, 40, 24, 0.6); --bg_menu: #432818;
       --accent: #D4A373; --accent_menu: #D4A373; --text_main: #FFE6A7;
       --text_sec: #E6CC98; --text_dim: #A47148; --border: rgba(212, 163, 115, 0.2);
       --border_solid: #8B5A2B;
     }
-    body { margin: 0; background-color: var(--bg); color: var(--text_main); font-family: 'Raleway', sans-serif; overflow: clip; height: 100vh; width: 100vw; user-select: none; transition: background-color 0.3s ease; }
+    body { margin: 0; background-color: var(--bg); color: var(--text_main); font-family: var(--ui-font, 'Raleway'), sans-serif; overflow: clip; height: 100vh; width: 100vw; user-select: none; transition: background-color 0.3s ease; }
 
     #sleep-screen { background-color: #000000; z-index: 3000; justify-content: center; align-items: center; flex-direction: column; pointer-events: none; }
     .sleep-cover { width: 340px; height: 510px; border-radius: 15px; border: 4px solid var(--border_solid); object-fit: cover; box-shadow: 0 20px 50px rgba(0,0,0,0.9); margin-bottom: 30px; }
@@ -881,7 +895,7 @@
       </div>
     </div>
     <style>
-      .crema-ach-tab { flex:1; padding:12px; background:transparent; border:none; color:var(--text_dim); font-family:Raleway,sans-serif; font-weight:900; font-size:14px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:0.15s; }
+      .crema-ach-tab { flex:1; padding:12px; background:transparent; border:none; color:var(--text_dim); font-family:var(--ui-font,Raleway),sans-serif; font-weight:900; font-size:14px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:0.15s; }
       .crema-ach-tab.active { color:var(--accent); border-bottom:2px solid var(--accent); }
       .crema-ach-card { display:flex; align-items:center; gap:16px; padding:14px 16px; border-radius:10px; border:1px solid var(--border_solid); background:rgba(255,255,255,0.02); }
       .crema-ach-card.unlocked { background:rgba(100,175,100,0.08); border-color:rgba(100,175,100,0.3); box-shadow:0 0 18px rgba(100,175,100,0.08); }

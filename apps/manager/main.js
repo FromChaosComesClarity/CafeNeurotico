@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu, Notification, nativeImage, screen } = require('electron');
 app.setName('cafeneurotico');
 const path = require('path');
 const os = require('os');
@@ -145,14 +145,21 @@ function getSavedBounds() {
 
 function createWindow () {
     const saved = getSavedBounds();
+    // Clamp to the display's work area so it never opens larger than the screen (e.g. 1080p with
+    // a saved size from a bigger monitor, or panels/taskbars eating vertical space) — which pushed
+    // the welcome screen partly off-screen. Fall back to a centered window when it wouldn't fit.
+    const wa = screen.getPrimaryDisplay().workArea;
+    const width  = Math.min(saved?.width  || 1360, wa.width  - 40);
+    const height = Math.min(saved?.height || 900,  wa.height - 40);
+    let x = saved?.x, y = saved?.y;
+    const onScreen = x != null && y != null && x >= wa.x && y >= wa.y &&
+                     x + width <= wa.x + wa.width && y + height <= wa.y + wa.height;
+    if (!onScreen) { x = undefined; y = undefined; }   // undefined → Electron centers it
     const win = new BrowserWindow({
-        width:  saved?.width  || 1400,
-        height: saved?.height || 950,
-        x: saved?.x,
-        y: saved?.y,
+        width, height, x, y,
         frame: false,
         show: false,
-        backgroundColor: '#2C1E16',
+        backgroundColor: '#1a1210',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
                                   contextIsolation: true,
