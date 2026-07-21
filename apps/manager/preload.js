@@ -160,6 +160,7 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderPlatforms:  (gid) => ipcRenderer.invoke('grinder-platforms', gid),
                                 onGrinderInstallProgress: (cb) => ipcRenderer.on('grinder-install-progress', (e, d) => cb(d)),
                                 onWindowRefocused: (cb) => ipcRenderer.on('window-refocused', () => cb()),
+                                onOpenGame: (cb) => ipcRenderer.on('open-game', (e, id) => cb(id)),
 
                                 // --- PLAYLISTS ---
                                 getPlaylists:           ()           => ipcRenderer.invoke('get-playlists'),

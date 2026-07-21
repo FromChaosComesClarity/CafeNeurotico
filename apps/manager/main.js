@@ -192,15 +192,45 @@ function createWindow () {
     win.webContents.once('did-finish-load', () => startSteamInstallWatcher(win));
 }
 
+// --game=<id> opens straight to that game's page. Companion apps (the Clock) use it to
+// link a piece of art back here. Read from argv on first launch, and from the *second*
+// instance's argv when we are already running — otherwise the request would be dropped
+// on the floor and the user would just see the library.
+const gameIdFromArgv = (argv) => {
+    const hit = (argv || []).find(a => a.startsWith('--game='));
+    if (!hit) return null;
+    const id = hit.slice('--game='.length).trim();
+    return /^\d+$/.test(id) ? id : null;
+};
+let pendingGameId = gameIdFromArgv(process.argv);
+
+function openGameInWindow(id) {
+    if (!id) return;
+    const w = BrowserWindow.getAllWindows()[0];
+    if (!w) return;
+    if (w.isMinimized()) w.restore();
+    w.focus();
+    w.webContents.send('open-game', id);
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
     app.quit();
 } else {
-    app.on('second-instance', () => {
+    app.on('second-instance', (_e, argv) => {
         const w = BrowserWindow.getAllWindows()[0];
         if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
+        openGameInWindow(gameIdFromArgv(argv));
     });
 }
+
+// The renderer tells us when it can accept it; before that the game list isn't loaded.
+ipcMain.on('renderer-ready', () => {
+    if (!pendingGameId) return;
+    const id = pendingGameId;
+    pendingGameId = null;
+    setTimeout(() => openGameInWindow(id), 400);
+});
 
 app.whenReady().then(() => {
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });

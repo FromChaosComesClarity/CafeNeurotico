@@ -1511,6 +1511,16 @@ function saveHomeConfig() {
 function _hImg(t) { if (!t) return ''; const p = t.CoverArt || t.HeroArt || t.Logo || ''; return p ? getSafePath(p) : ''; }
 function openHomeGameById(id, fallback) { const g = allGames.find(x => String(x.id) === String(id)) || fallback; if (g) { switchView(lastGridView); openGamepage(g); } }
 
+// Opened with --game=<id> (the Clock links its artwork back here). If the library hasn't
+// finished loading, wait for it rather than silently doing nothing.
+window.api.onOpenGame?.(id => {
+    const tryOpen = (attempt = 0) => {
+        if (Array.isArray(allGames) && allGames.length) { openHomeGameById(id); return; }
+        if (attempt < 20) setTimeout(() => tryOpen(attempt + 1), 250);
+    };
+    tryOpen();
+});
+
 function _homeFeatured(t, pill) {
     if (!t) return `<div class="hc-empty">Nothing here yet.</div>`;
     const meta = [t.Store, (t.GENRE || '').split(',')[0].trim(), t.METACRITIC ? ('MC ' + t.METACRITIC) : '', t.HLTB_Main].filter(Boolean).join(' &middot; ');
