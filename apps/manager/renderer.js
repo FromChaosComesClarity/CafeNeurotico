@@ -1509,7 +1509,15 @@ function saveHomeConfig() {
 }
 
 function _hImg(t) { if (!t) return ''; const p = t.CoverArt || t.HeroArt || t.Logo || ''; return p ? getSafePath(p) : ''; }
-function openHomeGameById(id, fallback) { const g = allGames.find(x => String(x.id) === String(id)) || fallback; if (g) { switchView(lastGridView); openGamepage(g); } }
+function openHomeGameById(id, fallback) {
+    const g = allGames.find(x => String(x.id) === String(id)) || fallback;
+    if (!g) return;
+    // The grid switch is only there to put the library behind the floating panel. If a panel is
+    // already floating the library is already behind it, and going via the grid would just start
+    // a close animation we immediately cancel — so swap the contents in place instead.
+    if (!document.body.classList.contains('gamepage-overlay')) switchView(lastGridView);
+    openGamepage(g);
+}
 
 // Opened with --game=<id> (the Clock links its artwork back here). If the library hasn't
 // finished loading, wait for it rather than silently doing nothing.
@@ -2616,6 +2624,11 @@ function syncFilterActiveStates() {
 // Play the floating-overlay gamepage's leave animation, then run `done()` (which re-enters
 // switchView to actually swap views). Falls back on a timer if animationend never fires.
 let _gpOverlayCloseTimer = null;
+// Bumped whenever a close is cancelled by the overlay re-opening. A close that has already
+// been scheduled cannot be un-scheduled, so instead it checks this on the way out and stays
+// quiet if it is stale — otherwise its done() fires ~360ms later and closes the panel that
+// just re-opened, which is what a --game= request arriving over an open gamepage does.
+let _gpOverlayCloseGen = 0;
 function _animateOverlayClose(done) {
     // Animate out whichever panel is currently floating (gamepage or the edit page on top of it).
     const gp = document.querySelector('#view-details.active') || document.getElementById('view-gamepage');
@@ -2625,12 +2638,14 @@ function _animateOverlayClose(done) {
         return;
     }
     document.body.classList.add('gamepage-overlay-closing');
+    const gen = ++_gpOverlayCloseGen;
     let finished = false;
     const finish = () => {
         if (finished) return;
         finished = true;
         clearTimeout(_gpOverlayCloseTimer);
         gp.removeEventListener('animationend', onEnd);
+        if (gen !== _gpOverlayCloseGen) return;   // the overlay re-opened — this close is void
         done();
     };
     const onEnd = (e) => { if (e.target === gp) finish(); };
@@ -2652,6 +2667,7 @@ function switchView(viewId) {
     const _overlayDetails = viewId === 'view-details' && _classicOverlay && document.body.classList.contains('gamepage-overlay');
     if (_overlayGamepage || _overlayDetails) {
         document.body.classList.remove('gamepage-overlay-closing');   // cancel any in-flight close
+        _gpOverlayCloseGen++;                                          // …and make that cancel stick
         document.body.classList.add('gamepage-overlay');
         const panel = document.getElementById(_overlayDetails ? 'view-details' : 'view-gamepage');
         const other = document.getElementById(_overlayDetails ? 'view-gamepage' : 'view-details');
