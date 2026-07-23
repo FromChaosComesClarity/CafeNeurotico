@@ -1301,7 +1301,7 @@ document.getElementById('btn-f2p-hide-one')?.addEventListener('click', async () 
 // 'sharp' = current flat look (corners-flat class on body); 'round' = the
 // previous rounded style (no class). Only affects the layouts listed below.
 const _CORNERS_FLAT_LAYOUTS = ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'];
-let _cornersStyle = 'round';
+let _cornersStyle = 'sharp';
 function applyCornersStyle() {
     const mode = localStorage.getItem('cngm_layout_mode') || 'rail';
     document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
@@ -1964,7 +1964,8 @@ document.getElementById('btn-titlebar-library')?.addEventListener('click', () =>
 });
 
 (async () => {
-    _cornersStyle = (await window.api.getSetting('corners_style')) === 'sharp' ? 'sharp' : 'round';
+    // Sharp is the default — only an explicitly saved 'round' opts back into the rounded style.
+    _cornersStyle = (await window.api.getSetting('corners_style')) === 'round' ? 'round' : 'sharp';
     document.querySelectorAll('.corners-btn').forEach(b => b.classList.toggle('active', b.dataset.val === _cornersStyle));
     // Release build: the icon side rail is the ONLY available layout — any saved
     // layout_mode is ignored (all layout code + the hidden picker kept for later).
@@ -2406,7 +2407,7 @@ function _renderPlaylistList(containerId, mode) {
 
     const riActive = currentPlaylistId === 'recently-imported';
     const riHtml = recentlyImportedCount > 0
-        ? `<div style="display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+        ? `<div style="display:flex; align-items:center; gap:4px; margin-bottom:4px; flex-shrink:0;">
             <button class="btn-recently-imported-filter"
                 style="flex:1; text-align:left; font-size:11px; padding:8px 10px; background:${riActive ? 'var(--accent)' : 'var(--bg_menu)'}; border:1px solid ${riActive ? 'var(--accent)' : 'var(--border_solid)'}; color:${riActive ? 'var(--bg)' : 'var(--text_sec)'}; border-radius:6px; cursor:pointer; font-family:inherit; font-weight:900; transition:background 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 📥 Recently Imported
@@ -2416,7 +2417,7 @@ function _renderPlaylistList(containerId, mode) {
 
     container.innerHTML = riHtml + allPlaylists.map(p => {
         const isActive = currentPlaylistId === p.id;
-        return `<div style="display:flex; align-items:center; gap:4px;">
+        return `<div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
             <button class="btn-playlist-filter" data-playlist-id="${p.id}"
                 style="flex:1; text-align:left; font-size:11px; padding:8px 10px; background:${isActive ? 'var(--accent)' : 'var(--bg_menu)'}; border:1px solid ${isActive ? 'var(--accent)' : 'var(--border_solid)'}; color:${isActive ? 'var(--bg)' : 'var(--text_sec)'}; border-radius:6px; cursor:pointer; font-family:inherit; font-weight:900; transition:background 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 ${escHtml(p.name)}

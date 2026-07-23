@@ -92,8 +92,15 @@
     .support-cta-heart { width: 13px; height: 12px; flex-shrink: 0; filter: drop-shadow(0 0 3px rgba(255,75,62,0.55)); }
     .support-cta-text { font-size: 10px; font-weight: 900; letter-spacing: 0.4px; color: #FFE6A7; white-space: nowrap; }
     /* Playlist multi-select rows */
-    .pl-select-row { padding:10px 14px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:10px; font-size:12px; font-weight:900; color:var(--text_sec); border-bottom:1px solid var(--border); transition:background 0.1s; font-family:inherit; }
+    .pl-select-row { padding:10px 14px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:10px; font-size:12px; font-weight:900; color:var(--text_sec); border-bottom:1px solid var(--border); transition:background 0.1s; font-family:inherit; flex-shrink:0; }
     .pl-select-row:last-child { border-bottom:none; }
+    /* Both playlist lists scroll once they outgrow their max-height — keep the bar slim and themed. */
+    #playlist-picker-list::-webkit-scrollbar,
+    #modal-playlists-nav-list::-webkit-scrollbar { width:6px; }
+    #playlist-picker-list::-webkit-scrollbar-track,
+    #modal-playlists-nav-list::-webkit-scrollbar-track { background:transparent; }
+    #playlist-picker-list::-webkit-scrollbar-thumb,
+    #modal-playlists-nav-list::-webkit-scrollbar-thumb { background:var(--accent); border-radius:3px; }
     .pl-select-row.pl-selected { background:var(--bg_menu); color:var(--text_sec); }
     .pl-select-row:hover:not(.pl-selected) { background:var(--bg_panel); }
     .pl-row-check { font-size:11px; flex-shrink:0; width:14px; text-align:center; opacity:0.7; }
@@ -6076,7 +6083,7 @@ LOADING...READY.</div>
     <div class="modal-box" style="max-width:400px; gap:0;">
       <h3 style="margin:0 0 4px; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Add to Playlist</h3>
       <p id="modal-playlist-picker-game" style="margin:0 0 14px; font-size:12px; font-weight:900; color:var(--text_main);"></p>
-      <div id="playlist-picker-list" style="display:flex; flex-direction:column; max-height:280px; overflow-y:auto; border:1px solid var(--border_solid); border-radius:6px; overflow:hidden;"></div>
+      <div id="playlist-picker-list" style="display:flex; flex-direction:column; max-height:min(280px, 45vh); overflow-y:auto; overflow-x:hidden; border:1px solid var(--border_solid); border-radius:6px;"></div>
       <div style="display:flex; gap:6px; margin-top:10px;">
         <input type="text" id="playlist-picker-new-name" placeholder="+ New playlist…" style="flex:1; box-sizing:border-box;">
         <button id="btn-playlist-picker-new" style="padding:0 14px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec); border-radius:6px; cursor:pointer; font-family:inherit; font-weight:900; font-size:11px; white-space:nowrap; letter-spacing:0.5px; transition:border-color 0.15s, color 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)';" onmouseout="this.style.borderColor='var(--border_solid)';this.style.color='var(--text_sec)';">Create &amp; Add</button>
@@ -6095,7 +6102,7 @@ LOADING...READY.</div>
         <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px; font-size:13px;">Playlists</h3>
         <button id="btn-playlists-nav-new" style="padding:3px 10px; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim); border-radius:4px; cursor:pointer; font-family:inherit; font-size:10px; font-weight:900; letter-spacing:0; text-transform:none; transition:color 0.15s, border-color 0.15s;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)';" onmouseout="this.style.color='var(--text_dim)';this.style.borderColor='var(--border_solid)';">+ New</button>
       </div>
-      <div id="modal-playlists-nav-list" style="display:flex; flex-direction:column; gap:6px; min-height:36px;"></div>
+      <div id="modal-playlists-nav-list" style="display:flex; flex-direction:column; gap:6px; min-height:36px; max-height:min(360px, 55vh); overflow-y:auto; overflow-x:hidden; padding-right:2px;"></div>
       <button id="btn-playlists-nav-close" style="width:100%; margin-top:14px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec); border-radius:6px; padding:8px;">Close</button>
     </div>
   </div>
