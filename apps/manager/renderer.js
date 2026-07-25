@@ -196,22 +196,46 @@ function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function showLauncherPicker(game, launchers) {
+async function showLauncherPicker(game, launchers) {
     const modal = document.getElementById('modal-launcher-pick');
     const list  = document.getElementById('launcher-pick-list');
     list.innerHTML = '';
+    modal.classList.add('active');
+    // Per-launcher install state (Steam appmanifest / GOG-Epic grinder.db) so an
+    // uninstalled store routes to its installer instead of a silent launch failure.
+    let states = [];
+    try { states = await window.api.launcherStates(game.id); } catch (e) {}
+    const byCmd = new Map(states.map(s => [s.cmd, s]));
     launchers.forEach(l => {
+        const st = byCmd.get(l.cmd);
+        // Unknown (untracked launcher: flatpak/custom/…) is treated as playable.
+        const installed = !st || st.installed !== false || st.store === null;
         const btn = document.createElement('button');
-        btn.className = 'primary';
-        btn.style.cssText = 'width:100%; text-align:left; padding:10px 14px; font-size:13px;';
-        btn.textContent = l.label || l.cmd;
+        btn.className = installed ? 'primary' : 'btn-install-primary';
+        btn.style.cssText = 'width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; font-size:13px;';
+        const name = l.label || l.cmd;
+        btn.innerHTML = `<span>${installed ? '▶' : '⤓'} ${escHtml(name)}</span>` +
+                        `<span style="opacity:.65; font-size:11px;">${installed ? '' : 'Install'}</span>`;
         btn.addEventListener('click', () => {
             modal.classList.remove('active');
-            _doLaunch(game, l.cmd);
+            if (installed) _doLaunch(game, l.cmd);
+            else _installLauncher(game, (st && st.store) || null, l.cmd);
         });
         list.appendChild(btn);
     });
-    modal.classList.add('active');
+}
+
+// Route an uninstalled launcher in the picker to the right installer for its store.
+function _installLauncher(game, store, cmd) {
+    if (store === 'steam') {
+        const appId = _steamAppId(game);
+        if (appId) { window.api.openInstallUrl('steam://install/' + appId); return; }
+    }
+    if (store === 'gog' || store === 'epic') {
+        if (/^(gog|epic)_/i.test(game.GrinderGameId || '')) { openGrinderInstall(game); return; }
+        window.api.openGrinder(game.Game); return;
+    }
+    _doLaunch(game, cmd); // untracked launcher — best-effort launch
 }
 document.getElementById('btn-launcher-pick-cancel').addEventListener('click', () => {
     document.getElementById('modal-launcher-pick').classList.remove('active');

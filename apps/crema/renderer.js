@@ -1148,13 +1148,25 @@ function tryLaunch(game) {
   }
 }
 
-function showLauncherPicker(game, launchers) {
+async function showLauncherPicker(game, launchers) {
   _lpGame = game; _lpList = launchers; _lpIndex = 0;
   document.getElementById('lp-game-title').textContent = game.Game;
   renderLpList();
   document.getElementById('launcher-pick-backdrop').classList.remove('hidden');
   previousGameState = gameState;
   gameState = 'LAUNCHER_PICK';
+  // Annotate each launcher with its store's install state (Steam appmanifest /
+  // GOG-Epic grinder.db) so an uninstalled store routes to its installer instead
+  // of a silent launch failure. Untracked launchers (flatpak/custom) count as playable.
+  try {
+    const states = await window.api.launcherStates(game.id);
+    const byCmd = new Map(states.map(s => [s.cmd, s]));
+    _lpList = _lpList.map(l => {
+      const st = byCmd.get(l.cmd);
+      return { ...l, installed: !st || st.installed !== false || st.store === null, store: st ? st.store : null };
+    });
+    if (gameState === 'LAUNCHER_PICK') renderLpList();
+  } catch (e) {}
 }
 
 function hideLauncherPicker() {
@@ -1169,7 +1181,13 @@ function renderLpList() {
   _lpList.forEach((l, i) => {
     const div = document.createElement('div');
     div.className = 'overlay-item' + (i === _lpIndex ? ' selected' : '');
-    div.textContent = l.label || l.cmd;
+    const notInstalled = l.installed === false;
+    const name = l.label || l.cmd;
+    if (notInstalled) {
+      div.innerHTML = `<span style="opacity:.6;">${name}</span><span style="float:right; opacity:.6; font-size:.8em;">${t('common.install') || 'INSTALL'}</span>`;
+    } else {
+      div.textContent = name;
+    }
     el.appendChild(div);
   });
 }
@@ -1439,7 +1457,18 @@ function handleInput(action) {
   else if (gameState === 'LAUNCHER_PICK') {
     if (action === 'DOWN') { _lpIndex = (_lpIndex + 1) % _lpList.length; playSound(sfxNav); renderLpList(); }
     else if (action === 'UP') { _lpIndex = (_lpIndex - 1 + _lpList.length) % _lpList.length; playSound(sfxNav); renderLpList(); }
-    else if (action === 'ACCEPT') { playSound(sfxSelect); const chosen = _lpList[_lpIndex]; hideLauncherPicker(); enterSleepMode({ ..._lpGame, LaunchCommand: chosen.cmd }); }
+    else if (action === 'ACCEPT') {
+      playSound(sfxSelect);
+      const chosen = _lpList[_lpIndex]; const g = _lpGame; hideLauncherPicker();
+      if (chosen.installed === false) {
+        // Uninstalled store — route to its installer rather than a dead launch.
+        if (chosen.store === 'gog' || chosen.store === 'epic') showGrinderConfirm(g);
+        else if (chosen.store === 'steam' && g.SteamAppID && String(g.SteamAppID) !== 'None') showSteamInstallConfirm(g);
+        else enterSleepMode({ ...g, LaunchCommand: chosen.cmd });
+      } else {
+        enterSleepMode({ ...g, LaunchCommand: chosen.cmd });
+      }
+    }
     else if (action === 'BACK') { playSound(sfxBack); hideLauncherPicker(); }
   }
   else if (gameState === 'GRINDER_PROGRESS') {

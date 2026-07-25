@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
                                 deleteGame: (id) => ipcRenderer.invoke('delete-game', id),
                                 signalReady: () => ipcRenderer.send('renderer-ready'),
                                 verifyInstallStatus: (id) => ipcRenderer.invoke('verify-install-status', id),
+                                launcherStates: (id) => ipcRenderer.invoke('launcher-states', id),
                                 openInstallUrl: (url) => ipcRenderer.invoke('open-install-url', url),
                                 openExternal: (url) => ipcRenderer.invoke('open-install-url', url),
                                 checkAllInstallStatus: () => ipcRenderer.invoke('check-all-install-status'),

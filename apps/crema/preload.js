@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
                                 protonWatchGet: () => ipcRenderer.invoke('proton-watch-get'),
                                 achGet: () => ipcRenderer.invoke('ach-get'),
                                 verifyInstallStatus: (id) => ipcRenderer.invoke('verify-install-status', id),
+                                launcherStates: (id) => ipcRenderer.invoke('launcher-states', id),
                                 openInstallUrl: (url) => ipcRenderer.invoke('open-install-url', url),
                                 onInstallStatusUpdated: (cb) => ipcRenderer.on('install-status-updated', () => cb()),
                                 searchSteam: (g) => ipcRenderer.invoke('search-steam', g),

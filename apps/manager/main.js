@@ -1419,42 +1419,132 @@ ipcMain.handle('ach-scan', async () => {
     return stats;
 });
 
-function resolveInstallState(launchCommand, steamAppId) {
-    const cmd = launchCommand || '';
-    // GOG/Epic (grinder://) install state is reconciled straight from GRINDER's DB
-    // (sync-grinder-installed / sync-all-grinder-games) — the source of truth.
-    if (/steam:\/\/rungameid/i.test(cmd) && steamAppId && steamAppId !== 'None' && steamAppId !== '') {
-        return isSteamGameInstalled(steamAppId) ? 1 : 0;
-    }
+// ── Multi-store install detection ────────────────────────────────────────────
+// A library row can front several stores at once (e.g. Store "Steam, GOG") with one
+// launcher per store in LaunchCommands. Install state is the OR across those stores —
+// the game is "installed" if ANY store's copy is on disk. The old code keyed off only
+// the primary LaunchCommand, so an installed Steam copy was invisible whenever the
+// primary command happened to be the GOG/Epic one (→ Play hidden, Installed stuck at 0).
+
+// Every launch-command string for a row: the plural LaunchCommands plus the primary.
+function launchCmdsOf(game) {
+    const out = [];
+    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) out.push(l.cmd); } catch {}
+    if (game.LaunchCommand) out.push(game.LaunchCommand);
+    return out;
+}
+
+// grinder.db's installed-id set (gog_* / epic_*), cached by file mtime so the watcher
+// and batch scans don't reopen the DB once per row.
+let _grinderInstalledCache = { key: '', set: new Set() };
+function grinderInstalledSet() {
+    const p = grinderDbPath();
+    if (!p) { _grinderInstalledCache = { key: '', set: new Set() }; return _grinderInstalledCache.set; }
+    let key = p;
+    try { key += ':' + fs.statSync(p).mtimeMs; } catch {}
+    if (key === _grinderInstalledCache.key) return _grinderInstalledCache.set;
+    const set = new Set();
+    try {
+        const gdb = new Database(p, { readonly: true, timeout: 5000 });
+        for (const r of gdb.prepare("SELECT id FROM games WHERE installed=1").all()) set.add(String(r.id));
+        gdb.close();
+    } catch {}
+    _grinderInstalledCache = { key, set };
+    return set;
+}
+
+// Is one launch command's store copy installed on disk? Returns true/false for a
+// recognised store (Steam via appmanifest, GOG/Epic via grinder.db), or null otherwise
+// (custom / emulator / manual — those key off "has a launch command" elsewhere).
+function launcherInstalled(cmd, steamAppId) {
+    const c = cmd || '';
+    const sm = c.match(/steam:\/\/rungameid\/(\d+)/i);
+    if (sm) return isSteamGameInstalled(sm[1] || steamAppId);
+    const gm = c.match(/grinder:\/\/launch\/(gog|epic)\/([^"\s]+)/i);
+    if (gm) return grinderInstalledSet().has(`${gm[1].toLowerCase()}_${gm[2]}`);
     return null;
 }
 
+// Install state for a Steam-fronting row, OR-ed across every store it fronts. Returns
+// 1/0 when the row has a Steam launcher, else null so pure GOG/Epic/manual rows keep
+// relying on their own source of truth (grinder push-sync / launch command presence).
+// Scoping to Steam-fronting rows keeps the blast radius to exactly the mixed-store
+// class this fixes and never overrides the GOG/Epic reconciler.
+function resolveInstallState(game) {
+    const cmds = launchCmdsOf(game);
+    if (!cmds.some(c => /steam:\/\/rungameid/i.test(c))) return null;
+    let allTracked = true;
+    for (const cmd of cmds) {
+        const s = launcherInstalled(cmd, game.SteamAppID);
+        if (s === true) return 1;          // any store copy on disk ⇒ installed
+        if (s === null) allTracked = false; // an untracked launcher (flatpak/custom/…)
+    }
+    // No tracked store copy is on disk. Only declare the row uninstalled when EVERY
+    // launcher is a tracked store (Steam/GOG/Epic); an untracked launcher (flatpak,
+    // custom, emulator) may itself be the install, so leave the flag alone.
+    return allTracked ? 0 : null;
+}
+
+// Per-launcher install state for the store-picker UI: [{ label, cmd, store, installed }].
+function launcherStatesForGame(game) {
+    let launchers = [];
+    try { launchers = JSON.parse(game.LaunchCommands || '[]'); } catch {}
+    if (!launchers.length && game.LaunchCommand) {
+        launchers = [{ label: guessLauncherLabel(game.LaunchCommand), cmd: game.LaunchCommand }];
+    }
+    return launchers.map(l => ({
+        label: l.label || guessLauncherLabel(l.cmd),
+        cmd: l.cmd,
+        store: launcherStore(l.cmd || ''),
+        installed: launcherInstalled(l.cmd, game.SteamAppID) === true,
+    }));
+}
+
+ipcMain.handle('launcher-states', (e, gameId) => {
+    if (!db) return [];
+    const game = db.prepare("SELECT SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
+    return game ? launcherStatesForGame(game) : [];
+});
+
 ipcMain.handle('verify-install-status', (e, gameId) => {
     if (!db) return { installed: 1 };
-    const game = db.prepare("SELECT id, SteamAppID, LaunchCommand, Installed FROM games WHERE id=?").get(gameId);
+    const game = db.prepare("SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games WHERE id=?").get(gameId);
     if (!game) return { installed: 1 };
-    const installed = resolveInstallState(game.LaunchCommand, game.SteamAppID);
+    const installed = resolveInstallState(game);
     if (installed !== null) db.prepare("UPDATE games SET Installed=? WHERE id=?").run(installed, gameId);
     return { installed: installed ?? game.Installed ?? 1 };
 });
 
 // ── DYNAMIC INSTALL WATCHER ───────────────────────────────────────────────
+// Reconcile Installed for every Steam-fronting row (incl. mixed-store rows whose Steam
+// launcher lives in LaunchCommands, not the primary). Returns how many rows changed.
+function reconcileSteamInstalls() {
+    if (!db) return 0;
+    let changed = 0;
+    const games = db.prepare(
+        "SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games " +
+        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+    ).all();
+    for (const g of games) {
+        const s = resolveInstallState(g);
+        if (s !== null && s !== g.Installed) { db.prepare("UPDATE games SET Installed=? WHERE id=?").run(s, g.id); changed++; }
+    }
+    return changed;
+}
+
 let steamInstallWatchers = [];
 function startSteamInstallWatcher(win) {
     steamInstallWatchers.forEach(w => { try { w.close(); } catch(e) {} });
     steamInstallWatchers = [];
+    // Reconcile once at boot so a game installed on Steam but fronted by GOG/Epic (Play
+    // hidden, Installed stuck at 0) corrects itself without waiting for a manifest change.
+    try { if (reconcileSteamInstalls() && win) win.webContents.send('install-status-updated'); } catch(e) {}
     let debounce = null;
     const onChange = (ev, filename) => {
         if (!filename || !filename.startsWith('appmanifest_')) return;
         clearTimeout(debounce);
         debounce = setTimeout(() => {
-            if (!db) return;
-            const games = db.prepare("SELECT id, SteamAppID, LaunchCommand FROM games WHERE LaunchCommand IS NOT NULL AND LaunchCommand != ''").all();
-            for (const g of games) {
-                const s = resolveInstallState(g.LaunchCommand, g.SteamAppID);
-                if (s !== null) db.prepare("UPDATE games SET Installed=? WHERE id=?").run(s, g.id);
-            }
-            if (win) win.webContents.send('install-status-updated');
+            if (reconcileSteamInstalls() >= 0 && win) win.webContents.send('install-status-updated');
         }, 1500);
     };
     for (const dir of getSteamLibraryPaths()) {
@@ -1467,9 +1557,14 @@ ipcMain.handle('check-all-install-status', async () => {
     let updated = 0;
 
     // ── STEAM: filesystem detection ──────────────────────────────────────────
-    const steamGames = db.prepare("SELECT id, SteamAppID, LaunchCommand FROM games WHERE LaunchCommand LIKE '%steam://rungameid%'").all();
+    // Include mixed-store rows whose Steam launcher sits in LaunchCommands (not the
+    // primary) so a game installed on Steam but fronted by GOG/Epic still resolves.
+    const steamGames = db.prepare(
+        "SELECT id, SteamAppID, LaunchCommand, LaunchCommands FROM games " +
+        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+    ).all();
     for (const g of steamGames) {
-        const s = resolveInstallState(g.LaunchCommand, g.SteamAppID);
+        const s = resolveInstallState(g);
         if (s !== null) { db.prepare("UPDATE games SET Installed=? WHERE id=?").run(s, g.id); updated++; }
     }
 
@@ -1654,6 +1749,10 @@ ipcMain.handle('sync-all-grinder-games', (_, allGrinderGames, grinderPath) => {
             }
         }
     }
+    // GRINDER only knows the GOG/Epic side, so the writes above set Installed purely from
+    // that store — which zeroes a mixed-store row (e.g. Steam+GOG) whose Steam copy is the
+    // one actually installed. Re-assert the Steam OR so those rows aren't wrongly downgraded.
+    reconcileSteamInstalls();
     return { synced };
 });
 
