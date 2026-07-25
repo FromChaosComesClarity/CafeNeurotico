@@ -3692,6 +3692,9 @@
                         <button id="btn-gamepage-browse" class="btn-hero btn-hero-sq" title="Browse Local Files" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                         </button>
+                        <button id="btn-gamepage-shortcut" class="btn-hero btn-hero-sq" title="Add to Desktop">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg>
+                        </button>
                         <button id="btn-gamepage-trailer" class="btn-hero btn-hero-sq" title="Watch Trailer">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                         </button>
@@ -5625,6 +5628,33 @@ LOADING...READY.</div>
 
   <div id="modal-refine-search" class="modal-overlay"><div class="modal-box"><h3 style="margin: 0; color: var(--accent); text-transform: uppercase;">Refine Search</h3><p style="font-size: 12px; color: var(--text_sec); margin: 0;">No exact matches found. Modify the title to search again:</p><input type="text" id="refine-search-input" style="margin-top: 10px;"><button id="btn-refine-search-submit" class="primary" style="padding: 10px;">Search Again</button><button id="btn-close-refine-search" style="margin-top: 5px;">Cancel</button></div></div>
   <div id="modal-steam-results" class="modal-overlay"><div class="modal-box" style="max-height: 80vh;"><h3 style="margin: 0; color: var(--accent); text-transform: uppercase;">Multiple Results Found</h3><p style="font-size: 12px; color: var(--text_sec); margin: 0;">Select the correct game from the Steam database:</p><div id="steam-results-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 5px;"></div><button id="btn-close-steam-results" style="margin-top: 10px;">Cancel</button></div></div>
+
+  <!-- Scan for Updates — results (z-index above the Control Panel it opens from) -->
+  <div id="modal-updates" class="modal-overlay" style="z-index:26000;">
+    <div class="modal-box" style="width:560px; max-width:95vw; max-height:82vh; text-align:left; display:flex; flex-direction:column;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase;">Game Updates</h3>
+      <div id="updates-status" style="font-size:12px; color:var(--text_sec); margin:6px 0;">Scanning…</div>
+      <div id="updates-progress-wrap" style="height:4px; background:var(--border_solid); border-radius:3px; overflow:hidden; margin-bottom:8px;">
+        <div id="updates-progress-fill" style="height:100%; width:0%; background:var(--accent); transition:width .2s;"></div>
+      </div>
+      <div id="updates-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
+      <button id="btn-close-updates" style="margin-top:12px; flex-shrink:0;">Close</button>
+    </div>
+  </div>
+
+  <!-- Add game to desktop / app menu — target picker (above the gamepage overlay) -->
+  <div id="modal-shortcut" class="modal-overlay" style="z-index:26000;">
+    <div class="modal-box" style="width:400px; max-width:95vw; text-align:left;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase;">Add to Desktop</h3>
+      <p style="font-size:12px; color:var(--text_sec); margin:6px 0 12px;">Create a launcher that opens <b id="shortcut-game-name">this game</b> straight through Cafe Neurotico. Where should it go?</p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button id="btn-shortcut-both" class="primary" style="width:100%; padding:10px; font-size:12px;">App Menu + Desktop</button>
+        <button id="btn-shortcut-menu" style="width:100%; padding:10px; font-size:12px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">App Menu only</button>
+        <button id="btn-shortcut-desktop" style="width:100%; padding:10px; font-size:12px; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Desktop only</button>
+        <button id="btn-shortcut-cancel" style="width:100%; margin-top:4px;">Cancel</button>
+      </div>
+    </div>
+  </div>
   <div id="modal-connect" class="modal-overlay">
     <div style="background: var(--bg_menu); border-radius: 14px; border: 2px solid var(--border_solid); width: 440px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow: hidden;">
 
@@ -5908,6 +5938,12 @@ LOADING...READY.</div>
           <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;" data-i18n="html.storage_hint">See disk usage per game (largest first) and free up space.</div>
           <button id="btn-storage-grinder" class="primary" style="width: 100%; font-size: 12px; padding: 10px; letter-spacing: 1px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg><span data-i18n="html.btn_manage_storage_grinder">GOG &amp; Epic Games</span></button>
           <button id="btn-storage-steam" style="width: 100%; font-size: 11px; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec);"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/></svg><span data-i18n="html.btn_manage_storage_steam">Steam Games</span></button>
+        </div>
+
+        <div class="tool-card tools-section" data-search="update updates check scan game patch version new gog epic steam upgrade outdated">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-i18n="html.card_updates">Game Updates</span></div>
+          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;" data-i18n="html.updates_hint">Check installed GOG &amp; Epic games for new versions (Steam updates are flagged and handled by Steam). Updating is always your choice.</div>
+          <button id="btn-scan-updates" class="primary" style="width: 100%; font-size: 12px; padding: 10px; letter-spacing: 1px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-i18n="html.btn_scan_updates">Scan for Updates</span></button>
         </div>
 
         <div class="tool-card tools-section" data-search="pico8 pico-8 games show hide visibility filter cartridge">

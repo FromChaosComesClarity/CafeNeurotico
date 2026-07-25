@@ -1583,6 +1583,97 @@ ipcMain.handle('check-all-install-status', async () => {
     return { updated };
 });
 
+// ── Scan for game updates (user-triggered, always optional) ──────────────────
+// GOG/Epic: compare the installed version against the store's latest (gogdl/legendary);
+// the user applies an update inside CN by re-running the install (reconciles to latest).
+// Steam owns its own updater, so Steam is a best-effort "pending in Steam" flag read from
+// the local appmanifest that routes to the Steam client — never an in-CN update.
+function steamUpdatePending(appId) {
+    const id = String(appId).replace(/\.0+$/, '');
+    if (!id || id === 'None') return false;
+    for (const dir of getSteamLibraryPaths()) {
+        const mf = path.join(dir, `appmanifest_${id}.acf`);
+        if (!fs.existsSync(mf)) continue;
+        try {
+            const txt = fs.readFileSync(mf, 'utf8');
+            const num = k => { const m = txt.match(new RegExp(`"${k}"\\s+"(\\d+)"`, 'i')); return m ? Number(m[1]) : 0; };
+            const stateFlags = num('StateFlags');
+            const toDownload = num('BytesToDownload');
+            const downloaded = num('BytesDownloaded');
+            // StateFlags bit 2 = "update required"; a real bytes gap = a queued/partial update.
+            // (ScheduledAutoUpdate is deliberately ignored — it's a next-check timestamp Steam
+            // sets on plenty of up-to-date games, so it produces false "update available" hits.)
+            if ((stateFlags & 2) || (toDownload > 0 && toDownload !== downloaded)) return true;
+        } catch {}
+    }
+    return false;
+}
+
+// Map an engine grinder.db row → a scan result keyed to the shared games.db row.
+function cnUpdateRow(g, current, latest, store) {
+    const gid = `${store}_${g.app_id}`;
+    let cn = null;
+    try { cn = db && db.prepare("SELECT id, Game FROM games WHERE GrinderGameId=?").get(gid); } catch {}
+    return { id: cn ? cn.id : null, name: (cn && cn.Game) || g.title, store, current: current || '', latest: latest || '', gid };
+}
+
+ipcMain.handle('scan-updates', async (evt) => {
+    const out = [];
+    const send = (scanned, total, label) => { try { evt.sender.send('update-scan-progress', { scanned, total, label }); } catch {} };
+
+    // 1) GOG / Epic — via the in-process GRINDER engine.
+    if (ensureGrinderEngine() && _grinderEngineDb) {
+        let installed = [];
+        try { installed = _grinderEngineDb.prepare(
+            "SELECT id, title, store, app_id, version, platform FROM games WHERE installed=1 AND (is_dlc IS NULL OR is_dlc=0)"
+        ).all(); } catch {}
+        const gog  = installed.filter(g => g.store === 'gog'  && g.app_id);
+        const epic = installed.filter(g => g.store === 'epic' && g.app_id);
+        const total = gog.length + epic.length;
+        let scanned = 0;
+
+        // Epic — one bulk `legendary list-installed --check-updates`.
+        if (epic.length) {
+            send(scanned, total, 'Checking Epic games…');
+            let updMap = new Map();
+            try { updMap = await grinderEngine.epicListUpdates(); } catch {}
+            for (const g of epic) {
+                scanned++;
+                const info = updMap.get(g.app_id);
+                if (info && info.update) out.push(cnUpdateRow(g, info.current, info.latest, 'epic'));
+            }
+        }
+        // GOG — per-game `gogdl info` (no bulk update check exists). Linux builds report no
+        // versionName, so they can't be diffed and are skipped.
+        for (const g of gog) {
+            scanned++;
+            send(scanned, total, `Checking ${g.title}…`);
+            const platform = (g.platform === 'linux') ? 'linux' : 'windows';
+            if (platform === 'linux') continue;
+            let latest = '';
+            try { latest = (await grinderEngine.gogInstallInfo(g.app_id, platform))?.version || ''; } catch {}
+            if (latest && g.version && String(latest) !== String(g.version)) out.push(cnUpdateRow(g, g.version, latest, 'gog'));
+        }
+        send(total, total, '');
+    }
+
+    // 2) Steam — best-effort "pending in Steam" from the local appmanifest.
+    if (db) {
+        let steamRows = [];
+        try { steamRows = db.prepare(
+            "SELECT id, Game, SteamAppID FROM games " +
+            "WHERE (LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%') AND Installed=1"
+        ).all(); } catch {}
+        for (const r of steamRows) {
+            const appId = r.SteamAppID ? String(r.SteamAppID).replace(/\.0+$/, '').trim() : '';
+            if (appId && appId !== 'None' && steamUpdatePending(appId)) {
+                out.push({ id: r.id, name: r.Game, store: 'steam', current: '', latest: '', appId });
+            }
+        }
+    }
+    return { updates: out };
+});
+
 ipcMain.handle('set-launch-command', (e, gameId, cmd) => {
     if (!db) return false;
     const installed = (cmd && cmd.trim() !== '') ? 1 : 0;
@@ -1818,6 +1909,81 @@ ipcMain.handle('install-to-menu', () => {
         if (installed.length === 0) return { success: false, message: 'CafeNeurotico.AppImage not found in the app folder.' };
         return { success: true, message: `Installed to menu: ${installed.join(' + ')}` };
     } catch(err) { return { success: false, message: err.message }; }
+});
+
+// Resolve the XDG Desktop folder (honours a localised name via user-dirs.dirs), ~/Desktop otherwise.
+function resolveDesktopDir() {
+    try {
+        const cfg = path.join(os.homedir(), '.config', 'user-dirs.dirs');
+        if (fs.existsSync(cfg)) {
+            const m = fs.readFileSync(cfg, 'utf8').match(/XDG_DESKTOP_DIR="([^"]+)"/);
+            if (m) return m[1].replace(/^\$HOME/, os.homedir());
+        }
+    } catch {}
+    return path.join(os.homedir(), 'Desktop');
+}
+
+// Add a per-game launcher that opens the game straight through Cafe Neurotico (via the
+// --game=<id> deeplink). targets = { menu, desktop }. Works on any XDG desktop (KDE/GNOME/…).
+ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
+    try {
+        if (!db) return { ok: false, message: 'Library not ready.' };
+        const game = db.prepare("SELECT id, Game, Icon, Logo, CoverArt FROM games WHERE id=?").get(gameId);
+        if (!game) return { ok: false, message: 'Game not found.' };
+        targets = targets || {};
+        if (!targets.menu && !targets.desktop) return { ok: false, message: 'No location selected.' };
+
+        // The suite AppImage (or the exec path in dev).
+        const files = (() => { try { return fs.readdirSync(baseDir); } catch { return []; } })();
+        const suiteFile = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
+        const suitePath = suiteFile ? path.join(baseDir, suiteFile) : (process.env.APPIMAGE || process.execPath);
+        try { if (/\.AppImage$/i.test(suitePath)) fs.chmodSync(suitePath, '755'); } catch {}
+
+        // Icon: prefer a squarish Icon/Logo, fall back to the cover, then the CN app icon.
+        const iconsDir = path.join(baseDir, 'icons');
+        const resolveImg = p => {
+            if (!p || !String(p).trim()) return '';
+            const abs = String(p).startsWith('/') ? String(p) : path.join(baseDir, String(p));
+            return fs.existsSync(abs) ? abs : '';
+        };
+        let iconPath = resolveImg(game.Icon) || resolveImg(game.Logo) || resolveImg(game.CoverArt);
+        if (!iconPath) {
+            try {
+                fs.mkdirSync(iconsDir, { recursive: true });
+                const f = path.join(iconsDir, 'CNGM.svg');
+                if (!fs.existsSync(f)) fs.writeFileSync(f, Buffer.from(CNGM_SVG_B64, 'base64'));
+                iconPath = f;
+            } catch {}
+        }
+
+        const nameEsc = String(game.Game || 'Game').replace(/[\r\n]/g, ' ');
+        const content =
+            `[Desktop Entry]\nVersion=1.0\nType=Application\n` +
+            `Name=${nameEsc}\nComment=Launch ${nameEsc} via Cafe Neurotico\n` +
+            `Exec="${suitePath}" --game=${game.id}\nIcon=${iconPath}\n` +
+            `Terminal=false\nCategories=Game;\nStartupWMClass=cafeneurotico\n`;
+        const fname = `cafe-neurotico-game-${game.id}.desktop`;
+
+        const wrote = [];
+        if (targets.menu) {
+            const appsDir = path.join(os.homedir(), '.local', 'share', 'applications');
+            fs.mkdirSync(appsDir, { recursive: true });
+            const p = path.join(appsDir, fname);
+            fs.writeFileSync(p, content); try { fs.chmodSync(p, '755'); } catch {}
+            execFile('update-desktop-database', [appsDir], () => {});
+            wrote.push('app menu');
+        }
+        if (targets.desktop) {
+            const desktopDir = resolveDesktopDir();
+            fs.mkdirSync(desktopDir, { recursive: true });
+            const p = path.join(desktopDir, fname);
+            fs.writeFileSync(p, content); try { fs.chmodSync(p, '755'); } catch {}
+            // GNOME/Nautilus require a launcher be marked trusted to run without a warning.
+            execFile('gio', ['set', p, 'metadata::trusted', 'true'], () => {});
+            wrote.push('desktop');
+        }
+        return { ok: true, message: `Shortcut added to ${wrote.join(' + ')}.` };
+    } catch (e) { return { ok: false, message: e.message }; }
 });
 
 // Opt-in: auto-start the CREMA (fullscreen) face on login (living-room / HTPC). Off by default.

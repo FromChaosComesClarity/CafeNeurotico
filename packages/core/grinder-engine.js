@@ -1189,6 +1189,25 @@ function gogInstalledDlcs(baseAppId) {
     } catch { return []; }
 }
 
+// Epic update check via `legendary list-installed --check-updates --json`. legendary compares
+// each installed game's local version against the store manifest and sets `update_available`.
+// Returns a Map of app_name → { current, latest, update } (empty on failure).
+async function epicListUpdates() {
+    const r = await runLegendary(['list-installed', '--check-updates', '--json']);
+    const out = new Map();
+    if (!r.ok) return out;
+    try {
+        for (const g of JSON.parse(r.stdout) || []) {
+            out.set(g.app_name, {
+                current: g.version || '',
+                latest: g.latest_version || g.version || '',
+                update: !!g.update_available,
+            });
+        }
+    } catch {}
+    return out;
+}
+
 // Epic download/disk size via legendary info.
 async function epicInstallInfo(appName) {
     const leg = findLegendary(); if (!leg) return null;
@@ -1215,7 +1234,7 @@ module.exports = {
     syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary, prefixPathForGame,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
     writeGogAuthConfig, findGogInstallResult, findLinuxGameExe,
-    getDiskSpace, gogInstallInfo, epicInstallInfo, syncOwnedLibrary, cancelActiveInstall,
+    getDiskSpace, gogInstallInfo, epicInstallInfo, epicListUpdates, syncOwnedLibrary, cancelActiveInstall,
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
 };

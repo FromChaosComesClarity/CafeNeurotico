@@ -1069,6 +1069,102 @@ document.getElementById('btn-open-hidden-games')?.addEventListener('click', open
 // Manage Storage: open GRINDER on installed games sorted by size (GOG/Epic), or Steam's storage settings.
 document.getElementById('btn-storage-grinder')?.addEventListener('click', () => window.api.openGrinderStorage());
 document.getElementById('btn-storage-steam')?.addEventListener('click', () => window.api.openInstallUrl('steam://settings/storage'));
+
+// ── Add to Desktop — per-game launcher via the --game deeplink ────────────────
+function openShortcutDialog(game) {
+    const modal = document.getElementById('modal-shortcut');
+    if (!modal) return;
+    document.getElementById('shortcut-game-name').textContent = game.Game || 'this game';
+    modal.classList.add('active');
+    const close = () => modal.classList.remove('active');
+    const run = async (targets) => {
+        close();
+        const res = await window.api.addGameShortcut(game.id, targets);
+        showAlert(res && res.ok ? (res.message || 'Shortcut created.')
+                                : `Could not create the shortcut.${res && res.message ? '\n\n' + res.message : ''}`);
+    };
+    document.getElementById('btn-shortcut-both').onclick    = () => run({ menu: true,  desktop: true  });
+    document.getElementById('btn-shortcut-menu').onclick    = () => run({ menu: true,  desktop: false });
+    document.getElementById('btn-shortcut-desktop').onclick = () => run({ menu: false, desktop: true  });
+    document.getElementById('btn-shortcut-cancel').onclick  = close;
+    modal.onclick = (e) => { if (e.target === modal) close(); };
+}
+
+// ── Scan for Updates — GOG/Epic real check (+ optional in-CN update), Steam flag-only ──
+const _storeBadge = { gog: '#a55eea', epic: '#4b7bec', steam: '#2a9d8f' };
+function _renderUpdateRow(u) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border_solid); border-radius:8px; background:var(--bg_panel);';
+    const badge = `<span style="flex-shrink:0; font-size:9px; font-weight:800; letter-spacing:1px; padding:2px 6px; border-radius:4px; color:#fff; background:${_storeBadge[u.store] || '#888'};">${u.store.toUpperCase()}</span>`;
+    const ver = (u.store === 'gog' || u.store === 'epic') && u.current
+        ? `<div style="font-size:10px; color:var(--text_dim);">${escHtml(String(u.current))} &rarr; ${escHtml(String(u.latest))}</div>`
+        : (u.store === 'steam' ? `<div style="font-size:10px; color:var(--text_dim);">Pending in Steam</div>` : '');
+    row.innerHTML =
+        `${badge}<div style="flex:1 1 auto; min-width:0;"><div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(u.name || 'Game')}</div>${ver}</div>`;
+    const btn = document.createElement('button');
+    btn.style.cssText = 'flex-shrink:0; font-size:11px; padding:7px 14px;';
+    if (u.store === 'steam') {
+        btn.textContent = 'Open in Steam';
+        btn.onclick = () => window.api.openInstallUrl('steam://open/downloads');
+    } else {
+        btn.className = 'primary';
+        btn.textContent = 'Update';
+        btn.onclick = () => {
+            document.getElementById('modal-updates')?.classList.remove('active');
+            const game = allGames.find(g => g.id == u.id);
+            if (game) handleInstall(game);   // re-running the install reconciles GOG/Epic to latest
+            else showAlert('This game is no longer in your library.');
+        };
+    }
+    row.appendChild(btn);
+    return row;
+}
+
+let _updateScanRunning = false;
+async function runUpdateScan() {
+    if (_updateScanRunning) return;
+    _updateScanRunning = true;
+    const modal   = document.getElementById('modal-updates');
+    const statusEl = document.getElementById('updates-status');
+    const listEl  = document.getElementById('updates-list');
+    const fill    = document.getElementById('updates-progress-fill');
+    const wrap    = document.getElementById('updates-progress-wrap');
+    listEl.innerHTML = '';
+    statusEl.textContent = 'Scanning your installed GOG, Epic and Steam games…';
+    fill.style.width = '0%'; wrap.style.display = 'block';
+    modal.classList.add('active');
+    try {
+        const res = await window.api.scanUpdates();
+        const updates = (res && res.updates) || [];
+        wrap.style.display = 'none';
+        if (!updates.length) {
+            statusEl.textContent = 'Everything is up to date. 🎉';
+        } else {
+            const n = updates.length;
+            statusEl.textContent = `${n} game${n === 1 ? '' : 's'} with an update available. Updating is optional.`;
+            updates.sort((a, b) => (a.store).localeCompare(b.store) || String(a.name).localeCompare(String(b.name)));
+            for (const u of updates) listEl.appendChild(_renderUpdateRow(u));
+        }
+    } catch (e) {
+        wrap.style.display = 'none';
+        statusEl.textContent = 'Could not complete the update scan.';
+    } finally {
+        _updateScanRunning = false;
+    }
+}
+window.api.onUpdateScanProgress?.((d) => {
+    const statusEl = document.getElementById('updates-status');
+    const fill = document.getElementById('updates-progress-fill');
+    if (!statusEl || !d) return;
+    if (d.total) fill.style.width = `${Math.round((d.scanned / d.total) * 100)}%`;
+    if (d.label) statusEl.textContent = d.label + (d.total ? ` (${d.scanned}/${d.total})` : '');
+});
+document.getElementById('btn-scan-updates')?.addEventListener('click', runUpdateScan);
+document.getElementById('btn-close-updates')?.addEventListener('click', () =>
+    document.getElementById('modal-updates')?.classList.remove('active'));
+document.getElementById('modal-updates')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-updates')) e.currentTarget.classList.remove('active');
+});
 document.getElementById('btn-close-hidden-games')?.addEventListener('click', () =>
     document.getElementById('modal-hidden-games')?.classList.remove('active'));
 
@@ -8162,6 +8258,10 @@ function openGamepage(game) {
             }
         });
     }
+
+    // Add to Desktop button — any game; creates a launcher that opens it through CN.
+    const shortcutBtn = document.getElementById('btn-gamepage-shortcut');
+    if (shortcutBtn) shortcutBtn.onclick = (e) => { e.stopPropagation(); openShortcutDialog(game); };
 
     // Trailer button — always visible; plays local trailer or opens download flow
     trailerBtn.onclick = () => {
