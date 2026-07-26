@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.0.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.2.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
@@ -24,7 +24,7 @@ cafeneurotico@linux:~$ ./brew
 [ ok ] pouring fullscreen interface.... CREMA
 [ ok ] blending into one shot.......... done
 
-▓▓ CAFE NEUROTICO 1.0 ▓▓
+▓▓ CAFE NEUROTICO 1.2 ▓▓
 > three faces, one binary. served.
 ```
 
@@ -65,9 +65,13 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 **A living-room mode that isn't an afterthought.** CREMA is fullscreen, gamepad-first, TV-typography: carousel or grid start screen, immersive or classic gamepages, achievements, a jukebox for your own music, an on-screen keyboard, and a screensaver built from your own screenshots.
 
-**92 themes across 10 families** — Catppuccin, Gruvbox, Nord, Dracula, Game Boy, Pip-Boy, BrewBalance, and twenty faithful retro-OS palettes (MS-DOS, Commodore 64, Amiga Workbench, BeOS, NeXTSTEP, Windows 3.1/95/XP, ZX Spectrum, Teletext…) each with its own era typeface. Plus six bundled interface fonts. Shared by all three faces.
+**93 themes across 10 families** — Catppuccin, Gruvbox, Nord, Dracula, Game Boy, Pip-Boy, BrewBalance, and twenty faithful retro-OS palettes (MS-DOS, Commodore 64, Amiga Workbench, BeOS, NeXTSTEP, Windows 3.1/95/XP, ZX Spectrum, Teletext…) each with its own era typeface. Plus six bundled interface fonts. Shared by all three faces.
 
 **A dashboard if you want one.** An optional drag-and-drop widget board: roulette, backlog weight, throwback, achievement completion, disk footprint, and strictly opt-in online widgets (deals, Epic freebies, RSS gaming news, Steam patch notes) that make **zero network calls until you enable them**.
+
+**Updates you asked for.** *Scan for Updates* checks your installed GOG and Epic games against the store — real version numbers, updated in-app with one press — and flags Steam games with a pending download so Steam can handle its own. The app itself never phones home: the Control Panel shows the version you're running with a **Check for Updates** button that simply opens the releases page, and you decide whether to download it.
+
+**A shortcut for the one game you always play.** *Add to Desktop* writes a proper `.desktop` launcher — the game's own art as the icon — that opens straight into it through the suite, in your app menu, on your desktop, or both.
 
 **Local-only, portable, backupable.** Everything lives in a `GameManagerConfig` folder next to the AppImage. Put it on a thumb drive, take your library to another machine. No account, no telemetry, no cloud.
 
