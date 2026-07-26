@@ -724,6 +724,7 @@ function applyI18nToDOM() {
   document.querySelectorAll('[data-i18n]').forEach(el => { const v = t(el.getAttribute('data-i18n')); if (v) el.textContent = v; });
   document.querySelectorAll('[data-i18n-html]').forEach(el => { const v = t(el.getAttribute('data-i18n-html')); if (v) el.innerHTML = v; });
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { const v = t(el.getAttribute('data-i18n-ph')); if (v) el.placeholder = v; });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { const v = t(el.getAttribute('data-i18n-title')); if (v) el.title = v; });
 }
 
 window.api.getSetting('language').then(lang => {
@@ -2302,11 +2303,20 @@ document.getElementById('btn-remove-from-pl-close')?.addEventListener('click', (
 ['btn-about', 'btn-about-sb'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', () => document.getElementById('modal-about').classList.add('active')));
 document.getElementById('btn-close-about').addEventListener('click', () => { document.getElementById('modal-about').classList.remove('active'); });
-// Stamp the suite version into the About dialog (from package.json via app.getVersion()).
+// Stamp the suite version into the About dialog and the Control Panel splash
+// (from package.json via app.getVersion()).
 window.api.getAppVersion?.().then(v => {
+    if (!v) return;
     const el = document.getElementById('about-version');
-    if (el && v) el.textContent = `VERSION ${v}`;
+    if (el) el.textContent = `VERSION ${v}`;
+    const cp = document.getElementById('cp-app-version-num');
+    if (cp) cp.textContent = `VERSION ${v}`;
 }).catch(() => {});
+
+// Control Panel splash → releases page. There is no in-app updater by design:
+// the user reads the release notes on GitHub and grabs the AppImage themselves.
+const RELEASES_URL = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases';
+document.getElementById('btn-check-app-updates')?.addEventListener('click', () => window.api.openExternal(RELEASES_URL));
 
 // --- MANUAL (opens as separate window) ---
 document.addEventListener('click', (e) => { if (e.target.id === 'btn-open-manual') { document.getElementById('modal-about').classList.remove('active'); window.api.openManual(); } });
