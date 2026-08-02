@@ -430,6 +430,14 @@
       <img id="sleep-cover" class="sleep-cover" src="">
       <div id="sleep-title" class="sleep-title" data-i18n="html.sleep_title">GAME RUNNING</div>
       <div id="sleep-instruction" class="sleep-instruction">Press [START] + [SELECT] to return to CREMA</div>
+      <!-- First Windows launch downloads umu's runtime and builds a Wine prefix — minutes with
+           a black screen otherwise, which on a TV is indistinguishable from a crash. -->
+      <div id="sleep-progress" style="display:none; width:min(560px,70vw); margin:26px auto 0;">
+        <div style="height:8px; background:rgba(255,255,255,0.12); border-radius:4px; overflow:hidden;">
+          <div id="sleep-bar" style="height:100%; width:0%; background:var(--accent); transition:width 0.4s ease;"></div>
+        </div>
+        <div id="sleep-progress-msg" style="font-size:15px; color:var(--text_sec); line-height:1.7; margin-top:14px; text-align:center;"></div>
+      </div>
     </div>
 
     <div id="start-screen" class="screen blur-target hidden">
@@ -963,6 +971,21 @@
         <span style="color:var(--accent)">[ A ]</span> CONFIRM &nbsp;&nbsp;
         <span style="color:var(--text_sec)">[ Y ]</span> CHANGE DIR &nbsp;&nbsp;
         <span style="color:var(--text_dim)">[ B ]</span> CANCEL
+      </div>
+    </div>
+  </div>
+
+  <!-- Launch failure (almost always: no Proton installed for a Windows game). CREMA can't
+       install Proton itself — no keyboard, and store/setup flows belong to the Manager — so
+       it explains the problem and says where to fix it. -->
+  <div id="launch-fail-backdrop" class="overlay-backdrop hidden" style="z-index: 320;">
+    <div class="overlay-modal" style="width:680px;">
+      <div class="overlay-title" id="lf-heading">CAN'T START GAME</div>
+      <div id="lf-game-title" style="text-align:center; color:var(--accent); font-size:24px; font-weight:900; letter-spacing:1px; margin-bottom:20px; text-transform:uppercase;"></div>
+      <div id="lf-message" style="text-align:center; color:var(--text_sec); font-size:16px; line-height:1.8; margin-bottom:16px;"></div>
+      <div id="lf-hint" style="text-align:center; color:var(--text_dim); font-size:14px; line-height:1.8; margin-bottom:24px;"></div>
+      <div style="text-align:center; color:var(--text_dim); font-size:14px; font-weight:900; letter-spacing:1.5px; line-height:2.2;">
+        <span style="color:var(--accent)">[ B ]</span> CLOSE
       </div>
     </div>
   </div>

@@ -1208,10 +1208,38 @@ function enterSleepMode(game) {
     sleepInst.innerText = t('sleep.press_return', {method: instructionText});
   }
   sleepScreen.classList.remove('hidden');
+  _sleepSetupSeen = false;
+  document.getElementById('sleep-progress').style.display = 'none';
+  document.getElementById('sleep-bar').style.width = '0%';
+  document.getElementById('sleep-progress-msg').textContent = '';
 
   window.api.updateLastPlayed(game.Game).then(() => { refreshDatabase(); });
   window.api.launchGame(game.LaunchCommand);
 }
+
+// Slow-launch progress on the sleep screen (umu runtime download → Wine prefix → game start).
+// Only shown once the wait is real, so ordinary launches keep the clean "GAME RUNNING" screen.
+let _sleepSetupSeen = false;
+const _SLEEP_SHOW_AFTER = ['runtime', 'prefix', 'extras', 'verify'];
+window.api.onGameLaunchProgress?.(p => {
+  if (!p) return;
+  const wrap = document.getElementById('sleep-progress');
+  if (!wrap || gameState !== 'GAME_RUNNING') return;
+  if (p.done) {
+    if (_sleepSetupSeen) {
+      document.getElementById('sleep-bar').style.width = '100%';
+      document.getElementById('sleep-progress-msg').textContent = p.phase === 'running' ? 'Ready — starting the game…' : '';
+      setTimeout(() => { wrap.style.display = 'none'; }, 2500);
+    }
+    _sleepSetupSeen = false;
+    return;
+  }
+  if (!_sleepSetupSeen && !_SLEEP_SHOW_AFTER.includes(p.phase)) return;
+  _sleepSetupSeen = true;
+  wrap.style.display = '';
+  document.getElementById('sleep-bar').style.width = (p.percent || 0) + '%';
+  document.getElementById('sleep-progress-msg').textContent = p.message || '';
+});
 
 function wakeUpCrema() {
   playSound(sfxSelect);
@@ -1454,6 +1482,9 @@ function handleInput(action) {
     else if (action === 'BACK') { playSound(sfxBack); hideGrinderConfirm(); }
     else if (action === 'Y_BUTTON') { hideGrinderConfirm(); openOSK('INSTALL_DIR', 'Install Directory', _grinderInstallDir); }
   }
+  // Any button dismisses the launch-failure notice — it is read-only, and a state missing from
+  // this router is indistinguishable from the whole app freezing.
+  else if (gameState === 'LAUNCH_FAIL') { hideLaunchFailure(); }
   else if (gameState === 'LAUNCHER_PICK') {
     if (action === 'DOWN') { _lpIndex = (_lpIndex + 1) % _lpList.length; playSound(sfxNav); renderLpList(); }
     else if (action === 'UP') { _lpIndex = (_lpIndex - 1 + _lpList.length) % _lpList.length; playSound(sfxNav); renderLpList(); }
@@ -4571,6 +4602,36 @@ function hideGrinderConfirm() {
     _grinderConfirmActive = false; _grinderConfirmGame = null;
     gameState = previousGameState;
 }
+
+// ── Launch failure notice ────────────────────────────────────────────────────
+// The main process reports games that die the instant they start (see the engine's launch
+// watchdog). Without this the screen just stayed on the library and nothing ever happened.
+let _launchFailPrevState = null;
+function showLaunchFailure(info) {
+    const el = document.getElementById('launch-fail-backdrop');
+    if (!el) return;
+    const isProton = info.code === 'NO_PROTON';
+    document.getElementById('lf-heading').textContent    = isProton ? 'PROTON REQUIRED' : "CAN'T START GAME";
+    document.getElementById('lf-game-title').textContent = info.title || '';
+    document.getElementById('lf-message').textContent    = info.message || 'The game could not be started.';
+    document.getElementById('lf-hint').textContent = isProton
+        ? 'Windows games need Proton, a compatibility layer. Open Cafe Neurotico on the desktop — it can install GE-Proton for you in one click.'
+        : 'Open Cafe Neurotico on the desktop for details, or try "Play with Log" there to see what happened.';
+    // Exiting sleep/"now playing" mode can also set gameState, so remember where we came from
+    // only the first time this opens.
+    if (gameState !== 'LAUNCH_FAIL') _launchFailPrevState = gameState;
+    el.classList.remove('hidden');
+    gameState = 'LAUNCH_FAIL';
+    renderFooters();
+}
+function hideLaunchFailure() {
+    playSound(sfxBack);
+    document.getElementById('launch-fail-backdrop')?.classList.add('hidden');
+    gameState = _launchFailPrevState || 'MAIN';
+    _launchFailPrevState = null;
+    renderFooters();
+}
+window.api.onGameLaunchFailed?.(info => showLaunchFailure(info || {}));
 
 function showGrinderProgress(isUninstall) {
     const game = _grinderConfirmGame;

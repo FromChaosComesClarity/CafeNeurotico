@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('api', {
                                 launcherStates: (id) => ipcRenderer.invoke('launcher-states', id),
                                 openInstallUrl: (url) => ipcRenderer.invoke('open-install-url', url),
                                 onInstallStatusUpdated: (cb) => ipcRenderer.on('install-status-updated', () => cb()),
+                                onGameLaunchFailed: (cb) => ipcRenderer.on('game-launch-failed', (e, d) => cb(d)),
+                                onGameLaunchProgress: (cb) => ipcRenderer.on('game-launch-progress', (e, d) => cb(d)),
                                 searchSteam: (g) => ipcRenderer.invoke('search-steam', g),
                                 searchIgdb: (g) => ipcRenderer.invoke('search-igdb', g),
                                 scrapeIgdbData: (g, mode, id) => ipcRenderer.invoke('scrape-igdb-data', g, mode, id),

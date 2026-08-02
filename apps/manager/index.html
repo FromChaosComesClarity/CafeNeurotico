@@ -5965,6 +5965,17 @@ LOADING...READY.</div>
           <button id="btn-storage-steam" style="width: 100%; font-size: 11px; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec);"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/></svg><span data-i18n="html.btn_manage_storage_steam">Steam Games</span></button>
         </div>
 
+        <div class="tool-card tools-section" data-search="install folder directory path default location download where games installed gog epic grinder drive disk change move">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Game Install Folder</div>
+          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;">Where GOG &amp; Epic downloads are installed — each game gets its own sub-folder. You can still pick a different folder for any single game while installing it.</div>
+          <input id="install-dir-current" type="text" readonly style="width:100%; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px 10px; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:6px;">
+          <div class="row" style="margin-top: 4px;">
+            <button id="btn-install-dir-change" class="primary" style="flex:2; font-size:11px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Change Folder</button>
+            <button id="btn-install-dir-reset" style="flex:1; font-size:11px; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec);"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>Reset</button>
+          </div>
+          <div id="install-dir-status" style="font-size: 11px; text-align: center; font-weight: bold; min-height: 14px;"></div>
+        </div>
+
         <div class="tool-card tools-section" data-search="update updates check scan game patch version new gog epic steam upgrade outdated">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-i18n="html.card_updates">Game Updates</span></div>
           <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;" data-i18n="html.updates_hint">Check installed GOG &amp; Epic games for new versions (Steam updates are flagged and handled by Steam). Updating is always your choice.</div>
@@ -6099,6 +6110,44 @@ LOADING...READY.</div>
       <div style="display:flex; gap:10px;">
         <button id="gi-install" class="primary" style="flex:1;">Install</button>
         <button id="gi-cancel" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- A game failed to launch. Windows games need Proton; when none is installed the game used
+       to die instantly with nothing shown at all, so this explains it and offers the fix. -->
+  <div id="modal-proton" class="modal-overlay" style="z-index:27000;">
+    <div class="modal-box" style="max-width:520px; gap:14px;">
+      <h3 id="pr-heading" style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Can't Start Game</h3>
+      <p id="pr-title" style="font-size:14px; font-weight:900; color:var(--text_main); margin:0;"></p>
+      <p id="pr-message" style="font-size:12px; color:var(--text_sec); line-height:1.7; margin:0;"></p>
+
+      <div id="pr-explain" style="display:none; font-size:11px; color:var(--text_dim); line-height:1.7; background:rgba(0,0,0,0.25); border:1px solid var(--border_solid); border-radius:8px; padding:10px 12px;">
+        Windows games run through <b style="color:var(--text_sec);">Proton</b>, a compatibility layer. Cafe Neurotico can install
+        <b style="color:var(--text_sec);">GE-Proton</b> for you — it's a one-time download of about 400&nbsp;MB that every Windows game then shares.
+      </div>
+
+      <div id="pr-found" style="display:none;">
+        <p style="font-size:10px; color:var(--accent); font-weight:900; letter-spacing:1px; margin:0 0 6px; text-transform:uppercase;">Proton builds found</p>
+        <select id="pr-select" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:6px; font-size:12px; box-sizing:border-box; cursor:pointer;"></select>
+      </div>
+
+      <div id="pr-progress" style="display:none;">
+        <p id="pr-step" style="font-size:11px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin:0 0 6px; color:var(--accent);"></p>
+        <div style="height:10px; background:var(--bg_menu); border:1px solid var(--border_solid); border-radius:5px; overflow:hidden;">
+          <div id="pr-bar" style="height:100%; width:0%; background:var(--accent); transition:width 0.2s;"></div>
+        </div>
+        <p id="pr-progress-msg" style="font-size:11px; color:var(--text_sec); margin:8px 0 0; font-family:monospace; word-break:break-word;"></p>
+      </div>
+
+      <details id="pr-details" style="display:none;">
+        <summary style="font-size:11px; color:var(--text_dim); cursor:pointer;">Technical details</summary>
+        <pre id="pr-log" style="font-size:10px; font-family:monospace; color:var(--text_dim); background:rgba(0,0,0,0.3); border:1px solid var(--border_solid); border-radius:6px; padding:8px; margin:8px 0 0; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word;"></pre>
+      </details>
+
+      <div style="display:flex; gap:10px;">
+        <button id="pr-install" class="primary" style="flex:2;">Install GE-Proton</button>
+        <button id="pr-close" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Close</button>
       </div>
     </div>
   </div>
@@ -6653,6 +6702,14 @@ LOADING...READY.</div>
       <div id="np-body">
         <div id="np-label">Now Playing</div>
         <div id="np-title"></div>
+        <!-- First launch on a machine downloads umu's runtime, and every new game builds a Wine
+             prefix — minutes of nothing otherwise. Shown only when a launch is actually slow. -->
+        <div id="np-progress" style="display:none; margin-top:12px;">
+          <div style="height:6px; background:rgba(0,0,0,0.35); border-radius:3px; overflow:hidden;">
+            <div id="np-bar" style="height:100%; width:0%; background:var(--accent); transition:width 0.4s ease;"></div>
+          </div>
+          <div id="np-progress-msg" style="font-size:11px; color:var(--text_dim); line-height:1.6; margin-top:8px;"></div>
+        </div>
       </div>
     </div>
   </div>

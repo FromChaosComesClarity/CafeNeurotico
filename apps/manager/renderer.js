@@ -164,15 +164,59 @@ function showNowPlaying(game) {
         artWrap.style.display = 'none';
     }
 
+    document.getElementById('np-progress').style.display = 'none';
+    document.getElementById('np-bar').style.width = '0%';
+    document.getElementById('np-progress-msg').textContent = '';
+    _npSetupSeen = false; _npDismissed = false;
+
     modal.classList.add('active');
     clearTimeout(_npTimer);
     _npTimer = setTimeout(closeNowPlaying, 5000);
 }
 
+// Set when the card goes away, so slow-launch progress never yanks it back up in front of
+// someone who has already dismissed it and moved on.
+let _npDismissed = false;
 function closeNowPlaying() {
     clearTimeout(_npTimer);
+    _npDismissed = true;
     document.getElementById('modal-now-playing')?.classList.remove('active');
 }
+
+// ── Slow-launch progress ─────────────────────────────────────────────────────
+// The main process tails a launching game's log (umu runtime download → Wine prefix build →
+// game start). A launch where everything is already set up races through every step, so hold
+// the card back until the wait is real — otherwise it would flash on every single launch.
+let _npSetupSeen = false;
+const _NP_SHOW_AFTER = ['runtime', 'prefix', 'extras', 'verify'];   // the phases that actually take minutes
+window.api.onGameLaunchProgress(p => {
+    if (!p) return;
+    const modal = document.getElementById('modal-now-playing');
+    const wrap  = document.getElementById('np-progress');
+    if (!modal || !wrap) return;
+
+    if (p.done) {
+        if (_npSetupSeen) {
+            document.getElementById('np-bar').style.width = '100%';
+            document.getElementById('np-progress-msg').textContent =
+                p.phase === 'running' ? 'Ready — the game is starting.' : '';
+            _npTimer = setTimeout(closeNowPlaying, 2500);
+        }
+        _npSetupSeen = false;
+        return;
+    }
+
+    if (_npDismissed) return;                                         // user closed it — leave them alone
+    if (!_npSetupSeen && !_NP_SHOW_AFTER.includes(p.phase)) return;   // fast launch → stay quiet
+    _npSetupSeen = true;
+
+    // A long setup must not be cut off by Now Playing's 5s auto-close.
+    clearTimeout(_npTimer);
+    modal.classList.add('active');
+    wrap.style.display = '';
+    document.getElementById('np-bar').style.width = (p.percent || 0) + '%';
+    document.getElementById('np-progress-msg').textContent = p.message || '';
+});
 
 document.getElementById('modal-now-playing')?.addEventListener('click', e => {
     if (e.target === document.getElementById('modal-now-playing')) closeNowPlaying();
@@ -530,7 +574,10 @@ async function openGrinderInstall(game) {
         refreshSizeInfo();
     }
 
-    $('gi-change-dir').onclick = async () => { const dir = await window.api.grinderPickDir(); if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); } };
+    $('gi-change-dir').onclick = async () => {
+        const dir = await window.api.grinderPickDir($('gi-dir').value);
+        if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); }
+    };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
     $('gi-install').onclick = () => {
         // Hand off to the Download Manager queue: it downloads now (or waits its turn),
@@ -541,6 +588,97 @@ async function openGrinderInstall(game) {
         enqueueDownload(item);
     };
 }
+
+// ── Launch failures / Proton ─────────────────────────────────────────────────
+// GOG/Epic games are spawned detached, so a game that dies on the spot reports nothing by
+// itself. The main process watches for that (and for launches it refuses outright) and sends
+// `game-launch-failed`; the commonest cause by far is having no Proton installed, which we can
+// fix right here instead of sending the user off to read a terminal log.
+let _protonBusy = false;
+async function showLaunchFailure(info) {
+    const $ = id => document.getElementById(id);
+    const modal = $('modal-proton');
+    if (!modal || _protonBusy) return;
+    const isProtonIssue = info.code === 'NO_PROTON';
+
+    $('pr-heading').textContent = isProtonIssue ? 'Proton Required' : "Can't Start Game";
+    $('pr-title').textContent   = info.title || '';
+    $('pr-message').textContent = info.message || 'The game could not be started.';
+    $('pr-explain').style.display = isProtonIssue ? '' : 'none';
+    $('pr-progress').style.display = 'none';
+    $('pr-bar').style.width = '0%';
+    $('pr-step').textContent = ''; $('pr-progress-msg').textContent = '';
+    $('pr-install').style.display = ''; $('pr-install').disabled = false;
+    $('pr-install').textContent = 'Install GE-Proton';
+    $('pr-close').textContent = 'Close';
+
+    const log = (info.log || '').trim();
+    $('pr-details').style.display = log ? '' : 'none';
+    $('pr-details').open = false;
+    $('pr-log').textContent = log ? (log + (info.logPath ? `\n\n(full log: ${info.logPath})` : '')) : '';
+
+    // If Proton builds DO exist, the problem is something else (or a bad selection) — let the
+    // user pick which one to use as the default rather than pushing another download at them.
+    let list = { protons: [], current: '' };
+    try { list = await window.api.protonList(); } catch {}
+    const sel = $('pr-select');
+    if (list.protons && list.protons.length) {
+        $('pr-found').style.display = '';
+        sel.innerHTML = list.protons
+            .map(p => `<option value="${p.path.replace(/"/g, '&quot;')}">${(p.label || p.name)} — ${p.name}</option>`)
+            .join('');
+        if (list.current) sel.value = list.current;
+        sel.onchange = () => window.api.protonSetDefault(sel.value);
+        $('pr-install').textContent = 'Install the latest GE-Proton';
+    } else {
+        $('pr-found').style.display = 'none';
+        sel.innerHTML = '';
+    }
+
+    modal.classList.add('active');
+    $('pr-close').onclick = () => { if (!_protonBusy) modal.classList.remove('active'); };
+    modal.onclick = e => { if (e.target === modal && !_protonBusy) modal.classList.remove('active'); };
+    $('pr-install').onclick = () => installProtonFromModal();
+}
+
+async function installProtonFromModal() {
+    const $ = id => document.getElementById(id);
+    _protonBusy = true;
+    $('pr-install').disabled = true;
+    $('pr-close').textContent = 'Cancel';
+    $('pr-close').onclick = async () => { await window.api.protonInstallCancel(); };
+    $('pr-progress').style.display = '';
+    $('pr-step').textContent = 'Preparing'; $('pr-step').style.color = 'var(--accent)';
+
+    const res = await window.api.protonInstallLatest();
+    _protonBusy = false;
+    $('pr-close').textContent = 'Close';
+    $('pr-close').onclick = () => document.getElementById('modal-proton').classList.remove('active');
+
+    if (res && res.ok) {
+        $('pr-step').textContent = 'Done'; $('pr-bar').style.width = '100%';
+        $('pr-progress-msg').textContent = `${res.proton?.label || 'Proton'} installed. Try launching the game again.`;
+        $('pr-install').style.display = 'none';
+        $('pr-message').textContent = 'Proton is ready — your Windows games can run now.';
+        $('pr-explain').style.display = 'none';
+    } else {
+        $('pr-step').textContent = 'Failed'; $('pr-step').style.color = '#ff6d00';
+        $('pr-progress-msg').textContent = (res && res.error) || 'Could not install Proton.';
+        $('pr-install').disabled = false;
+        $('pr-install').textContent = 'Try again';
+    }
+}
+
+window.api.onProtonInstallProgress(d => {
+    const step = document.getElementById('pr-step');
+    const bar  = document.getElementById('pr-bar');
+    const msg  = document.getElementById('pr-progress-msg');
+    if (!step) return;
+    step.textContent = (d.phase || '').toUpperCase();
+    if (typeof d.percent === 'number') bar.style.width = d.percent + '%';
+    msg.textContent = d.message || '';
+});
+window.api.onGameLaunchFailed(info => showLaunchFailure(info || {}));
 
 // In-process GOG/Epic uninstall (reuses the install modal in progress-only mode).
 async function openGrinderUninstall(game) {
@@ -9659,8 +9797,41 @@ function openToolsModal(pane = 'welcome') {
     document.getElementById('tools-no-results').style.display = 'none';
     _cpSelectPane(pane);
     _cpPrefillConnections();
+    _cpPrefillInstallDir();
     setTimeout(() => search.focus(), 150);
 }
+
+// ── Control Panel: global install folder ─────────────────────────────────────
+// Stored in grinder.db as `default_install_dir`, the same key the GRINDER face reads, so
+// both faces (and the per-game override in the install dialog) agree on one location.
+async function _cpPrefillInstallDir() {
+    const el = document.getElementById('install-dir-current');
+    if (!el) return;
+    try { el.value = (await window.api.grinderDefaultDir()) || ''; } catch { el.value = ''; }
+    const s = document.getElementById('install-dir-status');
+    if (s) s.innerText = '';
+}
+(() => {
+    const input = () => document.getElementById('install-dir-current');
+    const say = (msg, ok) => {
+        const s = document.getElementById('install-dir-status');
+        if (!s) return;
+        s.style.color = ok ? '#66bb6a' : '#ef5350';
+        s.innerText = msg;
+        setTimeout(() => { if (s.innerText === msg) s.innerText = ''; }, 4000);
+    };
+    const save = async (dir, okMsg) => {
+        const res = await window.api.grinderSetDefaultDir(dir);
+        if (res && res.ok) { input().value = res.dir || ''; say(okMsg, true); }
+        else say((res && res.error) || 'Could not save the install folder.', false);
+    };
+    document.getElementById('btn-install-dir-change')?.addEventListener('click', async () => {
+        const dir = await window.api.grinderPickDir(input().value);
+        if (dir) save(dir, 'Install folder saved.');
+    });
+    document.getElementById('btn-install-dir-reset')?.addEventListener('click', () =>
+        save('', 'Reset to the default folder.'));
+})();
 ['btn-open-tools', 'btn-open-tools-sb'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', openToolsModal));
 
@@ -9782,6 +9953,7 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
     [
         ['btn-update-library', 'library'],
         ['btn-storage-grinder', 'library'],
+        ['btn-install-dir-change', 'library'],
         ['btn-tools-add-game', 'library'],
         ['layout-cat-tabs', 'appearance'],
         ['btn-theme-switch', 'appearance'],

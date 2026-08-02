@@ -229,8 +229,37 @@ function ensureGrinderEngine() {
         homeDir:     home,
         db:          _grinderEngineDb,
         onProgress:  () => {},
+        onLaunchIssue: (info) => reportLaunchFailure(info),
+        onLaunchProgress: (info) => {
+            for (const w of BrowserWindow.getAllWindows()) {
+                try { w.webContents.send('game-launch-progress', info); } catch {}
+            }
+        },
     });
     return true;
+}
+
+// A Windows game that dies the moment it starts (almost always: no Proton installed) is
+// invisible on a TV — the couch UI would just sit there. Push it to the overlay instead.
+// CREMA can't install Proton itself (no keyboard, and it never owns store/setup flows), so it
+// says what's wrong and points at the Manager.
+function reportLaunchThrow(grinderGameId, err) {
+    let title = '';
+    try { title = _grinderEngineDb?.prepare('SELECT title FROM games WHERE id=?').get(grinderGameId)?.title || ''; } catch {}
+    reportLaunchFailure({ title, reason: { code: err?.code || 'LAUNCH_ERROR', message: err?.message || 'The game could not be started.' } });
+}
+
+function reportLaunchFailure(info) {
+    try {
+        const payload = {
+            title:   info?.title || '',
+            code:    info?.reason?.code || 'UNKNOWN',
+            message: info?.reason?.message || 'The game could not be started.',
+        };
+        for (const w of BrowserWindow.getAllWindows()) {
+            try { w.webContents.send('game-launch-failed', payload); } catch {}
+        }
+    } catch {}
 }
 
 // Sync installed/uninstalled status from GRINDER's DB into CREMA's games.db
@@ -275,7 +304,7 @@ ipcMain.on('launch-game', (event, cmd) => {
     if (grinderMatch) {
         const gId = getGrinderMap().get(grinderMatch[2]);
         if (gId && ensureGrinderEngine()) {
-            grinderEngine.launchGame(gId).catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+            grinderEngine.launchGame(gId).catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gId, e); });
         } else {
             console.error('[launch-game] no GRINDER mapping/engine for', grinderMatch[2]);
         }
@@ -284,7 +313,7 @@ ipcMain.on('launch-game', (event, cmd) => {
     // grinder://launch/<id> (direct GRINDER id)
     const gLaunch = cmd.match(/^grinder:\/\/(?:launch\/)?(.+)$/);
     if (gLaunch) {
-        if (ensureGrinderEngine()) grinderEngine.launchGame(gLaunch[1]).catch(e => console.error('[launch-game]', e.message));
+        if (ensureGrinderEngine()) grinderEngine.launchGame(gLaunch[1]).catch(e => { console.error('[launch-game]', e.message); reportLaunchThrow(gLaunch[1], e); });
         return;
     }
 

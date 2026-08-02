@@ -143,18 +143,61 @@ function getSavedBounds() {
     return null;
 }
 
+// Which monitor should the window open on? NOT getPrimaryDisplay(): on a multi-monitor Wayland
+// desk Electron reports the first-enumerated output as "primary" regardless of the compositor's
+// real primary, so a small side panel (e.g. a 640x480 HDMI screen) wins and the clamp below
+// shrinks the window to a useless 600x440. Prefer the display that already holds the saved
+// window, else the largest one. The cursor is no help — Wayland makes getCursorScreenPoint()
+// return {0,0} — and neither is waiting: getAllDisplays() returns 1, 2 or 3 outputs at random
+// on this session and then never corrects itself (display-added never fires), which is why
+// the size floor in createWindow is deliberately NOT capped by the reported work area.
+function pickDisplay(saved) {
+    const all = screen.getAllDisplays();
+    if (!all.length) return screen.getPrimaryDisplay();
+    // Only trust the saved position when the whole window still fits on that display —
+    // a partial match means the monitor layout changed under us (new machine, unplugged
+    // screen), and the saved coordinates are meaningless.
+    if (saved && saved.x != null && saved.y != null) {
+        const on = all.find(d => {
+            const w = d.workArea;
+            return saved.x >= w.x && saved.y >= w.y &&
+                   saved.x + (saved.width  || 0) <= w.x + w.width &&
+                   saved.y + (saved.height || 0) <= w.y + w.height;
+        });
+        if (on) return on;
+    }
+    return all.reduce((best, d) =>
+        d.workArea.width * d.workArea.height > best.workArea.width * best.workArea.height ? d : best);
+}
+
 function createWindow () {
     const saved = getSavedBounds();
     // Clamp to the display's work area so it never opens larger than the screen (e.g. 1080p with
     // a saved size from a bigger monitor, or panels/taskbars eating vertical space) — which pushed
     // the welcome screen partly off-screen. Fall back to a centered window when it wouldn't fit.
-    const wa = screen.getPrimaryDisplay().workArea;
-    const width  = Math.min(saved?.width  || 1360, wa.width  - 40);
-    const height = Math.min(saved?.height || 900,  wa.height - 40);
+    const wa = pickDisplay(saved).workArea;
+    // ...but only when the reported work area is believable. Electron under-reports the outputs
+    // here (see pickDisplay), and a work area smaller than the smallest usable window means we
+    // are looking at a side panel it mistook for the whole desk, not a genuinely tiny screen.
+    // In that case don't clamp at all — an oversized window the user can resize beats a
+    // miniscule one they can't read, and a restored size was one this machine already had.
+    const MIN_W = 1024, MIN_H = 700;
+    const trustWorkArea = wa.width >= MIN_W && wa.height >= MIN_H;
+    const wantW = saved?.width  || 1360, wantH = saved?.height || 900;
+    const width  = trustWorkArea ? Math.max(Math.min(wantW, wa.width  - 40), MIN_W) : wantW;
+    const height = trustWorkArea ? Math.max(Math.min(wantH, wa.height - 40), MIN_H) : wantH;
     let x = saved?.x, y = saved?.y;
     const onScreen = x != null && y != null && x >= wa.x && y >= wa.y &&
                      x + width <= wa.x + wa.width && y + height <= wa.y + wa.height;
-    if (!onScreen) { x = undefined; y = undefined; }   // undefined → Electron centers it
+    if (!onScreen) {
+        // Centre on the chosen display by hand — passing undefined would let Electron centre it
+        // on *its* idea of the primary, i.e. the wrong screen. If the window doesn't even fit
+        // there (under-reported display), hand placement back to Electron rather than pushing
+        // it off-screen.
+        const fits = width <= wa.width && height <= wa.height;
+        x = fits ? Math.round(wa.x + (wa.width  - width)  / 2) : undefined;
+        y = fits ? Math.round(wa.y + (wa.height - height) / 2) : undefined;
+    }
     const win = new BrowserWindow({
         width, height, x, y,
         frame: false,
@@ -400,10 +443,154 @@ function ensureGrinderEngine(createIfMissing = false) {
         homeDir:     home,
         db:          _grinderEngineDb,
         onProgress:  (data) => { try { _grinderProgressCb && _grinderProgressCb(data); } catch {} },
+        onLaunchIssue: (info) => reportLaunchFailure(info),
+        onLaunchProgress: (info) => broadcast('game-launch-progress', info),
     });
     if (created) grinderEngine.ensureSchema(_grinderEngineDb);   // fresh db → create tables (no-op otherwise)
     return true;
 }
+
+// ── Launch failures ───────────────────────────────────────────────────────────
+// A GOG/Epic game is spawned detached, so when it dies on the spot nothing used to reach the
+// user — the library just sat there while umu had already exited 1 (the classic case: no Proton
+// installed, see the engine's PROTON_SEARCH_DIRS note). Everything that can go wrong at launch
+// funnels through here and pops the Proton/launch-problem dialog in the renderer.
+function broadcast(channel, payload) {
+    for (const w of BrowserWindow.getAllWindows()) {
+        try { w.webContents.send(channel, payload); } catch {}
+    }
+}
+
+function reportLaunchFailure(info) {
+    try {
+        broadcast('game-launch-failed', {
+            title:  info?.title || '',
+            code:   info?.reason?.code || 'UNKNOWN',
+            message: info?.reason?.message || 'The game could not be started.',
+            log:    info?.log || '',
+            logPath: info?.logPath || '',
+            protonPath: info?.protonPath || '',
+            exitCode: info?.code,
+        });
+    } catch {}
+}
+
+// launchGame refused before spawning anything (e.g. no Proton for a Windows title). The engine
+// tags those errors with a `code`; anything untagged is still worth showing rather than hiding
+// in the console, which is where these used to die.
+function reportLaunchThrow(grinderGameId, err) {
+    let title = '';
+    try { title = _grinderEngineDb?.prepare('SELECT title FROM games WHERE id=?').get(grinderGameId)?.title || ''; } catch {}
+    reportLaunchFailure({
+        title,
+        reason: { code: err?.code || 'LAUNCH_ERROR', message: err?.message || 'The game could not be started.' },
+    });
+}
+
+// Proton builds installed on this machine, newest/best first (shared engine scanner, so this
+// list matches what a launch would actually pick).
+ipcMain.handle('proton-list', () => {
+    ensureGrinderEngine();
+    try {
+        const list = grinderEngine.scanProtonVersions();
+        let current = '';
+        try { current = _grinderEngineDb?.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || ''; } catch {}
+        return { ok: true, protons: list, current };
+    } catch (e) { return { ok: false, error: e.message, protons: [], current: '' }; }
+});
+
+ipcMain.handle('proton-set-default', (_, protonPath) => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data not available.' };
+    try {
+        if (protonPath) _grinderEngineDb.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('default_proton_path',?)").run(protonPath);
+        else            _grinderEngineDb.prepare("DELETE FROM settings WHERE key='default_proton_path'").run();
+        return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Download + install the latest GE-Proton. Mirrors the GRINDER face's downloader so a user who
+// never opens GRINDER can still get a working Proton from the Manager.
+let _protonDlReq = null;
+ipcMain.handle('proton-install-latest', async (event) => {
+    const send = d => { try { event.sender.send('proton-install-progress', d); } catch {} };
+    const home = os.homedir();
+
+    const ghJson = (url) => new Promise((resolve, reject) => {
+        https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
+            if (res.statusCode !== 200) { res.resume(); reject(new Error(`GitHub returned ${res.statusCode}`)); return; }
+            let data = ''; res.on('data', d => data += d);
+            res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON from GitHub')); } });
+        }).on('error', reject);
+    });
+
+    let release, asset;
+    try {
+        send({ phase: 'looking', percent: 0, message: 'Looking up the latest GE-Proton…' });
+        release = await ghJson('https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest');
+        asset = (release.assets || []).find(a => /\.tar\.(gz|xz)$/.test(a.name) && !/aarch64/i.test(a.name));
+        if (!asset) throw new Error('No release archive found.');
+    } catch (e) { return { ok: false, error: `Could not reach GitHub: ${e.message}` }; }
+
+    // Install into the first compatibilitytools.d that exists, else umu's own store — both are
+    // scanned by the engine, so either location works for launching.
+    const ctDirs = [
+        path.join(home, '.steam', 'root', 'compatibilitytools.d'),
+        path.join(home, '.local', 'share', 'Steam', 'compatibilitytools.d'),
+        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
+        path.join(home, '.local', 'share', 'umu', 'compatibilitytools'),
+    ];
+    const installBase = ctDirs.find(d => fs.existsSync(d)) || ctDirs[1];
+    try { fs.mkdirSync(installBase, { recursive: true }); }
+    catch (e) { return { ok: false, error: `Cannot create ${installBase}: ${e.message}` }; }
+
+    const tmpFile = path.join(os.tmpdir(), asset.name);
+    const dl = await new Promise(resolve => {
+        function get(url, redirects = 0) {
+            if (redirects > 5) { resolve({ ok: false, error: 'Too many redirects.' }); return; }
+            _protonDlReq = https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
+                if (res.statusCode === 301 || res.statusCode === 302) { res.resume(); get(res.headers.location, redirects + 1); return; }
+                if (res.statusCode !== 200) { res.resume(); resolve({ ok: false, error: `Download failed (HTTP ${res.statusCode}).` }); return; }
+                const total = parseInt(res.headers['content-length'] || '0', 10);
+                let got = 0;
+                const out = fs.createWriteStream(tmpFile);
+                res.on('data', c => {
+                    got += c.length;
+                    send({ phase: 'downloading', percent: total ? Math.round(got / total * 100) : 0,
+                           message: `${(got / 1e6).toFixed(0)} MB${total ? ` / ${(total / 1e6).toFixed(0)} MB` : ''}` });
+                });
+                res.pipe(out);
+                out.on('finish', () => resolve({ ok: true }));
+                out.on('error', e => resolve({ ok: false, error: e.message }));
+            });
+            _protonDlReq.on('error', e => resolve({ ok: false, error: e.message }));
+        }
+        get(asset.browser_download_url);
+    });
+    _protonDlReq = null;
+    if (!dl.ok) { try { fs.unlinkSync(tmpFile); } catch {} return { ok: false, error: dl.error || 'Download failed.' }; }
+
+    send({ phase: 'extracting', percent: 100, message: `Extracting ${release.tag_name}…` });
+    const flag = asset.name.endsWith('.xz') ? '-xJf' : '-xzf';
+    const extracted = await new Promise(resolve => {
+        const p = spawn('tar', [flag, tmpFile, '-C', installBase], { stdio: 'ignore' });
+        p.on('close', code => resolve(code === 0));
+        p.on('error', () => resolve(false));
+    });
+    try { fs.unlinkSync(tmpFile); } catch {}
+    if (!extracted) return { ok: false, error: 'Could not extract the archive (is `tar` installed?).' };
+
+    // Confirm the engine can now actually see it — the whole point of the exercise.
+    ensureGrinderEngine();
+    const found = grinderEngine.scanProtonVersions()[0];
+    if (!found) return { ok: false, error: 'Installed, but no Proton build was found afterwards.' };
+    send({ phase: 'done', percent: 100, message: `${found.label} ready.` });
+    return { ok: true, proton: found, installBase };
+});
+
+ipcMain.handle('proton-install-cancel', () => {
+    if (_protonDlReq) { try { _protonDlReq.destroy(); } catch {} _protonDlReq = null; }
+    return { ok: true };
+});
 
 // Split a GrinderGameId like "gog_2049187585" / "epic_<hex>" into { store, appId }.
 function parseGrinderId(gid) {
@@ -413,9 +600,14 @@ function parseGrinderId(gid) {
     return { store: m[1].toLowerCase(), appId: m[2] };
 }
 
+// Where GOG/Epic games get installed. `default_install_dir` in grinder.db is the single source
+// of truth (the GRINDER face reads the same key); when it's unset — fresh machine, GRINDER GUI
+// never opened — fall back to the same built-in base the engine itself installs into, so the
+// install dialog shows a real path instead of an empty box.
+const GRINDER_DEFAULT_DIR = path.join(os.homedir(), 'Games', 'CafeNeurotico');
 function grinderDefaultDir() {
-    try { return _grinderEngineDb?.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value || ''; }
-    catch { return ''; }
+    try { return _grinderEngineDb?.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value || GRINDER_DEFAULT_DIR; }
+    catch { return GRINDER_DEFAULT_DIR; }
 }
 
 // Pre-install: free disk space at a path + download/disk size for a GOG/Epic title (shared engine).
@@ -646,9 +838,32 @@ ipcMain.handle('grinder-uninstall', async (event, { gameId, grinderGameId } = {}
 
 // Default install dir + a native folder picker for the install dialog.
 ipcMain.handle('grinder-default-dir', () => { ensureGrinderEngine(); return grinderDefaultDir(); });
-ipcMain.handle('grinder-pick-dir', async () => {
-    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
+ipcMain.handle('grinder-pick-dir', async (_, current) => {
+    // NOTE: `win` is local to createWindow() — referencing it here threw a ReferenceError that
+    // rejected the invoke, so the install dialog's "Change" button silently did nothing.
+    const parent = BrowserWindow.getFocusedWindow();
+    const opts = { properties: ['openDirectory', 'createDirectory'] };
+    const start = expandTilde(current || grinderDefaultDir());
+    if (start && fs.existsSync(start)) opts.defaultPath = start;
+    const r = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts);
     return (!r.canceled && r.filePaths[0]) ? r.filePaths[0] : null;
+});
+
+// Persist the global default install folder (shared with the GRINDER face, which reads the
+// same grinder.db setting). Passing an empty value restores the built-in default.
+ipcMain.handle('grinder-set-default-dir', (_, dir) => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data not available.' };
+    const clean = String(dir || '').trim();
+    try {
+        if (clean) {
+            try { fs.mkdirSync(expandTilde(clean), { recursive: true }); }
+            catch (e) { return { ok: false, error: `Cannot create "${clean}": ${e.message}` }; }
+            _grinderEngineDb.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('default_install_dir',?)").run(clean);
+        } else {
+            _grinderEngineDb.prepare("DELETE FROM settings WHERE key='default_install_dir'").run();
+        }
+        return { ok: true, dir: grinderDefaultDir() };
+    } catch (e) { return { ok: false, error: e.message }; }
 });
 
 // CREMA is now a face of this same binary (launched with --crema), so it's always available.
@@ -2454,7 +2669,7 @@ ipcMain.on('launch-game', (event, cmd) => {
         if (ensureGrinderEngine()) {
             grinderEngine.launchGame(gid)
                 .then(r => console.log('[launch-game] launched via', r?.method))
-                .catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+                .catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gid, e); });
         } else {
             spawnGrinder(['launch', gid]); // fallback if grinder DB not found
         }
@@ -2472,7 +2687,7 @@ ipcMain.on('launch-game', (event, cmd) => {
             if (ensureGrinderEngine()) {
                 grinderEngine.launchGame(gId)
                     .then(r => console.log('[launch-game] launched via', r?.method))
-                    .catch(e => console.error('[launch-game] grinder launch failed:', e.message));
+                    .catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gId, e); });
             } else {
                 spawnGrinder(['launch', gId]); // fallback if grinder DB not found
             }

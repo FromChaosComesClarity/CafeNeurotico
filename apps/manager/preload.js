@@ -158,11 +158,21 @@ contextBridge.exposeInMainWorld('api', {
                                 grinderCancelInstall: () => ipcRenderer.invoke('grinder-install-cancel'),
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),
                                 grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),
-                                grinderPickDir:    () => ipcRenderer.invoke('grinder-pick-dir'),
+                                grinderSetDefaultDir: (dir) => ipcRenderer.invoke('grinder-set-default-dir', dir),
+                                grinderPickDir:    (current) => ipcRenderer.invoke('grinder-pick-dir', current),
                                 getDiskSpace:      (p)   => ipcRenderer.invoke('get-disk-space', p),
                                 getInstallSize:    (gid, platform) => ipcRenderer.invoke('get-install-size', gid, platform),
                                 grinderPlatforms:  (gid) => ipcRenderer.invoke('grinder-platforms', gid),
                                 onGrinderInstallProgress: (cb) => ipcRenderer.on('grinder-install-progress', (e, d) => cb(d)),
+
+                                // --- Proton (compatibility layer for Windows games) ---
+                                protonList:          ()  => ipcRenderer.invoke('proton-list'),
+                                protonSetDefault:    (p) => ipcRenderer.invoke('proton-set-default', p),
+                                protonInstallLatest: ()  => ipcRenderer.invoke('proton-install-latest'),
+                                protonInstallCancel: ()  => ipcRenderer.invoke('proton-install-cancel'),
+                                onProtonInstallProgress: (cb) => ipcRenderer.on('proton-install-progress', (e, d) => cb(d)),
+                                onGameLaunchFailed:  (cb) => ipcRenderer.on('game-launch-failed', (e, d) => cb(d)),
+                                onGameLaunchProgress: (cb) => ipcRenderer.on('game-launch-progress', (e, d) => cb(d)),
                                 onWindowRefocused: (cb) => ipcRenderer.on('window-refocused', () => cb()),
                                 onOpenGame: (cb) => ipcRenderer.on('open-game', (e, id) => cb(id)),
 

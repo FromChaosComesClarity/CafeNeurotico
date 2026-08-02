@@ -12,6 +12,7 @@ const grinderEngine = require('../../packages/core/grinder-engine.js');
 const {
     sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
     which, findLegendary, findGogdl, findComet, findUmu, findWineCached, findRuntime,
+    scanProtonVersions,
     GOG_CLIENT_ID, GOG_CLIENT_SECRET, GOG_REDIRECT_URI,
     syncSharedDb, headlessInstall, headlessUninstall, launchGame, runLegendary,
     getGameInstallInfo, runRedist, injectGogRegistry, gogFetch, getGogToken,
@@ -126,66 +127,9 @@ function initDb() {
 // ── Proton scanner ────────────────────────────────────────────────────────────
 const HOME = os.homedir();
 
-// All directories that may contain Proton installations
-const PROTON_DIRS = [
-    // Steam native (multiple common paths)
-    path.join(HOME, '.steam', 'root', 'steamapps', 'common'),
-    path.join(HOME, '.steam', 'steam', 'steamapps', 'common'),
-    path.join(HOME, '.local', 'share', 'Steam', 'steamapps', 'common'),
-    // GE-Proton and custom compatibility tools
-    path.join(HOME, '.steam', 'root', 'compatibilitytools.d'),
-    path.join(HOME, '.steam', 'steam', 'compatibilitytools.d'),
-    path.join(HOME, '.local', 'share', 'Steam', 'compatibilitytools.d'),
-    // Flatpak Steam
-    path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'steamapps', 'common'),
-    path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
-];
-
-function scanProtonVersions() {
-    const found = [];
-    const seen  = new Set();
-
-    for (const dir of PROTON_DIRS) {
-        if (!fs.existsSync(dir)) continue;
-        let entries;
-        try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-        catch { continue; }
-
-        for (const entry of entries) {
-            if (!entry.isDirectory()) continue;
-            const fullPath = path.join(dir, entry.name);
-            // Resolve symlinks so ~/.steam/root, ~/.steam/steam, ~/.local/share/Steam
-            // (which are all symlinks to the same location) don't produce duplicates.
-            const realPath = (() => { try { return fs.realpathSync(fullPath); } catch { return fullPath; } })();
-            if (seen.has(realPath)) continue;
-
-            // A valid Proton dir has a 'proton' script and/or toolmanifest.vdf
-            const isProton =
-                fs.existsSync(path.join(realPath, 'proton')) ||
-                fs.existsSync(path.join(realPath, 'toolmanifest.vdf')) ||
-                fs.existsSync(path.join(realPath, 'compatibilitytool.vdf'));
-
-            if (!isProton) continue;
-            seen.add(realPath);
-
-            const name = entry.name;
-            let type = 'other';
-            if (/^GE-Proton|^Proton-GE/i.test(name))  type = 'ge';
-            else if (/^Proton/i.test(name))             type = 'steam';
-
-            found.push({ name, path: realPath, type });
-        }
-    }
-
-    // Sort: GE-Proton first (usually preferred), then Steam Proton, then others.
-    // Within each group, newest (highest version number) first.
-    const order = { ge: 0, steam: 1, other: 2 };
-    return found.sort((a, b) => {
-        const to = (order[a.type] ?? 2) - (order[b.type] ?? 2);
-        if (to !== 0) return to;
-        return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' });
-    });
-}
+// Proton discovery (PROTON_DIRS + scanProtonVersions) now lives in packages/core/grinder-engine.js
+// so the Manager and CREMA resolve exactly the same builds this face lists; `scanProtonVersions`
+// is re-bound from the engine at the top of this file.
 
 // Expand ~ to HOME so spawn() (which doesn't use a shell) gets real paths
 // ── Bundled binary paths ──────────────────────────────────────────────────────
@@ -323,18 +267,19 @@ ipcMain.handle('uninstall-game-files', async (_, id) => {
     const errors = [];
 
     const installPath = expandTilde(game.install_path || '');
-    const defaultBase = expandTilde(
-        db.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value
-        || path.join(HOME, 'Games', 'CafeNeurotico')
-    );
+    // Both the configured install folder and the built-in default count as valid bases: the
+    // folder is user-changeable, so games installed under the previous one must stay removable.
+    const bases = [
+        db.prepare("SELECT value FROM settings WHERE key='default_install_dir'").get()?.value,
+        path.join(HOME, 'Games', 'CafeNeurotico'),
+    ].filter(Boolean).map(expandTilde);
 
-    // Safety guard: never delete the base install directory or any ancestor of it.
-    // A valid game path must be at least one level deeper than the base.
+    // Safety guard: never delete a base install directory or any ancestor of one.
+    // A valid game path must be at least one level deeper than its base.
     const isSafe = installPath &&
-        installPath !== defaultBase &&
         installPath !== HOME &&
         installPath !== '/' &&
-        installPath.startsWith(defaultBase + path.sep);
+        bases.some(b => installPath !== b && installPath.startsWith(b + path.sep));
 
     if (installPath && fs.existsSync(installPath)) {
         if (!isSafe) {
