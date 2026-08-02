@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.2.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.3.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
@@ -24,7 +24,7 @@ cafeneurotico@linux:~$ ./brew
 [ ok ] pouring fullscreen interface.... CREMA
 [ ok ] blending into one shot.......... done
 
-▓▓ CAFE NEUROTICO 1.2 ▓▓
+▓▓ CAFE NEUROTICO 1.3 ▓▓
 > three faces, one binary. served.
 ```
 
@@ -57,7 +57,9 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 **One library, every store.** Steam (API + a local scan that catches the free games and demos Steam's API hides), GOG and Epic (signed in from inside the app — no browser dance, no external launcher), Flatpak, itch.io, PICO-8, emulators, and anything else you can start from a command line. Refresh adds new purchases *and* removes what you refunded.
 
-**Install and launch, in-process.** GOG and Epic games download through the built-in GRINDER engine with live progress, a queue, disk-space checks, and a Linux-or-Windows build choice for the games that ship both. Per-game Proton version, prefix, winetricks and env vars when you want them; a verbose **Play with Log** window when a game refuses to start.
+**Install and launch, in-process.** GOG and Epic games download through the built-in GRINDER engine with live progress, a queue, disk-space checks, and a Linux-or-Windows build choice for the games that ship both. One install folder for everything, changeable in one place, overridable per game. Per-game Proton version, prefix, winetricks and env vars when you want them; a verbose **Play with Log** window when you want the raw output.
+
+**Proton, found for you — and failures you can see.** Windows games need Proton, so the suite locates it on your machine whatever the folder is called (Steam's builds, GE-Proton, whatever ProtonUp-Qt installed) and hands it over explicitly instead of hoping the launcher guesses right. If you have none, it offers to install GE-Proton in one click. A game that dies on startup says so, with the details a click away — no more pressing Play and watching nothing happen. The slow first launch of a Windows game shows real progress while the runtime downloads and its Windows environment is built.
 
 **Artwork that stays put.** Covers, hero art, logos, screenshots, descriptions, HowLongToBeat, Metacritic and ProtonDB tiers, scraped from Steam, SteamGridDB and IGDB and stored **locally**. No link rot when a storefront changes its API. Trailers download as real MP4 files.
 

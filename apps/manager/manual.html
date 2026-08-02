@@ -291,7 +291,12 @@
                 <li><strong>Cancel</strong> really cancels: the whole download process tree is stopped, not just the parent, so a cancelled install doesn&rsquo;t sit there half-finished.</li>
                 <li><strong>Uninstall</strong> (gamepage action row) removes the game files and its Wine prefix.</li>
                 <li><strong>Games you own on more than one store</strong> keep one entry with several launchers. Installing it anywhere counts as installed, and pressing Play asks which one you meant &mdash; the copies already on disk offer <em>Play</em>, the others offer to install first, so you never get a silent failure.</li>
+                <li><strong>Where games land:</strong> the install dialog starts at your <strong>Game Install Folder</strong> &mdash; <code>~/Games/CafeNeurotico</code> unless you change it (Control Panel &rarr; Library). <strong>Change&hellip;</strong> picks a different folder for that one game without touching the default.</li>
             </ul>
+            <h3>Windows Games &amp; Proton</h3>
+            <p>GOG and Epic games built for Windows run through <strong>Proton</strong>, a compatibility layer. Cafe Neurotico finds Proton on your machine by itself &mdash; Steam&rsquo;s own builds, GE-Proton, anything installed by ProtonUp-Qt &mdash; no matter what the folder is called, and picks the best one available.</p>
+            <p>If you have none, the first Windows game you launch says so and offers to <strong>install GE-Proton for you</strong>: one click, a progress bar, roughly a 400&nbsp;MB one-time download that every Windows game then shares. If you already have several builds, the same dialog lets you choose which one to use.</p>
+            <div class="tip-box"><p><strong>The first Windows game takes a few minutes to appear.</strong> Before it can start, a compatibility runtime is downloaded once for the whole machine, and each game gets its own small Windows environment built the first time you play it. The Now Playing card shows what stage it&rsquo;s at, with the download counting up &mdash; it isn&rsquo;t stuck. Every launch after that is immediate.</p></div>
             <h3>The Download Manager</h3>
             <p>Start more than one install and they <strong>queue</strong> &mdash; each begins automatically when the previous one finishes. Manage the queue from:</p>
             <ul>
@@ -345,7 +350,7 @@
             <p>The wrench icon opens the Control Panel &mdash; it lands on a title splash showing <strong>which version you are running</strong>; pick a section on the left or just start typing to <strong>search every setting</strong>.</p>
             <ul>
                 <li><strong>Appearance</strong> &mdash; Theme Selection (<strong>93 themes in 10 families</strong>, from Catppuccin to Game Boy to a shelf of retro operating systems), <strong>Interface Font</strong> (Poppins, Sora, Inter, Fraunces, Chicago or PxPlus IBM VGA8 &mdash; all bundled, nothing fetched from the web), UI scale (50&ndash;150%), Sharp/Round corners, Ken Burns on/off.</li>
-                <li><strong>Library</strong> &mdash; Update Library (full store re-sync), Add Custom Game, batch scraping, <strong>Manage Storage</strong> and <strong>Scan for Updates</strong> (both below).</li>
+                <li><strong>Library</strong> &mdash; Update Library (full store re-sync), Add Custom Game, batch scraping, <strong>Game Install Folder</strong>, <strong>Manage Storage</strong> and <strong>Scan for Updates</strong> (all below).</li>
                 <li><strong>Behavior</strong> &mdash; Gaming History, Recently Imported size, PICO-8 / Free-to-Play visibility, Hidden Games manager, desktop &amp; phone Notifications.</li>
                 <li><strong>Connections</strong> &mdash; Steam, GRINDER (GOG/Epic), itch.io, SteamGridDB, IGDB, PICO-8 binary.</li>
                 <li><strong>System</strong> &mdash; full <strong>Backup ZIP</strong> (library + artwork + trailers <em>+ your RetroArch save states</em>), Add to Application Menu, CREMA autostart on login, the Welcome screen.</li>
@@ -354,6 +359,10 @@
             <h3>Themes &amp; the Interface Font</h3>
             <p>All <strong>93 themes are shared by all three faces</strong> &mdash; the Manager, CREMA and GRINDER draw from the same set, so a look you like on the desktop is the same look on the TV. The families are Originals &amp; System, BrewBalance, Light &amp; Minimal, Gaming Legends, Aesthetics, Linux Ricing, Sci-Fi Universes, Horror Realm, PSIII Colors and <strong>Systems</strong> &mdash; twenty faithful retro-OS palettes (MS-DOS, Commodore 64, Windows 3.1 / 95 / XP, Amiga Workbench, BeOS, NeXTSTEP, ZX Spectrum, Atari ST, classic Mac OS, OS/2 Warp, IBM 3270, Solaris CDE, RISC OS, GEOS, amber and green CRT, Teletext). Each Systems theme brings its own era typeface along for the ride.</p>
             <p>The <strong>Interface Font</strong> setting changes the type across the whole suite independently of colour. New installs start on <strong>Poppins</strong> with the <strong>BrewBalance &middot; Mocha</strong> colour scheme.</p>
+            <h3>Game Install Folder</h3>
+            <p>Control Panel &rarr; Library &rarr; <strong>Game Install Folder</strong> is where GOG and Epic downloads go. New installs use <code>~/Games/CafeNeurotico</code>; <strong>Change Folder</strong> points everything somewhere else (a second drive, say) and <strong>Reset</strong> puts it back. Each game still gets its own sub-folder, and you can always override the folder for a single game while installing it.</p>
+            <p>Changing this only affects <em>future</em> installs &mdash; nothing already on disk moves. Games installed under a previous folder stay perfectly playable and can still be uninstalled normally.</p>
+
             <h3>Manage Storage</h3>
             <p>Control Panel &rarr; Library &rarr; <strong>Manage Storage</strong> answers &ldquo;what is eating my disk?&rdquo;. The <strong>GOG &amp; Epic</strong> button opens GRINDER showing only installed games, sorted biggest-first, so the space hogs are at the top and one click uninstalls them. The <strong>Steam</strong> button hands you over to Steam&rsquo;s own storage manager.</p>
 
@@ -465,7 +474,7 @@
             <div class="tip-box"><p><strong>You no longer sign in here.</strong> GOG and Epic logins happen directly in the Manager&rsquo;s Welcome and Connect screens. GRINDER&rsquo;s window is for tuning, not setup.</p></div>
             <h3>When to Open Its Window</h3>
             <ul>
-                <li><strong>Per-game tuning:</strong> Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables.</li>
+                <li><strong>Per-game tuning:</strong> Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables. You don&rsquo;t have to set a Proton here &mdash; the suite finds one by itself (&sect;7) &mdash; but this is where you pin a specific build for an awkward game.</li>
                 <li><strong>&ldquo;&#9654; Log&rdquo; &mdash; Play with Log.</strong> Next to every installed game&rsquo;s Launch button. It starts the game exactly as normal but streams everything the game and Wine print into a live window &mdash; the first thing to reach for when a title refuses to start. Copy the log with one button. Closing the window doesn&rsquo;t disturb the game.</li>
                 <li><strong>&ldquo;&#11015; Size&rdquo; sort</strong> &mdash; order the library by how much disk each install actually occupies. This is what Manage Storage opens.</li>
                 <li><strong>DLC:</strong> list, install and reset the DLC of your installed GOG games.</li>
@@ -515,7 +524,9 @@
             <ul>
                 <li><strong>Steam import returns nothing:</strong> your Steam profile&rsquo;s <em>Game Details</em> must be Public. Double-check the SteamID64 (17 digits).</li>
                 <li><strong>A newly bought GOG/Epic game isn&rsquo;t showing:</strong> hit <strong>Refresh Library</strong> &mdash; it pulls the fresh owned list from both stores. If it still doesn&rsquo;t appear, open Connect and check the GOG/Epic cards still say you&rsquo;re signed in; store tokens do expire, and signing in again takes a few seconds.</li>
-                <li><strong>A game won&rsquo;t start and says nothing useful:</strong> open GRINDER, find it, and press <strong>&#9654; Log</strong> instead of Launch. The verbose window shows what Wine or the game actually complained about &mdash; usually a missing dependency you can install from the same screen&rsquo;s winetricks.</li>
+                <li><strong>A Windows game won&rsquo;t start:</strong> a game that quits the moment it starts now tells you so, with the technical details one click away. The usual cause is having no <strong>Proton</strong> installed, which the dialog offers to fix in one click &mdash; see &sect;7. If you already have Proton, the same dialog lets you try a different build.</li>
+                <li><strong>Nothing at all seems to happen on the first Windows game:</strong> it&rsquo;s working. A compatibility runtime downloads once per machine and the game&rsquo;s Windows environment is built the first time you play it &mdash; a few minutes, shown on the Now Playing card. Later launches are instant.</li>
+                <li><strong>You want to see exactly what a game printed:</strong> open GRINDER, find it, and press <strong>&#9654; Log</strong> instead of Launch. The verbose window shows what Wine or the game actually complained about &mdash; usually a missing dependency you can install from the same screen&rsquo;s winetricks.</li>
                 <li><strong>A game vanished after Refresh Library:</strong> that&rsquo;s the removal check &mdash; the store no longer reports you as owning it (refunded, or a demo you uninstalled). Re-buy or reinstall it and the next refresh brings it back.</li>
                 <li><strong>A game shows Install instead of Play</strong> (or vice-versa): Refresh Library reconciles install state with GRINDER and Steam. Games owned on several stores at once count as installed if <em>any</em> copy is on disk.</li>
                 <li><strong>Am I running the latest version?</strong> Open the Control Panel &mdash; the splash it lands on tells you your version, and <strong>Check for Updates</strong> next to it opens the releases page so you can compare. There is no automatic check; nothing is downloaded without you.</li>
