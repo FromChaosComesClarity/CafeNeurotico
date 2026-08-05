@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.3.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.3.1-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
@@ -27,6 +27,20 @@ cafeneurotico@linux:~$ ./brew
 ▓▓ CAFE NEUROTICO 1.3 ▓▓
 > three faces, one binary. served.
 ```
+
+---
+
+<div align="center">
+
+### The Manager — your library on the desktop
+
+<img src="docs/screenshots/manager-library.png" alt="The Manager showing a game library grid with cover art, search and filters" width="800">
+
+### CREMA — the same library, on the TV
+
+<img src="docs/screenshots/crema-fullscreen.png" alt="CREMA fullscreen gamepad interface showing library stats, today's pick, and cover art rows" width="900">
+
+</div>
 
 ---
 
