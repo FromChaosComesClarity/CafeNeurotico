@@ -883,6 +883,15 @@ async function launchGame(gameId, opts = {}) {
     // Proton patches) just trades a visible failure for a mysterious one.
     if (!proton && (umu || !findWineCached())) throw noProtonError();
 
+    // Per-game fix (see applyFalloutNewCaliforniaFix). Runs before the spawn so the game
+    // finds its config and registry on this launch rather than the next one, and is
+    // self-healing: a prefix that gets rebuilt is re-seeded automatically. It must never
+    // be the reason a launch fails, hence the catch.
+    if (isFalloutNewCalifornia(game) && installPath) {
+        try { await applyFalloutNewCaliforniaFix(installPath, prefix, proton); }
+        catch (e) { console.error('[launch] New California fix failed:', e.message); }
+    }
+
     if (game.store === 'epic' && umu && proton) {
         spawnGame(umu, [launchExe, ...userArgs], { cwd: installPath || undefined, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
         return { ok: true, method: 'umu-run' };
@@ -1075,6 +1084,125 @@ async function injectGogRegistry(game, prefix, proton) {
         });
         proc.on('close', () => { try { fs.unlinkSync(regFile); } catch {} resolve(); });
         proc.on('error', () => { try { fs.unlinkSync(regFile); } catch {} resolve(); });
+    });
+}
+
+// ── Per-game fix: Fallout: New California (GOG 1168267909) ───────────────────
+// GOG ships post-install steps in goggame-<id>.script — registry values, plus config
+// files copied out of the game's own gog-support/ folder — that only Galaxy's installer
+// performs. gogdl downloads the depot and nothing else, so a title that depends on those
+// steps installs perfectly and then misbehaves. We deliberately don't run .script
+// generically (its actions include executing bundled .exe files), so affected titles are
+// fixed here one at a time. So far that is exactly one.
+//
+// New California is a standalone total conversion that bundles Fallout: New Vegas.
+// Without the .script steps three things go wrong, in sequence:
+//   • No FalloutPrefs.ini in My Games\FalloutNV → FalloutNV.exe hands off to
+//     FalloutNVLauncher.exe instead of starting the game.
+//   • No "Installed Path" under HKLM\Software\Bethesda Softworks\FalloutNV → that
+//     launcher decides New Vegas isn't installed and offers to install it from a
+//     DVD-ROM drive that doesn't exist. This is the dead end the player actually hits.
+//   • No plugins.txt in AppData\Local\FalloutNV → New California's plugins never load,
+//     so even a game that did start would be plain New Vegas.
+const FNC_APP_ID = '1168267909';
+
+// gog-support/<appId>/<source> → <windows user dir>/<destination>, mirroring the
+// supportData actions in goggame-1168267909.script.
+const FNC_SUPPORT_FILES = [
+    ['docs/Fallout.ini',      'Documents/My Games/FalloutNV/Fallout.ini'],
+    ['docs/FalloutPrefs.ini', 'Documents/My Games/FalloutNV/FalloutPrefs.ini'],
+    ['appdata/plugins.txt',   'AppData/Local/FalloutNV/plugins.txt'],
+];
+
+function isFalloutNewCalifornia(game) {
+    return (game?.store || '').toLowerCase() === 'gog' && String(game?.app_id) === FNC_APP_ID;
+}
+
+async function applyFalloutNewCaliforniaFix(installPath, prefix, proton) {
+    const support = path.join(installPath, 'gog-support', FNC_APP_ID);
+    if (!fs.existsSync(support)) return;   // not the GOG build these fixes describe
+
+    // Seed config into every real user directory in the prefix: Proton runs games as
+    // `steamuser`, while a prefix built by bare wine uses the unix login name. Only files
+    // that are genuinely absent get written — after the first run these hold the player's
+    // own settings, and re-copying them every launch would reset the game each time.
+    const usersRoot = path.join(prefix, 'drive_c', 'users');
+    let userDirs = [];
+    try {
+        userDirs = fs.readdirSync(usersRoot, { withFileTypes: true })
+            .filter(e => e.isDirectory() && e.name !== 'Public')
+            .map(e => path.join(usersRoot, e.name));
+    } catch {}
+    if (!userDirs.length) userDirs = [path.join(usersRoot, 'steamuser')];
+
+    for (const userDir of userDirs) {
+        for (const [from, to] of FNC_SUPPORT_FILES) {
+            const src = path.join(support, ...from.split('/'));
+            const dst = path.join(userDir, ...to.split('/'));
+            // Case-insensitive check: the game writes FALLOUT.INI, which on a
+            // case-sensitive filesystem is a different name from the Fallout.ini we would
+            // copy — leaving wine two files to pick between.
+            if (!fs.existsSync(src) || fs.existsSync(resolvePathCaseInsensitive(dst))) continue;
+            try {
+                fs.mkdirSync(path.dirname(dst), { recursive: true });
+                fs.copyFileSync(src, dst);
+                fs.chmodSync(dst, 0o644);   // the game rewrites these as it runs
+            } catch {}
+        }
+    }
+
+    // Reading system.reg directly keeps the common case free: once the value is in the
+    // prefix we never spawn wine for this again. A missing system.reg means the prefix was
+    // never built — runRedist returns early for a game GOG lists no dependencies for, so
+    // this is reachable on a first launch — and we go ahead and let wine create it rather
+    // than skip, or the player meets the launcher's dead end exactly once before it heals.
+    const systemReg = path.join(prefix, 'system.reg');
+    const prefixBuilt = fs.existsSync(systemReg);
+    if (prefixBuilt) {
+        try {
+            if (fs.readFileSync(systemReg, 'utf8').includes('Bethesda Softworks\\\\FalloutNV')) return;
+        } catch { return; }
+    }
+
+    // Trailing backslash matches the {app}\ GOG writes. FalloutNV.exe and its launcher are
+    // both 32-bit, so on a win64 prefix they read HKLM\Software through the WoW64 view —
+    // the Wow6432Node copy is the one they actually see.
+    const winPath = ('Z:' + installPath).replace(/\//g, '\\') + '\\';
+    const escaped = winPath.replace(/\\/g, '\\\\');
+
+    const regContent =
+        'Windows Registry Editor Version 5.00\r\n\r\n' +
+        '[HKEY_LOCAL_MACHINE\\SOFTWARE\\Bethesda Softworks\\FalloutNV]\r\n' +
+        `"Installed Path"="${escaped}"\r\n\r\n` +
+        '[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Bethesda Softworks\\FalloutNV]\r\n' +
+        `"Installed Path"="${escaped}"\r\n`;
+
+    const regFile = path.join(os.tmpdir(), `fnc_reg_${FNC_APP_ID}.reg`);
+    try { fs.writeFileSync(regFile, regContent, 'utf8'); } catch { return; }
+
+    // Proton's own wine, same as injectGogRegistry. It runs outside umu's container, which
+    // is what lets regedit read a file from the host's /tmp at all.
+    let wineBin = 'wine';
+    if (proton) {
+        for (const c of [path.join(proton, 'files', 'bin', 'wine64'),
+                         path.join(proton, 'files', 'bin', 'wine')]) {
+            if (fs.existsSync(c)) { wineBin = c; break; }
+        }
+    }
+
+    await new Promise(resolve => {
+        const finish = () => { try { fs.unlinkSync(regFile); } catch {} resolve(); };
+        const proc = spawn(wineBin, ['regedit', '/S', regFile], {
+            env: { ...process.env, WINEPREFIX: prefix, WINEDEBUG: '-all' },
+            stdio: 'ignore',
+        });
+        // A wedged wine must never hold the game hostage — give up and launch anyway. Merging
+        // into a built prefix takes seconds; building one from scratch is a wineboot, so don't
+        // pull the plug on that half way through.
+        const timer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} finish(); },
+                                 prefixBuilt ? 30000 : 180000);
+        proc.on('close', () => { clearTimeout(timer); finish(); });
+        proc.on('error', () => { clearTimeout(timer); finish(); });
     });
 }
 
