@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.4.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.5.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
@@ -86,6 +86,10 @@ All three read and write the **same database**. Favourite a game on the couch, i
 **Genres that mean something.** Stores tell you where a game came from; the suite tells you what it *is*. One scan sorts your library into ARPG, CRPG, FPS, Metroidvania, Soulslike, Shmup, Survival Horror, Point & Click and forty more — read from the tags players actually voted on, which is the only source that can tell a Diablo-like from a Baldur's Gate-like, with IGDB covering what the stores never listed. Filter by genre next to the search box on the desktop or from the menu on the TV, combine it with anything else (*GOG + CRPG + Installed*), and disagree with any of it: a genre you set by hand is pinned and no future scan will touch it.
 
 **Playlists that fill themselves.** Give a new playlist a genre instead of a list of games and it maintains its own membership forever — it tells you how many it collects before you commit, and every game you buy that fits simply turns up in it.
+
+**The manual, where the game keeps it.** Plenty of games — RPGs above all — still expect you to read something, and the file is usually already on your disk without anyone telling you. A book button on the gamepage finds it: GOG names its own documents, so Realms of Arkania offers you *Manual*, *Cluebook* and *Password reference card* rather than three filenames. For GOG games it can also fetch the scanned originals from the store. A game can hold as many as it needs, read in a window you can drag to a second monitor and keep open while you play.
+
+**DOS games that actually start.** GOG's DOS titles ship a Windows DOSBox and a config that only works from the right folder — get either wrong and the window opens and closes. Both are handled, including the configs GOG's installer copies and `gogdl` never did. Optionally hand the job to a native DOSBox instead: it reads the very same GOG config, so every tweak made for that game survives and only the emulator changes.
 
 **A dashboard if you want one.** An optional drag-and-drop widget board: roulette, backlog weight, throwback, achievement completion, disk footprint, and strictly opt-in online widgets (deals, Epic freebies, RSS gaming news, Steam patch notes) that make **zero network calls until you enable them**.
 
