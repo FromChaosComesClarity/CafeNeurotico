@@ -1896,6 +1896,90 @@ function cnUpdateRow(g, current, latest, store) {
     return { id: cn ? cn.id : null, name: (cn && cn.Game) || g.title, store, current: current || '', latest: latest || '', gid };
 }
 
+// ── Per-game manuals ─────────────────────────────────────────────────────────
+// A pointer to a file the user owns (see packages/core/manuals.js), read in a frameless
+// viewer window of its own so it can be dragged to a second monitor and survives the
+// library window moving or a game launching. One viewer is reused across games.
+const _manuals = require('../../packages/core/manuals.js');
+let gameManualWin = null;
+
+ipcMain.handle('manual-status', (_, gameId) => _manuals.manualStatus(db, fs, gameId));
+
+// Ask for the manual file. Opens in the game's own install folder when we can find it —
+// that is where GOG puts the PDFs it ships — but it is an ordinary file dialog, so
+// anywhere else on disk works just as well.
+ipcMain.handle('pick-manual', async (_, gameId) => {
+    if (!db) return { ok: false };
+    let startAt;
+    try {
+        const row = db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
+        const folder = row ? resolveGameFolder(row) : null;
+        if (folder && fs.existsSync(folder)) startAt = folder;
+    } catch {}
+    const opts = {
+        title: 'Choose this game’s manual',
+        properties: ['openFile'],
+        filters: _manuals.MANUAL_FILTERS,
+    };
+    if (startAt) opts.defaultPath = startAt;
+    const { canceled, filePaths } = await dialog.showOpenDialog(opts);
+    if (canceled || !filePaths || !filePaths.length) return { ok: false, canceled: true };
+    if (!_manuals.setManual(db, gameId, filePaths[0])) return { ok: false, error: 'Could not save that path.' };
+    return { ok: true, path: filePaths[0] };
+});
+
+ipcMain.handle('clear-manual', (_, gameId) => ({ ok: _manuals.clearManual(db, gameId) }));
+
+ipcMain.handle('open-manual-viewer', (event, opts = {}) => {
+    const p = opts.path;
+    if (!p || !fs.existsSync(p)) return { ok: false, error: 'Manual file not found.' };
+    const query = {
+        file:   p,
+        title:  opts.title || 'Manual',
+        store:  opts.store || '',
+        logo:   opts.logo  || '',
+        font:   opts.font  || '',
+        gameId: String(opts.gameId ?? ''),
+        theme:  JSON.stringify(opts.theme || {}),
+    };
+
+    if (gameManualWin && !gameManualWin.isDestroyed()) {
+        gameManualWin.loadFile(path.join(__dirname, 'game-manual.html'), { query });
+        if (gameManualWin.isMinimized()) gameManualWin.restore();
+        gameManualWin.focus();
+        return { ok: true };
+    }
+
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const pb = parent ? parent.getBounds() : { x: 80, y: 60, width: 1200, height: 900 };
+    gameManualWin = new BrowserWindow({
+        width: 860, height: 980,
+        x: (pb.x || 0) + 60, y: Math.max(0, (pb.y || 0) + 30),
+        frame: false,
+        backgroundColor: (opts.theme && opts.theme.bg) || '#141414',
+        title: opts.title ? `Manual — ${opts.title}` : 'Manual',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            webSecurity: false,   // the PDF is a local file loaded into an iframe
+            plugins: true,        // enables Chromium's built-in PDF viewer
+        }
+    });
+    gameManualWin.setMenu(null);
+    gameManualWin.loadFile(path.join(__dirname, 'game-manual.html'), { query });
+    gameManualWin.on('closed', () => { gameManualWin = null; });
+    return { ok: true };
+});
+
+// Window controls for the viewer's own chrome — scoped to the manual window so they can
+// never be aimed at the library window by anything else holding the preload.
+ipcMain.handle('game-manual-close', () => { try { gameManualWin?.close(); } catch {} });
+ipcMain.handle('game-manual-minimize', () => { try { gameManualWin?.minimize(); } catch {} });
+ipcMain.handle('open-manual-externally', async (_, p) => {
+    if (p && fs.existsSync(p)) await shell.openPath(p);
+});
+
 // ── Genre scan ───────────────────────────────────────────────────────────────
 // Community tags from SteamSpy, IGDB for everything Steam never heard of, and the old
 // GENRE column as a floor (see packages/core/genre-scan.js). The pace is SteamSpy's

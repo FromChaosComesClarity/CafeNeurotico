@@ -8592,6 +8592,10 @@ function openGamepage(game) {
         sploreBtn.onclick = null;
     }
 
+    // Manual button — always offered, because a manual can be attached to anything
+    // (a physical copy, an emulated game), not only to titles with an install folder.
+    _refreshManualBtn(game);
+
     // Browse Local Files button — shown whenever the game's install folder can be
     // located on disk (Steam, GOG/Epic, or a custom/emulator command with a real path).
     const browseBtn = document.getElementById('btn-gamepage-browse');
@@ -8792,6 +8796,65 @@ function _renderLauncherList(game) {
         const managed = /grinder:\/\/launch/i.test(l.cmd || '');
         list.appendChild(_makeLauncherRow(l.label || '', l.cmd || '', managed));
     });
+}
+
+// ── Game manuals ─────────────────────────────────────────────────────────────
+// One button, two jobs: with a manual attached it reads it, without one it asks for the
+// file. The picker opens in the game's own folder, which is where GOG leaves the PDFs it
+// ships, so the common case is a couple of clicks.
+async function _refreshManualBtn(game) {
+    const btn = document.getElementById('btn-gamepage-manual');
+    if (!btn) return;
+    let st = { path: null, exists: false };
+    try { st = await window.api.manualStatus(game.id) || st; } catch (e) {}
+    if (currentGameId !== game.id) return;   // gamepage moved on while we were asking
+
+    btn.classList.toggle('active', !!st.exists);
+    btn.title = st.exists ? 'Read the manual'
+              : st.path   ? 'Manual file is missing — click to pick it again'
+              : 'Attach a manual (PDF) to this game';
+    btn.onclick = async (e) => {
+        e.stopPropagation();
+        await openGameManual(game);
+    };
+}
+
+async function openGameManual(game) {
+    let st = { path: null, exists: false };
+    try { st = await window.api.manualStatus(game.id) || st; } catch (e) {}
+
+    // Nothing attached yet, or the file has since moved or been uninstalled — ask.
+    if (!st.exists) {
+        if (st.path && !await showConfirm(
+            `The manual saved for ${game.Game} is no longer at:\n\n${st.path}\n\nPick a different file?`, 'Choose File')) return;
+        const picked = await window.api.pickManual(game.id);
+        if (!picked || !picked.ok) return;
+        st = { path: picked.path, exists: true };
+    }
+
+    const res = await window.api.openManualViewer({
+        path: st.path,
+        gameId: game.id,
+        title: game.Game || 'Manual',
+        store: (game.Store || '').split(',')[0].trim(),
+        logo: game.Logo ? getSafePath(game.Logo) : '',
+        font: _uiFont || '',
+        theme: _currentThemeVars(),
+    });
+    if (res && !res.ok) showAlert(res.error || 'Could not open that manual.');
+    _refreshManualBtn(game);
+}
+
+// The viewer is a separate window with its own document, so it cannot inherit the CSS
+// variables — the active theme's colours are passed across and re-applied there.
+function _currentThemeVars() {
+    const cs = getComputedStyle(document.documentElement);
+    const out = {};
+    for (const k of ['bg', 'bg_panel', 'bg_menu', 'accent', 'text_main', 'text_sec', 'text_dim', 'border', 'border_solid']) {
+        const v = cs.getPropertyValue('--' + k).trim();
+        if (v) out[k] = v;
+    }
+    return out;
 }
 
 // Genre override in the edit dialog. Choosing one pins the game — scans skip it from

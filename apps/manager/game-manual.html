@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Manual</title>
+  <!-- The per-game manual viewer, ported from EmuLatte's manual.html. Named game-manual
+       so it cannot be confused with manual.html, which is the suite's own user manual. -->
+  <style>
+    :root {
+      --bg:#141414; --bg_panel:rgba(0,0,0,0.5); --bg_menu:#222; --accent:#D4A373;
+      --text_main:#FFE6A7; --text_sec:#E6CC98; --text_dim:#A47148;
+      --border:rgba(212,163,115,0.2); --border_solid:#8B5A2B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+      background: var(--bg); color: var(--text_main);
+      font-family: var(--ui-font, 'Raleway'), system-ui, sans-serif; user-select: none;
+    }
+
+    /* ── Header (draggable title bar) ─────────────────────────────────────── */
+    #m-head {
+      height: 52px; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+      padding: 0 10px 0 16px; background: var(--bg_menu);
+      border-bottom: 1px solid var(--border_solid); -webkit-app-region: drag;
+    }
+    #m-ident { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+    #m-book { color: var(--accent); flex-shrink: 0; display: flex; }
+    #m-logo { max-height: 30px; max-width: 240px; object-fit: contain; display: none;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+    #m-title {
+      font-size: 14px; font-weight: 900; letter-spacing: 1.5px; color: var(--text_main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+    .m-pill {
+      font-size: 9px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px; flex-shrink: 0; white-space: nowrap;
+    }
+    #m-store { background: rgba(0,0,0,0.35); color: var(--accent); border: 1px solid var(--border_solid); display: none; }
+
+    #m-actions { display: flex; align-items: center; gap: 8px; -webkit-app-region: no-drag; flex-shrink: 0; }
+    .m-btn {
+      -webkit-app-region: no-drag; cursor: pointer; border: 1px solid var(--border_solid);
+      background: transparent; color: var(--text_sec); border-radius: 8px;
+      height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      gap: 7px; padding: 0 10px; font-family: inherit; font-size: 10px; font-weight: 900;
+      letter-spacing: 1px; text-transform: uppercase; transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .m-btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .m-btn:disabled { opacity: 0.5; cursor: default; }
+    .m-btn.icon { width: 32px; padding: 0; }
+    #m-close:hover { background: #c62828; color: #fff; border-color: #c62828; }
+    .m-btn svg { display: block; }
+
+    /* ── Document area ────────────────────────────────────────────────────── */
+    #m-doc { flex: 1; width: 100%; border: none; background: #2b2b2b; }
+  </style>
+</head>
+<body>
+  <div id="m-head">
+    <div id="m-ident">
+      <span id="m-book"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+      <img id="m-logo" alt="">
+      <span id="m-title">Manual</span>
+      <span id="m-store" class="m-pill"></span>
+    </div>
+    <div id="m-actions">
+      <button id="m-change" class="m-btn" title="Point this game at a different manual file">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Change
+      </button>
+      <button id="m-forget" class="m-btn" title="Unlink this manual from the game (the file itself is not deleted)">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        <span class="m-forget-label">Unlink</span>
+      </button>
+      <button id="m-open" class="m-btn icon" title="Open in the system PDF viewer">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </button>
+      <button id="m-min" class="m-btn icon" title="Minimize">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button id="m-close" class="m-btn icon" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <iframe id="m-doc" title="Manual"></iframe>
+  <script src="game-manual.js"></script>
+</body>
+</html>

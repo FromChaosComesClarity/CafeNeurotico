@@ -23,6 +23,7 @@ const steamnews = require('./steamnews.js');
 const genres = require('./genres.js');
 const genreStore = require('./genre-store.js');
 const smartPlaylists = require('./smart-playlists.js');
+const manuals = require('./manuals.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
@@ -32,6 +33,7 @@ function registerSharedHandlers(ctx) {
     // share this DB and the schema must not drift between them.
     genreStore.ensureGenreSchema(db);
     smartPlaylists.ensureSmartSchema(db);
+    manuals.ensureManualSchema(db);
 
     // Wishlist of UN-OWNED games (Phase 2) — distinct from WANT_TO_PLAY (owned).
     try { db.prepare(`CREATE TABLE IF NOT EXISTS wishlist (id INTEGER PRIMARY KEY AUTOINCREMENT, itad_id TEXT UNIQUE, title TEXT, slug TEXT, cover TEXT, appid TEXT, added_at INTEGER DEFAULT 0, target_price REAL)`).run(); } catch (e) {}
