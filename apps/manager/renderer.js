@@ -8834,45 +8834,189 @@ function _renderLauncherList(game) {
 async function _refreshManualBtn(game) {
     const btn = document.getElementById('btn-gamepage-manual');
     if (!btn) return;
-    let st = { path: null, exists: false };
-    try { st = await window.api.manualStatus(game.id) || st; } catch (e) {}
+    let info = { attached: [], detected: [], gogAppId: null };
+    try { info = await window.api.manualList(game.id) || info; } catch (e) {}
     if (currentGameId !== game.id) return;   // gamepage moved on while we were asking
 
-    btn.classList.toggle('active', !!st.exists);
-    btn.title = st.exists ? 'Read the manual'
-              : st.path   ? 'Manual file is missing — click to pick it again'
-              : 'Attach a manual (PDF) to this game';
-    btn.onclick = async (e) => {
-        e.stopPropagation();
-        await openGameManual(game);
-    };
+    const readable = info.attached.filter(m => m.exists);
+    btn.classList.toggle('active', readable.length > 0);
+    btn.title = readable.length > 1 ? `${readable.length} manuals — choose one`
+              : readable.length     ? `Read: ${readable[0].label}`
+              : info.detected.length ? `${info.detected.length} manual(s) found in this game's folder`
+              : 'Attach a manual to this game';
+    btn.onclick = (e) => { e.stopPropagation(); openGameManual(game); };
 }
 
+// One manual and nothing else on offer → just read it. Anything else is a choice, and the
+// chooser is where that choice is made.
 async function openGameManual(game) {
-    let st = { path: null, exists: false };
-    try { st = await window.api.manualStatus(game.id) || st; } catch (e) {}
+    let info = { attached: [], detected: [], gogAppId: null };
+    try { info = await window.api.manualList(game.id) || info; } catch (e) {}
+    const readable = info.attached.filter(m => m.exists);
 
-    // Nothing attached yet, or the file has since moved or been uninstalled — ask.
-    if (!st.exists) {
-        if (st.path && !await showConfirm(
-            `The manual saved for ${game.Game} is no longer at:\n\n${st.path}\n\nPick a different file?`, 'Choose File')) return;
-        const picked = await window.api.pickManual(game.id);
-        if (!picked || !picked.ok) return;
-        st = { path: picked.path, exists: true };
+    if (readable.length === 1 && !info.detected.length && info.attached.length === 1) {
+        showManualViewer(game, readable[0].path);
+        return;
     }
+    openManualsModal(game);
+}
 
-    const res = await window.api.openManualViewer({
-        path: st.path,
+function showManualViewer(game, filePath) {
+    return window.api.openManualViewer({
+        path: filePath,
         gameId: game.id,
         title: game.Game || 'Manual',
         store: (game.Store || '').split(',')[0].trim(),
         logo: game.Logo ? getSafePath(game.Logo) : '',
         font: _uiFont || '',
         theme: _currentThemeVars(),
+    }).then(res => {
+        if (res && !res.ok) showAlert(res.error || 'Could not open that manual.');
+        return res;
     });
-    if (res && !res.ok) showAlert(res.error || 'Could not open that manual.');
-    _refreshManualBtn(game);
 }
+
+let _manualsGame = null;
+const _fmtMB = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+async function openManualsModal(game) {
+    _manualsGame = game;
+    document.getElementById('manuals-game').textContent = game.Game || '';
+    document.getElementById('manuals-status').textContent = '';
+    document.getElementById('modal-manuals').classList.add('active');
+    await renderManualsList();
+}
+
+async function renderManualsList() {
+    const game = _manualsGame;
+    if (!game) return;
+    const list = document.getElementById('manuals-list');
+    let info = { attached: [], detected: [], gogAppId: null };
+    try { info = await window.api.manualList(game.id) || info; } catch (e) {}
+    list.innerHTML = '';
+
+    const section = text => {
+        const h = document.createElement('div');
+        h.style.cssText = 'font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); margin:6px 0 1px;';
+        h.textContent = text;
+        list.appendChild(h);
+    };
+    const row = (label, sub, actions, dim) => {
+        const el = document.createElement('div');
+        el.style.cssText = 'display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--border_solid); border-radius:8px; background:var(--bg_panel);' + (dim ? ' opacity:.6;' : '');
+        el.innerHTML = `<div style="flex:1; min-width:0;">
+            <div style="font-size:12px; font-weight:700; color:var(--text_main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(label)}</div>
+            <div style="font-size:10px; color:var(--text_dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(sub)}</div>
+        </div>`;
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex; gap:6px; flex-shrink:0;';
+        for (const a of actions) {
+            const b = document.createElement('button');
+            b.textContent = a.text;
+            b.className = a.primary ? 'primary' : '';
+            b.style.cssText = 'font-size:10px; padding:6px 11px;' + (a.primary ? '' : ' background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);');
+            b.onclick = a.fn;
+            wrap.appendChild(b);
+        }
+        el.appendChild(wrap);
+        list.appendChild(el);
+        return el;
+    };
+
+    if (info.attached.length) {
+        section('On this game');
+        for (const m of info.attached) {
+            const acts = [];
+            if (m.exists) acts.push({ text: 'Read', primary: true, fn: () => showManualViewer(game, m.path) });
+            acts.push({ text: 'Remove', fn: async () => { await window.api.removeManual(m.id, game.id); renderManualsList(); _refreshManualBtn(game); } });
+            row(m.label || 'Manual', m.exists ? m.path : 'File is missing — ' + m.path, acts, !m.exists);
+        }
+    }
+
+    // Found in the game's own folder. GOG names these itself ("Cluebook", "Password
+    // reference card"), which is far better than anything guessed from a filename.
+    if (info.detected.length) {
+        section('Found in this game’s folder');
+        for (const d of info.detected) {
+            row(d.label, d.path, [{
+                text: 'Add', primary: true,
+                fn: async () => {
+                    await window.api.attachManual(game.id, d.path, d.label, d.source);
+                    renderManualsList(); _refreshManualBtn(game);
+                }
+            }]);
+        }
+    }
+
+    if (!info.attached.length && !info.detected.length) {
+        const p = document.createElement('p');
+        p.style.cssText = 'font-size:12px; color:var(--text_dim); margin:4px 0;';
+        p.textContent = 'Nothing found in this game’s folder. Browse for a file below' +
+                        (info.gogAppId ? ', or see what GOG has.' : '.');
+        list.appendChild(p);
+    }
+
+    if (info.gogAppId) renderGogManuals(game);
+}
+
+// GOG sells the extras alongside the game — the scanned originals. Listed lazily, because
+// it is a network call and most of the time the folder already had what you wanted.
+async function renderGogManuals(game) {
+    const list = document.getElementById('manuals-list');
+    const status = document.getElementById('manuals-status');
+    status.textContent = 'Checking GOG for manuals…';
+    let res = { ok: false, items: [] };
+    try { res = await window.api.gogManualList(game.id) || res; } catch (e) {}
+    if (_manualsGame?.id !== game.id) return;
+    status.textContent = res.ok ? '' : (res.error || '');
+    if (!res.ok || !res.items.length) {
+        if (res.ok) status.textContent = 'GOG has no manual for this game.';
+        return;
+    }
+
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); margin:6px 0 1px;';
+    h.textContent = 'From GOG';
+    list.appendChild(h);
+
+    for (const item of res.items) {
+        const el = document.createElement('div');
+        el.style.cssText = 'display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--border_solid); border-radius:8px; background:var(--bg_panel);';
+        el.innerHTML = `<div style="flex:1; min-width:0;">
+            <div style="font-size:12px; font-weight:700; color:var(--text_main);">${escHtml(item.name)}</div>
+            <div style="font-size:10px; color:var(--text_dim);">${escHtml(item.type)}${item.size ? ' · ' + _fmtMB(item.size) : ''}</div>
+        </div>`;
+        const btn = document.createElement('button');
+        btn.textContent = 'Download';
+        btn.className = 'primary';
+        btn.style.cssText = 'font-size:10px; padding:6px 11px; flex-shrink:0;';
+        btn.onclick = async () => {
+            btn.disabled = true; btn.textContent = 'Downloading…';
+            const r = await window.api.gogManualDownload(game.id, item.id);
+            if (r && r.ok) { status.textContent = `Added ${r.files.length} document(s) from GOG.`; renderManualsList(); _refreshManualBtn(game); }
+            else { status.textContent = (r && r.error) || 'Download failed.'; btn.disabled = false; btn.textContent = 'Download'; }
+        };
+        el.appendChild(btn);
+        list.appendChild(el);
+    }
+}
+
+window.api.onManualDownloadProgress(p => {
+    if (!p || !_manualsGame || p.gameId !== _manualsGame.id) return;
+    const status = document.getElementById('manuals-status');
+    if (status && p.total) status.textContent = `Downloading… ${_fmtMB(p.got)} of ${_fmtMB(p.total)}`;
+});
+
+document.getElementById('btn-manuals-browse')?.addEventListener('click', async () => {
+    if (!_manualsGame) return;
+    const res = await window.api.pickManual(_manualsGame.id);
+    if (res && res.ok) { renderManualsList(); _refreshManualBtn(_manualsGame); }
+});
+document.getElementById('btn-manuals-close')?.addEventListener('click', () =>
+    document.getElementById('modal-manuals')?.classList.remove('active'));
+document.getElementById('modal-manuals')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-manuals')) e.currentTarget.classList.remove('active');
+});
 
 // The viewer is a separate window with its own document, so it cannot inherit the CSS
 // variables — the active theme's colours are passed across and re-applied there.

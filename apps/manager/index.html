@@ -5688,6 +5688,22 @@ LOADING...READY.</div>
     </div>
   </div>
 
+  <!-- Manuals. Opens only when there is a choice to make: one manual and the button just
+       reads it. Lists what's attached, what was found in the game's own folder, and what
+       GOG has for sale-alongside (scanned originals). -->
+  <div id="modal-manuals" class="modal-overlay" style="z-index:26000;">
+    <div class="modal-box" style="width:520px; max-width:95vw; max-height:82vh; text-align:left; display:flex; flex-direction:column;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase;">Manuals</h3>
+      <p id="manuals-game" style="font-size:13px; font-weight:900; color:var(--text_main); margin:6px 0 10px;"></p>
+      <div id="manuals-list" style="display:flex; flex-direction:column; gap:7px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
+      <div id="manuals-status" style="font-size:11px; color:var(--text_dim); min-height:15px; margin-top:8px;"></div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-shrink:0;">
+        <button id="btn-manuals-browse" class="primary" style="flex:2; font-size:12px; padding:10px;">Browse for a file…</button>
+        <button id="btn-manuals-close" style="flex:1; font-size:12px; padding:10px;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Genre detection: a long scan (SteamSpy is one game per second), so it reports
        progress, can be cancelled, and keeps whatever it has already classified. -->
   <div id="modal-genres" class="modal-overlay" style="z-index:26000;">

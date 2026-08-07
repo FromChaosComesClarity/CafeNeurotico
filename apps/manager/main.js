@@ -1924,32 +1924,85 @@ ipcMain.handle('set-dosbox-mode', (_, mode) => {
 const _manuals = require('../../packages/core/manuals.js');
 let gameManualWin = null;
 
-ipcMain.handle('manual-status', (_, gameId) => _manuals.manualStatus(db, fs, gameId));
+// Manuals we download live here, one folder per game — the only manual files this app
+// owns, and therefore the only ones it may ever delete.
+const manualsDir = path.join(baseDir, 'GameManagerConfig', 'manuals');
+const gameManualDir = gameId => path.join(manualsDir, String(gameId));
 
-// Ask for the manual file. Opens in the game's own install folder when we can find it —
-// that is where GOG puts the PDFs it ships — but it is an ordinary file dialog, so
-// anywhere else on disk works just as well.
+function _gameRow(gameId) {
+    try { return db.prepare("SELECT id, Game, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); }
+    catch { return null; }
+}
+function _gogAppId(row) {
+    const m = String(row?.GrinderGameId || '').match(/^gog_(.+)$/i);
+    return m ? m[1] : null;
+}
+
+// Everything the button needs in one call: what is attached, what could be attached from
+// the game's own folder, and whether GOG has anything to offer.
+ipcMain.handle('manual-list', (_, gameId) => {
+    if (!db) return { attached: [], detected: [], gogAppId: null };
+    const attached = _manuals.listManuals(db, fs, gameId);
+    const row = _gameRow(gameId);
+    const folder = row ? resolveGameFolder(row) : null;
+    const have = new Set(attached.map(m => m.path.toLowerCase()));
+    const detected = (folder ? _manuals.detectManuals(fs, folder, _gogAppId(row)) : [])
+        .filter(d => !have.has(d.path.toLowerCase()));
+    return { attached, detected, gogAppId: _gogAppId(row) };
+});
+
+// Attach something detection already found — no dialog needed.
+ipcMain.handle('attach-manual', (_, gameId, filePath, label, source) => {
+    if (!db) return { ok: false };
+    const id = _manuals.addManual(db, gameId, filePath, label, source || 'user');
+    return { ok: !!id, id };
+});
+
+// Browse for one. Opens in the game's own install folder when we can find it — that is
+// where GOG leaves the PDFs it ships — but it is an ordinary file dialog, so anywhere
+// else on disk works just as well.
 ipcMain.handle('pick-manual', async (_, gameId) => {
     if (!db) return { ok: false };
     let startAt;
     try {
-        const row = db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
-        const folder = row ? resolveGameFolder(row) : null;
+        const folder = resolveGameFolder(_gameRow(gameId));
         if (folder && fs.existsSync(folder)) startAt = folder;
     } catch {}
     const opts = {
-        title: 'Choose this game’s manual',
-        properties: ['openFile'],
+        title: 'Choose a manual for this game',
+        properties: ['openFile', 'multiSelections'],
         filters: _manuals.MANUAL_FILTERS,
     };
     if (startAt) opts.defaultPath = startAt;
     const { canceled, filePaths } = await dialog.showOpenDialog(opts);
     if (canceled || !filePaths || !filePaths.length) return { ok: false, canceled: true };
-    if (!_manuals.setManual(db, gameId, filePaths[0])) return { ok: false, error: 'Could not save that path.' };
-    return { ok: true, path: filePaths[0] };
+    const added = filePaths.map(p => ({ path: p, id: _manuals.addManual(db, gameId, p, null, 'user') }));
+    return { ok: true, added, path: filePaths[0] };
 });
 
-ipcMain.handle('clear-manual', (_, gameId) => ({ ok: _manuals.clearManual(db, gameId) }));
+// Unlink. The file is only deleted when this app downloaded it (see removeManual).
+ipcMain.handle('remove-manual', (_, manualId, gameId) =>
+    ({ ok: _manuals.removeManual(db, fs, manualId, gameManualDir(gameId)) }));
+
+ipcMain.handle('gog-manual-list', async (_, gameId) => {
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER engine unavailable.' };
+    const appId = _gogAppId(_gameRow(gameId));
+    if (!appId) return { ok: false, error: 'Not a GOG game.' };
+    return grinderEngine.gogListManuals(appId);
+});
+
+ipcMain.handle('gog-manual-download', async (evt, gameId, bonusId) => {
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER engine unavailable.' };
+    const appId = _gogAppId(_gameRow(gameId));
+    if (!appId) return { ok: false, error: 'Not a GOG game.' };
+    const dest = gameManualDir(gameId);
+    const res = await grinderEngine.gogDownloadManual(appId, bonusId, dest, (got, total) => {
+        try { evt.sender.send('manual-download-progress', { gameId, got, total }); } catch {}
+    });
+    if (!res.ok) return res;
+    for (const f of res.files) _manuals.addManual(db, gameId, f.path, f.label, 'gog-download');
+    return res;
+});
 
 ipcMain.handle('open-manual-viewer', (event, opts = {}) => {
     const p = opts.path;

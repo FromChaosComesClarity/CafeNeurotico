@@ -47,31 +47,7 @@ function show(path) {
 }
 show(file);
 
-let current = file;
-
-document.getElementById('m-change').onclick = async () => {
-    const res = await window.api.pickManual(gameId);
-    if (res && res.ok && res.path) { current = res.path; show(current); }
-};
-
-// Two-step, so a stray click cannot silently detach a manual you spent time finding.
-const forgetBtn = document.getElementById('m-forget');
-const forgetLbl = forgetBtn.querySelector('.m-forget-label');
-let armed = false, armTimer = null;
-forgetBtn.onclick = async () => {
-    if (!armed) {
-        armed = true;
-        forgetLbl.textContent = 'Confirm?';
-        armTimer = setTimeout(() => { armed = false; forgetLbl.textContent = 'Unlink'; }, 3000);
-        return;
-    }
-    clearTimeout(armTimer);
-    forgetBtn.disabled = true;
-    await window.api.clearManual(gameId);
-    window.api.manualWindowClose();
-};
-
-document.getElementById('m-open').onclick  = () => window.api.openManualExternally(current);
+document.getElementById('m-open').onclick  = () => window.api.openManualExternally(file);
 document.getElementById('m-min').onclick   = () => window.api.manualWindowMinimize();
 document.getElementById('m-close').onclick = () => window.api.manualWindowClose();
 document.addEventListener('keydown', e => {

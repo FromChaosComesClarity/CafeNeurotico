@@ -1138,6 +1138,114 @@ async function injectGogRegistry(game, prefix, proton) {
 }
 
 // ── Per-game fix: Fallout: New California (GOG 1168267909) ───────────────────
+// ── GOG bonus manuals ────────────────────────────────────────────────────────
+// GOG sells the extras alongside the game — manuals, cluebooks, reference cards — and
+// exposes them through the same authenticated API GRINDER already uses for installs. They
+// are the scanned originals, so a game whose folder ships nothing can still get its manual.
+//
+// Two categories are worth offering. "manuals" is the obvious one; "guides & reference" is
+// where GOG files cluebooks and the reference cards RPGs of that era shipped in the box.
+// Everything else it serves (wallpapers, soundtracks, avatars) is not reading material.
+const GOG_MANUAL_TYPES = ['manuals', 'guides & reference'];
+
+async function gogListManuals(appId) {
+    const token = await getGogToken();
+    if (!token) return { ok: false, error: 'Not signed in to GOG.' };
+    try {
+        const data = await gogFetch(`https://api.gog.com/products/${appId}?expand=downloads`, token);
+        const bonus = data?.downloads?.bonus_content || [];
+        const items = bonus
+            .filter(b => GOG_MANUAL_TYPES.includes(String(b.type || '').toLowerCase()))
+            .map(b => ({
+                id: b.id,
+                name: b.name || b.type,
+                type: b.type,
+                size: b.total_size || 0,
+                downlink: (b.files || [])[0]?.downlink || '',
+            }))
+            .filter(b => b.downlink);
+        return { ok: true, items };
+    } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Download one bonus item and hand back the documents inside it. GOG serves these as ZIPs
+// even when the payload is a single PDF, so the archive is unpacked and thrown away —
+// what the library ends up pointing at is a plain readable file.
+async function gogDownloadManual(appId, bonusId, destDir, onProgress) {
+    const token = await getGogToken();
+    if (!token) return { ok: false, error: 'Not signed in to GOG.' };
+
+    let url;
+    try {
+        const list = await gogListManuals(appId);
+        if (!list.ok) return list;
+        const item = list.items.find(i => String(i.id) === String(bonusId));
+        if (!item) return { ok: false, error: 'That download is no longer offered for this game.' };
+        const res = await gogFetch(item.downlink, token);
+        url = res?.downlink;
+    } catch (e) { return { ok: false, error: e.message }; }
+    if (!url) return { ok: false, error: 'GOG did not return a download link.' };
+
+    fs.mkdirSync(destDir, { recursive: true });
+    const tmp = path.join(destDir, `.download-${bonusId}.tmp`);
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
+        const total = Number(res.headers.get('content-length') || 0);
+        const chunks = []; let got = 0;
+        for await (const c of res.body) {
+            chunks.push(c); got += c.length;
+            if (onProgress) { try { onProgress(got, total); } catch {} }
+        }
+        fs.writeFileSync(tmp, Buffer.concat(chunks));
+    } catch (e) {
+        try { fs.unlinkSync(tmp); } catch {}
+        return { ok: false, error: e.message };
+    }
+
+    // Zip or not is decided by the file's own magic bytes, never by whether the unpacker
+    // threw: a failing unpacker on a real archive would otherwise be "handled" by saving
+    // the archive under a .pdf name, which looks like success and opens as garbage.
+    let isZip = false;
+    try {
+        const fd = fs.openSync(tmp, 'r');
+        const head = Buffer.alloc(2);
+        fs.readSync(fd, head, 0, 2, 0);
+        fs.closeSync(fd);
+        isZip = head[0] === 0x50 && head[1] === 0x4B;   // "PK"
+    } catch {}
+
+    const out = [];
+    if (isZip) {
+        try {
+            const AdmZip = require('adm-zip');
+            const zip = new AdmZip(tmp);
+            for (const entry of zip.getEntries()) {
+                if (entry.isDirectory) continue;
+                const base = path.basename(entry.entryName);
+                if (!/\.(pdf|html?|txt)$/i.test(base)) continue;
+                const dst = path.join(destDir, base);
+                fs.writeFileSync(dst, entry.getData());
+                out.push({ path: dst, label: path.basename(base, path.extname(base)) });
+            }
+        } catch (e) {
+            try { fs.unlinkSync(tmp); } catch {}
+            return { ok: false, error: `Could not unpack GOG's archive: ${e.message}` };
+        }
+    } else {
+        // GOG occasionally serves the document directly rather than zipped.
+        try {
+            const dst = path.join(destDir, `manual-${bonusId}.pdf`);
+            fs.renameSync(tmp, dst);
+            return { ok: true, files: [{ path: dst, label: 'Manual' }] };
+        } catch (e) { return { ok: false, error: e.message }; }
+    }
+    try { fs.unlinkSync(tmp); } catch {}
+
+    if (!out.length) return { ok: false, error: 'That download contained no readable document.' };
+    return { ok: true, files: out };
+}
+
 // ── Native DOSBox for GOG's DOS games ────────────────────────────────────────
 // GOG ships a Windows DOSBox 0.74 from 2010 and runs it through Proton: an emulator inside
 // a translation layer, when the host can run the emulator directly. A native build is
@@ -1808,4 +1916,5 @@ module.exports = {
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
     findNativeDosbox, isGogDosGame, applyGogSupportFiles, engineSetting,
+    gogListManuals, gogDownloadManual,
 };
