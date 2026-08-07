@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron');
 contextBridge.exposeInMainWorld('api', {
     getBaseDir: () => ipcRenderer.invoke('get-basedir'),
                                 getGames: () => ipcRenderer.invoke('get-games'),
+                                genreList: () => ipcRenderer.invoke('genre-list'),
+                                setGameGenres: (id, slugs) => ipcRenderer.invoke('set-game-genres', id, slugs),
                                 addGame: (name) => ipcRenderer.invoke('add-game', name),
                                 updateGame: (id, data) => ipcRenderer.invoke('update-game', id, data),
                                 setGameFlag: (id, field, value) => ipcRenderer.invoke('set-game-flag', id, field, value),
@@ -16,6 +18,10 @@ contextBridge.exposeInMainWorld('api', {
                                 checkAllInstallStatus: () => ipcRenderer.invoke('check-all-install-status'),
                                 scanUpdates: () => ipcRenderer.invoke('scan-updates'),
                                 onUpdateScanProgress: (cb) => ipcRenderer.on('update-scan-progress', (_e, d) => cb(d)),
+                                scanGenres: (opts) => ipcRenderer.invoke('scan-genres', opts),
+                                cancelGenreScan: () => ipcRenderer.invoke('cancel-genre-scan'),
+                                quickGenrePass: () => ipcRenderer.invoke('quick-genre-pass'),
+                                onGenreScanProgress: (cb) => ipcRenderer.on('genre-scan-progress', (_e, d) => cb(d)),
                                 addGameShortcut: (id, targets) => ipcRenderer.invoke('add-game-shortcut', id, targets),
                                 resolveGameFolder: (id) => ipcRenderer.invoke('resolve-game-folder', id),
                                 openGameFolder: (id) => ipcRenderer.invoke('open-game-folder', id),
@@ -178,7 +184,8 @@ contextBridge.exposeInMainWorld('api', {
 
                                 // --- PLAYLISTS ---
                                 getPlaylists:           ()           => ipcRenderer.invoke('get-playlists'),
-                                addPlaylist:            (name)       => ipcRenderer.invoke('add-playlist', name),
+                                addPlaylist:            (name, rule) => ipcRenderer.invoke('add-playlist', name, rule),
+                                previewPlaylistRule:    (rule)       => ipcRenderer.invoke('preview-playlist-rule', rule),
                                 updatePlaylist:         (id, name)   => ipcRenderer.invoke('update-playlist', id, name),
                                 deletePlaylist:         (id)         => ipcRenderer.invoke('delete-playlist', id),
                                 getPlaylistGames:       (plId)       => ipcRenderer.invoke('get-playlist-games', plId),

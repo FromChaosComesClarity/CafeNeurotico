@@ -808,6 +808,79 @@ let currentLaunchCmd = '';
 let activeFilters = new Set(); // empty = ALL GAMES
 const STORE_FILTERS     = new Set(['steam','gog','epic','flatpak','pico8','itch','physical','emulation','apps','others']);
 const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable']);
+
+// ── Genres ───────────────────────────────────────────────────────────────────
+// The vocabulary lives in packages/core/genres.js and arrives via the genre-list IPC,
+// so the renderer never hardcodes the list. Each game row carries a `Genres` string
+// (comma-joined slugs) built by get-games — filtering is a string check, no lookups.
+let allGenres = [];             // [{ slug, label, count }]
+let genreCoverage = { total: 0, classified: 0, locked: 0 };
+let currentGenre = null;        // slug, or null for "All Genres"
+
+function genreLabel(slug) { return allGenres.find(g => g.slug === slug)?.label || ''; }
+
+// A playlist with a rule fills itself (see packages/core/smart-playlists.js); one
+// without is the ordinary hand-picked kind. The renderer only needs to tell them apart.
+function _playlistRule(p) {
+    try { const r = typeof p?.rule === 'string' ? JSON.parse(p.rule) : p?.rule; return (r && typeof r === 'object') ? r : null; }
+    catch { return null; }
+}
+function isSmartPlaylist(p) { return !!_playlistRule(p); }
+function smartPlaylistSummary(p) {
+    const r = _playlistRule(p);
+    if (!r) return '';
+    const bits = [];
+    if (r.genres?.length) bits.push(r.genres.map(genreLabel).filter(Boolean).join(' or '));
+    if (r.stores?.length) bits.push('on ' + r.stores.join(' or '));
+    if (r.installed) bits.push('installed');
+    if (r.fav) bits.push('favourites');
+    if (r.want) bits.push('want to play');
+    return bits.filter(Boolean).join(', ');
+}
+function gameGenres(game) { return String(game?.Genres || '').split(',').filter(Boolean); }
+function gameHasGenre(game, slug) { return gameGenres(game).includes(slug); }
+// The one-word answer for chips and columns: what the game IS, falling back to the
+// old free-text GENRE for anything a scan has not reached yet.
+function primaryGenreLabel(game) {
+    return genreLabel(game?.PrimaryGenre) || String(game?.GENRE || '').split(',')[0].trim();
+}
+
+async function loadGenres() {
+    try {
+        const res = await window.api.genreList();
+        allGenres = res?.genres || [];
+        genreCoverage = res?.coverage || genreCoverage;
+    } catch (e) { allGenres = []; }
+    _rebuildGenreDropdown();
+    _renderGenreCoverage();
+}
+
+// Only genres that actually match something are listed — an empty menu entry is a
+// dead end, and the counts make the list self-explanatory.
+function _rebuildGenreDropdown() {
+    const sel = document.getElementById('gallery-genre');
+    if (!sel) return;
+    const opts = ['<option value="all">All Genres</option>'];
+    for (const g of allGenres) {
+        if (!g.count) continue;
+        opts.push(`<option value="${g.slug}">${escHtml(g.label)} (${g.count})</option>`);
+    }
+    const unclassified = Math.max(0, genreCoverage.total - genreCoverage.classified);
+    if (unclassified) opts.push(`<option value="__none__">No Genre Yet (${unclassified})</option>`);
+    sel.innerHTML = opts.join('');
+    sel.value = currentGenre || 'all';
+    if (sel.selectedIndex < 0) { sel.value = 'all'; currentGenre = null; }
+}
+
+function _renderGenreCoverage() {
+    const el = document.getElementById('genre-coverage-bar');
+    if (!el) return;
+    const { total, classified, locked } = genreCoverage;
+    if (!total) { el.textContent = ''; return; }
+    const pct = Math.round((classified / total) * 100);
+    el.innerHTML = `<b style="color:var(--accent);">${classified}</b> of ${total} games sorted (${pct}%)` +
+                   (locked ? ` &middot; ${locked} set by you` : '');
+}
 let lastGridView = 'view-gallery';
 let _activePanelSection = null; // 'stores' | null
 let savedGridScrollTop = 0;
@@ -1302,6 +1375,79 @@ window.api.onUpdateScanProgress?.((d) => {
     if (d.total) fill.style.width = `${Math.round((d.scanned / d.total) * 100)}%`;
     if (d.label) statusEl.textContent = d.label + (d.total ? ` (${d.scanned}/${d.total})` : '');
 });
+// ── Genre detection ─────────────────────────────────────────────────────────
+// The scan is paced by SteamSpy's one-request-a-second guidance, so it is minutes
+// long by nature. It is therefore built to be interrupted: every game is written as
+// it is classified, cancelling keeps the work so far, and re-running resumes.
+let _genreScanRunning = false;
+
+function openGenreModal() {
+    const modal = document.getElementById('modal-genres');
+    const done  = genreCoverage.classified, total = genreCoverage.total;
+    const left  = Math.max(0, total - done);
+    const mins  = Math.max(1, Math.round(left * 1.2 / 60));
+    document.getElementById('genres-intro').innerHTML = left
+        ? `<b>${left}</b> of your ${total} games still need a genre. The scan reads the tags players ` +
+          `voted on for each one, so it works through them about one a second — roughly <b>${mins} minute${mins === 1 ? '' : 's'}</b>. ` +
+          `You can close this and keep using the app, or stop it at any point and keep what it found.`
+        : `All ${total} games already have a genre. Re-check them if you want the latest tags.`;
+    document.getElementById('genres-progress-wrap').style.display = 'none';
+    document.getElementById('genres-status').textContent = '';
+    document.getElementById('genres-force').checked = !left;
+    document.getElementById('btn-genres-start').textContent = _genreScanRunning ? 'Stop Scan' : 'Start Scan';
+    modal.classList.add('active');
+}
+
+async function runGenreScan() {
+    if (_genreScanRunning) { window.api.cancelGenreScan(); return; }
+    _genreScanRunning = true;
+    const startBtn = document.getElementById('btn-genres-start');
+    const wrap = document.getElementById('genres-progress-wrap');
+    const fill = document.getElementById('genres-progress-fill');
+    const statusEl = document.getElementById('genres-status');
+    startBtn.textContent = 'Stop Scan';
+    wrap.style.display = 'block';
+    fill.style.width = '0%';
+    document.getElementById('genres-force-row').style.display = 'none';
+
+    const force = document.getElementById('genres-force').checked;
+    try {
+        const res = await window.api.scanGenres({ force });
+        statusEl.textContent = res?.ok
+            ? `Sorted ${res.classified} game${res.classified === 1 ? '' : 's'}${res.cancelled ? ' before you stopped it' : ''}.`
+            : 'Scan failed.';
+        fill.style.width = '100%';
+        await loadGenres();
+        await loadGames();          // rows carry Genres/PrimaryGenre — re-read to show them
+    } catch (e) {
+        statusEl.textContent = 'Scan failed.';
+    } finally {
+        _genreScanRunning = false;
+        startBtn.textContent = 'Start Scan';
+        document.getElementById('genres-force-row').style.display = '';
+        opToastDone('Genres updated');
+    }
+}
+
+window.api.onGenreScanProgress(p => {
+    if (!p) return;
+    const pct = p.total ? Math.round((p.scanned / p.total) * 100) : 0;
+    const fill = document.getElementById('genres-progress-fill');
+    if (fill) fill.style.width = pct + '%';
+    const statusEl = document.getElementById('genres-status');
+    if (statusEl) statusEl.textContent = p.label ? `${p.scanned} / ${p.total} · ${p.label}` : `${p.scanned} / ${p.total}`;
+    // Mirrored to the global toast so closing the modal doesn't hide the progress.
+    opToast(`Detecting genres — ${p.scanned}/${p.total}`, pct);
+});
+
+document.getElementById('btn-scan-genres')?.addEventListener('click', openGenreModal);
+document.getElementById('btn-genres-start')?.addEventListener('click', runGenreScan);
+document.getElementById('btn-genres-close')?.addEventListener('click', () =>
+    document.getElementById('modal-genres')?.classList.remove('active'));
+document.getElementById('modal-genres')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-genres')) e.currentTarget.classList.remove('active');
+});
+
 document.getElementById('btn-scan-updates')?.addEventListener('click', runUpdateScan);
 document.getElementById('btn-close-updates')?.addEventListener('click', () =>
     document.getElementById('modal-updates')?.classList.remove('active'));
@@ -2298,7 +2444,9 @@ async function openPlaylistPickerForGame(game) {
     // (Re)render the checkbox list of playlists the game isn't already a member of.
     async function renderPickerList() {
         const gamePlaylistIds = await window.api.getGamePlaylists(game.id);
-        const available = allPlaylists.filter(p => !gamePlaylistIds.includes(p.id));
+        // Smart playlists compute their members from a rule, so adding a game by hand
+        // would write a row nothing ever reads. They are simply not offered.
+        const available = allPlaylists.filter(p => !gamePlaylistIds.includes(p.id) && !isSmartPlaylist(p));
         confirmBtn.disabled = true;
         if (!available.length) {
             const msg = !allPlaylists.length ? 'No playlists yet — create one below.' : 'Game is already in all playlists.';
@@ -2377,20 +2525,33 @@ document.getElementById('btn-playlist-picker-close')?.addEventListener('click', 
 document.getElementById('btn-create-playlist-cancel')?.addEventListener('click', () =>
     document.getElementById('modal-create-playlist').classList.remove('active'));
 
-document.getElementById('btn-create-playlist-confirm')?.addEventListener('click', async () => {
+// A genre picked here becomes the playlist's rule; leaving it empty keeps the old
+// hand-picked behaviour exactly as it was.
+function _newPlaylistRule() {
+    const slug = document.getElementById('new-playlist-genre')?.value || '';
+    return slug ? { genres: [slug] } : null;
+}
+async function _createPlaylistFromModal() {
     const name = document.getElementById('new-playlist-name').value.trim();
     if (!name) { document.getElementById('new-playlist-name').focus(); return; }
-    await window.api.addPlaylist(name);
+    await window.api.addPlaylist(name, _newPlaylistRule());
     document.getElementById('modal-create-playlist').classList.remove('active');
     await loadPlaylists();
+}
+document.getElementById('btn-create-playlist-confirm')?.addEventListener('click', _createPlaylistFromModal);
+document.getElementById('new-playlist-name')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') _createPlaylistFromModal();
 });
-document.getElementById('new-playlist-name')?.addEventListener('keydown', async e => {
-    if (e.key !== 'Enter') return;
-    const name = e.target.value.trim();
-    if (!name) return;
-    await window.api.addPlaylist(name);
-    document.getElementById('modal-create-playlist').classList.remove('active');
-    await loadPlaylists();
+document.getElementById('new-playlist-genre')?.addEventListener('change', async e => {
+    const preview = document.getElementById('new-playlist-preview');
+    const rule = _newPlaylistRule();
+    if (!rule) { preview.textContent = 'You choose what goes in, one game at a time.'; return; }
+    // Show what the rule collects right now, before committing to it.
+    const n = await window.api.previewPlaylistRule(rule).catch(() => 0);
+    const nameInput = document.getElementById('new-playlist-name');
+    if (!nameInput.value.trim()) nameInput.value = genreLabel(e.target.value);
+    preview.innerHTML = `Collects <b style="color:var(--accent);">${n}</b> game${n === 1 ? '' : 's'} today, ` +
+                        `and keeps itself up to date as you add more.`;
 });
 
 document.getElementById('btn-edit-playlist-cancel')?.addEventListener('click', () =>
@@ -2689,12 +2850,13 @@ function _renderPlaylistList(containerId, mode) {
 
     container.innerHTML = riHtml + allPlaylists.map(p => {
         const isActive = currentPlaylistId === p.id;
+        const smart = isSmartPlaylist(p);
         return `<div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-            <button class="btn-playlist-filter" data-playlist-id="${p.id}"
+            <button class="btn-playlist-filter" data-playlist-id="${p.id}" title="${smart ? 'Fills itself — ' + escHtml(smartPlaylistSummary(p)) : ''}"
                 style="flex:1; text-align:left; font-size:11px; padding:8px 10px; background:${isActive ? 'var(--accent)' : 'var(--bg_menu)'}; border:1px solid ${isActive ? 'var(--accent)' : 'var(--border_solid)'}; color:${isActive ? 'var(--bg)' : 'var(--text_sec)'}; border-radius:6px; cursor:pointer; font-family:inherit; font-weight:900; transition:background 0.15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${escHtml(p.name)}
+                ${smart ? '<span style="opacity:.75;">✦</span> ' : ''}${escHtml(p.name)}
             </button>
-            ${manageBtnHtml(p.id)}
+            ${smart ? '' : manageBtnHtml(p.id)}
         </div>`;
     }).join('');
 
@@ -2748,8 +2910,21 @@ function clearPlaylistFilter() {
     applyFilters();
 }
 
-function openCreatePlaylistModal() {
+// `presetGenre` is optional — the function is also wired straight to click handlers,
+// which would otherwise hand it an Event.
+function openCreatePlaylistModal(presetGenre) {
+    if (typeof presetGenre !== 'string') presetGenre = '';
     document.getElementById('new-playlist-name').value = '';
+    const gsel = document.getElementById('new-playlist-genre');
+    if (gsel) {
+        // Only genres with games in them: an auto-playlist that resolves to nothing is
+        // just a confusing empty list.
+        gsel.innerHTML = ["<option value=\"\">Hand-picked — I'll add games myself</option>"]
+            .concat(allGenres.filter(g => g.count).map(g => `<option value="${g.slug}">${escHtml(g.label)} (${g.count})</option>`))
+            .join('');
+        gsel.value = presetGenre || '';
+        gsel.dispatchEvent(new Event('change'));
+    }
     document.getElementById('modal-create-playlist').classList.add('active');
     setTimeout(() => document.getElementById('new-playlist-name').focus(), 80);
 }
@@ -3316,6 +3491,7 @@ function enhanceSelect(sel) {
 // Only the gallery selects are enhanced (other native selects live in modals/forms).
 enhanceSelect(document.getElementById('gallery-category'));
 enhanceSelect(document.getElementById('gallery-sort'));
+enhanceSelect(document.getElementById('gallery-genre'));
 enhanceSelect(document.getElementById('gallery-playlist'));
 enhanceSelect(document.getElementById('ui-font-select'));   // themed Interface Font dropdown (Appearance)
 
@@ -3333,6 +3509,19 @@ function _rebuildPlaylistDropdown() {
     sel.value = currentPlaylistId == null ? 'none' : String(currentPlaylistId);
     if (sel.selectedIndex < 0) sel.value = 'none';   // active playlist was deleted
 }
+document.getElementById('gallery-genre')?.addEventListener('change', e => {
+    const v = e.target.value;
+    currentGenre = (v === 'all') ? null : v;
+    // The "save as playlist" star only makes sense for a real genre, not for
+    // "All Genres" or the "No Genre Yet" bucket.
+    const star = document.getElementById('btn-genre-to-playlist');
+    if (star) star.style.display = (currentGenre && currentGenre !== '__none__') ? '' : 'none';
+    applyFilters();
+});
+document.getElementById('btn-genre-to-playlist')?.addEventListener('click', () => {
+    if (currentGenre && currentGenre !== '__none__') openCreatePlaylistModal(currentGenre);
+});
+
 document.getElementById('gallery-playlist').addEventListener('change', e => {
     const v = e.target.value;
     if (v === '__new__') { _rebuildPlaylistDropdown(); openCreatePlaylistModal(); }   // revert label, open the create modal
@@ -3437,7 +3626,8 @@ const _SEARCH_BLOB = Symbol('searchBlob');
 function searchBlob(game) {
     let blob = game[_SEARCH_BLOB];
     if (blob === undefined) {
-        blob = [game.Game, game.Store, game.DEV, game.PUB, game.GENRE, game.Franchise, game.Tags]
+        blob = [game.Game, game.Store, game.DEV, game.PUB, game.GENRE, game.Franchise, game.Tags,
+                gameGenres(game).map(genreLabel).join(' '), gameGenres(game).join(' ')]
             .filter(Boolean).join(' ').toLowerCase();
         Object.defineProperty(game, _SEARCH_BLOB, { value: blob, enumerable: false, configurable: true });
     }
@@ -3484,6 +3674,14 @@ function applyFilters() {
                 return false;
             });
             if (!storeMatch) return false;
+        }
+
+        // Genre: AND against everything else — narrowing "Steam" by "CRPG" is the
+        // whole point, so it never widens the result the way the store chips do.
+        if (currentGenre === '__none__') {
+            if (game.PrimaryGenre) return false;
+        } else if (currentGenre && !gameHasGenre(game, currentGenre)) {
+            return false;
         }
 
         // Qualifiers: AND — game must satisfy every selected qualifier
@@ -3788,7 +3986,7 @@ function renderSplitDetail(game) {
 
     const metaEl = document.getElementById('split-game-meta');
     const chips = [];
-    if (game.GENRE) chips.push(game.GENRE);
+    if (primaryGenreLabel(game)) chips.push(primaryGenreLabel(game));
     if (game.DEV || game.DEVELOPER) chips.push(game.DEV || game.DEVELOPER);
     if (game.Store) chips.push(game.Store.toUpperCase().replace(/,/g, ' · '));
     metaEl.innerHTML = chips.map(c => `<span class="split-meta-chip">${c}</span>`).join('');
@@ -4545,7 +4743,7 @@ function _updateMacSidePanels(game) {
         ['Developer',  game.DEV || null],
         ['Publisher',  (game.PUB && game.PUB !== game.DEV) ? game.PUB : null],
         ['Released',   game.RELEASED || null],
-        ['Genre',      game.GENRE || null],
+        ['Genre',      primaryGenreLabel(game) || null],
         ['HLTB',       _hltbDisplay(game.HLTB_Main)],
         ['Proton',     game.ProtonTier || null],
         ['Metacritic', game.METACRITIC ? String(game.METACRITIC) : null],
@@ -4614,7 +4812,7 @@ function openMacGamepage(game) {
         ['Developer',  game.DEV || null],
         ['Publisher',  (game.PUB && game.PUB !== game.DEV) ? game.PUB : null],
         ['Released',   game.RELEASED || null],
-        ['Genre',      game.GENRE || null],
+        ['Genre',      primaryGenreLabel(game) || null],
         ['HLTB',       _hltbDisplay(game.HLTB_Main)],
         ['Proton',     game.ProtonTier || null],
         ['Metacritic', game.METACRITIC ? String(game.METACRITIC) : null],
@@ -8596,6 +8794,30 @@ function _renderLauncherList(game) {
     });
 }
 
+// Genre override in the edit dialog. Choosing one pins the game — scans skip it from
+// then on — and "Detected automatically" hands it back to them.
+function _renderGenrePicker(game) {
+    const sel = document.getElementById('edit-primary-genre');
+    if (!sel) return;
+    sel.innerHTML = ['<option value="">Detected automatically</option>']
+        .concat(allGenres.map(g => `<option value="${g.slug}">${escHtml(g.label)}</option>`)).join('');
+    sel.value = game.GenreLocked == 1 ? (game.PrimaryGenre || '') : '';
+    _updateGenreNote(game);
+    sel.onchange = () => _updateGenreNote(game);
+}
+
+function _updateGenreNote(game) {
+    const note = document.getElementById('edit-genre-note');
+    const sel  = document.getElementById('edit-primary-genre');
+    if (!note || !sel) return;
+    if (sel.value) {
+        note.textContent = 'Pinned by you — genre scans will leave this game alone.';
+    } else {
+        const detected = genreLabel(game.PrimaryGenre);
+        note.textContent = detected ? `Currently detected as ${detected}.` : 'No genre detected yet.';
+    }
+}
+
 function _makeLauncherRow(label, cmd, managed = false) {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex; gap:6px; align-items:center;';
@@ -8627,6 +8849,7 @@ function openDetails(game) {
     document.getElementById('edit-store').value = displayStore;
     _renderLauncherList(game);
     document.getElementById('edit-genre').value = game.GENRE || '';
+    _renderGenrePicker(game);
     document.getElementById('edit-released').value = game.RELEASED || '';
     document.getElementById('edit-appid').value = game.SteamAppID || '';
     document.getElementById('edit-proton').value = game.ProtonTier || '';
@@ -9011,7 +9234,12 @@ document.getElementById('btn-save-game').addEventListener('click', async () => {
     };
 
     const success = await window.api.updateGame(currentGameId, data);
+    // The filter genre lives in its own table, so it saves separately. An empty pick
+    // clears the override and lets the next scan decide again.
+    const _pinned = document.getElementById('edit-primary-genre')?.value || '';
+    try { await window.api.setGameGenres(currentGameId, _pinned ? [_pinned] : []); } catch (e) {}
     if (success) {
+        await loadGenres();
         await loadGames();
         const updatedGame = allGames.find(g => g.id === currentGameId);
         if (updatedGame) openGamepage(updatedGame); else switchView('view-gallery');
@@ -10472,6 +10700,7 @@ window.api.getSetting('cngm_theme').then(saved => {
     applyTheme(saved && THEMES[saved] ? saved : activeTheme);
     window.api.signalReady();
     loadPlaylists();
+    loadGenres();
     return window.api.getSetting('welcome_shown');
 }).then(shown => {
     if (!shown) _welcomeModal.classList.add('active');

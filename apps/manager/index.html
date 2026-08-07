@@ -231,9 +231,15 @@
       cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .cust-sel-item:hover { background: var(--bg_panel); color: var(--text_main); }
     .cust-sel-item.sel { background: var(--accent); color: var(--bg); font-weight: 700; }
-    #gallery-search-wrap .cust-sel { width: 158px; flex-shrink: 0; }
-    #gallery-search-wrap #gallery-category + .cust-sel { width: 132px; }
+    /* Four dropdowns now share this row, so they shrink instead of squeezing the search
+       field to nothing on a narrow window — each keeps a readable floor and the input
+       keeps a hard minimum of its own. */
+    #gallery-search-wrap { gap: 10px; flex-wrap: wrap; }
+    #gallery-search-inner { min-width: 220px; }
+    #gallery-search-wrap .cust-sel { width: 158px; flex: 0 1 158px; min-width: 104px; flex-shrink: 1; }
+    #gallery-search-wrap #gallery-category + .cust-sel { width: 132px; flex-basis: 132px; }
     #gallery-search-wrap .cust-sel-btn { padding: 12px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    #btn-genre-to-playlist:hover { border-color: var(--accent); color: var(--accent); }
     #main-content { flex: 1; display: flex; flex-direction: column; background-color: transparent; position: relative; overflow: hidden; }
 
     /* ── CLASSIC SIDEBAR ─────────────────────────────────────────────────────── */
@@ -3646,6 +3652,12 @@
               <option value="added">Recently Added</option>
               <option value="scraped">Scraped First</option>
             </select>
+            <select id="gallery-genre" title="Genre" aria-label="Genre filter">
+              <option value="all">All Genres</option><!-- options rebuilt from the vocabulary at runtime -->
+            </select>
+            <!-- Turns the genre you are looking at into a playlist that stays up to date.
+                 Only shown while a genre is actually selected. -->
+            <button id="btn-genre-to-playlist" title="Save this genre as a playlist that keeps itself up to date" style="display:none; flex-shrink:0; padding:12px 12px; border-radius:12px; font-size:12px; font-weight:700; background:transparent; border:1.5px solid var(--border_solid); color:var(--text_sec); cursor:pointer; line-height:1;">✦</button>
             <select id="gallery-playlist" title="Playlist" aria-label="Playlist">
               <option value="none">No Playlist</option><!-- options rebuilt from allPlaylists at runtime -->
             </select>
@@ -3846,6 +3858,17 @@
                 <div class="row" style="flex-shrink: 0;">
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_genre">Genre:</span> <input type="text" id="edit-genre" style="margin-top: 5px;"></label>
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_year">Released (Year):</span> <input type="text" id="edit-released" style="margin-top: 5px;"></label>
+                </div>
+                <!-- Detected genre: what the library filters on. Picking one here pins it
+                     and future scans leave this game alone. -->
+                <div class="row" style="flex-shrink: 0; flex-direction: column; align-items: stretch; gap: 4px;">
+                  <span style="color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;">Filter Genre</span>
+                  <div style="display:flex; gap:6px; align-items:center;">
+                    <select id="edit-primary-genre" style="flex:1; padding:8px 10px; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:4px; font-size:12px; cursor:pointer;">
+                      <option value="">Detected automatically</option>
+                    </select>
+                  </div>
+                  <span id="edit-genre-note" style="font-size:10px; color:var(--text_dim); font-weight:400; text-transform:none; min-height:13px;"></span>
                 </div>
                 <div class="row" style="flex-shrink: 0;">
                   <label style="flex: 1; color: var(--text_sec); font-weight: bold; font-size: 11px; text-transform: uppercase;"><span data-i18n="html.lbl_steam_id">Steam App ID:</span> <input type="text" id="edit-appid" style="margin-top: 5px;"></label>
@@ -5659,6 +5682,27 @@ LOADING...READY.</div>
     </div>
   </div>
 
+  <!-- Genre detection: a long scan (SteamSpy is one game per second), so it reports
+       progress, can be cancelled, and keeps whatever it has already classified. -->
+  <div id="modal-genres" class="modal-overlay" style="z-index:26000;">
+    <div class="modal-box" style="width:520px; max-width:95vw; text-align:left;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase;">Detect Genres</h3>
+      <p id="genres-intro" style="font-size:12px; color:var(--text_sec); margin:8px 0 4px; line-height:1.6;"></p>
+      <div id="genres-progress-wrap" style="height:4px; background:var(--border_solid); border-radius:3px; overflow:hidden; margin:10px 0 6px; display:none;">
+        <div id="genres-progress-fill" style="height:100%; width:0%; background:var(--accent); transition:width .2s;"></div>
+      </div>
+      <div id="genres-status" style="font-size:11px; color:var(--text_dim); min-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+      <label id="genres-force-row" style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text_dim); margin:10px 0 2px; cursor:pointer;">
+        <input type="checkbox" id="genres-force" style="accent-color:var(--accent);">
+        Re-check games that already have a genre
+      </label>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button id="btn-genres-start" class="primary" style="flex:2; font-size:12px; padding:10px;">Start Scan</button>
+        <button id="btn-genres-close" style="flex:1; font-size:12px; padding:10px;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add game to desktop / app menu — target picker (above the gamepage overlay) -->
   <div id="modal-shortcut" class="modal-overlay" style="z-index:26000;">
     <div class="modal-box" style="width:400px; max-width:95vw; text-align:left;">
@@ -5982,6 +6026,13 @@ LOADING...READY.</div>
           <button id="btn-scan-updates" class="primary" style="width: 100%; font-size: 12px; padding: 10px; letter-spacing: 1px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-i18n="html.btn_scan_updates">Scan for Updates</span></button>
         </div>
 
+        <div class="tool-card tools-section" data-search="genre genres category categorise categorize arpg crpg fps rpg racing shooter tag tags classify sort">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg><span data-i18n="html.card_genres">Game Genres</span></div>
+          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;" data-i18n="html.genres_hint">Sort your library into real genres — ARPG, CRPG, FPS, Metroidvania, Racing — using the tags players voted on, so you can filter by what a game actually <i>is</i>. Anything you set by hand is never overwritten.</div>
+          <div id="genre-coverage-bar" style="font-size:11px; color:var(--text_sec); margin:2px 0 6px;"></div>
+          <button id="btn-scan-genres" class="primary" style="width: 100%; font-size: 12px; padding: 10px; letter-spacing: 1px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg><span data-i18n="html.btn_scan_genres">Detect Genres</span></button>
+        </div>
+
         <div class="tool-card tools-section" data-search="pico8 pico-8 games show hide visibility filter cartridge">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4M8 10v4"/><circle cx="15" cy="13" r="1" fill="currentColor"/><circle cx="18" cy="11" r="1" fill="currentColor"/></svg>PICO-8 Games</div>
           <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Show or hide PICO-8 cartridge games across all library views.</p>
@@ -6154,6 +6205,13 @@ LOADING...READY.</div>
     <div class="modal-box" style="max-width:380px;">
       <h3 style="margin:0 0 16px; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">New Playlist</h3>
       <input type="text" id="new-playlist-name" placeholder="Playlist name…" style="width:100%; margin-bottom:12px; box-sizing:border-box;">
+      <!-- Pick a genre and the playlist maintains itself: members are resolved from the
+           rule every time it is opened, so new games that fit simply appear in it. -->
+      <label style="display:block; font-size:10px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--text_dim); margin-bottom:5px;">Fill it automatically</label>
+      <select id="new-playlist-genre" style="width:100%; padding:9px 10px; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:4px; font-size:12px; cursor:pointer; box-sizing:border-box;">
+        <option value="">Hand-picked — I'll add games myself</option>
+      </select>
+      <div id="new-playlist-preview" style="font-size:11px; color:var(--text_dim); margin:7px 0 12px; min-height:14px;"></div>
       <div style="display:flex; gap:8px;">
         <button id="btn-create-playlist-confirm" class="primary" style="flex:1;">Create</button>
         <button id="btn-create-playlist-cancel" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Cancel</button>

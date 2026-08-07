@@ -173,6 +173,11 @@
     #gallery-cat-icon { width: 32px; height: 32px; background-color: var(--accent); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; flex-shrink: 0; filter: drop-shadow(0 1px 6px rgba(0,0,0,0.9)); }
     #gallery-cat-name { font-size: 26px; font-weight: 900; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,1); }
     #gallery-search-tag { font-size: 16px; color: rgba(255,255,255,0.75); font-style: italic; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+    /* The active genre filter. Shown wherever the category is, because a filter you
+       cannot see is indistinguishable from a library that lost half its games. */
+    #gallery-genre-tag, .cn-genre-tag { display: none; font-size: 13px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--bg); background: var(--accent); padding: 4px 12px; border-radius: 20px; white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.6); }
     #gallery-count { position: absolute; bottom: 16px; left: 22px; z-index: 2; font-size: 14px; font-weight: 900; color: var(--text_dim); letter-spacing: 2px; text-shadow: 0 2px 8px rgba(0,0,0,1); }
     #gallery-hero-game-name { position: absolute; bottom: 16px; right: 22px; z-index: 2; font-size: 26px; font-weight: 900; color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,1); text-align: right; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #gallery-hero-logo { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; max-width: 55%; max-height: 50%; object-fit: contain; display: none; filter: drop-shadow(0 4px 24px rgba(0,0,0,0.95)); }
@@ -691,6 +696,7 @@
           <div id="gallery-cat-icon"></div>
           <div id="gallery-cat-name"></div>
           <div id="gallery-search-tag"></div>
+          <div id="gallery-genre-tag"></div>
         </div>
         <img id="gallery-hero-logo" src="" alt="">
         <div id="gallery-count"></div>

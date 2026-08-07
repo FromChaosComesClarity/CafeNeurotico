@@ -1896,6 +1896,65 @@ function cnUpdateRow(g, current, latest, store) {
     return { id: cn ? cn.id : null, name: (cn && cn.Game) || g.title, store, current: current || '', latest: latest || '', gid };
 }
 
+// ── Genre scan ───────────────────────────────────────────────────────────────
+// Community tags from SteamSpy, IGDB for everything Steam never heard of, and the old
+// GENRE column as a floor (see packages/core/genre-scan.js). The pace is SteamSpy's
+// one-request-a-second guidance, so a full library takes minutes, not seconds — hence
+// the progress events and the cancel flag.
+const _genreScan = require('../../packages/core/genre-scan.js');
+const _smart = require('../../packages/core/smart-playlists.js');
+const _genreStore = require('../../packages/core/genre-store.js');
+let _genreScanRunning = false;
+let _genreScanCancel  = false;
+
+// IGDB genres/themes/keywords for one game. Separate from igdbSearch's fat metadata
+// query: this asks for the three fields the classifier reads and nothing else.
+async function igdbGenreLookup(name, steamAppId) {
+    const auth = await getIgdbToken();
+    if (!auth) return null;
+    const fields = 'fields name,genres.name,themes.name,keywords.name;';
+    try {
+        if (steamAppId) {
+            const byId = await igdbQuery(auth, `${fields} where external_games.uid = "${steamAppId}" & external_games.category = 1; limit 1;`);
+            if (byId) return byId;
+        }
+        if (!name) return null;
+        const hit = await igdbQuery(auth, `search "${String(name).replace(/"/g, '')}"; ${fields} limit 3;`);
+        // A loose search can return a sequel or an unrelated title; only trust a close match.
+        if (hit && titleSimilarity(hit.name || '', name) < 0.5) return null;
+        return hit;
+    } catch { return null; }
+}
+
+ipcMain.handle('scan-genres', async (evt, opts) => {
+    if (_genreScanRunning) return { ok: false, error: 'already_running' };
+    _genreScanRunning = true;
+    _genreScanCancel  = false;
+    try {
+        const res = await _genreScan.runGenreScan({
+            db,
+            force: !!(opts && opts.force),
+            igdbLookup: igdbGenreLookup,
+            shouldCancel: () => _genreScanCancel,
+            onProgress: p => { try { evt.sender.send('genre-scan-progress', p); } catch {} },
+        });
+        return { ok: true, ...res };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    } finally {
+        _genreScanRunning = false;
+    }
+});
+
+ipcMain.handle('cancel-genre-scan', () => { _genreScanCancel = true; return true; });
+
+// Instant, offline: re-reads the GENRE column through the vocabulary. Worth offering
+// before the long scan because it costs nothing and already sorts a good chunk.
+ipcMain.handle('quick-genre-pass', () => {
+    try { return { ok: true, ..._genreScan.quickGenrePass(db) }; }
+    catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('scan-updates', async (evt) => {
     const out = [];
     const send = (scanned, total, label) => { try { evt.sender.send('update-scan-progress', { scanned, total, label }); } catch {} };
@@ -4103,14 +4162,24 @@ ipcMain.handle('get-playlists', () => {
     if (!db) return [];
     return db.prepare('SELECT * FROM playlists ORDER BY name').all();
 });
-ipcMain.handle('add-playlist', (_, name) => {
+ipcMain.handle('add-playlist', (_, name, rule) => {
     if (!db) return null;
-    return db.prepare('INSERT INTO playlists (name) VALUES (?)').run(name.trim()).lastInsertRowid;
+    // A rule turns the playlist smart: members are computed on read, so it keeps up
+    // with the library instead of freezing whatever matched on the day it was made.
+    const r = _smart.parseRule(rule);
+    return db.prepare('INSERT INTO playlists (name, rule) VALUES (?,?)')
+             .run(name.trim(), r ? JSON.stringify(r) : null).lastInsertRowid;
 });
 ipcMain.handle('update-playlist', (_, id, name) => {
     if (!db) return false;
     db.prepare('UPDATE playlists SET name=? WHERE id=?').run(name.trim(), id);
     return true;
+});
+// Live count while a rule is being built, so "CRPG" shows what it would collect
+// before the playlist exists.
+ipcMain.handle('preview-playlist-rule', (_, rule) => {
+    if (!db) return 0;
+    return _smart.ruleCount(db, rule);
 });
 ipcMain.handle('delete-playlist', (_, id) => {
     if (!db) return false;
@@ -4119,8 +4188,8 @@ ipcMain.handle('delete-playlist', (_, id) => {
     return true;
 });
 ipcMain.handle('get-playlist-games', (_, playlistId) => {
-    if (!db) return [];
-    return db.prepare('SELECT g.* FROM playlist_games pg JOIN games g ON g.id=pg.game_id WHERE pg.playlist_id=? ORDER BY pg.sort_order, g.Game').all(playlistId);
+    // Smart playlists resolve their rule here; manual ones read playlist_games as before.
+    return _smart.playlistGames(db, playlistId);
 });
 ipcMain.handle('add-game-to-playlist', (_, playlistId, gameId) => {
     if (!db) return { ok: false };
@@ -4142,7 +4211,7 @@ ipcMain.handle('get-game-playlists', (_, gameId) => {
 });
 ipcMain.handle('get-recently-imported', (_, limit) => {
     if (!db) return [];
-    return db.prepare('SELECT * FROM games WHERE date_added > 0 ORDER BY date_added DESC LIMIT ?').all(limit);
+    return _genreStore.attachGenres(db, db.prepare('SELECT * FROM games WHERE date_added > 0 ORDER BY date_added DESC LIMIT ?').all(limit));
 });
 
 // ── COMMAND BAR SHELL LAUNCHER ────────────────────────────────────────────────

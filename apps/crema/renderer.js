@@ -116,6 +116,14 @@ const RECENTLY_IMPORTED_LIMIT = 50;
 // category name (e.g. a playlist literally named "STEAM") or the Recently-Imported
 // entry, and so users can tell playlists apart from stores at a glance.
 const PLAYLIST_CAT_PREFIX = "≡ ";
+// Genre is a FILTER, not a category. Putting one entry per genre in the category strip
+// would have added forty-odd stops to a list you walk with a d-pad; instead a genre
+// narrows whatever category you are already in — GOG *and* CRPG — and is chosen from
+// its own menu (System ▸ Filter by Genre). Session-only on purpose: a filter that
+// survived a restart would be an invisible reason the library looks half empty.
+let genreCats = [];              // [{ slug, label, count }], biggest first
+let activeGenreFilter = null;    // slug, or null for no genre filter
+function activeGenreLabel() { return genreCats.find(g => g.slug === activeGenreFilter)?.label || ''; }
 let gamePlaylists = [];          // [{id, name}] from the shared games.db
 let playlistMembers = {};        // playlistId -> Set(gameId)
 let playlistCatMap = {};         // category-label -> playlistId
@@ -323,6 +331,12 @@ function playlistCatMatch(g, catName) {
   const id = playlistCatMap[catName];
   return id != null && playlistMembers[id] ? playlistMembers[id].has(g.id) : false;
 }
+// ANDed with the category everywhere games are filtered, so a genre narrows the view
+// you are in rather than replacing it. No filter set ⇒ always true.
+function genreFilterMatch(g) {
+  if (!activeGenreFilter) return true;
+  return String(g.Genres || '').split(',').includes(activeGenreFilter);
+}
 function computeRecentlyImported() {
   recentlyImportedIds = new Set(
     allGames
@@ -342,6 +356,20 @@ function rebuildCategories() {
   categories.push(...labels);
   if (currentCategoryIndex >= categories.length) currentCategoryIndex = 0;
   if (galleryCatIndex >= categories.length) galleryCatIndex = 0;
+}
+
+// The genres worth offering, biggest first — the menu scrolls, so every non-empty genre
+// is listed, unlike the category strip which had to stay short.
+async function loadGenreCategories() {
+  try {
+    const res = await window.api.genreList();
+    genreCats = (res?.genres || [])
+      .filter(g => g.count > 0)
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  } catch (e) { genreCats = []; }
+  // A genre can empty out (games hidden, a re-scan) — drop a filter that now matches
+  // nothing rather than leaving the library looking mysteriously empty.
+  if (activeGenreFilter && !genreCats.some(g => g.slug === activeGenreFilter)) activeGenreFilter = null;
 }
 // Load playlists + their membership sets from the shared DB, then rebuild nav.
 async function loadGamePlaylists() {
@@ -1128,6 +1156,7 @@ async function boot() {
   await window.api.syncGrinderInstalled().catch(() => {});
   const res = await window.api.getGames(); allGames = (res.games || []).filter(g => g.Game && String(g.Game).trim() !== "");
   await loadGamePlaylists();
+  await loadGenreCategories();
   for (let g of allGames) { if (g.Screenshot && String(g.Screenshot).trim() !== "") { let paths = String(g.Screenshot).split('|').filter(s => s.trim() !== ""); paths.forEach(p => availableScreenshots.push({ path: p, game: g })); } }
   let prog = 0; const bar = document.getElementById('splash-bar'); const txt = document.getElementById('splash-text');
   const l = setInterval(() => { prog += 2; bar.style.width = `${prog}%`; if (prog === 30) txt.innerText = t('status.grinding'); if (prog === 60) txt.innerText = t('status.brewing'); if (prog >= 100) { clearInterval(l); document.querySelector('.splash-logo').classList.add('boot-anim'); setTimeout(async () => { hasBooted = true; const setupDone = await window.api.getSetting('setup_complete'); if (!setupDone) { applyBgmMode(); showSetupScreen(); } else { if (audioCfg.homeEnabled) transitionToHome(); else transitionToStart(); applyBgmMode(); resetIdleTimer(); } }, 800); } }, 30);
@@ -1541,10 +1570,10 @@ function handleInput(action) {
   else if (gameState === 'JUKEBOX' || gameState === 'JUKEBOX_OVERLAY') { handleJukeboxInput(action); }
   // NOTE: every overlay-menu gameState must be listed here or it receives no input at all —
   // the overlay draws, then d-pad/A/B do nothing and there is no way back out.
-  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'FONTS', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
+  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'FONTS', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'GENRE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
     else if (action === 'BACK') {
-      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'FONTS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
+      if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'FONTS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'GENRE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAME_SCRAPE_MENU' || gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
@@ -1762,7 +1791,7 @@ function applyLiveFilters(preserveIndex = false) {
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
     if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
-    if (!matchCat) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
+    if (!matchCat) return false; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
     let recentGames = [];
@@ -1796,6 +1825,7 @@ async function refreshDatabase() {
   const res = await window.api.getGames();
   allGames = res.games || [];
   await loadGamePlaylists();
+  await loadGenreCategories();
   // Stay in sync if The Manager changed its theme while CREMA is open (no reflow when unchanged).
   if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
   // Follow a font change made on the desktop, but only while set to follow The Manager.
@@ -1915,7 +1945,7 @@ async function openOverlay(type) {
   if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, 'FILTER BY GENRE', t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
     const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdItems = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? [] : [t('game_menu.add_launch')]; /* EDIT LAUNCH COMMAND removed for release */ const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
@@ -2141,6 +2171,7 @@ function executeOverlayAction() {
     else if (action === t('menu.color_scheme')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openThemeCategoryMenu(); }
     else if (action === 'INTERFACE FONT') { document.getElementById('overlay-backdrop').classList.add('hidden'); openFontMenu(); }
     else if (action === t('menu.screensaver')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openScreensaverMenu(); }
+else if (action === 'FILTER BY GENRE') { openGenreFilterMenu(); }
 else if (action === t('menu.history')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openHistoryMenu(); }
     else if (action === 'PICO-8 GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openPico8Menu(); }
     else if (action === 'FREE-TO-PLAY GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openFreeGamesMenu(); }
@@ -2156,6 +2187,12 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
     }
     else if (action === t('common.close_menu')) closeOverlay();
     else closeOverlay();
+  }
+  else if (gameState === 'GENRE_MENU') {
+    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
+    if (String(action).replace('★ ', '') === 'ALL GENRES') { applyGenreFilter(null); closeOverlay(); return; }
+    const slug = _genreSlugFromMenuItem(action);
+    if (slug) { applyGenreFilter(slug); closeOverlay(); }
   }
   else if (gameState === 'THEME_CATS') { if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); } else if (String(action).replace("★ ", "") === FOLLOW_MANAGER_LABEL) { audioCfg.themeSource = 'MANAGER'; window.api.saveAudioConfig(audioCfg); resolveAndApplyTheme().then(openThemeCategoryMenu); } else { openThemeMenu(action); } }
   else if (gameState === 'THEMES') { if (action === t('common.back')) { openThemeCategoryMenu(); } else if (action) { let raw = String(action).replace("★ ", ""); audioCfg.theme = raw; audioCfg.themeSource = 'CUSTOM'; window.api.saveAudioConfig(audioCfg); applyTheme(raw); openThemeCategoryMenu(); } }
@@ -2259,6 +2296,7 @@ let _newPlFromGallery = false; // '+ NEW PLAYLIST' opened from the gallery Playl
 async function openPlaylistAssignMenu(game) {
   _plAssignGame = game || filteredGames[currentGameIndex];
   await loadGamePlaylists();
+  await loadGenreCategories();
   renderPlaylistAssignMenu();
 }
 function renderPlaylistAssignMenu() {
@@ -2445,6 +2483,57 @@ function executeScreensaverMenuAction() {
   }
 }
 
+// ── FILTER BY GENRE ──────────────────────────────────────────────────────────
+// A genre narrows whatever category is on screen. Counts come from the shared
+// vocabulary and are shown so the list explains itself; the active one is starred,
+// the same convention the theme and font menus use.
+// NB: 'GENRE_MENU' MUST also appear in the overlay input-routing list in handleInput,
+// or every button press is swallowed and the app looks frozen.
+function openGenreFilterMenu() {
+  gameState = 'GENRE_MENU';
+  const items = [(activeGenreFilter ? '' : '★ ') + 'ALL GENRES'];
+  if (genreCats.length) items.push('§BY GENRE');
+  for (const g of genreCats) {
+    items.push((g.slug === activeGenreFilter ? '★ ' : '') + `${g.label}  (${g.count})`);
+  }
+  items.push(t('common.back_to_menu'));
+  renderGenericOverlay('FILTER BY GENRE', items);
+}
+
+// Map a chosen menu row back to its slug — labels carry a star and a count.
+function _genreSlugFromMenuItem(item) {
+  const clean = String(item).replace('★ ', '').replace(/\s*\(\d+\)\s*$/, '').trim();
+  return genreCats.find(g => g.label === clean)?.slug || null;
+}
+
+function applyGenreFilter(slug) {
+  activeGenreFilter = slug;
+  // Every view keys off its own index into the filtered list, so those have to be
+  // reset or the selection can land past the end of a now-shorter library.
+  currentGameIndex = 0; galleryIndex = 0;
+  applyLiveFilters(false);
+  applyGalleryFilter();
+  renderGalleryGrid();
+  refreshGenreTag();
+}
+
+// The headers are painted on view transitions, and changing the filter is not one —
+// without this the badge would not appear until the next category change.
+function refreshGenreTag() {
+  const tag = document.getElementById('gallery-genre-tag');
+  if (tag) { tag.style.display = activeGenreFilter ? 'block' : 'none'; tag.innerText = activeGenreLabel(); }
+  const header = document.getElementById('main-header');
+  if (!header) return;
+  header.querySelector('.cn-genre-tag')?.remove();
+  if (activeGenreFilter) {
+    const el = document.createElement('div');
+    el.className = 'cn-genre-tag';
+    el.style.cssText = 'display:block; align-self:center;';
+    el.innerText = activeGenreLabel();
+    header.appendChild(el);
+  }
+}
+
 function openThemeCategoryMenu() { gameState = 'THEME_CATS'; const follow = (audioCfg.themeSource === 'MANAGER' ? '★ ' : '') + FOLLOW_MANAGER_LABEL; let cats = [follow, '§BY CATEGORY', ...Object.keys(THEME_CATEGORIES)]; cats.push(t('common.back_to_menu')); renderGenericOverlay("THEME CATEGORIES", cats); }
 function openThemeMenu(category) { gameState = 'THEMES'; activeThemeCategory = category; let themes = THEME_CATEGORIES[category].map(th => th === activeTheme ? "★ " + th : th); themes.push(t('common.back')); renderGenericOverlay(category.toUpperCase(), themes); }
 // Interface Font — same shape as the theme picker: "follow The Manager" on top, then the faces.
@@ -2496,7 +2585,7 @@ function updateDownloadProgressBar(percentage) { const fillEl = document.getElem
 function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -2545,7 +2634,8 @@ function transitionToMain() {
   const catName = categories[currentCategoryIndex];
   const safeCatName = catName.toLowerCase().replace(/ /g, '_');
   const catIconPath = logoPath(safeCatName);
-  document.getElementById('main-header').innerHTML = `<div class="header-icon" style="-webkit-mask-image: url('${catIconPath}');"></div><div>${tCat(catName)}</div>`;
+  document.getElementById('main-header').innerHTML = `<div class="header-icon" style="-webkit-mask-image: url('${catIconPath}');"></div><div>${tCat(catName)}</div>` +
+    (activeGenreFilter ? `<div class="cn-genre-tag" style="display:block; align-self:center;">${activeGenreLabel()}</div>` : '');
   searchQuery = ""; applyLiveFilters(false);
   maybeRunFlatpakScan(catName);
   maybeRunPico8Scan(catName);
@@ -3359,6 +3449,7 @@ function applyGalleryFilter() {
   const q = galleryQuery.toLowerCase();
   const base = allGames.filter(g => {
     if (!matchCatForGallery(g, catName)) return false;
+    if (!genreFilterMatch(g)) return false;
     if (g.Hidden == 1) return false;
     if (_cremaHideFree && g.FreeToPlay == 1) return false;
     if (pico8HiddenFor(g, catName)) return false;
@@ -3425,6 +3516,11 @@ function renderGalleryGrid() {
   const searchTag = document.getElementById('gallery-search-tag');
   if (galleryQuery) { searchTag.style.display = 'block'; searchTag.innerText = `"${galleryQuery}"`; }
   else { searchTag.style.display = 'none'; }
+  const genreTag = document.getElementById('gallery-genre-tag');
+  if (genreTag) {
+    genreTag.style.display = activeGenreFilter ? 'block' : 'none';
+    genreTag.innerText = activeGenreLabel();
+  }
   document.getElementById('gallery-count').innerText = `${galleryGames.length} ${t('history.games')}`;
 
   // Section header: recent games

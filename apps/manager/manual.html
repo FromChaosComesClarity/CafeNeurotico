@@ -138,7 +138,7 @@
             <button class="manual-nav-btn" data-target="man-7">7. Installs &amp; Downloads</button>
             <button class="manual-nav-btn" data-target="man-8">8. Scraping &amp; Artwork</button>
             <button class="manual-nav-btn" data-target="man-9">9. The Home Dashboard</button>
-            <button class="manual-nav-btn" data-target="man-10">10. Playlists, Hidden &amp; F2P</button>
+            <button class="manual-nav-btn" data-target="man-10">10. Genres, Playlists &amp; Hidden</button>
             <button class="manual-nav-btn" data-target="man-11">11. Control Panel</button>
 
             <div class="nav-group-label">CREMA</div>
@@ -253,6 +253,7 @@
                 <li><strong>Search</strong> &mdash; instant, searches titles as you type.</li>
                 <li><strong>Category dropdown</strong> &mdash; jump to any store or filter (Steam, GOG, Epic, Flatpak, PICO-8, itch.io, Installed, Favourites, Want to Play&hellip;). Stays in sync with the rail buttons.</li>
                 <li><strong>Sort dropdown</strong> &mdash; A&nbsp;&mdash;&nbsp;Z, Last Played, Favourites First, Want to Play First, Recently Added, Scraped First. Your choice is remembered across restarts. Any sort other than A&mdash;Z hides the &ldquo;Recent Games&rdquo; strip so the whole grid reads in your chosen order.</li>
+                <li><strong>Genre dropdown</strong> &mdash; narrow the view to a real genre: ARPG, CRPG, FPS, Metroidvania, Soulslike, Shmup, Racing&hellip; (see <a href="#man-10">Genres</a>). It combines with everything else, so <em>GOG</em> + <em>CRPG</em> + <em>Installed</em> is one view. The <span class="key">&#10022;</span> button beside it turns whatever genre you are looking at into a playlist that keeps itself up to date.</li>
                 <li><strong>Playlist dropdown</strong> &mdash; jump into any playlist, the Recently Imported feed, or create a new playlist on the spot.</li>
                 <li><strong>Games count</strong> &mdash; live count of what you&rsquo;re looking at.</li>
             </ul>
@@ -333,10 +334,21 @@
             <p><strong>Online (strictly opt-in &mdash; zero network calls until you enable them):</strong> Wishlist &amp; Deals (IsThereAnyDeal &mdash; track un-owned games and price cuts), Free This Week (Epic), Gaming News (your own RSS feeds), Your Games &mdash; What&rsquo;s New (Steam patch notes for games you play), Proton Watch (games that climbed to Gold/Platinum).</p>
 
             <!-- ====== SECTION 10 ====== -->
-            <h2 id="man-10">10. Playlists, Hidden Games &amp; Free-to-Play</h2>
+            <h2 id="man-10">10. Genres, Playlists, Hidden Games &amp; Free-to-Play</h2>
+            <h3>Genres</h3>
+            <p>Stores tell you where a game came from; genres tell you what it <em>is</em>. Cafe Neurotico sorts your library into real genres &mdash; not &ldquo;Action, Adventure, Indie&rdquo; but <strong>ARPG</strong>, <strong>CRPG</strong>, <strong>FPS</strong>, <strong>Metroidvania</strong>, <strong>Soulslike</strong>, <strong>Shmup</strong>, <strong>Survival Horror</strong>, <strong>Point &amp; Click</strong> and forty more.</p>
+            <ul>
+                <li><strong>Detect Genres</strong> (Control Panel &rarr; Tools) reads the tags <em>players</em> voted on for each game, which is the only source that can tell a Diablo-like from a Baldur&rsquo;s Gate-like. Games your stores don&rsquo;t know are looked up on IGDB instead. The card shows how much of your library is sorted.</li>
+                <li>It works through your games about one a second, so a large library takes a few minutes. <strong>You can close the window and keep playing</strong> &mdash; progress carries on in the corner toast &mdash; and stopping it keeps everything already sorted.</li>
+                <li>Each game gets one <strong>main genre</strong> (shown on its gamepage) plus any others that genuinely apply, so a game can be both an FPS and Horror and turn up under each.</li>
+                <li><strong>Disagree with one?</strong> Set it yourself in the game&rsquo;s edit panel under <strong>Filter Genre</strong>. Anything you pick by hand is pinned &mdash; no future scan will ever overwrite it.</li>
+                <li>Search knows genres too: typing <em>crpg</em> or <em>metroidvania</em> finds the games.</li>
+            </ul>
+            <div class="tip-box"><p><strong>Games with no genre:</strong> PICO-8 cartridges, Flatpak apps and other titles that no store has ever listed have nothing to look up. They gather under <strong>No Genre Yet</strong> in the dropdown, where you can give them one by hand.</p></div>
             <h3>Playlists</h3>
             <ul>
                 <li>Create from the rail, the search-row dropdown, or any game&rsquo;s + Playlist button &mdash; that picker has a <strong>&ldquo;+ New playlist&hellip;&rdquo;</strong> box built in, so you can invent a playlist and drop the game into it in one go, even if you had none to begin with. Order is yours; games can live in many playlists.</li>
+                <li><strong>Playlists that fill themselves.</strong> When you create one, pick a genre under <em>Fill it automatically</em> and the playlist maintains its own membership &mdash; it tells you how many games it collects before you commit, and every future game that fits simply appears in it. These are marked <span class="key">&#10022;</span>; the games are decided by the rule, so there is no hand-editing to do.</li>
                 <li><strong>Recently Imported</strong> is an automatic feed of your newest arrivals (size configurable in Behavior; newest always on top).</li>
                 <li>Playlists appear in CREMA as first-class categories, marked with <code>&#8801;</code>. Changes sync both ways instantly.</li>
             </ul>
@@ -365,6 +377,9 @@
 
             <h3>Manage Storage</h3>
             <p>Control Panel &rarr; Library &rarr; <strong>Manage Storage</strong> answers &ldquo;what is eating my disk?&rdquo;. The <strong>GOG &amp; Epic</strong> button opens GRINDER showing only installed games, sorted biggest-first, so the space hogs are at the top and one click uninstalls them. The <strong>Steam</strong> button hands you over to Steam&rsquo;s own storage manager.</p>
+
+            <h3>Detect Genres</h3>
+            <p>Control Panel &rarr; Tools &rarr; <strong>Detect Genres</strong> sorts your library by what each game actually is &mdash; ARPG, CRPG, FPS, Racing &mdash; rather than by the vague genre line stores hand out. See <a href="#man-10">Genres</a> for what it does and how to overrule it.</p>
 
             <h3>Scan for Updates &mdash; Your Games</h3>
             <p>Control Panel &rarr; Library &rarr; <strong>Scan for Updates</strong> checks the games you have <em>installed</em> for newer versions. Nothing is ever downloaded behind your back: the scan only ever hands you a list, and updating is one deliberate press per game.</p>
@@ -410,6 +425,8 @@
                 <li><span class="key">SELECT</span> opens <strong>Playlists</strong> &mdash; jump to any playlist or create a new one with the on-screen keyboard.</li>
                 <li><span class="key">Y</span> searches; cards show install state, store badges and <span class="key">FREE</span> pills.</li>
             </ul>
+            <h3>Filtering by Genre</h3>
+            <p>Genres are not another row of categories &mdash; they <em>narrow</em> whichever category you are already in. Open <span class="key">START</span> &rarr; Library &rarr; <strong>Filter by Genre</strong>, pick one (every genre in your library, most-stocked first, with counts), and it applies on top: <em>GOG</em> becomes <em>GOG CRPGs</em>. The active genre shows as a coloured pill next to the category name, and <strong>All Genres</strong> clears it. The filter lasts for the session and is gone on the next launch, so it can never quietly hide half your library.</p>
             <h3>List Browsing</h3>
             <p>A vertical list with a live media panel: trailer or screenshots on the right, metadata below. <span class="key">X</span> swaps trailer and screenshots; <span class="key">L1</span>/<span class="key">R1</span> jump ten games; <span class="key">L2</span>/<span class="key">R2</span> jump to the ends.</p>
 
@@ -464,7 +481,7 @@
                 <li><strong>Audio</strong> &mdash; Jukebox mode, sound settings (volumes, SFX).</li>
                 <li><strong>Appearance</strong> &mdash; Color Scheme (all 93 suite themes, in the same ten categories as the desktop; <em>&#9733; Follow The Manager</em> keeps CREMA matched to your desktop theme automatically), <strong>Interface Font</strong> (the same six faces, each shown in itself so you can judge it at TV distance &mdash; and its own <em>&#9733; Follow The Manager</em>, which is how it starts out), Home Screen (startup toggle + row selection), Start Screen mode, Browse mode, Gamepage style (applies live, even inside a gamepage), Screensaver.</li>
                 <li><strong>Controls</strong> &mdash; Keybindings, Gamepad icon set (Xbox / PlayStation / Nintendo), Wake method.</li>
-                <li><strong>Library</strong> &mdash; Gaming History, PICO-8 / Free-to-Play visibility, <strong>Hidden Games</strong> (unhide individually).</li>
+                <li><strong>Library</strong> &mdash; <strong>Filter by Genre</strong>, Gaming History, PICO-8 / Free-to-Play visibility, <strong>Hidden Games</strong> (unhide individually).</li>
                 <li><strong>System</strong> &mdash; About, Quit.</li>
             </ul>
 

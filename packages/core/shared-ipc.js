@@ -20,10 +20,18 @@ const freebies = require('./freebies.js');
 const rss = require('./rss.js');
 const proton = require('./proton.js');
 const steamnews = require('./steamnews.js');
+const genres = require('./genres.js');
+const genreStore = require('./genre-store.js');
+const smartPlaylists = require('./smart-playlists.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
             getBeautifulName, getOldCrushedName } = ctx;
+
+    // Genre tables live here rather than in each face's migration block — both faces
+    // share this DB and the schema must not drift between them.
+    genreStore.ensureGenreSchema(db);
+    smartPlaylists.ensureSmartSchema(db);
 
     // Wishlist of UN-OWNED games (Phase 2) — distinct from WANT_TO_PLAY (owned).
     try { db.prepare(`CREATE TABLE IF NOT EXISTS wishlist (id INTEGER PRIMARY KEY AUTOINCREMENT, itad_id TEXT UNIQUE, title TEXT, slug TEXT, cover TEXT, appid TEXT, added_at INTEGER DEFAULT 0, target_price REAL)`).run(); } catch (e) {}
@@ -44,8 +52,39 @@ function registerSharedHandlers(ctx) {
 
     ipcMain.handle('get-games', () => {
         if (!db) return { games: [] };
-        try { return { games: db.prepare("SELECT * FROM games ORDER BY Game ASC").all() }; }
-        catch (err) { return { games: [] }; }
+        try {
+            const rows = db.prepare("SELECT * FROM games ORDER BY Game ASC").all();
+            // Every row carries its genre slugs so the renderers can filter without a
+            // per-game round trip. One extra query for the whole library, not 892.
+            const byGame = genreStore.genresByGame(db);
+            for (const r of rows) r.Genres = (byGame.get(r.id) || []).join(',');
+            return { games: rows };
+        } catch (err) { return { games: [] }; }
+    });
+
+    // The curated vocabulary + how many games sit in each genre, for menus and chips.
+    ipcMain.handle('genre-list', () => {
+        const counts = genreStore.genreCounts(db);
+        return {
+            genres: genres.GENRES.map(g => ({ slug: g.slug, label: g.label, count: counts[g.slug] || 0 })),
+            coverage: genreStore.genreCoverage(db),
+        };
+    });
+
+    // Manual override from the edit dialog — locks the row against future scans.
+    // slugs[0] is the primary. An empty list clears the override and unlocks.
+    ipcMain.handle('set-game-genres', (e, gameId, slugs) => {
+        if (!db) return false;
+        const list = (Array.isArray(slugs) ? slugs : []).filter(s => genres.GENRES.some(g => g.slug === s));
+        if (!list.length) {
+            try { db.prepare("DELETE FROM game_genres WHERE game_id=? AND source='manual'").run(gameId); } catch {}
+            genreStore.unlockGenres(db, gameId);
+            return true;
+        }
+        // Descending scores keep the chosen order meaningful downstream (genresByGame
+        // sorts by score, and the first slug is what PrimaryGenre becomes).
+        const result = { primary: list[0], genres: list.map((slug, i) => ({ slug, score: 1 - i * 0.01 })) };
+        return genreStore.setGameGenres(db, gameId, result, 'manual');
     });
 
     ipcMain.handle('clear-history', () => {

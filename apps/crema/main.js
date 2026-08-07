@@ -5,6 +5,7 @@ const os = require('os');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 const { registerSharedHandlers } = require('../../packages/core/shared-ipc.js');
+const _smart = require('../../packages/core/smart-playlists.js');
 const { spawn, exec, execFile } = require('child_process');
 const https = require('https');
 const mm = require('music-metadata');
@@ -1008,8 +1009,9 @@ ipcMain.handle('get-game-playlist-list', () => {
     try { return db.prepare('SELECT * FROM playlists ORDER BY name').all(); } catch(e) { return []; }
 });
 ipcMain.handle('get-playlist-games', (_, playlistId) => {
-    if (!db) return [];
-    try { return db.prepare('SELECT g.* FROM playlist_games pg JOIN games g ON g.id=pg.game_id WHERE pg.playlist_id=? ORDER BY pg.sort_order, g.Game').all(playlistId); } catch(e) { return []; }
+    // Smart playlists resolve their rule (genre, store, installed…) instead of reading a
+    // stored member list — same helper the Manager uses, so both faces agree on members.
+    try { return _smart.playlistGames(db, playlistId); } catch(e) { return []; }
 });
 ipcMain.handle('get-game-playlists', (_, gameId) => {
     if (!db) return [];

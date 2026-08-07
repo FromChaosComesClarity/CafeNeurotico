@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   getBaseDir: () => ipcRenderer.invoke('get-basedir'),
                                 getGames: () => ipcRenderer.invoke('get-games'),
+                                genreList: () => ipcRenderer.invoke('genre-list'),
+                                setGameGenres: (id, slugs) => ipcRenderer.invoke('set-game-genres', id, slugs),
                                 launchGame: (cmd) => ipcRenderer.send('launch-game', cmd),
                                 quitApp: () => ipcRenderer.send('quit-app'),
                                 saveDbField: (data) => ipcRenderer.send('save-db-field', data),
