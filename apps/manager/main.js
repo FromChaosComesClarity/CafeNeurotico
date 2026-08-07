@@ -1896,6 +1896,27 @@ function cnUpdateRow(g, current, latest, store) {
     return { id: cn ? cn.id : null, name: (cn && cn.Game) || g.title, store, current: current || '', latest: latest || '', gid };
 }
 
+// ── DOSBox mode ──────────────────────────────────────────────────────────────
+// GOG's DOS games ship a Windows DOSBox 0.74 from 2010 that we run through Proton — an
+// emulator inside a translation layer. A native DOSBox reads the very same GOG .conf, so
+// the game keeps every tweak GOG made for it and only the emulator changes. Stored in
+// GRINDER's settings because the engine is what acts on it.
+ipcMain.handle('dosbox-status', () => {
+    if (!ensureGrinderEngine()) return { mode: 'auto', native: null };
+    return {
+        mode: String(grinderEngine.engineSetting('dosbox_mode', 'auto') || 'auto'),
+        native: grinderEngine.findNativeDosbox(),
+    };
+});
+ipcMain.handle('set-dosbox-mode', (_, mode) => {
+    if (!ensureGrinderEngine() || !_grinderEngineDb) return false;
+    const v = ['auto', 'native', 'bundled'].includes(String(mode)) ? String(mode) : 'auto';
+    try {
+        _grinderEngineDb.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('dosbox_mode', ?)").run(v);
+        return true;
+    } catch { return false; }
+});
+
 // ── Per-game manuals ─────────────────────────────────────────────────────────
 // A pointer to a file the user owns (see packages/core/manuals.js), read in a frameless
 // viewer window of its own so it can be dragged to a second monitor and survives the

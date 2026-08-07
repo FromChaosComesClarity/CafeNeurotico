@@ -6032,6 +6032,17 @@ LOADING...READY.</div>
           <button id="btn-scan-updates" class="primary" style="width: 100%; font-size: 12px; padding: 10px; letter-spacing: 1px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-i18n="html.btn_scan_updates">Scan for Updates</span></button>
         </div>
 
+        <div class="tool-card tools-section" data-search="dosbox dos msdos retro old games emulator staging native proton gog">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="18" x2="12" y2="21"/><path d="M6 9h2m2 0h.01"/></svg><span>DOS Games</span></div>
+          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 6px;">GOG's DOS games come with a Windows DOSBox from 2010 that has to run through Proton. A native DOSBox reads the very same GOG configuration &mdash; every tweak GOG made for the game is kept, only the emulator changes.</div>
+          <div class="segmented-control" id="dosbox-mode-control">
+            <button class="segmented-btn dosbox-mode-btn active" data-val="auto">Automatic</button>
+            <button class="segmented-btn dosbox-mode-btn" data-val="native">Native</button>
+            <button class="segmented-btn dosbox-mode-btn" data-val="bundled">GOG's</button>
+          </div>
+          <div id="dosbox-status" style="font-size: 11px; text-align: center; min-height: 15px; margin-top: 6px;"></div>
+        </div>
+
         <div class="tool-card tools-section" data-search="genre genres category categorise categorize arpg crpg fps rpg racing shooter tag tags classify sort">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg><span data-i18n="html.card_genres">Game Genres</span></div>
           <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 2px;" data-i18n="html.genres_hint">Sort your library into real genres — ARPG, CRPG, FPS, Metroidvania, Racing — using the tags players voted on, so you can filter by what a game actually <i>is</i>. Anything you set by hand is never overwritten.</div>

@@ -1176,6 +1176,35 @@ document.getElementById('btn-min').addEventListener('click', () => window.api.mi
 document.getElementById('btn-max').addEventListener('click', () => window.api.maximizeApp());
 document.getElementById('btn-close').addEventListener('click', () => window.api.closeApp());
 
+// ── DOS GAMES: which DOSBox runs them ──────────────────────────────────────
+// The status line is the whole point of the card: "Native" is only meaningful if a
+// native DOSBox is actually installed, so say plainly whether one is, and how to get it.
+async function _refreshDosboxCard() {
+    const el = document.getElementById('dosbox-status');
+    if (!el) return;
+    let st = { mode: 'auto', native: null };
+    try { st = await window.api.dosboxStatus() || st; } catch (e) {}
+    document.querySelectorAll('.dosbox-mode-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === st.mode));
+
+    const name = st.native ? st.native.split('/').pop() : '';
+    if (st.native) {
+        el.innerHTML = st.mode === 'bundled'
+            ? `<span style="color:var(--text_dim);">Using GOG's DOSBox. <b>${escHtml(name)}</b> is installed if you want it.</span>`
+            : `<span style="color:#66bb6a;">Using <b>${escHtml(name)}</b>.</span>`;
+    } else {
+        el.innerHTML = st.mode === 'native'
+            ? `<span style="color:#ef5350;">No native DOSBox installed — games will not start. Install one, or choose Automatic.</span>`
+            : `<span style="color:var(--text_dim);">No native DOSBox found, using GOG's. Install one with <code>sudo dnf install dosbox-staging</code>.</span>`;
+    }
+}
+document.querySelectorAll('.dosbox-mode-btn').forEach(btn =>
+    btn.addEventListener('click', async () => {
+        await window.api.setDosboxMode(btn.dataset.val);
+        _refreshDosboxCard();
+    }));
+_refreshDosboxCard();
+
 // ── PICO-8 VISIBILITY ─────────────────────────────────────────────────────
 let _hidePico8 = false;
 function applyPico8Visibility(hide) {

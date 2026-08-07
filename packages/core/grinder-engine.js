@@ -687,17 +687,44 @@ async function launchGame(gameId, opts = {}) {
         return rel ? path.join(installPath, ...rel.replace(/\\/g, '/').split('/')) : '';
     })());
 
-    // Read arguments for the active task from goggame-*.info (GOG only).
-    // GOG stores launch arguments in playTasks — without them mods/configs don't load.
-    const gogTaskArgs = (() => {
-        if (game.store !== 'gog' || !installPath || !game.app_id) return [];
+    // The active playTask from goggame-*.info (GOG only) — it carries both the launch
+    // arguments and the working directory the game expects to be started from.
+    const gogTask = (() => {
+        if (game.store !== 'gog' || !installPath || !game.app_id) return null;
         try {
             const infoFile = path.join(installPath, `goggame-${game.app_id}.info`);
             const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
             const activeRel = (game.launch_target || game.executable || '').replace(/\\/g, '/');
-            const task = (info.playTasks || []).find(t =>
+            return (info.playTasks || []).find(t =>
                 t.type === 'FileTask' && t.path && t.path.replace(/\\/g, '/') === activeRel
-            );
+            ) || null;
+        } catch { return null; }
+    })();
+
+    // Put back the config files GOG's installer would have copied out of gog-support/.
+    // Early, because everything below — the arguments, the working directory, the DOSBox
+    // decision — assumes those files are where the game expects them.
+    if (game.store === 'gog' && installPath && game.app_id) {
+        try { applyGogSupportFiles(installPath, game.app_id); }
+        catch (e) { console.error('[launch] gog-support restore failed:', e.message); }
+    }
+
+    // GOG's workingDir is not decoration: DOS games are started from their DOSBOX folder and
+    // their config mounts the drive with `mount C ".."`, which only points at the game when
+    // the process really is one level down. Launching from the install root instead mounted
+    // the *parent* of the game folder as C:, so DOSBox came up, found no game and quit —
+    // indistinguishable from a crash.
+    const launchCwd = (() => {
+        const rel = (gogTask?.workingDir || '').replace(/\\/g, '/').trim();
+        if (!rel || !installPath) return installPath || undefined;
+        const dir = resolvePathCaseInsensitive(path.join(installPath, ...rel.split('/')));
+        return fs.existsSync(dir) ? dir : installPath;
+    })();
+
+    // GOG stores launch arguments in playTasks — without them mods/configs don't load.
+    const gogTaskArgs = (() => {
+        try {
+            const task = gogTask;
             if (!task?.arguments) return [];
             // Simple shell-split that respects quoted tokens
             const args = []; let cur = ''; let inQ = false; let q = '';
@@ -867,11 +894,34 @@ async function launchGame(gameId, opts = {}) {
     const isBat = resolvedExe.toLowerCase().endsWith('.bat');
     const launchExe = isBat ? ('Z:' + resolvedExe.replace(/\//g, '\\')) : resolvedExe;
 
+    // A DOS game can skip Proton entirely when a native DOSBox is installed: it reads the
+    // very same GOG config, so the game's own tweaks are kept and only the emulator changes.
+    // Checked before the Proton gate — a DOS game handled natively must not be refused for
+    // want of a Proton it is never going to use.
+    //   dosbox_mode: 'auto' (default — native when present) · 'native' · 'bundled'
+    const dosboxMode = String(engineSetting('dosbox_mode', 'auto') || 'auto').toLowerCase();
+    if (dosboxMode !== 'bundled' && isGogDosGame(game, resolvedExe)) {
+        const nativeDosbox = findNativeDosbox();
+        if (nativeDosbox) {
+            spawnGame(nativeDosbox, nativeDosboxArgs(allArgs), {
+                cwd: launchCwd, env: baseEnv(), detached: true, stdio: 'ignore',
+            });
+            return { ok: true, method: `dosbox-native (${path.basename(nativeDosbox)})` };
+        }
+        if (dosboxMode === 'native') {
+            throw new Error(
+                'No native DOSBox found. Install one (on Fedora/Nobara: `sudo dnf install dosbox-staging`), ' +
+                'or set DOSBox mode back to Automatic to use the copy GOG ships.'
+            );
+        }
+        // 'auto' with nothing installed → fall through to GOG's bundled DOSBox via Proton.
+    }
+
     // Native Linux builds need no compatibility layer at all — check this BEFORE any Proton
     // gate, or a Linux-native title would be blocked on a Proton it never uses.
     if (game.platform === 'linux') {
         try { fs.chmodSync(resolvedExe, '755'); } catch {}
-        spawnGame(resolvedExe, [...userArgs], { cwd: installPath || undefined, env: baseEnv(), detached: true, stdio: 'ignore' });
+        spawnGame(resolvedExe, [...userArgs], { cwd: launchCwd, env: baseEnv(), detached: true, stdio: 'ignore' });
         return { ok: true, method: 'native' };
     }
 
@@ -893,12 +943,12 @@ async function launchGame(gameId, opts = {}) {
     }
 
     if (game.store === 'epic' && umu && proton) {
-        spawnGame(umu, [launchExe, ...userArgs], { cwd: installPath || undefined, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
+        spawnGame(umu, [launchExe, ...userArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
         return { ok: true, method: 'umu-run' };
     }
 
     if (umu && proton) {
-        spawnGame(umu, [launchExe, ...allArgs], { cwd: installPath || undefined, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
+        spawnGame(umu, [launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
         return { ok: true, method: isBat ? 'umu-run-bat' : 'umu-run' };
     }
 
@@ -906,13 +956,13 @@ async function launchGame(gameId, opts = {}) {
         const steamRoot = which('steam') ? path.dirname(which('steam')) : path.join(HOME, '.steam', 'root');
         const protonBin = path.join(proton, 'proton');
         if (!fs.existsSync(protonBin)) throw new Error(`proton script not found in ${proton}`);
-        spawnGame(protonBin, ['run', launchExe, ...allArgs], { cwd: installPath || undefined, env: baseEnv({ WINEPREFIX: prefix, STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot }), detached: true, stdio: 'ignore' });
+        spawnGame(protonBin, ['run', launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot }), detached: true, stdio: 'ignore' });
         return { ok: true, method: isBat ? 'proton-bat' : 'proton-direct' };
     }
 
     const wine = findWineCached();
     if (!wine) throw new Error('No launch method: umu-run not found, no Proton path set, wine not installed.');
-    spawnGame(wine, [launchExe, ...allArgs], { cwd: installPath || undefined, env: baseEnv({ WINEPREFIX: prefix }), detached: true, stdio: 'ignore' });
+    spawnGame(wine, [launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix }), detached: true, stdio: 'ignore' });
     return { ok: true, method: 'wine' };
 }
 
@@ -1088,6 +1138,109 @@ async function injectGogRegistry(game, prefix, proton) {
 }
 
 // ── Per-game fix: Fallout: New California (GOG 1168267909) ───────────────────
+// ── Native DOSBox for GOG's DOS games ────────────────────────────────────────
+// GOG ships a Windows DOSBox 0.74 from 2010 and runs it through Proton: an emulator inside
+// a translation layer, when the host can run the emulator directly. A native build is
+// faster, gets working sound and fullscreen without Proton's help, and is still maintained.
+//
+// The reason this is even possible is that GOG's per-game .conf files are ordinary DOSBox
+// configuration — the same format a native build reads — and their paths are relative:
+//
+//     [autoexec]
+//     mount C ".."
+//     c:
+//     intro
+//     bladem
+//
+// So every tweak GOG made for the game (cycles, machine type, sound cards, the autoexec
+// that actually starts it) is preserved exactly. We change what runs the config, not the
+// config. Nothing is rewritten on disk.
+//
+// dosbox-staging is preferred: it is the actively maintained fork and the one distributions
+// package today. Plain dosbox and dosbox-x are accepted too.
+const DOSBOX_BINARIES = ['dosbox-staging', 'dosbox', 'dosbox-x'];
+
+// GRINDER's own settings table, read the same way the GOG credentials are.
+function engineSetting(key, fallback = null) {
+    try { return db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value ?? fallback; }
+    catch { return fallback; }
+}
+
+let _dosboxCache;
+function findNativeDosbox() {
+    if (_dosboxCache !== undefined) return _dosboxCache;
+    _dosboxCache = null;
+    for (const b of DOSBOX_BINARIES) {
+        const p = which(b);
+        if (p) { _dosboxCache = p; break; }
+    }
+    return _dosboxCache;
+}
+
+// A GOG DOS game is one whose launch target is the bundled DOSBox.
+function isGogDosGame(game, resolvedExe) {
+    if ((game?.store || '').toLowerCase() !== 'gog') return false;
+    const rel = String(game.launch_target || game.executable || '').replace(/\\/g, '/').toLowerCase();
+    if (/(^|\/)dosbox\/dosbox\.exe$/.test(rel)) return true;
+    return /(^|\/)dosbox\.exe$/i.test(String(resolvedExe || '').replace(/\\/g, '/'));
+}
+
+// Translate GOG's Windows DOSBox invocation for a native binary. Run from the same working
+// directory, so the relative -conf paths and the config's own `mount C ".."` still resolve.
+//   • backslashes → forward slashes, so ..\game.conf finds the file on Linux
+//   • -noconsole is dropped: it exists only to hide a Windows console window, and a native
+//     build rejects the unknown option outright
+function nativeDosboxArgs(gogArgs) {
+    const out = [];
+    for (let i = 0; i < gogArgs.length; i++) {
+        const a = gogArgs[i];
+        if (a === '-noconsole') continue;
+        if (a === '-conf' && gogArgs[i + 1] !== undefined) {
+            out.push('-conf', gogArgs[++i].replace(/\\/g, '/'));
+            continue;
+        }
+        out.push(a);
+    }
+    return out;
+}
+
+// ── gog-support/<appId>/app → the install root ───────────────────────────────
+// The generic half of the .script problem. GOG stages a game's shipped config files under
+// gog-support/<appId>/app/ and its installer copies them into the game folder; gogdl
+// downloads the depot and stops there, so those files are simply absent afterwards.
+//
+// DOS games are where this bites hardest, because their whole launch depends on it:
+// Realms of Arkania is started as `dosbox.exe -conf "..\dosbox_realms1.conf" …` and that
+// conf only ever existed under gog-support, so DOSBox opened with no configuration and
+// exited on the spot. Blade of Destiny, Star Trail and Albion all fail this way.
+//
+// Only plain files, only one level, and only where nothing of that name is already in
+// place — after the first run these hold the player's own settings (screen mode, sound,
+// cycles), and re-copying them on every launch would quietly undo their choices. Unlike
+// running .script itself, which can execute bundled .exe files, copying a config is safe
+// to do for every GOG game rather than one title at a time.
+function applyGogSupportFiles(installPath, appId) {
+    if (!installPath || !appId) return 0;
+    const appDir = path.join(installPath, 'gog-support', String(appId), 'app');
+    let entries = [];
+    try { entries = fs.readdirSync(appDir, { withFileTypes: true }); } catch { return 0; }
+
+    let copied = 0;
+    for (const e of entries) {
+        if (!e.isFile()) continue;
+        const src = path.join(appDir, e.name);
+        const dst = path.join(installPath, e.name);
+        if (fs.existsSync(resolvePathCaseInsensitive(dst))) continue;
+        try {
+            fs.copyFileSync(src, dst);
+            fs.chmodSync(dst, 0o644);   // the game and GOGDOSConfig rewrite these
+            copied++;
+        } catch {}
+    }
+    if (copied) console.log(`[launch] restored ${copied} GOG support file(s) into ${installPath}`);
+    return copied;
+}
+
 // GOG ships post-install steps in goggame-<id>.script — registry values, plus config
 // files copied out of the game's own gog-support/ folder — that only Galaxy's installer
 // performs. gogdl downloads the depot and nothing else, so a title that depends on those
@@ -1654,4 +1807,5 @@ module.exports = {
     getDiskSpace, gogInstallInfo, epicInstallInfo, epicListUpdates, syncOwnedLibrary, cancelActiveInstall,
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
+    findNativeDosbox, isGogDosGame, applyGogSupportFiles, engineSetting,
 };

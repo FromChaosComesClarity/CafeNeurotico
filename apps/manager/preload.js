@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
     getBaseDir: () => ipcRenderer.invoke('get-basedir'),
                                 getGames: () => ipcRenderer.invoke('get-games'),
                                 genreList: () => ipcRenderer.invoke('genre-list'),
+                                dosboxStatus: () => ipcRenderer.invoke('dosbox-status'),
+                                setDosboxMode: (m) => ipcRenderer.invoke('set-dosbox-mode', m),
                                 manualStatus: (id) => ipcRenderer.invoke('manual-status', id),
                                 pickManual: (id) => ipcRenderer.invoke('pick-manual', id),
                                 clearManual: (id) => ipcRenderer.invoke('clear-manual', id),
