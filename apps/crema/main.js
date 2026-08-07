@@ -397,11 +397,40 @@ function launcherStore(cmd) {
     if (/grinder:\/\/launch\/epic\//i.test(cmd)) return 'epic';
     return null;
 }
-function launchCmdsOf(game) {
-    const out = [];
-    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) out.push(l.cmd); } catch {}
-    if (game.LaunchCommand) out.push(game.LaunchCommand);
+// The canonical per-store launcher list for a row: [{ label, cmd }] — mirrors the Manager.
+// LaunchCommands is the source of truth when populated, but plenty of genuinely multi-store
+// rows never had it written (legacy cross-store merges, or a Manager save that dropped the
+// GRINDER launcher), so anything the row's own store fields prove exists is filled back in.
+// Needs Store + GrinderGameId on the row; a SELECT without them just skips the synthesis.
+function expandLaunchers(game) {
+    const out = [], seen = new Set();
+    const add = (label, cmd) => {
+        if (!cmd || seen.has(cmd)) return;
+        seen.add(cmd);
+        out.push({ label: label || guessLauncherLabel(cmd), cmd });
+    };
+    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) add(l.label, l.cmd); } catch {}
+    add(null, game.LaunchCommand);
+
+    const stores = (game.Store || '').toLowerCase();
+    const has = s => out.some(l => launcherStore(l.cmd) === s);
+
+    // SteamAppID alone proves nothing — it doubles as the metadata key on GOG/itch rows.
+    const appId = String(game.SteamAppID || '').replace(/\.0+$/, '').trim();
+    if (stores.includes('steam') && appId && appId !== 'None' && !has('steam')) {
+        add('Steam', `steam steam://rungameid/${appId} -silent`);
+    }
+    const gg = String(game.GrinderGameId || '').match(/^(gog|epic)_(.+)$/i);
+    if (gg) {
+        const store = gg[1].toLowerCase();
+        if (stores.includes(store) && !has(store)) {
+            add(store === 'gog' ? 'GOG via GRINDER' : 'Epic via GRINDER', `grinder://launch/${store}/${gg[2]}`);
+        }
+    }
     return out;
+}
+function launchCmdsOf(game) {
+    return expandLaunchers(game).map(l => l.cmd);
 }
 let _grinderInstalledCache = { key: '', set: new Set() };
 function grinderInstalledSet() {
@@ -439,12 +468,7 @@ function resolveInstallState(game) {
     return allTracked ? 0 : null;
 }
 function launcherStatesForGame(game) {
-    let launchers = [];
-    try { launchers = JSON.parse(game.LaunchCommands || '[]'); } catch {}
-    if (!launchers.length && game.LaunchCommand) {
-        launchers = [{ label: guessLauncherLabel(game.LaunchCommand), cmd: game.LaunchCommand }];
-    }
-    return launchers.map(l => ({
+    return expandLaunchers(game).map(l => ({
         label: l.label || guessLauncherLabel(l.cmd),
         cmd: l.cmd,
         store: launcherStore(l.cmd || ''),
@@ -453,12 +477,12 @@ function launcherStatesForGame(game) {
 }
 ipcMain.handle('launcher-states', (e, gameId) => {
     if (!db) return [];
-    const game = db.prepare("SELECT SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
+    const game = db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
     return game ? launcherStatesForGame(game) : [];
 });
 ipcMain.handle('verify-install-status', (e, gameId) => {
     if (!db) return { installed: 1 };
-    const game = db.prepare("SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games WHERE id=?").get(gameId);
+    const game = db.prepare("SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands, Installed FROM games WHERE id=?").get(gameId);
     if (!game) return { installed: 1 };
     const installed = resolveInstallState(game);
     if (installed !== null) db.prepare("UPDATE games SET Installed=? WHERE id=?").run(installed, gameId);
@@ -471,8 +495,10 @@ function reconcileSteamInstalls() {
     if (!db) return 0;
     let changed = 0;
     const games = db.prepare(
-        "SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games " +
-        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+        "SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands, Installed FROM games " +
+        // Also rows that only imply their Steam launcher: a Steam tag plus an appid (see expandLaunchers).
+        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%' " +
+        "OR (LOWER(Store) LIKE '%steam%' AND SteamAppID IS NOT NULL AND SteamAppID NOT IN ('', 'None'))"
     ).all();
     for (const g of games) {
         const s = resolveInstallState(g);

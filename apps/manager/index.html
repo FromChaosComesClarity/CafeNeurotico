@@ -6067,19 +6067,6 @@ LOADING...READY.</div>
   </div>
 
   <!-- Install store picker (multi-store games) -->
-  <div id="modal-install-picker" class="modal-overlay" style="z-index:25000;">
-    <div class="modal-box" style="max-width:400px;">
-      <h3 style="margin:0 0 6px; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Choose Version</h3>
-      <p id="install-picker-game" style="font-size:13px; font-weight:900; color:var(--text_main); margin:0 0 10px;"></p>
-      <p style="font-size:11px; color:var(--text_dim); margin:0 0 18px; line-height:1.7;">This game is available on multiple stores. Choose which version to install:</p>
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <button id="btn-install-pick-steam" style="width:100%; padding:12px;">Steam — Opens Steam client</button>
-        <button id="btn-install-pick-grinder" style="width:100%; padding:12px;">GRINDER — GOG / Epic</button>
-        <button id="btn-install-pick-cancel" style="width:100%; background:transparent; border:1px solid var(--border_solid); color:var(--text_dim);">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <!-- In-process GOG/Epic install (no GRINDER window) -->
   <div id="modal-grinder-install" class="modal-overlay" style="z-index:26000;">
     <div class="modal-box" style="max-width:460px; gap:14px;">
@@ -6514,7 +6501,7 @@ LOADING...READY.</div>
   <div id="modal-launcher-pick" class="modal-overlay">
     <div class="modal-box" style="max-width:420px; gap:14px;">
       <h2 style="margin:0; font-size:15px; letter-spacing:1.5px; color:var(--accent); text-transform:uppercase;">Choose Launcher</h2>
-      <p style="margin:0; color:var(--text_sec); font-size:12px; line-height:1.6;">This game is available on multiple stores.<br>Which one do you want to launch?</p>
+      <p id="launcher-pick-prompt" style="margin:0; color:var(--text_sec); font-size:12px; line-height:1.6;">This game is available on multiple stores.<br>Which one do you want to launch?</p>
       <div id="launcher-pick-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       <button id="btn-launcher-pick-cancel" style="align-self:flex-end; font-size:11px; padding:6px 18px; margin-top:4px;">Cancel</button>
     </div>

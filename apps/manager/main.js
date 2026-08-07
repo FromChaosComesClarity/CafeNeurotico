@@ -318,6 +318,32 @@ app.whenReady().then(() => {
         // One-time migration: rename the legacy launch scheme heroic://launch/… → grinder://launch/… (Heroic-era leftover)
         try { db.prepare("UPDATE games SET LaunchCommand = REPLACE(LaunchCommand, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommand LIKE '%heroic://launch/%'").run(); } catch(e) {}
         try { db.prepare("UPDATE games SET LaunchCommands = REPLACE(LaunchCommands, 'heroic://launch/', 'grinder://launch/') WHERE LaunchCommands LIKE '%heroic://launch/%'").run(); } catch(e) {}
+        // …and unwrap the external Heroic flatpak that used to carry that URL. The rename above
+        // left `flatpak run com.heroicgameslauncher.hgl "grinder://launch/…"`, which the in-process
+        // launcher can't recognise (its match is anchored) and which needs a Heroic install we no
+        // longer depend on — so those rows launched nothing. The bare URL is what GRINDER handles.
+        try {
+            const unwrap = c => {
+                const m = String(c || '').match(/com\.heroicgameslauncher\.hgl\s+"?(grinder:\/\/launch\/[^"\s]+)"?/i);
+                return m ? m[1] : c;
+            };
+            const rows = db.prepare(
+                "SELECT id, LaunchCommand, LaunchCommands FROM games " +
+                "WHERE LaunchCommand LIKE '%com.heroicgameslauncher.hgl%grinder://launch/%' " +
+                "   OR LaunchCommands LIKE '%com.heroicgameslauncher.hgl%grinder://launch/%'"
+            ).all();
+            for (const r of rows) {
+                const cmd = unwrap(r.LaunchCommand);
+                let cmds = r.LaunchCommands;
+                try {
+                    const parsed = JSON.parse(r.LaunchCommands || 'null');
+                    if (Array.isArray(parsed)) cmds = JSON.stringify(parsed.map(l => ({ ...l, cmd: unwrap(l && l.cmd) })));
+                } catch(e) {}
+                if (cmd !== r.LaunchCommand || cmds !== r.LaunchCommands) {
+                    db.prepare("UPDATE games SET LaunchCommand=?, LaunchCommands=? WHERE id=?").run(cmd, cmds, r.id);
+                }
+            }
+        } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN FreeToPlay INTEGER DEFAULT 0").run(); } catch(e) {} // 1 = Steam free-to-play (played-free-games)
@@ -650,7 +676,7 @@ ipcMain.handle('grinder-refresh-owned', async () => {
         // grinder.db diff), so pre-existing games.db↔grinder.db drift is never wrongly deleted.
         const removedIds = [...(r.gog?.removedIds || []), ...(r.epic?.removedIds || [])];
         if (db && removedIds.length) {
-            const sel = db.prepare("SELECT id, Store, LaunchCommand, LaunchCommands, GrinderGameId FROM games WHERE GrinderGameId=?");
+            const sel = db.prepare("SELECT id, Store, SteamAppID, LaunchCommand, LaunchCommands, GrinderGameId FROM games WHERE GrinderGameId=?");
             db.transaction(() => {
                 for (const gid of removedIds) {
                     const row = sel.get(gid);
@@ -929,11 +955,10 @@ function launcherStore(cmd) {
 // store's launcher + tag are stripped and the surviving store(s) keep the row. Returns
 // 'deleted' | 'stripped'. `which` is 'steam' | 'gog' | 'epic'.
 function pruneStoreEntry(row, which) {
-    let launchers = [];
-    try { launchers = JSON.parse(row.LaunchCommands || '[]'); } catch(e) {}
-    if (!launchers.length && row.LaunchCommand) {
-        launchers.push({ label: guessLauncherLabel(row.LaunchCommand), cmd: row.LaunchCommand });
-    }
+    // Expanded, not raw: a mixed-store row whose other store is only implied by its Store tag
+    // + id (see expandLaunchers) would otherwise look single-store here and get deleted whole
+    // when the refunded store is the one that owns the primary command.
+    const launchers = expandLaunchers(row);
     const remaining = launchers.filter(l => launcherStore(l.cmd || '') !== which);
     // Keep the row only if a DIFFERENT recognised store launcher survives; a leftover
     // unrecognised/dangling launcher (e.g. a bare grinder://<id> fallback) still deletes.
@@ -1032,13 +1057,13 @@ function resolveGameFolder(game) {
 // Renderer asks whether a browsable folder exists (to show/hide the hero button).
 ipcMain.handle('resolve-game-folder', (e, gameId) => {
     if (!db) return null;
-    try { return resolveGameFolder(db.prepare("SELECT SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId)); }
+    try { return resolveGameFolder(db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId)); }
     catch { return null; }
 });
 // Open the game's install folder in the system file manager.
 ipcMain.handle('open-game-folder', (e, gameId) => {
     if (!db) return { ok: false };
-    let game; try { game = db.prepare("SELECT SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return { ok: false }; }
+    let game; try { game = db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return { ok: false }; }
     const folder = resolveGameFolder(game);
     if (!folder) return { ok: false };
     shell.openPath(folder);
@@ -1285,7 +1310,7 @@ function resolveSaveDirs(ctx) {
 // Load both DB rows + resolve prefix/install/platform for a GOG game. null ⇒ not a GOG game.
 function saveGameContext(gameId) {
     if (!db) return null;
-    let row; try { row = db.prepare("SELECT id, Game, GrinderGameId, SaveDirOverride, SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return null; }
+    let row; try { row = db.prepare("SELECT id, Game, Store, GrinderGameId, SaveDirOverride, SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId); } catch { return null; }
     const gid = String(row?.GrinderGameId || '');
     if (!row || !/^(gog|epic)_/i.test(gid)) return { supported: false };
     if (!ensureGrinderEngine()) return { supported: false };
@@ -1641,12 +1666,50 @@ ipcMain.handle('ach-scan', async () => {
 // the primary LaunchCommand, so an installed Steam copy was invisible whenever the
 // primary command happened to be the GOG/Epic one (→ Play hidden, Installed stuck at 0).
 
-// Every launch-command string for a row: the plural LaunchCommands plus the primary.
-function launchCmdsOf(game) {
-    const out = [];
-    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) out.push(l.cmd); } catch {}
-    if (game.LaunchCommand) out.push(game.LaunchCommand);
+// The canonical per-store launcher list for a row: [{ label, cmd }].
+//
+// LaunchCommands is the source of truth when it is populated, but plenty of genuinely
+// multi-store rows have never had it — cross-store merges predating the column only wrote
+// the Store tag, and until the edit dialog stopped hiding GRINDER launchers a plain Save
+// collapsed the list back down to the primary. Those rows silently lost their second store:
+// no picker, and install state keyed off whichever launcher survived. So anything the row's
+// own store fields prove exists is filled back in (Steam tag + SteamAppID, GOG/Epic tag +
+// GrinderGameId), which is enough for both the picker and the install-state OR.
+//
+// Needs Store + GrinderGameId on the row; a SELECT without them just skips the synthesis.
+function expandLaunchers(game) {
+    const out = [], seen = new Set();
+    const add = (label, cmd) => {
+        if (!cmd || seen.has(cmd)) return;
+        seen.add(cmd);
+        out.push({ label: label || guessLauncherLabel(cmd), cmd });
+    };
+    try { for (const l of JSON.parse(game.LaunchCommands || '[]')) if (l && l.cmd) add(l.label, l.cmd); } catch {}
+    add(null, game.LaunchCommand);
+
+    const stores = (game.Store || '').toLowerCase();
+    const has = s => out.some(l => launcherStore(l.cmd) === s);
+
+    // A SteamAppID on its own proves nothing — it doubles as the metadata key on GOG and
+    // itch rows — so a Steam launcher is only inferred when the row is tagged Steam too.
+    const appId = String(game.SteamAppID || '').replace(/\.0+$/, '').trim();
+    if (stores.includes('steam') && appId && appId !== 'None' && !has('steam')) {
+        add('Steam', `steam steam://rungameid/${appId} -silent`);
+    }
+    const gg = String(game.GrinderGameId || '').match(/^(gog|epic)_(.+)$/i);
+    if (gg) {
+        const store = gg[1].toLowerCase();
+        if (stores.includes(store) && !has(store)) {
+            add(store === 'gog' ? 'GOG via GRINDER' : 'Epic via GRINDER', `grinder://launch/${store}/${gg[2]}`);
+        }
+    }
     return out;
+}
+
+// Every launch-command string for a row: the plural LaunchCommands plus the primary,
+// plus any store launcher the row's fields imply (see expandLaunchers).
+function launchCmdsOf(game) {
+    return expandLaunchers(game).map(l => l.cmd);
 }
 
 // grinder.db's installed-id set (gog_* / epic_*), cached by file mtime so the watcher
@@ -1702,12 +1765,7 @@ function resolveInstallState(game) {
 
 // Per-launcher install state for the store-picker UI: [{ label, cmd, store, installed }].
 function launcherStatesForGame(game) {
-    let launchers = [];
-    try { launchers = JSON.parse(game.LaunchCommands || '[]'); } catch {}
-    if (!launchers.length && game.LaunchCommand) {
-        launchers = [{ label: guessLauncherLabel(game.LaunchCommand), cmd: game.LaunchCommand }];
-    }
-    return launchers.map(l => ({
+    return expandLaunchers(game).map(l => ({
         label: l.label || guessLauncherLabel(l.cmd),
         cmd: l.cmd,
         store: launcherStore(l.cmd || ''),
@@ -1717,18 +1775,24 @@ function launcherStatesForGame(game) {
 
 ipcMain.handle('launcher-states', (e, gameId) => {
     if (!db) return [];
-    const game = db.prepare("SELECT SteamAppID, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
+    const game = db.prepare("SELECT Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games WHERE id=?").get(gameId);
     return game ? launcherStatesForGame(game) : [];
 });
 
 ipcMain.handle('verify-install-status', (e, gameId) => {
     if (!db) return { installed: 1 };
-    const game = db.prepare("SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games WHERE id=?").get(gameId);
+    const game = db.prepare("SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands, Installed FROM games WHERE id=?").get(gameId);
     if (!game) return { installed: 1 };
     const installed = resolveInstallState(game);
     if (installed !== null) db.prepare("UPDATE games SET Installed=? WHERE id=?").run(installed, gameId);
     return { installed: installed ?? game.Installed ?? 1 };
 });
+
+// Rows that front Steam: an explicit steam:// launcher in either column, or a Steam tag
+// plus an appid (a mixed-store row whose Steam launcher is only implied — see expandLaunchers).
+const STEAM_FRONTING_SQL =
+    "LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%' " +
+    "OR (LOWER(Store) LIKE '%steam%' AND SteamAppID IS NOT NULL AND SteamAppID NOT IN ('', 'None'))";
 
 // ── DYNAMIC INSTALL WATCHER ───────────────────────────────────────────────
 // Reconcile Installed for every Steam-fronting row (incl. mixed-store rows whose Steam
@@ -1737,8 +1801,8 @@ function reconcileSteamInstalls() {
     if (!db) return 0;
     let changed = 0;
     const games = db.prepare(
-        "SELECT id, SteamAppID, LaunchCommand, LaunchCommands, Installed FROM games " +
-        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+        "SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands, Installed FROM games " +
+        `WHERE ${STEAM_FRONTING_SQL}`
     ).all();
     for (const g of games) {
         const s = resolveInstallState(g);
@@ -1775,8 +1839,8 @@ ipcMain.handle('check-all-install-status', async () => {
     // Include mixed-store rows whose Steam launcher sits in LaunchCommands (not the
     // primary) so a game installed on Steam but fronted by GOG/Epic still resolves.
     const steamGames = db.prepare(
-        "SELECT id, SteamAppID, LaunchCommand, LaunchCommands FROM games " +
-        "WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+        "SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands FROM games " +
+        `WHERE ${STEAM_FRONTING_SQL}`
     ).all();
     for (const g of steamGames) {
         const s = resolveInstallState(g);
@@ -3284,7 +3348,7 @@ ipcMain.handle('sync-steam', async (event, steamId, apiKey) => {
             // Only rows that are genuinely Steam-launched games — never a manual/physical
             // entry that merely borrows a SteamAppID for artwork scraping.
             const steamRows = db.prepare(
-                "SELECT id, Store, LaunchCommand, LaunchCommands, SteamAppID FROM games WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
+                "SELECT id, Store, LaunchCommand, LaunchCommands, SteamAppID, GrinderGameId FROM games WHERE LaunchCommand LIKE '%steam://rungameid%' OR LaunchCommands LIKE '%steam://rungameid%'"
             ).all();
             db.transaction(() => {
                 for (const row of steamRows) {

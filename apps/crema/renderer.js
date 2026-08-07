@@ -1137,36 +1137,49 @@ async function boot() {
 
 let inputDebounce = false; let navRepeatDelay = 180; let lastSelectionTime = 0; let wakeHoldFrames = 0;
 
-function tryLaunch(game) {
-  let launchers = [];
-  try { launchers = JSON.parse(game.LaunchCommands || '[]'); } catch(e) {}
-  if (launchers.length >= 2) {
-    showLauncherPicker(game, launchers);
+// Every store a row can be played or installed from, each with its install state (Steam
+// appmanifest / GOG-Epic grinder.db). Main resolves this from the row's store fields, not
+// just LaunchCommands, so a mixed-store row that never got the plural column written still
+// lists both stores. [] on failure — callers fall back to the single-launcher path.
+async function launcherStatesFor(game) {
+  try { return await window.api.launcherStates(game.id) || []; } catch (e) { return []; }
+}
+
+async function tryLaunch(game) {
+  const states = await launcherStatesFor(game);
+  if (states.length >= 2) {
+    showLauncherPicker(game, states);
   } else {
-    const cmd = launchers.length === 1 ? launchers[0].cmd : game.LaunchCommand;
+    const cmd = states.length === 1 ? states[0].cmd : game.LaunchCommand;
     enterSleepMode(cmd ? { ...game, LaunchCommand: cmd } : game);
   }
 }
 
-async function showLauncherPicker(game, launchers) {
-  _lpGame = game; _lpList = launchers; _lpIndex = 0;
+// A row fronting several stores may be owned on all of them, so the Install button asks
+// which store rather than taking whichever branch matches first. Falls back to the caller's
+// single-store routing when there is nothing to choose between.
+async function tryInstall(game, fallback) {
+  const states = await launcherStatesFor(game);
+  if (states.length >= 2) { showLauncherPicker(game, states, 'install'); return; }
+  fallback();
+}
+
+// `states` comes from launcherStatesFor(). `mode` only picks the wording: an installed
+// store always offers Play and an uninstalled one always offers Install.
+function showLauncherPicker(game, states, mode = 'launch') {
+  // An untracked launcher (flatpak / custom / emulator) has no install state to read, so
+  // it counts as playable — its command is the only thing we know about it.
+  _lpGame = game; _lpIndex = 0;
+  _lpList = states.map(st => ({ ...st, installed: st.installed !== false || st.store === null }));
   document.getElementById('lp-game-title').textContent = game.Game;
+  const prompt = document.getElementById('lp-prompt');
+  if (prompt) prompt.textContent = mode === 'install'
+    ? 'Available on multiple stores — choose one to install'
+    : 'Available on multiple stores';
   renderLpList();
   document.getElementById('launcher-pick-backdrop').classList.remove('hidden');
   previousGameState = gameState;
   gameState = 'LAUNCHER_PICK';
-  // Annotate each launcher with its store's install state (Steam appmanifest /
-  // GOG-Epic grinder.db) so an uninstalled store routes to its installer instead
-  // of a silent launch failure. Untracked launchers (flatpak/custom) count as playable.
-  try {
-    const states = await window.api.launcherStates(game.id);
-    const byCmd = new Map(states.map(s => [s.cmd, s]));
-    _lpList = _lpList.map(l => {
-      const st = byCmd.get(l.cmd);
-      return { ...l, installed: !st || st.installed !== false || st.store === null, store: st ? st.store : null };
-    });
-    if (gameState === 'LAUNCHER_PICK') renderLpList();
-  } catch (e) {}
 }
 
 function hideLauncherPicker() {
@@ -1408,10 +1421,14 @@ function handleInput(action) {
       const g = filteredGames[currentGameIndex];
       if (g.LaunchCommand) {
         const isInstalled = g.Installed == null || g.Installed == 1;
-        const stL = (g.Store || '').toLowerCase();
-        if (!isInstalled && (stL.includes('gog') || stL.includes('epic'))) { showGrinderConfirm(g); }
-        else if (!isInstalled && stL.includes('steam') && g.SteamAppID && String(g.SteamAppID) !== 'None') { showSteamInstallConfirm(g); }
-        else { tryLaunch(g); }
+        if (!isInstalled) {
+          tryInstall(g, () => {
+            const stL = (g.Store || '').toLowerCase();
+            if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(g); }
+            else if (stL.includes('steam') && g.SteamAppID && String(g.SteamAppID) !== 'None') { showSteamInstallConfirm(g); }
+            else { tryLaunch(g); }
+          });
+        } else { tryLaunch(g); }
       }
       else if (isManualCategory(g)) { openOverlay("GAME_MENU"); }
     }
@@ -2105,7 +2122,7 @@ function executeOverlayAction() {
     else if (action === t('game_menu.scraping')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
     else if (action === t('game_menu.download_trailer')) openSearchOverlay();
     else if (action === t('game_menu.delete_trailer')) { clearMediaLoaders(); window.api.deleteTrailer(filteredGames[currentGameIndex].Game).then(() => { setDebug("🗑️ Trailer Deleted", true); refreshDatabase(); closeOverlay(); }); }
-    else if (action === 'INSTALL VIA GRINDER') { closeOverlay(); const _ig = filteredGames[currentGameIndex]; const _stL = (_ig.Store || '').toLowerCase(); if (_ig.GrinderGameId && !_stL.includes('gog') && !_stL.includes('epic')) { window.api.openGrinderGui(_ig.Game); } else { showGrinderConfirm(_ig); } }
+    else if (action === 'INSTALL VIA GRINDER') { closeOverlay(); const _ig = filteredGames[currentGameIndex]; tryInstall(_ig, () => { const _stL = (_ig.Store || '').toLowerCase(); if (_ig.GrinderGameId && !_stL.includes('gog') && !_stL.includes('epic')) { window.api.openGrinderGui(_ig.Game); } else { showGrinderConfirm(_ig); } }); }
     else if (action === 'UNINSTALL VIA GRINDER') { closeOverlay(); triggerGrinderUninstall(filteredGames[currentGameIndex]); }
     else if (action === 'VIEW ACHIEVEMENTS') {
       const game = filteredGames[currentGameIndex];
@@ -4136,11 +4153,13 @@ function ggpActivateButton() {
       document.getElementById('overlay-backdrop').classList.add('hidden');
       openOSK('LAUNCH_CMD', t('osk.launch_command'), '');
     } else if (playBtnEl?.dataset?.installMode === '1') {
-      const stL = (game.Store || '').toLowerCase();
-      if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) {
-        window.api.openGrinderGui(game.Game);
-      } else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
-      else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+      tryInstall(game, () => {
+        const stL = (game.Store || '').toLowerCase();
+        if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) {
+          window.api.openGrinderGui(game.Game);
+        } else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+        else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+      });
     } else if (game.LaunchCommand) { tryLaunch(game); }
   }
 }
@@ -4505,10 +4524,12 @@ function _cfgpActivateBtn() {
       document.getElementById('overlay-backdrop').classList.add('hidden');
       openOSK('LAUNCH_CMD', t('osk.launch_command'), '');
     } else if (mode === '1') {
-      const stL = (game.Store || '').toLowerCase();
-      if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) { window.api.openGrinderGui(game.Game); }
-      else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
-      else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+      tryInstall(game, () => {
+        const stL = (game.Store || '').toLowerCase();
+        if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) { window.api.openGrinderGui(game.Game); }
+        else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+        else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
+      });
     } else if (game.LaunchCommand) { tryLaunch(game); }
   }
 }

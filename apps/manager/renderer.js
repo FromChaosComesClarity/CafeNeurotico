@@ -61,16 +61,6 @@ function openAddGameDialog() {
     };
 }
 
-function openInstallPicker(game, installCmd) {
-    const modal = document.getElementById('modal-install-picker');
-    document.getElementById('install-picker-game').textContent = game.Game;
-    modal.classList.add('active');
-    const close = () => modal.classList.remove('active');
-    document.getElementById('btn-install-pick-steam').onclick   = () => { close(); window.api.openInstallUrl(installCmd); };
-    document.getElementById('btn-install-pick-grinder').onclick = () => { close(); window.api.openGrinder(game.Game); };
-    document.getElementById('btn-install-pick-cancel').onclick  = close;
-}
-
 function _isGrinderGame(game) {
     const store = (game.Store || '').toLowerCase();
     return store.includes('gog') || store.includes('epic') || /grinder:\/\/launch/i.test(game.LaunchCommand || '');
@@ -240,33 +230,42 @@ function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function showLauncherPicker(game, launchers) {
+// Every store a row can be played or installed from, with each one's install state
+// (Steam appmanifest / GOG-Epic grinder.db). Main resolves this from the row's store
+// fields, not just LaunchCommands, so a mixed-store row that never got the plural column
+// written still lists both stores. [] on failure — callers fall back to the single path.
+async function launcherStatesFor(game) {
+    try { return await window.api.launcherStates(game.id) || []; } catch (e) { return []; }
+}
+
+// `states` comes from launcherStatesFor(). `mode` only picks the wording: the buttons
+// always offer Play for a store that's installed and Install for one that isn't.
+function showLauncherPicker(game, states, mode = 'launch') {
     const modal = document.getElementById('modal-launcher-pick');
     const list  = document.getElementById('launcher-pick-list');
     list.innerHTML = '';
-    modal.classList.add('active');
-    // Per-launcher install state (Steam appmanifest / GOG-Epic grinder.db) so an
-    // uninstalled store routes to its installer instead of a silent launch failure.
-    let states = [];
-    try { states = await window.api.launcherStates(game.id); } catch (e) {}
-    const byCmd = new Map(states.map(s => [s.cmd, s]));
-    launchers.forEach(l => {
-        const st = byCmd.get(l.cmd);
-        // Unknown (untracked launcher: flatpak/custom/…) is treated as playable.
-        const installed = !st || st.installed !== false || st.store === null;
+    const prompt = document.getElementById('launcher-pick-prompt');
+    if (prompt) {
+        prompt.innerHTML = 'This game is available on multiple stores.<br>' +
+            (mode === 'install' ? 'Which one do you want to install from?' : 'Which one do you want to launch?');
+    }
+    states.forEach(st => {
+        // An untracked launcher (flatpak / custom / emulator) has no install state to read,
+        // so it counts as playable — its command is the only thing we know about it.
+        const installed = st.installed !== false || st.store === null;
         const btn = document.createElement('button');
         btn.className = installed ? 'primary' : 'btn-install-primary';
         btn.style.cssText = 'width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; font-size:13px;';
-        const name = l.label || l.cmd;
-        btn.innerHTML = `<span>${installed ? '▶' : '⤓'} ${escHtml(name)}</span>` +
+        btn.innerHTML = `<span>${installed ? '▶' : '⤓'} ${escHtml(st.label || st.cmd)}</span>` +
                         `<span style="opacity:.65; font-size:11px;">${installed ? '' : 'Install'}</span>`;
         btn.addEventListener('click', () => {
             modal.classList.remove('active');
-            if (installed) _doLaunch(game, l.cmd);
-            else _installLauncher(game, (st && st.store) || null, l.cmd);
+            if (installed) { showNowPlaying(game); _doLaunch(game, st.cmd); }
+            else _installLauncher(game, st.store || null, st.cmd);
         });
         list.appendChild(btn);
     });
+    modal.classList.add('active');
 }
 
 // Route an uninstalled launcher in the picker to the right installer for its store.
@@ -709,7 +708,13 @@ async function openGrinderUninstall(game) {
     }
 }
 
-function handleInstall(game) {
+async function handleInstall(game) {
+    // A row can front several stores at once (Store "Steam, GOG"), and the game may well be
+    // owned on all of them — so ask which store to install from instead of silently taking
+    // whichever branch happens to match first.
+    const states = await launcherStatesFor(game);
+    if (states.length >= 2) { showLauncherPicker(game, states, 'install'); return; }
+
     if (_isGrinderGame(game)) {
         if (/^(gog|epic)_/i.test(game.GrinderGameId || '')) { openGrinderInstall(game); return; }
         window.api.openGrinder(game.Game); return;
@@ -722,18 +727,15 @@ function handleInstall(game) {
 async function verifyAndLaunch(gameId, launchCmd) {
     try {
         const game = allGames.find(g => g.id == gameId);
-        if (game) showNowPlaying(game);
 
-        // Multi-launcher: show picker when ≥2 commands are defined
-        let launchers = [];
-        try { launchers = JSON.parse(game?.LaunchCommands || '[]'); } catch(e) {
-            console.warn('[verifyAndLaunch] malformed LaunchCommands JSON for game', gameId);
-        }
-        if (launchers.length >= 2) {
-            showLauncherPicker(game, launchers);
+        // Multi-store: pick the store before committing to a launch.
+        const states = game ? await launcherStatesFor(game) : [];
+        if (states.length >= 2) {
+            showLauncherPicker(game, states);
             return;
         }
-        const cmd = launchers.length === 1 ? launchers[0].cmd : launchCmd;
+        if (game) showNowPlaying(game);
+        const cmd = states.length === 1 ? states[0].cmd : launchCmd;
         await _doLaunch(game, cmd);
     } catch (e) { console.error('[verifyAndLaunch]', e); }
 }
@@ -1251,7 +1253,9 @@ function _renderUpdateRow(u) {
         btn.onclick = () => {
             document.getElementById('modal-updates')?.classList.remove('active');
             const game = allGames.find(g => g.id == u.id);
-            if (game) handleInstall(game);   // re-running the install reconciles GOG/Epic to latest
+            // Re-running the install reconciles GOG/Epic to latest. The scan already knows
+            // which store has the update, so go straight there — no store picker to answer.
+            if (game) _installLauncher(game, u.store, game.LaunchCommand);
             else showAlert('This game is no longer in your library.');
         };
     }
@@ -3808,7 +3812,7 @@ function renderSplitDetail(game) {
             playBtn.textContent = 'INSTALL';
             playBtn.className = 'btn-install-primary';
             playBtn.style.display = 'inline-flex';
-            playBtn.onclick = () => window.api.openInstallUrl(installCmd);
+            playBtn.onclick = () => handleInstall(game);
         } else if (isManualCategory(game)) {
             playBtn.textContent = 'INSTALL';
             playBtn.className = 'btn-install-primary';
@@ -4115,7 +4119,8 @@ _tbody.addEventListener('click', async (e) => {
             const g = allGames.find(x => x.id == install.dataset.id);
             if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
         } else {
-            window.api.openInstallUrl(install.dataset.url);
+            const g = allGames.find(x => x.id == install.dataset.id);
+            if (g) handleInstall(g); else window.api.openInstallUrl(install.dataset.url);
         }
         return;
     }
@@ -7917,7 +7922,8 @@ _grid.addEventListener('click', (e) => {
             const g = allGames.find(x => x.id == install.dataset.id);
             if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
         } else {
-            window.api.openInstallUrl(install.dataset.url);
+            const g = allGames.find(x => x.id == install.dataset.id);
+            if (g) handleInstall(g); else window.api.openInstallUrl(install.dataset.url);
         }
         return;
     }
@@ -8191,7 +8197,7 @@ function refreshGamepagePlayBtn(game) {
             playBtn.style.display = 'block';
             playBtn.innerText = t('status.install');
             playBtn.className = 'btn-install-primary';
-            playBtn.onclick = () => window.api.openInstallUrl(installCmd);
+            playBtn.onclick = () => handleInstall(game);
         } else if (isManualCategory(game)) {
             playBtn.style.display = 'block';
             playBtn.innerText = t('status.install');
@@ -8577,23 +8583,28 @@ function _renderLauncherList(game) {
     if (launchers.length === 0 && game.LaunchCommand) {
         launchers = [{ label: _guessLabel(game.LaunchCommand), cmd: game.LaunchCommand }];
     }
-    if (_isGrinderGame(game)) {
-        // Strip grinder:// commands — GOG/Epic games launch via GRINDER only
-        launchers = launchers.filter(l => !/grinder:\/\/launch/i.test(l.cmd || ''));
-        if (launchers.length === 0) {
-            list.innerHTML = '<p style="font-size:11px; color:var(--text_dim); margin:4px 0; font-style:italic;">Launched via GRINDER. You can add a custom command below if needed.</p>';
-            return;
-        }
+    if (launchers.length === 0 && _isGrinderGame(game)) {
+        list.innerHTML = '<p style="font-size:11px; color:var(--text_dim); margin:4px 0; font-style:italic;">Launched via GRINDER. You can add a custom command below if needed.</p>';
+        return;
     }
-    launchers.forEach(l => list.appendChild(_makeLauncherRow(l.label || '', l.cmd || '')));
+    // grinder:// rows are shown read-only rather than hidden: hiding them meant Save
+    // rebuilt LaunchCommands from the visible rows alone and threw the GOG/Epic launcher
+    // away, quietly demoting a Steam+GOG game to Steam-only (no store picker, wrong installer).
+    launchers.forEach(l => {
+        const managed = /grinder:\/\/launch/i.test(l.cmd || '');
+        list.appendChild(_makeLauncherRow(l.label || '', l.cmd || '', managed));
+    });
 }
 
-function _makeLauncherRow(label, cmd) {
+function _makeLauncherRow(label, cmd, managed = false) {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex; gap:6px; align-items:center;';
+    const ro = managed ? ' readonly' : '';
+    const dim = managed ? ' opacity:.6; cursor:default;' : '';
+    const tip = managed ? ' title="Managed by GRINDER — install and launch are handled for you."' : '';
     row.innerHTML =
-        `<input type="text" class="lnch-label" placeholder="Label" value="${escHtml(label)}" style="width:140px; font-size:11px; padding:6px 8px; flex-shrink:0; background:var(--bg_input,rgba(255,255,255,0.07)); border:1px solid var(--border_solid); border-radius:4px; color:var(--text_main);">` +
-        `<input type="text" class="lnch-cmd" placeholder="Command or URL" value="${escHtml(cmd)}" style="flex:1; font-size:11px; padding:6px 8px; background:var(--bg_input,rgba(255,255,255,0.07)); border:1px solid var(--border_solid); border-radius:4px; color:var(--text_main);">` +
+        `<input type="text" class="lnch-label" placeholder="Label" value="${escHtml(label)}"${ro}${tip} style="width:140px; font-size:11px; padding:6px 8px; flex-shrink:0; background:var(--bg_input,rgba(255,255,255,0.07)); border:1px solid var(--border_solid); border-radius:4px; color:var(--text_main);${dim}">` +
+        `<input type="text" class="lnch-cmd" placeholder="Command or URL" value="${escHtml(cmd)}"${ro}${tip} style="flex:1; font-size:11px; padding:6px 8px; background:var(--bg_input,rgba(255,255,255,0.07)); border:1px solid var(--border_solid); border-radius:4px; color:var(--text_main);${dim}">` +
         `<button class="lnch-remove" title="Remove" style="flex-shrink:0; padding:4px 9px; font-size:12px; background:transparent; border:1px solid var(--text_dim); color:var(--text_dim); border-radius:4px; cursor:pointer; line-height:1;">✕</button>`;
     row.querySelector('.lnch-remove').addEventListener('click', () => row.remove());
     return row;
