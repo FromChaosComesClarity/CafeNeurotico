@@ -24,7 +24,7 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
 
 // ── Injected context (set by init) ────────────────────────────────────────────
@@ -903,10 +903,10 @@ async function launchGame(gameId, opts = {}) {
     if (dosboxMode !== 'bundled' && isGogDosGame(game, resolvedExe)) {
         const nativeDosbox = findNativeDosbox();
         if (nativeDosbox) {
-            spawnGame(nativeDosbox, nativeDosboxArgs(allArgs), {
+            spawnGame(nativeDosbox.cmd, [...nativeDosbox.args, ...nativeDosboxArgs(allArgs)], {
                 cwd: launchCwd, env: baseEnv(), detached: true, stdio: 'ignore',
             });
-            return { ok: true, method: `dosbox-native (${path.basename(nativeDosbox)})` };
+            return { ok: true, method: `dosbox-native (${nativeDosbox.label})` };
         }
         if (dosboxMode === 'native') {
             throw new Error(
@@ -1274,15 +1274,49 @@ function engineSetting(key, fallback = null) {
     catch { return fallback; }
 }
 
+// Flatpak is the one way to get DOSBox that works on every distribution, so it is worth
+// finding too — otherwise someone who installed it that way is told they have none.
+const DOSBOX_FLATPAKS = ['io.github.dosbox-staging', 'com.dosbox_x.DOSBox-X'];
+
+// { cmd, args, label } or null. args is non-empty only for the flatpak form.
 let _dosboxCache;
 function findNativeDosbox() {
     if (_dosboxCache !== undefined) return _dosboxCache;
     _dosboxCache = null;
     for (const b of DOSBOX_BINARIES) {
         const p = which(b);
-        if (p) { _dosboxCache = p; break; }
+        if (p) { _dosboxCache = { cmd: p, args: [], label: path.basename(p) }; return _dosboxCache; }
+    }
+    const flatpak = which('flatpak');
+    if (flatpak) {
+        for (const id of DOSBOX_FLATPAKS) {
+            try {
+                const r = spawnSync(flatpak, ['info', id], { encoding: 'utf8', timeout: 4000 });
+                if (r.status === 0) { _dosboxCache = { cmd: flatpak, args: ['run', id], label: id }; return _dosboxCache; }
+            } catch {}
+        }
     }
     return _dosboxCache;
+}
+
+// How to get one, in the words of the user's own distribution. Flatpak is always offered
+// alongside, because it is the single instruction that works everywhere.
+function dosboxInstallHint() {
+    let id = '', like = '';
+    try {
+        const osr = fs.readFileSync('/etc/os-release', 'utf8');
+        id   = (osr.match(/^ID=(.*)$/m)      || [, ''])[1].replace(/"/g, '').trim().toLowerCase();
+        like = (osr.match(/^ID_LIKE=(.*)$/m) || [, ''])[1].replace(/"/g, '').trim().toLowerCase();
+    } catch {}
+    const is = (...names) => names.some(n => id === n || like.split(/\s+/).includes(n));
+    const native =
+        is('fedora', 'rhel', 'centos')  ? 'sudo dnf install dosbox-staging'
+      : is('debian', 'ubuntu')          ? 'sudo apt install dosbox-staging'
+      : is('arch')                      ? 'sudo pacman -S dosbox-staging'
+      : is('opensuse', 'suse')          ? 'sudo zypper install dosbox-staging'
+      : is('alpine')                    ? 'sudo apk add dosbox-staging'
+      : '';
+    return { native, flatpak: 'flatpak install flathub io.github.dosbox-staging' };
 }
 
 // A GOG DOS game is one whose launch target is the bundled DOSBox.
@@ -1915,6 +1949,6 @@ module.exports = {
     getDiskSpace, gogInstallInfo, epicInstallInfo, epicListUpdates, syncOwnedLibrary, cancelActiveInstall,
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
-    findNativeDosbox, isGogDosGame, applyGogSupportFiles, engineSetting,
+    findNativeDosbox, dosboxInstallHint, isGogDosGame, applyGogSupportFiles, engineSetting,
     gogListManuals, gogDownloadManual,
 };

@@ -1902,10 +1902,12 @@ function cnUpdateRow(g, current, latest, store) {
 // the game keeps every tweak GOG made for it and only the emulator changes. Stored in
 // GRINDER's settings because the engine is what acts on it.
 ipcMain.handle('dosbox-status', () => {
-    if (!ensureGrinderEngine()) return { mode: 'auto', native: null };
+    if (!ensureGrinderEngine()) return { mode: 'auto', native: null, hint: {} };
+    const native = grinderEngine.findNativeDosbox();
     return {
         mode: String(grinderEngine.engineSetting('dosbox_mode', 'auto') || 'auto'),
-        native: grinderEngine.findNativeDosbox(),
+        native: native ? { label: native.label, flatpak: native.args.length > 0 } : null,
+        hint: grinderEngine.dosboxInstallHint(),
     };
 });
 ipcMain.handle('set-dosbox-mode', (_, mode) => {

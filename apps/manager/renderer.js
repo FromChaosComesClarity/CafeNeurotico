@@ -1187,15 +1187,25 @@ async function _refreshDosboxCard() {
     document.querySelectorAll('.dosbox-mode-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.val === st.mode));
 
-    const name = st.native ? st.native.split('/').pop() : '';
+    // The whole point of this line: "Native" means nothing unless a native DOSBox is
+    // actually installed, so say plainly which one is in use — and if none is, give the
+    // command for *this* distribution rather than a guess.
+    const cmds = [st.hint?.native, st.hint?.flatpak].filter(Boolean)
+        .map(c => `<code style="user-select:text;">${escHtml(c)}</code>`).join(' &nbsp;or&nbsp; ');
+    const name = st.native?.label || '';
     if (st.native) {
+        const sandboxNote = st.native.flatpak
+            ? ' <span style="color:var(--text_dim);">(Flatpak — if a game fails to start, its folder may be outside the sandbox.)</span>'
+            : '';
         el.innerHTML = st.mode === 'bundled'
             ? `<span style="color:var(--text_dim);">Using GOG's DOSBox. <b>${escHtml(name)}</b> is installed if you want it.</span>`
-            : `<span style="color:#66bb6a;">Using <b>${escHtml(name)}</b>.</span>`;
+            : `<span style="color:#66bb6a;">Using <b>${escHtml(name)}</b>.</span>${sandboxNote}`;
     } else {
         el.innerHTML = st.mode === 'native'
-            ? `<span style="color:#ef5350;">No native DOSBox installed — games will not start. Install one, or choose Automatic.</span>`
-            : `<span style="color:var(--text_dim);">No native DOSBox found, using GOG's. Install one with <code>sudo dnf install dosbox-staging</code>.</span>`;
+            ? `<span style="color:#ef5350;">No native DOSBox installed, so DOS games will not start.</span><br>` +
+              `<span style="color:var(--text_dim);">Install one with ${cmds}, or switch back to Automatic.</span>`
+            : `<span style="color:var(--text_dim);">No native DOSBox found — using GOG's, which works. ` +
+              `For the better one: ${cmds}</span>`;
     }
 }
 document.querySelectorAll('.dosbox-mode-btn').forEach(btn =>
