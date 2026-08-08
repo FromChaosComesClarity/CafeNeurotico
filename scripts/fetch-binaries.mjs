@@ -27,8 +27,14 @@ const REQUIRED = ['ffmpeg', 'ffprobe', 'yt-dlp', 'gogdl', 'legendary', 'comet'];
 
 // Pinned release asset + its SHA256. Bump the tag and hash together when the
 // binary set changes.
-const URL    = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v1/cafeneurotico-binaries-v1.tar.gz';
-const SHA256 = '15b7eb24f906339bd002e864b35426b7a6bfe966cc8226456553f517f3df39b2';
+//
+// gogdl here is OUR BUILD, from the fork — it carries fixes that are not in upstream
+// 1.2.1 (CDN failover on a corrupt chunk, bounded secure-link retries, non-blocking
+// telemetry, API timeouts). These binaries are gitignored, so this tarball is the only
+// place they live: point this at the upstream build and a clean checkout would quietly
+// lose all of it. Rebuild from the fork and publish a new binaries-vN before bumping.
+const URL    = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v2/cafeneurotico-binaries-v2.tar.gz';
+const SHA256 = '876eecaeda3228ee24288c1fae0b87b8f2ed9b1775b1ce48c2d5ad47cc93b3bf';
 
 function allPresent() {
     return REQUIRED.every(name => existsSync(join(BIN_DIR, name)));
