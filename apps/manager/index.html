@@ -6828,6 +6828,16 @@ LOADING...READY.</div>
               <span id="dlm-pct" style="font-size:28px; font-weight:900; color:var(--accent); letter-spacing:-1px; line-height:1;">0%</span>
               <span id="dlm-msg" style="font-size:12px; color:var(--text_dim); letter-spacing:0.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
             </div>
+            <!-- Shown only when the percentage has genuinely stopped moving. A download can
+                 hold its transfer rate up while making no progress, and a frozen number on
+                 its own looks exactly like a slow one. -->
+            <div id="dlm-stall-warning" style="display:none; align-items:flex-start; gap:10px; margin-top:14px; padding:11px 13px; border:1px solid #ef5350; border-radius:8px; background:rgba(239,83,80,0.08);">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef5350" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px;"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div style="min-width:0;">
+                <div style="font-size:11px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:#ef5350; margin-bottom:3px;">Download has stopped moving</div>
+                <div id="dlm-stall-text" style="font-size:11px; color:var(--text_sec); line-height:1.55;"></div>
+              </div>
+            </div>
           </div>
         </div>
 

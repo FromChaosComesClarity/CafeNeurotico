@@ -336,6 +336,10 @@ window.api.onGrinderInstallProgress(d => {
         if (typeof d.percent === 'number') _dlActive.pct = d.percent;
         if (d.message) _dlActive.message = d.message;
         _dlActive.step = step;
+        // A download can hold its transfer rate up while making no progress at all; the
+        // engine watches the percentage and tells us when it has stopped moving.
+        _dlActive.stalled = !!d.stalled;
+        _dlActive.stalledMinutes = d.stalledMinutes || 0;
     }
 
     if (_dlmOpen) {
@@ -462,6 +466,19 @@ function renderDownloadManager() {
         $('dlm-bar').style.width = (_dlActive.pct || 0) + '%';
         $('dlm-pct').textContent = (_dlActive.pct || 0).toFixed(1) + '%';
         $('dlm-msg').textContent = _dlActive.message || '';
+        // Stalled: colour the bar and the figure so a frozen percentage cannot be mistaken
+        // for a working one, and put the explanation where the eye already is.
+        const stalled = !!_dlActive.stalled;
+        $('dlm-bar').style.background = stalled ? '#ef5350' : '';
+        $('dlm-pct').style.color = stalled ? '#ef5350' : '';
+        const warn = $('dlm-stall-warning');
+        if (warn) {
+            warn.style.display = stalled ? 'flex' : 'none';
+            const mins = _dlActive.stalledMinutes || 0;
+            $('dlm-stall-text').textContent =
+                `No progress for ${mins} minute${mins === 1 ? '' : 's'}. This usually means GOG is serving a bad copy of one file — ` +
+                `cancel and start the download again, which normally picks a different server and continues from where it stopped.`;
+        }
     }
     // Queue
     $('dlm-queue-section').style.display = _dlQueue.length ? 'flex' : 'none';

@@ -499,8 +499,28 @@ async function headlessInstall(store, appId, platform, installDir, opts = {}) {
         await getGogToken().catch(() => {});
         const authPath = writeGogAuthConfig();
 
+        // ── Stall watchdog ───────────────────────────────────────────────────
+        // A download can keep its process alive, its sockets open and its transfer rate up
+        // while making no actual progress — a corrupt chunk on one of GOG's CDNs did exactly
+        // that, and the only symptom was a percentage that never changed. Nothing in the app
+        // noticed for over an hour; the user did.
+        //
+        // So watch the number itself. If the reported percentage has not moved in
+        // STALL_WARN_MS, say so plainly and keep saying it, rather than presenting a frozen
+        // figure as though it were fine. This is deliberately a reporter, not a healer: it
+        // cannot know whether a stall is fatal, and killing someone's 9 GB download on a
+        // guess would be worse than telling them the truth and letting them decide.
+        const STALL_WARN_MS = 4 * 60 * 1000;
+        const STALL_TICK_MS = 30 * 1000;
+
         const runGogdlDownload = async (plat) => {
             let lastLines = [];
+            let lastPercent = -1;
+            let lastMovedAt = Date.now();
+            let stallTimer = null;
+            const noteProgress = pct => {
+                if (pct !== lastPercent) { lastPercent = pct; lastMovedAt = Date.now(); }
+            };
             const ok = await new Promise(resolve => {
                 const proc = spawn(gogdl, [
                     '--auth-config-path', authPath, 'download', appId,
@@ -517,11 +537,29 @@ async function headlessInstall(store, appId, platform, installDir, opts = {}) {
                         if (trimmed) { lastLines.push(trimmed); if (lastLines.length > 5) lastLines.shift(); }
                         const pct = line.match(/(\d+(?:\.\d+)?)\s*%/)?.[1];
                         const sz  = line.match(/([\d.]+\s*(?:GiB|MiB|GB|MB))\s*\/\s*([\d.]+\s*(?:GiB|MiB|GB|MB))/i);
-                        if (pct || sz) writeProgress({ ...base, step: 'downloading', percent: pct ? parseFloat(pct) : 0, message: `[${plat}] ${sz ? `${sz[1]} / ${sz[2]}` : `${pct || 0}%`}` });
+                        if (pct || sz) {
+                            const pctNum = pct ? parseFloat(pct) : 0;
+                            noteProgress(pctNum);
+                            writeProgress({ ...base, step: 'downloading', percent: pctNum, message: `[${plat}] ${sz ? `${sz[1]} / ${sz[2]}` : `${pct || 0}%`}` });
+                        }
                     }
                 };
                 proc.stdout.on('data', onData); proc.stderr.on('data', onData);
-                const done = ok => { if (_activeInstallProc === proc) _activeInstallProc = null; if (_activeKillTimer) { clearTimeout(_activeKillTimer); _activeKillTimer = null; } resolve(ok); };
+
+                // Re-sent on every tick while the stall lasts, so the message survives the
+                // next ordinary progress line and the UI keeps showing it.
+                stallTimer = setInterval(() => {
+                    const stalledFor = Date.now() - lastMovedAt;
+                    if (stalledFor < STALL_WARN_MS) return;
+                    const mins = Math.floor(stalledFor / 60000);
+                    writeProgress({
+                        ...base, step: 'downloading', percent: lastPercent >= 0 ? lastPercent : 0,
+                        stalled: true, stalledMinutes: mins,
+                        message: `[${plat}] Stuck at ${lastPercent >= 0 ? lastPercent.toFixed(2) : '0'}% for ${mins} min — GOG may be serving a bad file. Cancelling and starting again usually clears it.`,
+                    });
+                }, STALL_TICK_MS);
+
+                const done = ok => { if (stallTimer) { clearInterval(stallTimer); stallTimer = null; } if (_activeInstallProc === proc) _activeInstallProc = null; if (_activeKillTimer) { clearTimeout(_activeKillTimer); _activeKillTimer = null; } resolve(ok); };
                 proc.on('close', code => done(code === 0));
                 proc.on('error', () => done(false));
             });

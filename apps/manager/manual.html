@@ -386,6 +386,11 @@
             <h3>Manage Storage</h3>
             <p>Control Panel &rarr; Library &rarr; <strong>Manage Storage</strong> answers &ldquo;what is eating my disk?&rdquo;. The <strong>GOG &amp; Epic</strong> button opens GRINDER showing only installed games, sorted biggest-first, so the space hogs are at the top and one click uninstalls them. The <strong>Steam</strong> button hands you over to Steam&rsquo;s own storage manager.</p>
 
+            <h3>When a Download Stops Moving</h3>
+            <p>A download can keep its connection open and its speed up while making no actual progress &mdash; usually because one of GOG&rsquo;s content servers is handing out a damaged copy of a single file. On the surface that looks identical to a slow download, which is why it can go unnoticed for a long time.</p>
+            <p>Cafe Neurotico watches the percentage itself. If it hasn&rsquo;t moved for a few minutes, the Download Manager <strong>says so</strong>: the bar turns red and a note explains what is happening. It never cancels anything on your behalf &mdash; it cannot know whether a pause is fatal, and throwing away a part-finished download on a guess would be worse than telling you and letting you decide.</p>
+            <p>If you see it: <strong>cancel and start the download again</strong>. Nothing is lost &mdash; downloads resume from where they stopped &mdash; and the retry normally reaches a different server and carries on. Cafe Neurotico also switches servers automatically when a file arrives damaged, so this should be rare.</p>
+
             <h3>DOS Games &mdash; which DOSBox runs them</h3>
             <p>GOG&rsquo;s DOS games come with a Windows build of DOSBox from 2010, which on Linux has to run through Proton &mdash; an emulator inside a translation layer. It works, and it is what Cafe Neurotico uses out of the box: <strong>you need install nothing</strong>.</p>
             <p>A <strong>native DOSBox</strong> is better: faster, sound and fullscreen without Proton in the way, and still maintained. Cafe Neurotico can use one, and crucially it reads <em>the very same configuration file GOG wrote for that game</em> &mdash; every tweak GOG made (CPU cycles, machine type, sound cards, the startup commands) is kept exactly. Only the emulator changes; nothing on disk is rewritten.</p>
