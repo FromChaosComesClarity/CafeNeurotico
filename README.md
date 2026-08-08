@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.5.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.5.1-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
