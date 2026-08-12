@@ -699,6 +699,21 @@ function prefixPathForGame(game, opts = {}) {
     return path.join(prefixesDir, safeName);
 }
 
+// The bundled opengl32.dll a pre-2000 game would load on Windows, or ''. Looked for beside
+// the executable first, because that is the directory Windows searches, then at the install
+// root for the layouts that keep the exe in a subfolder. Scanned case-insensitively: these
+// releases are as likely to ship OPENGL32.DLL as opengl32.dll.
+function findShippedOpengl32(resolvedExe, installPath) {
+    const dirs = [resolvedExe && path.dirname(resolvedExe), installPath].filter(Boolean);
+    for (const dir of [...new Set(dirs)]) {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+        const hit = entries.find(e => e.isFile() && e.name.toLowerCase() === 'opengl32.dll');
+        if (hit) return path.join(dir, hit.name);
+    }
+    return '';
+}
+
 // ── GOG play tasks ───────────────────────────────────────────────────────────
 // A GOG release often ships more than one way to start. Quake: The Offering has three —
 // GLQuake (the primary, and the one with no music, being redbook-CD-only), WinQuake, and
@@ -870,6 +885,22 @@ async function launchGame(gameId, opts = {}) {
     }
     if (game.use_battleye) { const p = findRuntime('battleye_runtime'); if (p) compatEnv.PROTON_BATTLEYE_RUNTIME = p; }
     if (game.use_eac)      { const p = findRuntime('eac_runtime');       if (p) compatEnv.PROTON_EAC_RUNTIME      = p; }
+
+    // A game that ships its own opengl32.dll beside the executable gets that file on Windows,
+    // where the application directory is searched first. Wine reverses this for DLLs it
+    // implements itself, so the bundled one is shadowed by a modern OpenGL — and the games
+    // that bundle one are 3dfx MiniGL wrappers from the nineties that cannot survive talking
+    // to a modern driver. GOG's Quake ships 3dfx's "Voodoo Quake Driver" as opengl32.dll and
+    // nGlide as glide2x/glide3x; GLQuake against Wine's builtin dies on a stack overflow
+    // before a window ever appears, which reads to the player as "the game closed
+    // immediately". Restoring Windows' own resolution order is the whole fix, and it hands
+    // the game the driver stack GOG shipped it with (MiniGL → nGlide → D3D → DXVK).
+    const shippedOpengl = usingProton && findShippedOpengl32(resolvedExe, installPath);
+    if (shippedOpengl && !/\bopengl32\b/i.test(customEnv.WINEDLLOVERRIDES || '')) {
+        const existing = (customEnv.WINEDLLOVERRIDES || '').trim().replace(/;$/, '');
+        compatEnv.WINEDLLOVERRIDES = existing ? `${existing};opengl32=n` : 'opengl32=n';
+        console.log(`[launch] ${path.basename(shippedOpengl)} ships with this game — using it instead of Wine's builtin`);
+    }
 
     // Base env: system → custom user vars → compat flags → GRINDER's required vars (highest priority)
     const baseEnv = (extra = {}) => ({ ...process.env, ...customEnv, ...compatEnv, ...extra });
