@@ -162,13 +162,18 @@ function renderCustomList(recipes) {
         const actions = row.querySelector('.ci-actions');
         const btn = document.createElement('button');
         btn.className = 'primary';
-        btn.textContent = r.installed ? 'REINSTALL' : 'INSTALL FROM FILE';
+        // A shape-based entry is never "reinstalled" — every OpenBOR archive is a different
+        // game arriving through the same recipe, so it always reads as adding one.
+        btn.textContent = r.dynamic ? 'ADD FROM FILE' : (r.installed ? 'REINSTALL' : 'INSTALL FROM FILE');
         btn.onclick = () => runCustomInstall(r, btn);
         actions.appendChild(btn);
-        if (r.installed) {
+        const tagText = r.dynamic
+            ? (r.installedCount ? `${r.installedCount} INSTALLED` : '')
+            : (r.installed ? 'INSTALLED' : '');
+        if (tagText) {
             const tag = document.createElement('span');
             tag.className = 'ci-installed';
-            tag.textContent = 'INSTALLED';
+            tag.textContent = tagText;
             actions.appendChild(tag);
         }
 

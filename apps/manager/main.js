@@ -870,8 +870,16 @@ const _grinderRowsForData = () => {
 ipcMain.handle('custom-recipe-list', () => {
     const rows = _grinderRowsForData();
     return customInstallers.listRecipes().map(r => {
-        const out = { ...r, installed: false, data: r.data ? { ...r.data } : null };
-        try { out.installed = !!_grinderEngineDb?.prepare('SELECT 1 FROM games WHERE id=?').get(`cn_${r.id}`); } catch {}
+        const out = { ...r, installed: false, installedCount: 0, data: r.data ? { ...r.data } : null };
+        try {
+            if (r.dynamic) {
+                // One recipe, many installs (every OpenBOR game shares it) — so report a
+                // count rather than a yes/no, and never offer to "reinstall" a shape.
+                out.installedCount = _grinderEngineDb?.prepare("SELECT COUNT(*) n FROM games WHERE id LIKE ?").get(`cn_${r.id}_%`)?.n || 0;
+            } else {
+                out.installed = !!_grinderEngineDb?.prepare('SELECT 1 FROM games WHERE id=?').get(`cn_${r.id}`);
+            }
+        } catch {}
         if (r.data) {
             const d = customInstallers.resolveGameData(r.data.id, rows);
             out.data.ready = d.ok;
@@ -911,7 +919,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, overwrite } 
     // Registered in grinder.db so the shared engine owns the launch — that is what buys
     // Proton, the prefix, and every fix that lives in launchGame, for free. games.db then
     // only needs to point at it, exactly like a GOG title does.
-    const gid = `cn_${r.recipeId}`;
+    const gid = `cn_${r.key || r.recipeId}`;
     try {
         _grinderEngineDb.prepare(`INSERT INTO games (id,title,store,installed,install_path,executable,platform)
                                   VALUES (?,?,?,1,?,?,?)
@@ -925,8 +933,13 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, overwrite } 
     try {
         const existing = db.prepare('SELECT id FROM games WHERE GrinderGameId=?').get(gid);
         if (existing) db.prepare('UPDATE games SET Installed=1, LaunchCommand=? WHERE id=?').run(cmd, existing.id);
+        // OpenBOR is its own category rather than a member of Others — one engine with one
+        // rigid layout, the same argument that earned PICO-8 its own place in the library.
+        // 'Others' is appended so the existing store filters, which are literal substring
+        // matches, still find it until the dedicated category lands in the gallery.
         else db.prepare(`INSERT INTO games (Game, Store, LaunchCommand, GrinderGameId, Installed, FAV, WANT_TO_PLAY)
-                         VALUES (?,?,?,?,1,'NO','NO')`).run(r.title, 'Others', cmd, gid);
+                         VALUES (?,?,?,?,1,'NO','NO')`)
+                .run(r.title, r.category ? `${r.category}, Others` : 'Others', cmd, gid);
     } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
 
     invalidateGrinderInstalledCache();

@@ -74,6 +74,78 @@ const RECIPES = [
         entry: { exe: /^(vkquake|quake[-_]?rt)\.exe$/i, platform: 'windows' },
         data: 'quake',
     },
+    {
+        id: 'gzdoom',
+        title: 'GZDoom',
+        kind: 'Source port',
+        game: 'Doom',
+        blurb: 'The Doom engine everything else is built on — mouselook, high resolutions, and the engine nearly every Doom mod expects.',
+        source: {
+            name: 'GitHub — ZDoom/gzdoom',
+            url: 'https://github.com/ZDoom/gzdoom/releases/latest',
+            hint: 'On the Releases page, download the Windows zip — it is named like gzdoom-4-14-1-windows.zip.',
+        },
+        archive: /^gzdoom.*\.(zip|7z)$/i,
+        dirName: 'GZDoom',
+        entry: { exe: /^gzdoom\.exe$/i, platform: 'windows' },
+        data: 'doom',
+    },
+    {
+        id: 'minidoom2',
+        title: 'Mini Doom 2',
+        kind: 'Fan game',
+        game: '',
+        blurb: 'A standalone Doom-flavoured action platformer. Complete in itself — no Doom data needed.',
+        source: {
+            name: 'ModDB — Mini Doom 2',
+            url: 'https://www.moddb.com/games/minidoom-2',
+            hint: 'Download the Windows build; the file is named like miniDoom2 v3-1.zip.',
+        },
+        archive: /^minidoom\s*2.*\.(zip|7z|rar)$/i,
+        dirName: 'Mini Doom 2',
+        entry: { exe: /^minidoom2.*\.exe$/i, platform: 'windows' },
+        data: null,
+    },
+    {
+        id: 'minidoom1',
+        title: 'Mini Doom',
+        kind: 'Fan game',
+        game: '',
+        blurb: 'The original standalone Mini Doom. Complete in itself — no Doom data needed.',
+        source: {
+            name: 'ModDB — MiniDoom',
+            url: 'https://www.moddb.com/games/minidoom',
+            hint: 'Download the Windows build; the file is named like MiniDoom_v1_3.zip.',
+        },
+        archive: /^minidoom[_\s]*v?\d.*\.(zip|7z|rar)$/i,
+        dirName: 'Mini Doom',
+        entry: { exe: /^mini\s*doom.*\.exe$/i, platform: 'windows' },
+        data: null,
+    },
+    // Not a title but a shape. Every OpenBOR game is the same engine renamed, sitting
+    // beside Paks/<game>.pak — so one recipe covers all of them, and the archive is
+    // identified by what is inside rather than by whatever the download was called.
+    // This is the same argument that made native DOSBox worth supporting: one engine,
+    // one rigid layout, nothing to curate per game.
+    {
+        id: 'openbor',
+        title: 'OpenBOR game',
+        kind: 'OpenBOR',
+        game: '',
+        dynamic: true,
+        blurb: 'Any OpenBOR game — Streets of Rage X, Streets of Vendetta and the rest. Drop in the archive you downloaded and the name is taken from the game itself.',
+        source: {
+            name: 'ChronoCrash — the OpenBOR community',
+            url: 'https://www.chronocrash.com/forum/resources/',
+            hint: 'Download the Windows build of any OpenBOR game — a zip or rar containing the game exe and a Paks folder.',
+        },
+        archive: /\.(zip|7z|rar)$/i,
+        contains: { pak: /(^|\/)Paks\/[^/]+\.pak$/i },
+        dirName: 'OpenBOR',
+        entry: { exe: /\.exe$/i, platform: 'windows' },
+        data: null,
+        category: 'OpenBOR',
+    },
 ];
 
 // ── Game data the ports need ─────────────────────────────────────────────────
@@ -97,6 +169,38 @@ const DATA_SPECS = {
         titles: [/^quake(:? the offering)?$/i, /^quake the offering/i],
         exclude: [/enhanced/i, /\bii\b|^quake ?2/i],
         owned: 'You own Quake but it is not installed. Install it first and this will find it automatically.',
+
+        // The soundtrack, from a *different* product. The 1996 release keeps its music on
+        // the CD, which is why GLQuake is silent and why every port ships a note about
+        // needing external tracks. The 2021 re-release ships the same music as ogg — so a
+        // player who owns both (very common: GOG bundles them) already has, legitimately
+        // on disk, exactly the files these engines want.
+        //
+        // Not a nicety: vkQuake-RT refuses to start cleanly without id1/music/track02..11
+        // and offers to go copy them out of a Steam install. Providing them up front is
+        // the difference between a clean launch and a dialog the user has to interpret.
+        extras: [{
+            id: 'quake-music',
+            label: 'Quake soundtrack (from the re-release)',
+            titles: [/quake.*enhanced|enhanced.*quake|quake.*re-?release/i],
+            // Both the GOG re-release layout (id1/music) and Steam's (rerelease/id1/music).
+            roots: ['', 'rerelease'],
+            subdir: 'music',
+            match: /^track\d+\.ogg$/i,
+        }],
+    },
+
+    // Named by file rather than by folder: every storefront nests the IWAD somewhere
+    // different (GOG's classic releases put it at the root, the 2024 re-release hides it
+    // under rerelease/), and they move it between releases. Searching for the file itself
+    // is what lets one spec survive all of those layouts.
+    doom: {
+        label: 'Doom or Doom II',
+        files: [{ find: /^(doom|doom2|doomu|tnt|plutonia)\.wad$/i, into: '' }],
+        requireAny: true,
+        titles: [/^(the ultimate )?doom$/i, /^doom \+ doom ii/i, /^doom ii/i, /^final doom$/i, /^doom (i|ii) enhanced$/i, /^doom$/i],
+        exclude: [/doom 3|doom 64|eternal|dark ages|\(2016\)|resurrection|phobos|akalabeth/i],
+        owned: 'You own Doom but it is not installed. Install it first and this will find the IWAD automatically.',
     },
 };
 
@@ -150,8 +254,64 @@ function flattenSingleRoot(dir) {
     try { fs.rmdirSync(inner); } catch {}
 }
 
+// List an archive without unpacking it, so a download can be identified by what is inside
+// rather than by what someone named the file. OpenBOR needs this: every one of its games is
+// a differently-named archive around an identical layout.
+function inspectArchive(archivePath) {
+    const bsdtar = which('bsdtar');
+    if (bsdtar) {
+        const r = spawnSync(bsdtar, ['-tf', archivePath], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        if (r.status === 0) return r.stdout.split('\n').filter(Boolean);
+    }
+    const unzip = which('unzip');
+    if (unzip && path.extname(archivePath).toLowerCase() === '.zip') {
+        const r = spawnSync(unzip, ['-Z1', archivePath], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        if (r.status === 0) return r.stdout.split('\n').filter(Boolean);
+    }
+    return [];
+}
+
+// Depth-limited recursive search for data files. Used by the specs that name a file
+// (DOOM.WAD) rather than a folder, because storefronts nest those differently and often
+// move them between releases — searching is what makes one spec survive all the layouts.
+function findFiles(root, pattern, maxDepth = 4) {
+    const out = [];
+    const walk = (dir, depth) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+            const p = path.join(dir, e.name);
+            if (e.isFile() && pattern.test(e.name)) out.push(p);
+            else if (e.isDirectory() && depth < maxDepth) walk(p, depth + 1);
+        }
+    };
+    walk(root, 0);
+    return out;
+}
+
 // Depth-limited hunt for the entry point. Shallow on purpose — an .exe buried four levels
 // down is a redistributable or a tool, not the game.
+// The executable that lives beside a marker directory. OpenBOR's engine is renamed to the
+// game, so position is the only thing that identifies it.
+function findEntryBesideDir(root, dirPattern, exePattern, maxDepth = 3) {
+    const walk = (dir, depth) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return ''; }
+        if (entries.some(e => e.isDirectory() && dirPattern.test(e.name))) {
+            const exe = entries.find(e => e.isFile() && exePattern.test(e.name));
+            if (exe) return path.join(dir, exe.name);
+        }
+        if (depth >= maxDepth) return '';
+        for (const e of entries) {
+            if (!e.isDirectory()) continue;
+            const hit = walk(path.join(dir, e.name), depth + 1);
+            if (hit) return hit;
+        }
+        return '';
+    };
+    return walk(root, 0);
+}
+
 function findEntry(root, pattern, maxDepth = 3) {
     const walk = (dir, depth) => {
         let entries = [];
@@ -175,7 +335,7 @@ function findEntry(root, pattern, maxDepth = 3) {
 function listRecipes() {
     return RECIPES.map(r => ({
         id: r.id, title: r.title, kind: r.kind, game: r.game, blurb: r.blurb,
-        source: r.source, dirName: r.dirName,
+        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic,
         data: r.data ? { id: r.data, label: DATA_SPECS[r.data]?.label || r.data } : null,
     }));
 }
@@ -184,9 +344,12 @@ function getRecipe(id) { return RECIPES.find(r => r.id === id) || null; }
 
 // Which recipe does this download belong to? Returned as a list because a user could
 // plausibly have a file that two recipes would both accept.
+// Shape-based recipes are excluded: their archive pattern is deliberately "any archive",
+// so including them here would have every download claimed by OpenBOR. Those are matched
+// by content at install time instead.
 function detectRecipe(fileName) {
     const base = path.basename(String(fileName || ''));
-    return RECIPES.filter(r => r.archive.test(base)).map(r => r.id);
+    return RECIPES.filter(r => !r.contains && r.archive.test(base)).map(r => r.id);
 }
 
 // Find the user's own copy of the data a recipe needs.
@@ -205,14 +368,21 @@ function resolveGameData(dataId, rows) {
         return spec.titles.some(rx => rx.test(t));
     });
 
-    const required = spec.dirs.filter(d => d.required);
+    const required = (spec.dirs || []).filter(d => d.required);
     for (const g of named.filter(g => g.installed && g.install_path)) {
         const root = g.install_path;
-        const ok = required.every(d => {
-            const dir = resolveCaseInsensitive(root, d.name);
-            return dir && dirHasProbe(dir, d.probe);
-        });
-        if (ok) return { ok: true, path: root, title: g.title };
+        // Folder-shaped spec: every required folder must exist and hold its proving file.
+        const dirsOk = required.length
+            ? required.every(d => {
+                const dir = resolveCaseInsensitive(root, d.name);
+                return dir && dirHasProbe(dir, d.probe);
+            })
+            : true;
+        // File-shaped spec: at least one of the named files must turn up somewhere inside.
+        const filesOk = spec.files
+            ? spec.files.some(f => findFiles(root, f.find).length > 0)
+            : true;
+        if (dirsOk && filesOk) return { ok: true, path: root, title: g.title };
     }
 
     const owned = named.map(g => g.title);
@@ -220,16 +390,62 @@ function resolveGameData(dataId, rows) {
     return { ok: false, message: `No copy of ${spec.label} found in your library.` };
 }
 
+// A second product in the library that can contribute optional files — the re-release's
+// ogg soundtrack being the case this exists for. Returns null when nothing suitable is
+// installed, which is never an error: the port still works, it is just quieter.
+function resolveExtra(extra, rows) {
+    for (const g of (rows || [])) {
+        if (!g.installed || !g.install_path) continue;
+        if (!extra.titles.some(rx => rx.test(String(g.title || '')))) continue;
+        for (const rel of extra.roots) {
+            const base = rel ? resolveCaseInsensitive(g.install_path, rel) : g.install_path;
+            if (!base) continue;
+            // Confirm by looking for the files themselves under a known dir, not by trusting
+            // the layout: the two storefronts nest this differently.
+            const id1 = resolveCaseInsensitive(base, 'id1');
+            const music = id1 && resolveCaseInsensitive(id1, extra.subdir);
+            if (music && dirHasProbe(music, extra.match)) return { path: base, title: g.title };
+        }
+    }
+    return null;
+}
+
 // Link the data into the port's own folder rather than pointing the engine at the original
 // install. Symlinking the pak files (not the folders) means the port writes its configs and
 // saves into its own id1/ while the multi-gigabyte data stays in one place — and the game
 // CN installed for you is never written into by something else.
-function linkGameData(dataId, sourceRoot, targetRoot) {
+function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
     const spec = DATA_SPECS[dataId];
     if (!spec) return { ok: false, error: `Unknown data requirement "${dataId}".` };
 
+    const link = (from, to) => {
+        try { fs.unlinkSync(to); } catch {}
+        fs.symlinkSync(from, to);
+    };
+
     const linked = [];
-    for (const d of spec.dirs) {
+
+    // File-shaped specs: link each named file it finds beside the executable, which is
+    // where these engines look. Deduplicated by target name, so owning four Doom products
+    // does not produce four fights over doom.wad.
+    for (const f of (spec.files || [])) {
+        const seen = new Set();
+        for (const found of findFiles(sourceRoot, f.find)) {
+            const name = path.basename(found).toLowerCase();
+            if (seen.has(name)) continue;
+            seen.add(name);
+            const dstDir = path.join(targetRoot, f.into || '');
+            fs.mkdirSync(dstDir, { recursive: true });
+            link(found, path.join(dstDir, name));
+            linked.push(name);
+        }
+    }
+    if (spec.requireAny && !linked.length) {
+        return { ok: false, error: `No ${spec.label} data files were found in ${sourceRoot}.` };
+    }
+
+    const extra = spec.extras && spec.extras[0];
+    for (const d of (spec.dirs || [])) {
         const src = resolveCaseInsensitive(sourceRoot, d.name);
         if (!src || !dirHasProbe(src, d.probe)) {
             if (d.required) return { ok: false, error: `${sourceRoot} has no ${d.name}/ with the expected data.` };
@@ -239,11 +455,25 @@ function linkGameData(dataId, sourceRoot, targetRoot) {
         fs.mkdirSync(dst, { recursive: true });
         for (const f of fs.readdirSync(src)) {
             if (!/\.pak$/i.test(f)) continue;
-            const link = path.join(dst, f.toLowerCase());
-            try { fs.unlinkSync(link); } catch {}
-            fs.symlinkSync(path.join(src, f), link);
+            link(path.join(src, f), path.join(dst, f.toLowerCase()));
         }
         linked.push(d.name);
+
+        // Same episode folder, other product: id1's music comes from the re-release's id1,
+        // hipnotic's from its hipnotic, and so on.
+        if (!extraSource || !extra) continue;
+        const eDir = resolveCaseInsensitive(extraSource.path, d.name);
+        const eMusic = eDir && resolveCaseInsensitive(eDir, extra.subdir);
+        if (!eMusic) continue;
+        const mDst = path.join(dst, extra.subdir);
+        fs.mkdirSync(mDst, { recursive: true });
+        let n = 0;
+        for (const f of fs.readdirSync(eMusic)) {
+            if (!extra.match.test(f)) continue;
+            link(path.join(eMusic, f), path.join(mDst, f.toLowerCase()));
+            n++;
+        }
+        if (n) linked.push(`${d.name}/${extra.subdir} (${n})`);
     }
     return { ok: true, linked };
 }
@@ -259,6 +489,22 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
         return { ok: false, error: `That file does not look like ${recipe.title}. ${recipe.source.hint}` };
     }
 
+    // Shape-based recipes are identified by what is inside, because the filename carries
+    // nothing: every OpenBOR game is a differently-named archive around the same layout.
+    // The game's own name comes from the pak, which is the only place it is written down.
+    let title = recipe.title;
+    let dirName = recipe.dirName;
+    let key = recipe.id;
+    if (recipe.contains) {
+        const entries = inspectArchive(archivePath);
+        if (!entries.length) return { ok: false, error: 'Could not read that archive. Install bsdtar (libarchive) if it is a .rar.' };
+        const pak = entries.find(e => recipe.contains.pak.test(e));
+        if (!pak) return { ok: false, error: `That archive does not look like an OpenBOR game — it has no Paks folder inside. ${recipe.source.hint}` };
+        title = path.basename(pak).replace(/\.pak$/i, '').replace(/[_]+/g, ' ').trim() || recipe.title;
+        dirName = title.replace(/[/\\:*?"<>|]/g, '').trim().slice(0, 64) || recipe.dirName;
+        key = `${recipe.id}_${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+    }
+
     // Resolve the data before unpacking anything: an install that cannot be played is
     // worse than a refusal, and this is the failure the user can actually act on.
     let data = null;
@@ -267,7 +513,7 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
         if (!data.ok) return { ok: false, error: data.message, owned: data.owned || [], needsData: recipe.data };
     }
 
-    const target = path.join(installRoot, recipe.dirName);
+    const target = path.join(installRoot, dirName);
     if (fs.existsSync(target) && fs.readdirSync(target).length) {
         if (!overwrite) return { ok: false, error: `${target} already exists and is not empty.`, exists: true };
         fs.rmSync(target, { recursive: true, force: true });
@@ -283,33 +529,45 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
 
     flattenSingleRoot(target);
 
-    const exe = findEntry(target, recipe.entry.exe);
+    // For a shape-based recipe the entry point is defined by position, not by name: the
+    // OpenBOR engine is renamed per game, so the only reliable rule is "the exe that sits
+    // beside Paks/". A name-matching search would just pick the first .exe it tripped over.
+    const exe = recipe.contains ? findEntryBesideDir(target, /^Paks$/i, recipe.entry.exe)
+                                : findEntry(target, recipe.entry.exe);
     if (!exe) {
-        return { ok: false, error: `Unpacked, but no ${recipe.entry.exe.source.replace(/[\\^$]/g, '')} was found inside. The download may be the wrong file.` };
+        return { ok: false, error: recipe.contains
+            ? 'Unpacked, but no game executable was found next to the Paks folder.'
+            : `Unpacked, but no matching executable was found inside. The download may be the wrong file.` };
     }
 
     let linked = null;
+    let extra = null;
     if (recipe.data) {
+        const spec = DATA_SPECS[recipe.data];
+        if (spec && spec.extras) extra = resolveExtra(spec.extras[0], dataRows);
         // Link beside the executable — that is the engine's basedir, which is not always
         // the top of the archive.
-        linked = linkGameData(recipe.data, data.path, path.dirname(exe));
+        linked = linkGameData(recipe.data, data.path, path.dirname(exe), extra);
         if (!linked.ok) return { ok: false, error: linked.error };
     }
 
     return {
         ok: true,
         recipeId: recipe.id,
-        title: recipe.title,
+        key,
+        category: recipe.category || '',
+        title,
         installPath: target,
         executable: path.relative(target, exe) || path.basename(exe),
         platform: recipe.entry.platform,
         dataFrom: data && data.ok ? { path: data.path, title: data.title, linked: linked.linked } : null,
+        extraFrom: extra ? extra.title : null,
     };
 }
 
 module.exports = {
     RECIPES, DATA_SPECS,
     listRecipes, getRecipe, detectRecipe,
-    resolveGameData, linkGameData, installFromArchive,
+    resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,
 };
