@@ -91,6 +91,22 @@ const RECIPES = [
         data: 'doom',
     },
     {
+        id: 'uzdoom',
+        title: 'UZDoom',
+        kind: 'Source port',
+        game: 'Doom',
+        blurb: 'A fork of GZDoom made in late 2025, continuing the same 4.x line. Same command line and the same mods — GZDoom still has the larger ecosystem, so either works.',
+        source: {
+            name: 'GitHub — UZDoom/UZDoom',
+            url: 'https://github.com/UZDoom/uzdoom/releases/latest',
+            hint: 'On the Releases page, download the Windows zip — it is named like uzdoom-4.14.3-windows.zip.',
+        },
+        archive: /^uzdoom.*\.(zip|7z)$/i,
+        dirName: 'UZDoom',
+        entry: { exe: /^uzdoom\.exe$/i, platform: 'windows' },
+        data: 'doom',
+    },
+    {
         id: 'minidoom2',
         title: 'Mini Doom 2',
         kind: 'Fan game',
@@ -101,9 +117,9 @@ const RECIPES = [
             url: 'https://www.moddb.com/games/minidoom-2',
             hint: 'Download the Windows build; the file is named like miniDoom2 v3-1.zip.',
         },
-        archive: /^minidoom\s*2.*\.(zip|7z|rar)$/i,
+        archive: /^minidoom[\s_-]*2.*\.(zip|7z|rar)$/i,
         dirName: 'Mini Doom 2',
-        entry: { exe: /^minidoom2.*\.exe$/i, platform: 'windows' },
+        entry: { exe: /^mini\s*doom[\s_-]*2.*\.exe$/i, platform: 'windows' },
         data: null,
     },
     {
@@ -117,10 +133,74 @@ const RECIPES = [
             url: 'https://www.moddb.com/games/minidoom',
             hint: 'Download the Windows build; the file is named like MiniDoom_v1_3.zip.',
         },
-        archive: /^minidoom[_\s]*v?\d.*\.(zip|7z|rar)$/i,
+        // The lookahead is load-bearing: without it this also matched miniDoom2's download
+        // and installed the sequel under the first game's name, which is exactly what
+        // happened. Two recipes whose patterns overlap silently mislabel each other.
+        archive: /^minidoom(?![\s_-]*2).*\.(zip|7z|rar)$/i,
         dirName: 'Mini Doom',
-        entry: { exe: /^mini\s*doom.*\.exe$/i, platform: 'windows' },
+        entry: { exe: /^mini\s*doom(?![\s_-]*2).*\.exe$/i, platform: 'windows' },
         data: null,
+    },
+    // ── Mods ────────────────────────────────────────────────────────────────
+    // These are what people actually want to play. Nobody sets out to install GZDoom;
+    // they set out to install Brutal Doom, and the engine is a means to that end. So a
+    // mod recipe owns its whole stack: it will install the engine for you if you have
+    // not got one, link the IWAD out of your library, and register itself as its own
+    // library entry carrying the -file line that loads it. The engine is shared rather
+    // than copied per mod, because that is how GZDoom is designed to work.
+    {
+        id: 'brutaldoom',
+        title: 'Brutal Doom',
+        kind: 'Mod',
+        game: 'Doom',
+        engine: ['gzdoom', 'uzdoom'],
+        blurb: 'The famous overhaul — reworked weapons, gore and enemy behaviour, on top of the original maps.',
+        source: {
+            name: 'ModDB — Brutal Doom',
+            url: 'https://www.moddb.com/mods/brutal-doom/downloads',
+            hint: 'Download the latest release; the file is named like brutalv22.zip, and a bare .pk3 works too.',
+        },
+        archive: /^brutal.*\.(zip|7z|rar|pk3)$/i,
+        modFile: /\.(pk3|wad)$/i,
+        dirName: 'Brutal Doom',
+        iwad: /^doom2\.wad$/i,
+        data: 'doom',
+    },
+    {
+        id: 'brutaldoom-black',
+        title: 'Brutal Doom: Black Edition',
+        kind: 'Mod',
+        game: 'Doom',
+        engine: ['gzdoom', 'uzdoom'],
+        blurb: 'A darker, heavily reworked take on Brutal Doom, with its own lighting and effects.',
+        source: {
+            name: 'ModDB — Brutal Doom: Black Edition',
+            url: 'https://www.moddb.com/mods/brutal-doom-black-edition/downloads',
+            hint: 'Download the latest release; the file is named like BDBE_v3.5.zip.',
+        },
+        archive: /^(bdbe|brutal.*black).*\.(zip|7z|rar|pk3)$/i,
+        modFile: /\.(pk3|wad)$/i,
+        dirName: 'Brutal Doom Black Edition',
+        iwad: /^doom2\.wad$/i,
+        data: 'doom',
+    },
+    {
+        id: 'doom-hd',
+        title: 'DOOM Ultra HD',
+        kind: 'Mod',
+        game: 'Doom',
+        engine: ['gzdoom', 'uzdoom'],
+        blurb: 'High-resolution texture and sprite packs for the original maps. Several .pk3 files loaded together — drop in the archive and they all get loaded in order.',
+        source: {
+            name: 'ModDB — DHTP / Doom HD texture projects',
+            url: 'https://www.moddb.com/mods/hi-res-doom-texture-project',
+            hint: 'Download the texture pack archive; every .pk3 and .wad inside will be loaded.',
+        },
+        archive: /(doom).*(hd|ultra|dhtp|hi-?res).*\.(zip|7z|rar|pk3)$/i,
+        modFile: /\.(pk3|wad)$/i,
+        modAll: true,
+        dirName: 'DOOM Ultra HD',
+        data: 'doom',
     },
     // Not a title but a shape. Every OpenBOR game is the same engine renamed, sitting
     // beside Paks/<game>.pak — so one recipe covers all of them, and the archive is
@@ -369,6 +449,7 @@ function resolveGameData(dataId, rows) {
     });
 
     const required = (spec.dirs || []).filter(d => d.required);
+    const hits = [];
     for (const g of named.filter(g => g.installed && g.install_path)) {
         const root = g.install_path;
         // Folder-shaped spec: every required folder must exist and hold its proving file.
@@ -382,7 +463,15 @@ function resolveGameData(dataId, rows) {
         const filesOk = spec.files
             ? spec.files.some(f => findFiles(root, f.find).length > 0)
             : true;
-        if (dirsOk && filesOk) return { ok: true, path: root, title: g.title };
+        if (dirsOk && filesOk) hits.push({ path: root, title: g.title });
+    }
+    // File-shaped specs take from *every* matching product rather than the first, so
+    // owning Ultimate Doom, Final Doom and both Enhanced releases puts doom.wad, doom2.wad,
+    // tnt.wad and plutonia.wad side by side and the engine can offer the choice.
+    if (hits.length) {
+        return spec.files
+            ? { ok: true, path: hits[0].path, paths: hits.map(h => h.path), title: hits.map(h => h.title).join(', ') }
+            : { ok: true, path: hits[0].path, paths: [hits[0].path], title: hits[0].title };
     }
 
     const owned = named.map(g => g.title);
@@ -418,6 +507,7 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
     const spec = DATA_SPECS[dataId];
     if (!spec) return { ok: false, error: `Unknown data requirement "${dataId}".` };
 
+    const roots = Array.isArray(sourceRoot) ? sourceRoot : [sourceRoot];
     const link = (from, to) => {
         try { fs.unlinkSync(to); } catch {}
         fs.symlinkSync(from, to);
@@ -426,18 +516,20 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
     const linked = [];
 
     // File-shaped specs: link each named file it finds beside the executable, which is
-    // where these engines look. Deduplicated by target name, so owning four Doom products
-    // does not produce four fights over doom.wad.
+    // where these engines look. Deduplicated by target name across every source, so
+    // owning four Doom products does not produce four fights over doom.wad.
+    const seen = new Set();
     for (const f of (spec.files || [])) {
-        const seen = new Set();
-        for (const found of findFiles(sourceRoot, f.find)) {
-            const name = path.basename(found).toLowerCase();
-            if (seen.has(name)) continue;
-            seen.add(name);
-            const dstDir = path.join(targetRoot, f.into || '');
-            fs.mkdirSync(dstDir, { recursive: true });
-            link(found, path.join(dstDir, name));
-            linked.push(name);
+        for (const root of roots) {
+            for (const found of findFiles(root, f.find)) {
+                const name = path.basename(found).toLowerCase();
+                if (seen.has(name)) continue;
+                seen.add(name);
+                const dstDir = path.join(targetRoot, f.into || '');
+                fs.mkdirSync(dstDir, { recursive: true });
+                link(found, path.join(dstDir, name));
+                linked.push(name);
+            }
         }
     }
     if (spec.requireAny && !linked.length) {
@@ -547,7 +639,7 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
         if (spec && spec.extras) extra = resolveExtra(spec.extras[0], dataRows);
         // Link beside the executable — that is the engine's basedir, which is not always
         // the top of the archive.
-        linked = linkGameData(recipe.data, data.path, path.dirname(exe), extra);
+        linked = linkGameData(recipe.data, data.paths || data.path, path.dirname(exe), extra);
         if (!linked.ok) return { ok: false, error: linked.error };
     }
 
@@ -565,8 +657,78 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
     };
 }
 
+// Install a mod alongside an engine that is already on disk. The engine is shared rather
+// than copied per mod — that is how ZDoom-family ports are designed to work, and it keeps
+// four Doom mods from meaning four copies of the same 50MB engine. Each mod still becomes
+// its own library entry, distinguished by the -file line it carries.
+function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows }) {
+    const recipe = getRecipe(recipeId);
+    if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
+    if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
+    if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall GZDoom or UZDoom.' };
+    if (!recipe.archive.test(path.basename(archivePath))) {
+        return { ok: false, error: `That file does not look like ${recipe.title}. ${recipe.source.hint}` };
+    }
+
+    // Its own folder under the engine, so two mods never fight over a filename and
+    // removing one is just deleting a directory.
+    const modsDir = path.join(engineRoot, 'mods', recipe.dirName);
+    fs.rmSync(modsDir, { recursive: true, force: true });
+    fs.mkdirSync(modsDir, { recursive: true });
+
+    // A mod arrives either as the loadable file itself or as an archive around it.
+    const ext = path.extname(archivePath).toLowerCase();
+    let picked = [];
+    if (ext === '.pk3' || ext === '.wad') {
+        const dst = path.join(modsDir, path.basename(archivePath));
+        fs.copyFileSync(archivePath, dst);
+        picked = [dst];
+    } else {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cn-mod-'));
+        try {
+            const ex = findExtractor(archivePath);
+            if (!ex) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive) or unzip.' };
+            const res = spawnSync(ex.cmd, ex.args(archivePath, tmp), { encoding: 'utf8' });
+            if (res.status !== 0) return { ok: false, error: `Could not unpack the mod: ${(res.stderr || '').trim().slice(0, 300)}` };
+
+            const found = findFiles(tmp, recipe.modFile, 4);
+            if (!found.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
+            // Load order matters for stacked packs, and these are conventionally numbered
+            // ("10 DHTP normal.pk3", "11 HD SFX.wad"), so sort by name and keep it.
+            found.sort((a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true }));
+            const take = recipe.modAll ? found : [found[0]];
+            for (const f of take) {
+                const dst = path.join(modsDir, path.basename(f));
+                fs.copyFileSync(f, dst);
+                picked.push(dst);
+            }
+        } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+    }
+
+    // Point at an IWAD explicitly when the recipe prefers one, otherwise let the engine
+    // offer its own picker over whatever is linked beside it.
+    const args = [];
+    if (recipe.iwad) {
+        const iwad = fs.readdirSync(engineRoot).find(f => recipe.iwad.test(f));
+        if (iwad) args.push('-iwad', iwad);
+    }
+    for (const f of picked) args.push('-file', path.relative(engineRoot, f));
+
+    return {
+        ok: true,
+        recipeId: recipe.id,
+        key: recipe.id,
+        title: recipe.title,
+        installPath: engineRoot,
+        executable: engineExe,
+        platform: 'windows',
+        launchArgs: args.map(a => (/\s/.test(a) ? `"${a}"` : a)).join(' '),
+        modFiles: picked.map(f => path.basename(f)),
+    };
+}
+
 module.exports = {
-    RECIPES, DATA_SPECS,
+    RECIPES, DATA_SPECS, installMod,
     listRecipes, getRecipe, detectRecipe,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,

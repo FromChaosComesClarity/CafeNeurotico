@@ -865,6 +865,45 @@ const _grinderRowsForData = () => {
     catch { return []; }
 };
 
+// The first engine from an accepted group that is actually installed. Mods declare a group
+// (GZDoom or UZDoom) rather than one engine: they are the same 4.x lineage with the same
+// command line, so either satisfies the requirement and the user's existing one is reused.
+function _installedEngine(engineIds) {
+    if (!ensureGrinderEngine()) return null;
+    for (const id of engineIds) {
+        try {
+            const row = _grinderEngineDb.prepare('SELECT id,title,install_path,executable FROM games WHERE id=? AND installed=1').get(`cn_${id}`);
+            if (row && row.install_path && fs.existsSync(row.install_path)) return row;
+        } catch {}
+    }
+    return null;
+}
+
+// Register an install in both databases. grinder.db owns the launch (so the shared engine
+// supplies Proton and the prefix); games.db points at it exactly as a GOG title does.
+function _registerCustomInstall(r) {
+    const gid = `cn_${r.key || r.recipeId}`;
+    _grinderEngineDb.prepare(`INSERT INTO games (id,title,store,installed,install_path,executable,platform,launch_args)
+                              VALUES (?,?,?,1,?,?,?,?)
+                              ON CONFLICT(id) DO UPDATE SET
+                                installed=1, install_path=excluded.install_path,
+                                executable=excluded.executable, platform=excluded.platform,
+                                launch_args=excluded.launch_args`)
+        .run(gid, r.title, 'custom', r.installPath, r.executable, r.platform, r.launchArgs || null);
+
+    const cmd = `grinder://launch/${gid}`;
+    const existing = db.prepare('SELECT id FROM games WHERE GrinderGameId=?').get(gid);
+    if (existing) db.prepare('UPDATE games SET Installed=1, LaunchCommand=? WHERE id=?').run(cmd, existing.id);
+    // OpenBOR is its own category rather than a member of Others — one engine with one
+    // rigid layout, the same argument that earned PICO-8 its own place in the library.
+    // 'Others' is appended so the existing store filters, which are literal substring
+    // matches, still find it until the dedicated category lands in the gallery.
+    else db.prepare(`INSERT INTO games (Game, Store, LaunchCommand, GrinderGameId, Installed, FAV, WANT_TO_PLAY)
+                     VALUES (?,?,?,?,1,'NO','NO')`)
+            .run(r.title, r.category ? `${r.category}, Others` : 'Others', cmd, gid);
+    return gid;
+}
+
 // The catalogue, each entry carrying what this machine can currently do with it: whether
 // the required game data is already resolvable, and whether it is installed already.
 ipcMain.handle('custom-recipe-list', () => {
@@ -887,6 +926,14 @@ ipcMain.handle('custom-recipe-list', () => {
             out.data.owned = d.owned || [];
             out.data.message = d.ok ? '' : d.message;
         }
+        // A mod needs an engine. Report which of its accepted engines is already here, so
+        // the button can say whether this is one file or two.
+        if (r.engine) {
+            const eng = _installedEngine(r.engine);
+            out.engineReady = !!eng;
+            out.engineTitle = eng ? eng.title : '';
+            out.engineNames = r.engine.map(id => customInstallers.getRecipe(id)?.title || id);
+        }
         return out;
     });
 });
@@ -906,8 +953,46 @@ ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     return { ok: true, path: res.filePaths[0] };
 });
 
-ipcMain.handle('custom-install', async (_, { recipeId, archivePath, overwrite } = {}) => {
+ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, overwrite } = {}) => {
     if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
+    const recipe = customInstallers.getRecipe(recipeId);
+    if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
+
+    // A mod is installed against an engine. Reuse one that is already here; otherwise
+    // install the engine the user just pointed at, in the same click, because nobody sets
+    // out to install GZDoom — they set out to install Brutal Doom.
+    if (recipe.engine) {
+        let engine = _installedEngine(recipe.engine);
+        if (!engine) {
+            if (!engineArchivePath) {
+                return { ok: false, needsEngine: true,
+                         engines: recipe.engine.map(id => customInstallers.getRecipe(id)).filter(Boolean)
+                                   .map(e => ({ id: e.id, title: e.title, source: e.source })) };
+            }
+            const engineId = customInstallers.detectRecipe(engineArchivePath)
+                .find(id => recipe.engine.includes(id));
+            if (!engineId) {
+                return { ok: false, error: `That file does not look like ${recipe.engine.map(id => customInstallers.getRecipe(id)?.title).join(' or ')}.` };
+            }
+            const er = customInstallers.installFromArchive({
+                recipeId: engineId, archivePath: engineArchivePath, overwrite: true,
+                installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
+            });
+            if (!er.ok) return er;
+            try { _registerCustomInstall(er); } catch (e) { return { ok: false, error: `Engine installed, but could not register it: ${e.message}` }; }
+            engine = { install_path: er.installPath, executable: er.executable, title: er.title };
+        }
+
+        const mr = customInstallers.installMod({
+            recipeId, archivePath,
+            engineRoot: engine.install_path, engineExe: engine.executable,
+            dataRows: _grinderRowsForData(),
+        });
+        if (!mr.ok) return mr;
+        try { _registerCustomInstall(mr); } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
+        invalidateGrinderInstalledCache();
+        return { ...mr, engineTitle: engine.title };
+    }
 
     const r = customInstallers.installFromArchive({
         recipeId, archivePath, overwrite: !!overwrite,
@@ -916,31 +1001,8 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, overwrite } 
     });
     if (!r.ok) return r;
 
-    // Registered in grinder.db so the shared engine owns the launch — that is what buys
-    // Proton, the prefix, and every fix that lives in launchGame, for free. games.db then
-    // only needs to point at it, exactly like a GOG title does.
-    const gid = `cn_${r.key || r.recipeId}`;
-    try {
-        _grinderEngineDb.prepare(`INSERT INTO games (id,title,store,installed,install_path,executable,platform)
-                                  VALUES (?,?,?,1,?,?,?)
-                                  ON CONFLICT(id) DO UPDATE SET
-                                    installed=1, install_path=excluded.install_path,
-                                    executable=excluded.executable, platform=excluded.platform`)
-            .run(gid, r.title, 'custom', r.installPath, r.executable, r.platform);
-    } catch (e) { return { ok: false, error: `Installed, but could not register it: ${e.message}` }; }
-
-    const cmd = `grinder://launch/${gid}`;
-    try {
-        const existing = db.prepare('SELECT id FROM games WHERE GrinderGameId=?').get(gid);
-        if (existing) db.prepare('UPDATE games SET Installed=1, LaunchCommand=? WHERE id=?').run(cmd, existing.id);
-        // OpenBOR is its own category rather than a member of Others — one engine with one
-        // rigid layout, the same argument that earned PICO-8 its own place in the library.
-        // 'Others' is appended so the existing store filters, which are literal substring
-        // matches, still find it until the dedicated category lands in the gallery.
-        else db.prepare(`INSERT INTO games (Game, Store, LaunchCommand, GrinderGameId, Installed, FAV, WANT_TO_PLAY)
-                         VALUES (?,?,?,?,1,'NO','NO')`)
-                .run(r.title, r.category ? `${r.category}, Others` : 'Others', cmd, gid);
-    } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
+    try { _registerCustomInstall(r); }
+    catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
 
     invalidateGrinderInstalledCache();
     return r;

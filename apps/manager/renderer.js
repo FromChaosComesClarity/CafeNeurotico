@@ -151,11 +151,21 @@ function renderCustomList(recipes) {
                       r.data.owned && r.data.owned.length ? ` <span style="color:var(--text_sec);">(you own: ${escHtml(r.data.owned.slice(0, 3).join(', '))})</span>` : ''}</div>`;
         }
 
+        // Mods need an engine. Say so up front, including that we will install it in the
+        // same click, so "two file dialogs" is expected rather than a surprise.
+        let engineLine = '';
+        if (r.engineNames) {
+            engineLine = r.engineReady
+                ? `<div class="ci-meta">Engine: <span class="ci-ok">${escHtml(r.engineTitle)} ready</span></div>`
+                : `<div class="ci-meta">Engine: <span class="ci-warn">${escHtml(r.engineNames.join(' or '))} needed</span> &mdash; you will be asked for that download first, then this one.</div>`;
+        }
+
         row.innerHTML =
             `<div class="ci-head"><span class="ci-title">${escHtml(r.title)}</span><span class="ci-kind">${escHtml(r.kind)}</span>${
                 r.game ? `<span class="ci-kind">for ${escHtml(r.game)}</span>` : ''}</div>` +
             `<div class="ci-blurb">${escHtml(r.blurb)}</div>` +
             `<div class="ci-meta">Get it from <a href="#" data-url="${escHtml(r.source.url)}">${escHtml(r.source.name)}</a><br>${escHtml(r.source.hint)}</div>` +
+            engineLine +
             dataLine +
             `<div class="ci-actions"></div>`;
 
@@ -198,6 +208,19 @@ async function runCustomInstall(recipe, btn) {
         btn.textContent = 'INSTALLING…';
         let res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path });
 
+        // The mod needs an engine and there isn't one yet. Ask for that download too and
+        // install both in this one click, rather than sending the user away to do it
+        // themselves — installing GZDoom was never the thing they wanted.
+        if (res && !res.ok && res.needsEngine) {
+            const names = res.engines.map(e => e.title).join(' or ');
+            const ok = await showConfirm(`${recipe.title} runs on ${names}, which isn't installed yet.\n\nPick your ${names} download next and both will be installed together.`, 'Choose file', false);
+            if (!ok) return;
+            const eng = await window.api.customInstallPick(res.engines[0].id);
+            if (!eng || !eng.ok) return;
+            btn.textContent = 'INSTALLING…';
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, engineArchivePath: eng.path });
+        }
+
         // Reinstalling over an existing folder is a decision, not a default — ask rather
         // than silently deleting whatever is already there.
         if (res && !res.ok && res.exists) {
@@ -208,8 +231,11 @@ async function runCustomInstall(recipe, btn) {
 
         if (!res || !res.ok) { showAlert((res && res.error) || 'Could not install that.'); return; }
 
-        const from = res.dataFrom ? `\n\nGame data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).` : '';
-        showAlert(`${res.title} is installed and added to your library.${from}`);
+        const bits = [];
+        if (res.engineTitle) bits.push(`Running on ${res.engineTitle}.`);
+        if (res.modFiles && res.modFiles.length) bits.push(`Loading ${res.modFiles.join(', ')}.`);
+        if (res.dataFrom) bits.push(`Game data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).`);
+        showAlert(`${res.title} is installed and added to your library.${bits.length ? '\n\n' + bits.join('\n') : ''}`);
         renderCustomList(await window.api.customRecipeList() || []);
         loadGames();
     } catch (e) {
