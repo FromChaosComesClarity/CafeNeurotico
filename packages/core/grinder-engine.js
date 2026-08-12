@@ -790,7 +790,7 @@ async function launchGame(gameId, opts = {}) {
         if (cur) args.push(cur);
         return args;
     })();
-    const allArgs = [...gogTaskArgs, ...userArgs];
+    let allArgs = [...gogTaskArgs, ...userArgs];
 
     const umu = findUmu();
     const usingProton = !!(proton || umu);
@@ -938,7 +938,19 @@ async function launchGame(gameId, opts = {}) {
     // want of a Proton it is never going to use.
     //   dosbox_mode: 'auto' (default — native when present) · 'native' · 'bundled'
     const dosboxMode = String(engineSetting('dosbox_mode', 'auto') || 'auto').toLowerCase();
-    if (dosboxMode !== 'bundled' && isGogDosGame(game, resolvedExe)) {
+
+    // Give the game its CD back before either DOSBox route is chosen: the extra -conf goes
+    // ahead of GOG's own so the disc is mounted by the time GOG's autoexec starts the game,
+    // and prepending it to allArgs covers the native spawn and the bundled-under-Proton
+    // fallthrough alike. A no-op for every game that has no CD image, or whose config
+    // already mounts one.
+    const isDosGame = isGogDosGame(game, resolvedExe);
+    if (isDosGame) {
+        const cdArgs = gogCdAudioConfArgs(installPath, launchCwd, allArgs);
+        if (cdArgs.length) allArgs = [...cdArgs, ...allArgs];
+    }
+
+    if (dosboxMode !== 'bundled' && isDosGame) {
         const nativeDosbox = findNativeDosbox();
         if (nativeDosbox) {
             spawnGame(nativeDosbox.cmd, [...nativeDosbox.args, ...nativeDosboxArgs(allArgs)], {
@@ -1382,6 +1394,143 @@ function nativeDosboxArgs(gogArgs) {
         out.push(a);
     }
     return out;
+}
+
+// ── CD audio for GOG's DOS games ─────────────────────────────────────────────
+// A lot of GOG's classic releases ship the original disc as a CD image beside the game —
+// a cue sheet plus its binary, where the binary is renamed .gog so nobody burns it. When
+// the disc carried redbook audio, that image is the only copy of the soundtrack in the
+// release, and the game plays its music from the CD or not at all.
+//
+// GOG usually mounts it themselves. Albion's config does it once, at the top:
+//
+//     imgmount d "..\game.ins" -t iso -fs iso
+//
+// Quake's does it per campaign, inside the launcher menu in dosbox_quake_single.conf
+// (:quake → game.cue, :mp1 → gamea.cue, :mp2 → gamed.cue). Both are detected and both
+// are left completely alone. This exists for the releases where they did not bother, and
+// as of today it fires for nothing in the tested library — that is the intended resting
+// state, not a bug. Verify against the real .conf before concluding a game needs it:
+// they are ISO-8859 with CRLF, so plain grep calls them binary and prints nothing (use
+// grep -a), and GOG passes a second -conf that plain dosbox_<game>.conf gives no hint of.
+//
+// Nothing of GOG's is edited. DOSBox accepts repeated -conf and concatenates the
+// [autoexec] blocks in the order given, so a generated overlay config passed *before*
+// GOG's own runs its imgmount first and GOG's autoexec still starts the game. Every
+// setting in GOG's config wins, because a later -conf overrides an earlier one.
+//
+// Paths inside are relative and backslashed, the same convention GOG's own configs use —
+// DOSBox rewrites those separators for the host, so one file serves both the native
+// binary and the bundled Windows DOSBox under Proton.
+const CD_AUDIO_CONF = 'dosbox_cafeneurotico_cdaudio.conf';
+
+// Cue sheets are plain text. All we need is whether any track is audio: a data-only image
+// (Albion's is a lone MODE2/2352 track) has no soundtrack to recover and is left alone.
+function cueAudioTrackCount(text) {
+    return (String(text).match(/^\s*TRACK\s+\d+\s+AUDIO\s*$/gim) || []).length;
+}
+
+// Depth-1 scan of the install root for cue sheets carrying audio, newest convention first.
+// .ins is GOG's older name for the same thing; .cue is what current releases use. Both are
+// verified against the binary they name, so a stray sheet without its image is skipped.
+// Alphabetical order happens to be disc order for the releases that ship several
+// (game.cue, gamea.cue, gamed.cue → Quake, Mission Pack 1, Mission Pack 2).
+function findGogCdAudioImages(installPath) {
+    let entries = [];
+    try { entries = fs.readdirSync(installPath, { withFileTypes: true }); } catch { return []; }
+
+    const out = [];
+    for (const e of entries) {
+        if (!e.isFile() || !/\.(cue|ins)$/i.test(e.name)) continue;
+        const full = path.join(installPath, e.name);
+        let text = '';
+        try { text = fs.readFileSync(full, 'utf8'); } catch { continue; }
+
+        const tracks = cueAudioTrackCount(text);
+        if (!tracks) continue;
+
+        // The sheet is useless without the binary it points at, and GOG's casing is not
+        // dependable (FILE "GAME.GOG" against game.gog on disk).
+        const named = (text.match(/^\s*FILE\s+"([^"]+)"/im) || [, ''])[1];
+        if (named && !fs.existsSync(resolvePathCaseInsensitive(path.join(installPath, named)))) continue;
+
+        out.push({ name: e.name, path: full, audioTracks: tracks });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// The .conf files GOG's launch command names, resolved against the working directory the
+// game actually starts from — the paths in those arguments are relative to it.
+function gogConfPaths(gogArgs, launchCwd) {
+    const out = [];
+    for (let i = 0; i < gogArgs.length; i++) {
+        if (gogArgs[i] !== '-conf' || gogArgs[i + 1] === undefined) continue;
+        const rel = gogArgs[++i].replace(/\\/g, '/');
+        const p = resolvePathCaseInsensitive(path.resolve(launchCwd, rel));
+        if (fs.existsSync(p)) out.push(p);
+    }
+    return out;
+}
+
+// Drive letters the game's own configs already claim, so the CD lands somewhere free.
+// Both commands take the letter as their first argument: `mount c ".."`, `imgmount d …`.
+function driveLettersInUse(confTexts) {
+    const used = new Set();
+    for (const t of confTexts) {
+        for (const m of String(t).matchAll(/^\s*(?:img)?mount\s+([a-z])\b/gim)) used.add(m[1].toLowerCase());
+    }
+    return used;
+}
+
+// Build the overlay and return the -conf arguments to prepend, or [] when there is
+// nothing to do. Never throws: a game that would have launched without music must not
+// fail to launch because of this.
+function gogCdAudioConfArgs(installPath, launchCwd, gogArgs) {
+    try {
+        if (!installPath || !launchCwd) return [];
+
+        const images = findGogCdAudioImages(installPath);
+        if (!images.length) return [];
+
+        const confs = gogConfPaths(gogArgs, launchCwd);
+        const texts = confs.map(p => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } });
+
+        // GOG already mounts a disc for this game (Albion, and every release where they
+        // bothered) — leave it entirely alone. Mounting a second copy would only shift
+        // the drive letters the game was configured against.
+        if (texts.some(t => /^\s*imgmount\s/im.test(t))) return [];
+
+        // D upwards. X and Y are skipped: dosbox-staging auto-mounts its own drives there,
+        // and Z is DOSBox's internal drive on every build.
+        const used = driveLettersInUse(texts);
+        const letter = 'defghijklmnopqrstuvw'.split('').find(l => !used.has(l));
+        if (!letter) return [];
+
+        // Relative to the working directory, exactly like GOG writes its own paths, so the
+        // same file works under a native DOSBox and under the Windows one via Proton.
+        const rel = p => path.relative(launchCwd, p).replace(/\//g, '\\');
+        const discs = images.map(i => `"${rel(i.path)}"`).join(' ');
+        const body =
+            `# Generated by Cafe Neurotico — regenerated on every launch, edits will be lost.\n` +
+            `# Mounts the CD image(s) GOG ships with this game so its soundtrack plays.\n` +
+            (images.length > 1 ? `# Several discs on one letter: press Ctrl+F4 in DOSBox to swap.\n` : '') +
+            `\n[autoexec]\n` +
+            `imgmount ${letter} ${discs} -t iso -fs iso\n`;
+
+        const confPath = path.join(installPath, CD_AUDIO_CONF);
+        let existing = null;
+        try { existing = fs.readFileSync(confPath, 'utf8'); } catch {}
+        if (existing !== body) fs.writeFileSync(confPath, body, 'utf8');
+
+        console.log(
+            `[launch] CD audio: mounting ${images.map(i => `${i.name} (${i.audioTracks} audio tracks)`).join(', ')} ` +
+            `on ${letter.toUpperCase()}:`
+        );
+        return ['-conf', rel(confPath)];
+    } catch (e) {
+        console.error('[launch] CD audio setup failed:', e.message);
+        return [];
+    }
 }
 
 // ── gog-support/<appId>/app → the install root ───────────────────────────────
@@ -1988,5 +2137,6 @@ module.exports = {
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
     findNativeDosbox, dosboxInstallHint, isGogDosGame, applyGogSupportFiles, engineSetting,
+    findGogCdAudioImages, gogCdAudioConfArgs,
     gogListManuals, gogDownloadManual,
 };
