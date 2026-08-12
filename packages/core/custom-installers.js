@@ -35,9 +35,10 @@ const RECIPES = [
         source: {
             name: 'GitHub — andrei-drexler/ironwail',
             url: 'https://github.com/andrei-drexler/ironwail/releases/latest',
-            hint: 'On the Releases page, download the Windows zip — it is named like ironwail-0.8.0-win64.zip.',
+            hint: 'On the Releases page, download the Windows zip — it is named like ironwail-0.8.2-win64.zip.',
         },
-        archive: /^ironwail.*\.(zip|7z)$/i,
+        archive: /ironwail.*\.(zip|7z)$/i,
+        samples: ['ironwail-0.8.2-win64.zip'],
         dirName: 'Ironwail',
         entry: { exe: /^ironwail\.exe$/i, platform: 'windows' },
         data: 'quake',
@@ -51,9 +52,10 @@ const RECIPES = [
         source: {
             name: 'GitHub — Novum/vkQuake',
             url: 'https://github.com/Novum/vkQuake/releases/latest',
-            hint: 'On the Releases page, download the Windows zip — it is named like vkquake-1.31.3_win64.zip.',
+            hint: 'On the Releases page, download the Windows zip — it is named like vkQuake-1.35.0_windows_x64.zip.',
         },
-        archive: /^vkquake.*\.(zip|7z)$/i,
+        archive: /vkquake(?![-_]rt).*\.(zip|7z)$/i,
+        samples: ['vkQuake-1.35.0_windows_x64.zip'],
         dirName: 'vkQuake',
         entry: { exe: /^vkquake\.exe$/i, platform: 'windows' },
         data: 'quake',
@@ -69,7 +71,8 @@ const RECIPES = [
             url: 'https://github.com/sultim-t/vkquake-rt/releases/latest',
             hint: 'On the Releases page, download the Windows zip — it is named like quake-rt-1_0_1.zip.',
         },
-        archive: /^(quake[-_]rt|vkquake[-_]rt).*\.(zip|7z)$/i,
+        archive: /(quake[-_]rt|vkquake[-_]rt).*\.(zip|7z)$/i,
+        samples: ['quake-rt-1_0_1.zip'],
         dirName: 'Quake Ray Traced',
         entry: { exe: /^(vkquake|quake[-_]?rt)\.exe$/i, platform: 'windows' },
         data: 'quake',
@@ -83,9 +86,10 @@ const RECIPES = [
         source: {
             name: 'GitHub — ZDoom/gzdoom',
             url: 'https://github.com/ZDoom/gzdoom/releases/latest',
-            hint: 'On the Releases page, download the Windows zip — it is named like gzdoom-4-14-1-windows.zip.',
+            hint: 'On the Releases page, download the Windows zip — it is named like gzdoom-4-14-2-windows.zip.',
         },
-        archive: /^gzdoom.*\.(zip|7z)$/i,
+        archive: /gzdoom.*\.(zip|7z)$/i,
+        samples: ['gzdoom-4-14-2-windows.zip'],
         dirName: 'GZDoom',
         entry: { exe: /^gzdoom\.exe$/i, platform: 'windows' },
         data: 'doom',
@@ -99,9 +103,10 @@ const RECIPES = [
         source: {
             name: 'GitHub — UZDoom/UZDoom',
             url: 'https://github.com/UZDoom/uzdoom/releases/latest',
-            hint: 'On the Releases page, download the Windows zip — it is named like uzdoom-4.14.3-windows.zip.',
+            hint: 'On the Releases page, download the Windows zip — it is named like Windows-UZDoom-4.14.3.zip.',
         },
-        archive: /^uzdoom.*\.(zip|7z)$/i,
+        archive: /uzdoom.*\.(zip|7z)$/i,
+        samples: ['Windows-UZDoom-4.14.3.zip'],
         dirName: 'UZDoom',
         entry: { exe: /^uzdoom\.exe$/i, platform: 'windows' },
         data: 'doom',
@@ -118,6 +123,7 @@ const RECIPES = [
             hint: 'Download the Windows build; the file is named like miniDoom2 v3-1.zip.',
         },
         archive: /^minidoom[\s_-]*2.*\.(zip|7z|rar)$/i,
+        samples: ['miniDoom2 v3-1.zip'],
         dirName: 'Mini Doom 2',
         entry: { exe: /^mini\s*doom[\s_-]*2.*\.exe$/i, platform: 'windows' },
         data: null,
@@ -137,6 +143,7 @@ const RECIPES = [
         // and installed the sequel under the first game's name, which is exactly what
         // happened. Two recipes whose patterns overlap silently mislabel each other.
         archive: /^minidoom(?![\s_-]*2).*\.(zip|7z|rar)$/i,
+        samples: ['MiniDoom_v1_3.zip'],
         dirName: 'Mini Doom',
         entry: { exe: /^mini\s*doom(?![\s_-]*2).*\.exe$/i, platform: 'windows' },
         data: null,
@@ -163,6 +170,7 @@ const RECIPES = [
         // Excludes Black Edition, whose download is also called Brutal_Doom_something.
         // Sibling recipes must be mutually exclusive or they silently mislabel each other.
         archive: /^brutal(?!.*black).*\.(zip|7z|rar|pk3)$/i,
+        samples: ['brutalv22.zip', 'brutal22test6.zip', 'brutalv21.pk3'],
         modFile: /\.(pk3|wad)$/i,
         dirName: 'Brutal Doom',
         iwad: /^doom2\.wad$/i,
@@ -181,27 +189,35 @@ const RECIPES = [
             hint: 'Download the latest release; the file is named like BDBE_v3.5.zip.',
         },
         archive: /^(bdbe|brutal.*black).*\.(zip|7z|rar|pk3)$/i,
+        samples: ['Brutal_Doom_Black_Edition.52.zip'],
         modFile: /\.(pk3|wad)$/i,
         dirName: 'Brutal Doom Black Edition',
         iwad: /^doom2\.wad$/i,
         data: 'doom',
     },
+    // A shape rather than a title, and honest about it. There is no single "DOOM Ultra HD"
+    // download — HD texture work is spread across DHTP, Hoover1979's pack, brightmap and
+    // sprite projects, and most people end up with an assembled folder of numbered .pk3s.
+    // A recipe naming one of those would be pretending to a precision it does not have, so
+    // this one accepts any Doom mod archive, shows what is inside, and lets the user choose
+    // and order what loads. Excluded from filename detection because it would otherwise
+    // claim every archive; it only ever runs when the user picks it deliberately.
     {
-        id: 'doom-hd',
-        title: 'DOOM Ultra HD',
+        id: 'doom-mod',
+        title: 'Any Doom mod or texture pack',
         kind: 'Mod',
         game: 'Doom',
         engine: ['gzdoom', 'uzdoom'],
-        blurb: 'High-resolution texture and sprite packs for the original maps. Several .pk3 files loaded together — drop in the archive and they all get loaded in order.',
+        generic: true,
+        blurb: 'For anything else that loads into GZDoom or UZDoom — HD texture packs like DHTP, brightmaps, sprite fixes, map sets. Pick the archive and choose which .pk3 and .wad files to load; several can be stacked and they load in name order.',
         source: {
-            name: 'ModDB — DHTP / Doom HD texture projects',
-            url: 'https://www.moddb.com/mods/doom-hd1/downloads',
-            hint: 'Download the texture pack archive; every .pk3 and .wad inside will be loaded.',
+            name: 'ModDB — Doom mods',
+            url: 'https://www.moddb.com/games/doom/mods',
+            hint: 'Any .zip, .7z, .rar, .pk3 or .wad. You will be shown everything loadable inside it and can tick as many as you want.',
         },
-        archive: /(doom).*(hd|ultra|dhtp|hi-?res).*\.(zip|7z|rar|pk3)$/i,
+        archive: /\.(zip|7z|rar|pk3|wad)$/i,
         modFile: /\.(pk3|wad)$/i,
-        modAll: true,
-        dirName: 'DOOM Ultra HD',
+        dirName: 'Doom Mods',
         data: 'doom',
     },
     // Not a title but a shape. Every OpenBOR game is the same engine renamed, sitting
@@ -285,6 +301,30 @@ const DATA_SPECS = {
         owned: 'You own Doom but it is not installed. Install it first and this will find the IWAD automatically.',
     },
 };
+
+// ── Catalogue self-check ─────────────────────────────────────────────────────
+// Two mistakes have cost real installs here, and both were invisible at the time: a
+// pattern that also matched a sibling's download (Mini Doom 2 installed as Mini Doom;
+// Black Edition matching Brutal Doom too), and a pattern anchored to an asset name that
+// was guessed rather than checked (UZDoom ships Windows-UZDoom-4.14.3.zip, so /^uzdoom/
+// rejected the only file it was meant to accept).
+//
+// So every recipe carries `samples` — filenames actually observed from that project —
+// and this asserts each one matches its own recipe and nothing else. Run it whenever a
+// recipe is added or a pattern changed.
+function selfCheck() {
+    const problems = [];
+    for (const r of RECIPES) {
+        if (r.contains || r.generic) continue;        // matched on content or chosen deliberately
+        if (!r.samples || !r.samples.length) { problems.push(`${r.id}: no samples to check`); continue; }
+        for (const s of r.samples) {
+            const m = detectRecipe(s);
+            if (!m.includes(r.id))  problems.push(`${r.id}: its own sample "${s}" does not match its pattern`);
+            if (m.length > 1)       problems.push(`"${s}" matches several recipes: ${m.join(' + ')}`);
+        }
+    }
+    return problems;
+}
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -417,7 +457,7 @@ function findEntry(root, pattern, maxDepth = 3) {
 function listRecipes() {
     return RECIPES.map(r => ({
         id: r.id, title: r.title, kind: r.kind, game: r.game, blurb: r.blurb,
-        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic,
+        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic,
         data: r.data ? { id: r.data, label: DATA_SPECS[r.data]?.label || r.data } : null,
     }));
 }
@@ -431,7 +471,7 @@ function getRecipe(id) { return RECIPES.find(r => r.id === id) || null; }
 // by content at install time instead.
 function detectRecipe(fileName) {
     const base = path.basename(String(fileName || ''));
-    return RECIPES.filter(r => !r.contains && r.archive.test(base)).map(r => r.id);
+    return RECIPES.filter(r => !r.contains && !r.generic && r.archive.test(base)).map(r => r.id);
 }
 
 // Find the user's own copy of the data a recipe needs.
@@ -775,7 +815,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates,
-    listRecipes, getRecipe, detectRecipe,
+    listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,
 };
