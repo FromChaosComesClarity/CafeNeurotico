@@ -2894,6 +2894,11 @@
     .ci-actions { display:flex; gap:8px; align-items:center; margin-top:10px; }
     .ci-actions button { font-size:11px; padding:8px 14px; letter-spacing:0.5px; }
     .ci-installed { font-size:11px; font-weight:700; color:#66bb6a; letter-spacing:0.5px; }
+    .mp-row { display:flex; align-items:flex-start; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; }
+    .mp-row:hover { background:var(--bg_menu); border-color:var(--border_solid); }
+    .mp-row input { margin-top:3px; flex-shrink:0; accent-color:var(--accent); }
+    .mp-name { font-size:13px; font-weight:700; color:var(--text_main); word-break:break-all; }
+    .mp-sub { font-size:11px; color:var(--text_dim); margin-top:2px; word-break:break-all; }
 
     /* Play-task picker: one GOG release can ship several ways to start, and they are not
        interchangeable — Quake's DOS build plays the CD soundtrack its GLQuake primary
@@ -5726,6 +5731,20 @@ LOADING...READY.</div>
       <div style="font-size:12px; color:var(--text_sec); margin:6px 0 10px;">You download the port; Cafe Neurotico does the rest. Each one below says exactly where to get it and what the file is called &mdash; the game data comes from a title you already own.</div>
       <div id="custom-list" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
       <button id="btn-close-custom" style="margin-top:12px; flex-shrink:0;">Close</button>
+    </div>
+  </div>
+
+  <!-- Which files out of a mod archive to load. Above the catalogue modal, which is
+       itself above the Control Panel. -->
+  <div id="modal-modpick" class="modal-overlay" style="z-index:27000;">
+    <div class="modal-box" style="width:620px; max-width:95vw; max-height:80vh; text-align:left; display:flex; flex-direction:column;">
+      <h3 id="modpick-title" style="margin:0; color:var(--accent); text-transform:uppercase;">What should load?</h3>
+      <div style="font-size:12px; color:var(--text_sec); margin:6px 0 10px;">This download contains more than one loadable file. The largest is usually the mod itself; the rest are normally optional extras you can add if you want them. Load order follows the file names.</div>
+      <div id="modpick-list" style="display:flex; flex-direction:column; gap:2px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
+      <div class="row" style="margin-top:12px; flex-shrink:0;">
+        <button id="btn-modpick-ok" class="primary" style="flex:2;">Install Selected</button>
+        <button id="btn-modpick-cancel" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Cancel</button>
+      </div>
     </div>
   </div>
 

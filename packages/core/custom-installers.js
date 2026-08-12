@@ -114,7 +114,7 @@ const RECIPES = [
         blurb: 'A standalone Doom-flavoured action platformer. Complete in itself — no Doom data needed.',
         source: {
             name: 'ModDB — Mini Doom 2',
-            url: 'https://www.moddb.com/games/minidoom-2',
+            url: 'https://www.moddb.com/games/mini-doom-2/downloads',
             hint: 'Download the Windows build; the file is named like miniDoom2 v3-1.zip.',
         },
         archive: /^minidoom[\s_-]*2.*\.(zip|7z|rar)$/i,
@@ -130,7 +130,7 @@ const RECIPES = [
         blurb: 'The original standalone Mini Doom. Complete in itself — no Doom data needed.',
         source: {
             name: 'ModDB — MiniDoom',
-            url: 'https://www.moddb.com/games/minidoom',
+            url: 'https://www.moddb.com/games/mini-doom/downloads',
             hint: 'Download the Windows build; the file is named like MiniDoom_v1_3.zip.',
         },
         // The lookahead is load-bearing: without it this also matched miniDoom2's download
@@ -160,7 +160,9 @@ const RECIPES = [
             url: 'https://www.moddb.com/mods/brutal-doom/downloads',
             hint: 'Download the latest release; the file is named like brutalv22.zip, and a bare .pk3 works too.',
         },
-        archive: /^brutal.*\.(zip|7z|rar|pk3)$/i,
+        // Excludes Black Edition, whose download is also called Brutal_Doom_something.
+        // Sibling recipes must be mutually exclusive or they silently mislabel each other.
+        archive: /^brutal(?!.*black).*\.(zip|7z|rar|pk3)$/i,
         modFile: /\.(pk3|wad)$/i,
         dirName: 'Brutal Doom',
         iwad: /^doom2\.wad$/i,
@@ -175,7 +177,7 @@ const RECIPES = [
         blurb: 'A darker, heavily reworked take on Brutal Doom, with its own lighting and effects.',
         source: {
             name: 'ModDB — Brutal Doom: Black Edition',
-            url: 'https://www.moddb.com/mods/brutal-doom-black-edition/downloads',
+            url: 'https://www.moddb.com/mods/brutal-doom/downloads/brutal-doom-v20b-black-edition',
             hint: 'Download the latest release; the file is named like BDBE_v3.5.zip.',
         },
         archive: /^(bdbe|brutal.*black).*\.(zip|7z|rar|pk3)$/i,
@@ -193,7 +195,7 @@ const RECIPES = [
         blurb: 'High-resolution texture and sprite packs for the original maps. Several .pk3 files loaded together — drop in the archive and they all get loaded in order.',
         source: {
             name: 'ModDB — DHTP / Doom HD texture projects',
-            url: 'https://www.moddb.com/mods/hi-res-doom-texture-project',
+            url: 'https://www.moddb.com/mods/doom-hd1/downloads',
             hint: 'Download the texture pack archive; every .pk3 and .wad inside will be loaded.',
         },
         archive: /(doom).*(hd|ultra|dhtp|hi-?res).*\.(zip|7z|rar|pk3)$/i,
@@ -661,7 +663,31 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
 // than copied per mod — that is how ZDoom-family ports are designed to work, and it keeps
 // four Doom mods from meaning four copies of the same 50MB engine. Each mod still becomes
 // its own library entry, distinguished by the -file line it carries.
-function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows }) {
+// The loadable files inside a mod archive, read from the listing without unpacking. Mod
+// packs routinely ship the mod plus a pile of optional extras — Black Edition's download
+// carries the 199MB mod alongside thirty-odd alternate footstep and voice packs — so
+// "take the first .pk3" picks a hero voice and produces something that installs cleanly
+// and plays nothing. Which file is the mod is the user's call, not a heuristic's.
+function listModCandidates(archivePath, recipe) {
+    const bsdtar = which('bsdtar');
+    if (!bsdtar) return [];
+    const r = spawnSync(bsdtar, ['-tvf', archivePath], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    if (r.status !== 0) return [];
+
+    const out = [];
+    for (const line of r.stdout.split('\n')) {
+        if (!line.trim()) continue;
+        // bsdtar -tvf: perms links owner group size <date fields> name
+        const m = line.match(/^\S+\s+\d+\s+\S+\s+\S+\s+(\d+)\s+\S+\s+\S+\s+\S+\s+(.*)$/);
+        if (!m) continue;
+        const [, size, name] = m;
+        if (name.endsWith('/') || !recipe.modFile.test(name)) continue;
+        out.push({ rel: name, name: path.basename(name), dir: path.dirname(name), size: Number(size) });
+    }
+    return out.sort((a, b) => b.size - a.size);   // biggest first: the mod, then its extras
+}
+
+function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, selected }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
@@ -684,24 +710,44 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows }) 
         fs.copyFileSync(archivePath, dst);
         picked = [dst];
     } else {
+        const candidates = listModCandidates(archivePath, recipe);
+        if (!candidates.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
+
+        let take;
+        if (selected && selected.length) {
+            take = candidates.filter(c => selected.includes(c.rel));
+            if (!take.length) return { ok: false, error: 'None of the chosen files are in that archive.' };
+        } else if (candidates.length === 1) {
+            take = candidates;
+        } else if (recipe.modAll) {
+            take = candidates;
+        } else {
+            // Hand the choice back rather than guessing. Sorted biggest-first, which puts
+            // the actual mod at the top for every pack seen so far.
+            return { ok: false, choose: candidates, title: recipe.title };
+        }
+
+        // Load order matters once several files are loaded together, and these packs are
+        // conventionally numbered ("10 DHTP normal.pk3", "11 HD SFX.wad"), so honour that.
+        take = [...take].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cn-mod-'));
         try {
-            const ex = findExtractor(archivePath);
-            if (!ex) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive) or unzip.' };
-            const res = spawnSync(ex.cmd, ex.args(archivePath, tmp), { encoding: 'utf8' });
+            const bsdtar = which('bsdtar');
+            if (!bsdtar) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive).' };
+            // Extract only the chosen members — these archives run to hundreds of megabytes
+            // and unpacking the other thirty addons to throw them away is pure waste.
+            const res = spawnSync(bsdtar, ['-xf', archivePath, '-C', tmp, ...take.map(t => t.rel)], { encoding: 'utf8' });
             if (res.status !== 0) return { ok: false, error: `Could not unpack the mod: ${(res.stderr || '').trim().slice(0, 300)}` };
 
-            const found = findFiles(tmp, recipe.modFile, 4);
-            if (!found.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
-            // Load order matters for stacked packs, and these are conventionally numbered
-            // ("10 DHTP normal.pk3", "11 HD SFX.wad"), so sort by name and keep it.
-            found.sort((a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true }));
-            const take = recipe.modAll ? found : [found[0]];
-            for (const f of take) {
-                const dst = path.join(modsDir, path.basename(f));
-                fs.copyFileSync(f, dst);
+            for (const t of take) {
+                const src = path.join(tmp, t.rel);
+                if (!fs.existsSync(src)) continue;
+                const dst = path.join(modsDir, t.name);
+                fs.copyFileSync(src, dst);
                 picked.push(dst);
             }
+            if (!picked.length) return { ok: false, error: 'The chosen files could not be extracted from that archive.' };
         } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
     }
 
@@ -728,7 +774,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows }) 
 }
 
 module.exports = {
-    RECIPES, DATA_SPECS, installMod,
+    RECIPES, DATA_SPECS, installMod, listModCandidates,
     listRecipes, getRecipe, detectRecipe,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,

@@ -953,7 +953,7 @@ ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     return { ok: true, path: res.filePaths[0] };
 });
 
-ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, overwrite } = {}) => {
+ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, selected, overwrite } = {}) => {
     if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
     const recipe = customInstallers.getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
@@ -984,11 +984,13 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
         }
 
         const mr = customInstallers.installMod({
-            recipeId, archivePath,
+            recipeId, archivePath, selected,
             engineRoot: engine.install_path, engineExe: engine.executable,
             dataRows: _grinderRowsForData(),
         });
-        if (!mr.ok) return mr;
+        // Several loadable files inside — the renderer asks which, then calls back with
+        // `selected`. Carries the engine title so the second pass can report it.
+        if (!mr.ok) return mr.choose ? { ...mr, engineTitle: engine.title } : mr;
         try { _registerCustomInstall(mr); } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
         invalidateGrinderInstalledCache();
         return { ...mr, engineTitle: engine.title };

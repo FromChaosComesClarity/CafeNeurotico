@@ -195,6 +195,44 @@ function renderCustomList(recipes) {
     }
 }
 
+// Which files out of a mod archive should actually be loaded. Resolves to an array of
+// archive-relative paths, or null if the user backed out. The biggest file is ticked
+// because in every pack seen so far that is the mod itself and the rest are extras.
+function pickModFiles(recipe, candidates) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('modal-modpick');
+        const list = document.getElementById('modpick-list');
+        document.getElementById('modpick-title').textContent = `${recipe.title} — what should load?`;
+        list.innerHTML = '';
+
+        candidates.forEach((c, i) => {
+            const row = document.createElement('label');
+            row.className = 'mp-row';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = c.rel;
+            cb.checked = i === 0;
+            const txt = document.createElement('div');
+            txt.innerHTML = `<div class="mp-name">${escHtml(c.name)}</div>` +
+                            `<div class="mp-sub">${_fmtBytes(c.size)}${c.dir && c.dir !== '.' ? ' · ' + escHtml(c.dir) : ''}</div>`;
+            row.appendChild(cb);
+            row.appendChild(txt);
+            list.appendChild(row);
+        });
+
+        const done = (val) => {
+            modal.classList.remove('active');
+            document.getElementById('btn-modpick-ok').onclick = null;
+            document.getElementById('btn-modpick-cancel').onclick = null;
+            resolve(val);
+        };
+        document.getElementById('btn-modpick-ok').onclick = () =>
+            done([...list.querySelectorAll('input:checked')].map(i => i.value));
+        document.getElementById('btn-modpick-cancel').onclick = () => done(null);
+        modal.classList.add('active');
+    });
+}
+
 async function runCustomInstall(recipe, btn) {
     const label = btn.textContent;
     // Anything thrown on the main side arrives here as a rejected invoke. Unhandled, that
@@ -223,6 +261,16 @@ async function runCustomInstall(recipe, btn) {
 
         // Reinstalling over an existing folder is a decision, not a default — ask rather
         // than silently deleting whatever is already there.
+        // The archive holds several loadable files — Black Edition ships the mod plus
+        // thirty-odd optional voice and footstep packs. Which one is "the mod" is not
+        // something to guess at, so ask, with the largest pre-ticked.
+        if (res && !res.ok && res.choose) {
+            const chosen = await pickModFiles(recipe, res.choose);
+            if (!chosen || !chosen.length) return;
+            btn.textContent = 'INSTALLING…';
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, selected: chosen });
+        }
+
         if (res && !res.ok && res.exists) {
             const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it with this download? Anything in its folder will be deleted.`, 'Replace', true);
             if (!ok) return;
