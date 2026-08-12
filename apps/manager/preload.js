@@ -174,6 +174,8 @@ contextBridge.exposeInMainWorld('api', {
                                 // --- in-process install (no GRINDER window) ---
                                 grinderInstall:   (payload) => ipcRenderer.invoke('grinder-install', payload),
                                 dlcList:          (grinderGameId, platform) => ipcRenderer.invoke('dlc-list', grinderGameId, platform),
+                                playTasks:        (grinderGameId) => ipcRenderer.invoke('play-tasks', grinderGameId),
+                                setLaunchTarget:  (grinderGameId, relPath, taskIndex) => ipcRenderer.invoke('set-launch-target', grinderGameId, relPath, taskIndex),
                                 grinderCancelInstall: () => ipcRenderer.invoke('grinder-install-cancel'),
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),
                                 grinderDefaultDir: () => ipcRenderer.invoke('grinder-default-dir'),

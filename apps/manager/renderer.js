@@ -119,6 +119,99 @@ function openSteamMenu(anchorBtn, appId) {
     setTimeout(() => document.addEventListener('click', _steamMenuOutside, true), 0);
 }
 
+// ── Play-task picker ──────────────────────────────────────────────────────────
+// A GOG release can ship several ways to start, and the one GOG marks primary is not
+// always the one you want: Quake: The Offering starts GLQuake, which reads its music off
+// the physical CD and so plays none at all, while the DOS task in the very same install
+// plays the soundtrack. The GRINDER face has always exposed this choice; from the Manager
+// there was no way to reach it, which made a whole class of GOG classics quietly worse.
+function _closePlayTaskMenu() {
+    document.getElementById('playtask-menu')?.remove();
+    document.removeEventListener('click', _playTaskMenuOutside, true);
+}
+function _playTaskMenuOutside(e) {
+    if (e.target.closest('#playtask-menu') || e.target.closest('#btn-gamepage-playtask')) return;
+    _closePlayTaskMenu();
+}
+function openPlayTaskMenu(anchorBtn, game, tasks) {
+    _closePlayTaskMenu();
+    const menu = document.createElement('div');
+    menu.id = 'playtask-menu';
+    menu.className = 'steam-menu pt-menu';
+
+    for (const t of tasks) {
+        const item = document.createElement('button');
+        item.className = 'pt-item' + (t.isActive ? ' active' : '');
+        item.dataset.index = String(t.index);
+
+        const check = document.createElement('div');
+        check.className = 'pt-check';
+        check.textContent = t.isActive ? '✓' : '';
+
+        const name = document.createElement('div');
+        name.className = 'pt-name';
+        name.textContent = t.name + (t.isPrimary ? ' — GOG default' : '');
+        const sub = document.createElement('div');
+        sub.className = 'pt-path';
+        sub.textContent = t.path;
+
+        const body = document.createElement('div');
+        body.appendChild(name);
+        body.appendChild(sub);
+        item.appendChild(check);
+        item.appendChild(body);
+        menu.appendChild(item);
+    }
+    document.body.appendChild(menu);
+
+    const r = anchorBtn.getBoundingClientRect();
+    const left = Math.min(r.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top  = (r.bottom + 6) + 'px';
+
+    menu.addEventListener('click', async (e) => {
+        const b = e.target.closest('.pt-item');
+        if (!b) return;
+        _closePlayTaskMenu();
+        // GOG's own primary is stored as no override at all, so a game left on the default
+        // keeps following it if a later update moves what the default is.
+        const picked = tasks.find(t => String(t.index) === b.dataset.index);
+        if (!picked) return;
+        const res = picked.isPrimary
+            ? await window.api.setLaunchTarget(game.GrinderGameId, '', null)
+            : await window.api.setLaunchTarget(game.GrinderGameId, picked.path, picked.index);
+        if (!res || !res.ok) {
+            showAlert('Could not save that choice.' + (res?.error ? `\n\n${res.error}` : ''));
+            return;
+        }
+        _refreshPlayTaskBtn(game);
+    });
+    setTimeout(() => document.addEventListener('click', _playTaskMenuOutside, true), 0);
+}
+
+async function _refreshPlayTaskBtn(game) {
+    const btn = document.getElementById('btn-gamepage-playtask');
+    if (!btn) return;
+    btn.style.display = 'none';
+    btn.onclick = null;
+    btn.classList.remove('active');
+    if (!/^gog_/i.test(game.GrinderGameId || '') || game.Installed != 1) return;
+
+    let tasks = [];
+    try { tasks = await window.api.playTasks(game.GrinderGameId) || []; } catch (e) {}
+    if (currentGameId !== game.id) return;   // gamepage moved on while we were asking
+    if (tasks.length < 2) return;            // one way to start is not a choice
+
+    const active = tasks.find(t => t.isActive);
+    btn.style.display = 'block';
+    // Tinted only when the game is on something other than GOG's default — the button
+    // says "this starts the usual way" or "this starts differently" without being opened.
+    btn.classList.toggle('active', !!active && !active.isPrimary);
+    btn.title = active ? `Starts: ${active.name} — click to change`
+                       : `Choose which of the ${tasks.length} versions PLAY starts`;
+    btn.onclick = (e) => { e.stopPropagation(); openPlayTaskMenu(btn, game, tasks); };
+}
+
 // ── Now Playing popup ─────────────────────────────────────────────────────────
 let _npTimer = null;
 
@@ -8628,6 +8721,9 @@ function openGamepage(game) {
             dlcBtn.onclick = null;
         }
     }
+
+    // Play-task picker — installed GOG games that ship more than one way to start
+    _refreshPlayTaskBtn(game);
 
     // Save Manager button — installed GOG & Epic games (locate/back up/restore saves)
     const savesBtn = document.getElementById('btn-gamepage-saves');

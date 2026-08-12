@@ -521,6 +521,20 @@ document.getElementById('btn-verify-installs')?.addEventListener('click', async 
 // ── Modal: Add / Edit game ─────────────────────────────────────────────────────
 const modal = document.getElementById('modal-game');
 
+// The GOG play tasks currently offered by the launch-target dropdown, so a selected
+// option (keyed by index) can be turned back into the path and index the row stores.
+let _editPlayTasks = [];
+function _launchTargetFields() {
+    const raw = document.getElementById('edit-launch-target').value;
+    if (raw === '') return { launch_target: null, launch_task_index: null };
+    const task = _editPlayTasks.find(t => String(t.index) === raw);
+    if (!task) return { launch_target: null, launch_task_index: null };
+    // The default is stored as no override at all, so the game keeps following GOG's
+    // primary if a later update moves it.
+    return task.isPrimary ? { launch_target: null, launch_task_index: null }
+                          : { launch_target: task.path, launch_task_index: task.index };
+}
+
 function openModal(game = null) {
     document.getElementById('modal-title').textContent = game ? 'Edit Game' : 'Add Game';
     document.getElementById('edit-id').value           = game?.id           || '';
@@ -550,19 +564,23 @@ function openModal(game = null) {
     document.getElementById('edit-verify-repair').style.display = isGogOrEpic ? 'flex' : 'none';
     document.getElementById('edit-achievements').style.display  = isGog       ? 'flex' : 'none';
 
-    // Load play tasks for launch target dropdown (GOG only)
+    // Load play tasks for launch target dropdown (GOG only). Options are keyed by the
+    // task's index, not its path: Quake's two mission packs are both glquake.exe and
+    // differ only in their arguments, so a path-keyed option cannot tell them apart.
     const launchTargetRow = document.getElementById('edit-launch-target-row');
     const launchTargetSel = document.getElementById('edit-launch-target');
     launchTargetSel.innerHTML = '<option value="">Default executable</option>';
     launchTargetRow.style.display = 'none';
+    _editPlayTasks = [];
     if (game?.id && isGog) {
         window.api.getPlayTasks(game.id).then(tasks => {
             if (!tasks || tasks.length <= 1) return;
+            _editPlayTasks = tasks;
             tasks.forEach(t => {
                 const opt = document.createElement('option');
-                opt.value = t.path;
+                opt.value = String(t.index);
                 opt.textContent = t.name + (t.isPrimary ? ' (default)' : '');
-                if (game.launch_target === t.path) opt.selected = true;
+                if (t.isActive) opt.selected = true;
                 launchTargetSel.appendChild(opt);
             });
             launchTargetRow.style.display = 'flex';
@@ -832,7 +850,7 @@ document.getElementById('btn-modal-save').addEventListener('click', async () => 
         use_dxvk_nvapi:document.getElementById('edit-dxvk-nvapi').checked? 1 : 0,
         use_battleye:  document.getElementById('edit-battleye').checked  ? 1 : 0,
         use_eac:          document.getElementById('edit-eac').checked            ? 1 : 0,
-        launch_target:    document.getElementById('edit-launch-target').value      || null,
+        ..._launchTargetFields(),
         launch_args:      document.getElementById('edit-launch-args').value.trim() || null,
         custom_exe:       document.getElementById('edit-custom-exe-enabled').checked
                             ? (document.getElementById('edit-custom-exe').value.trim() || null)

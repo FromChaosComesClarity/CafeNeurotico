@@ -839,6 +839,20 @@ ipcMain.handle('dlc-list', async (_, grinderGameId, platform) => {
     return res;
 });
 
+// The alternate ways a GOG release can be started (goggame-<appId>.info playTasks), and
+// the picker's write-back. grinder.db's games.id *is* the GrinderGameId, so the engine's
+// reader takes it unchanged — no lookup by app_id needed here.
+ipcMain.handle('play-tasks', (_, grinderGameId) => {
+    if (!grinderGameId || !ensureGrinderEngine()) return [];
+    try { return grinderEngine.gogPlayTasks(grinderGameId); } catch { return []; }
+});
+
+ipcMain.handle('set-launch-target', (_, grinderGameId, relPath, taskIndex) => {
+    if (!grinderGameId || !ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
+    try { return grinderEngine.setGogLaunchTarget(grinderGameId, relPath, taskIndex); }
+    catch (e) { return { ok: false, error: e.message }; }
+});
+
 // Cancel the in-flight in-process download (kills gogdl/legendary). The install
 // promise then resolves as failed and the renderer's queue advances to the next.
 ipcMain.handle('grinder-install-cancel', () => {

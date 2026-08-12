@@ -92,6 +92,10 @@ function ensureSchema(handle = db) {
         "ALTER TABLE games ADD COLUMN use_battleye INTEGER DEFAULT 0",
         "ALTER TABLE games ADD COLUMN use_eac INTEGER DEFAULT 0",
         "ALTER TABLE games ADD COLUMN launch_target TEXT",
+        // Which entry of goggame-<appId>.info playTasks launch_target came from. Needed
+        // because a path does not identify a task: Quake's two mission packs are both
+        // glquake.exe and differ only in their arguments (-game hipnotic / -game rogue).
+        "ALTER TABLE games ADD COLUMN launch_task_index INTEGER",
         "ALTER TABLE games ADD COLUMN launch_args TEXT",
         "ALTER TABLE games ADD COLUMN is_dlc INTEGER DEFAULT 0",
         "ALTER TABLE games ADD COLUMN custom_exe TEXT",
@@ -695,6 +699,72 @@ function prefixPathForGame(game, opts = {}) {
     return path.join(prefixesDir, safeName);
 }
 
+// ── GOG play tasks ───────────────────────────────────────────────────────────
+// A GOG release often ships more than one way to start. Quake: The Offering has three —
+// GLQuake (the primary, and the one with no music, being redbook-CD-only), WinQuake, and
+// the DOS build that actually plays the soundtrack. Which one you get is not a detail the
+// store makes visible, and picking the wrong default is not something we can fix for the
+// user; we can only let them choose.
+//
+// goggame-<appId>.info lists them; games.launch_target names the chosen one and is what
+// launchGame resolves the executable, the arguments and the working directory from.
+//
+// A path alone does not identify a task, which is why launch_task_index exists. Quake ships
+// seven, and three of them are the same executable: the primary Glquake.exe, plus both
+// mission packs as glquake.exe with -game hipnotic and -game rogue. Keyed on the path, the
+// two packs are indistinguishable and the first one listed wins — so choosing Dissolution
+// of Eternity would quietly start Scourge of Armagon.
+//
+// The index is a disambiguator, never the source of truth: a game update can reorder
+// playTasks, so it is only honoured when the entry it points at still has the stored path.
+function gogPlayTaskList(game) {
+    if (!game || game.store !== 'gog' || !game.install_path || !game.app_id) return [];
+    const installPath = expandTilde(game.install_path);
+    const infoFile = resolvePathCaseInsensitive(path.join(installPath, `goggame-${game.app_id}.info`));
+    let info;
+    try { info = JSON.parse(fs.readFileSync(infoFile, 'utf8')); } catch { return []; }
+
+    return (info.playTasks || [])
+        .map((t, index) => ({ t, index }))
+        .filter(({ t }) => t.type === 'FileTask' && t.path)
+        .map(({ t, index }) => ({
+            index,
+            // GOG leaves the primary task unnamed — it is "the game". The title beats
+            // repeating the filename, which the picker already shows underneath.
+            name: t.name || (t.isPrimary ? (game.title || t.path) : t.path.replace(/\\/g, '/')),
+            path: t.path.replace(/\\/g, '/'),
+            arguments: t.arguments || '',
+            workingDir: (t.workingDir || '').replace(/\\/g, '/'),
+            isPrimary: !!t.isPrimary,
+        }));
+}
+
+// The task launchGame will actually run, by one rule both it and the pickers follow.
+function activeGogPlayTask(game, tasks) {
+    if (!tasks.length) return null;
+    const rel = String(game.launch_target || game.executable || '').replace(/\\/g, '/');
+    if (!rel) return tasks.find(t => t.isPrimary) || null;
+    const byIndex = tasks.find(t => t.index === game.launch_task_index && t.path === rel);
+    return byIndex || tasks.find(t => t.path === rel) || null;
+}
+
+function gogPlayTasks(gameId) {
+    const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
+    const tasks = gogPlayTaskList(game);
+    const active = activeGogPlayTask(game, tasks);
+    return tasks.map(t => ({ ...t, isActive: active ? t.index === active.index : false }));
+}
+
+// Empty path clears the override and hands the choice back to GOG's primary task, so a
+// game left on the default follows it if a later update moves what the default is.
+function setGogLaunchTarget(gameId, relPath, taskIndex) {
+    const target = String(relPath || '').replace(/\\/g, '/').trim() || null;
+    const index = (target && Number.isInteger(taskIndex)) ? taskIndex : null;
+    db.prepare('UPDATE games SET launch_target = ?, launch_task_index = ? WHERE id = ?')
+      .run(target, index, gameId);
+    return { ok: true, launchTarget: target, launchTaskIndex: index };
+}
+
 async function launchGame(gameId, opts = {}) {
     // opts.onOutput(line) → "Play with Log": pipe the game's stdout/stderr live (for troubleshooting
     // problematic titles) instead of the normal detached/ignored spawn.
@@ -726,18 +796,10 @@ async function launchGame(gameId, opts = {}) {
     })());
 
     // The active playTask from goggame-*.info (GOG only) — it carries both the launch
-    // arguments and the working directory the game expects to be started from.
-    const gogTask = (() => {
-        if (game.store !== 'gog' || !installPath || !game.app_id) return null;
-        try {
-            const infoFile = path.join(installPath, `goggame-${game.app_id}.info`);
-            const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
-            const activeRel = (game.launch_target || game.executable || '').replace(/\\/g, '/');
-            return (info.playTasks || []).find(t =>
-                t.type === 'FileTask' && t.path && t.path.replace(/\\/g, '/') === activeRel
-            ) || null;
-        } catch { return null; }
-    })();
+    // arguments and the working directory the game expects to be started from. Resolved
+    // through the same helper the pickers use, so what the gamepage says will start is
+    // exactly what starts, mission packs included.
+    const gogTask = activeGogPlayTask(game, gogPlayTaskList(game));
 
     // Put back the config files GOG's installer would have copied out of gog-support/.
     // Early, because everything below — the arguments, the working directory, the DOSBox
@@ -2137,6 +2199,7 @@ module.exports = {
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
     findNativeDosbox, dosboxInstallHint, isGogDosGame, applyGogSupportFiles, engineSetting,
+    gogPlayTasks, setGogLaunchTarget,
     findGogCdAudioImages, gogCdAudioConfArgs,
     gogListManuals, gogDownloadManual,
 };

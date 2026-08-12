@@ -2875,6 +2875,22 @@
     .steam-menu-item { background:transparent; border:none; color:var(--text_sec); text-align:left; padding:9px 12px; border-radius:6px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:700; font-size:12px; letter-spacing:0.4px; white-space:nowrap; }
     .steam-menu-item:hover { background:var(--accent); color:var(--bg); }
 
+    /* Play-task picker: one GOG release can ship several ways to start, and they are not
+       interchangeable — Quake's DOS build plays the CD soundtrack its GLQuake primary
+       cannot. Two lines per entry because the file is often what separates tasks whose
+       names read alike ("Quake" vs "Quake (Software Mode)"). */
+    .pt-menu { max-width:400px; }
+    .pt-item { display:flex; align-items:flex-start; gap:9px; width:100%; background:transparent; border:none; color:var(--text_sec); text-align:left; padding:9px 12px; border-radius:6px; cursor:pointer; font-family:var(--ui-font,'Raleway'),sans-serif; }
+    .pt-item:hover { background:var(--accent); color:var(--bg); }
+    .pt-check { flex-shrink:0; width:11px; font-weight:900; font-size:12px; line-height:1.4; }
+    .pt-name { font-weight:700; font-size:12px; letter-spacing:0.4px; }
+    .pt-path { font-size:10px; font-weight:600; opacity:0.6; word-break:break-all; margin-top:2px; }
+    .pt-item.active .pt-name { color:var(--accent); }
+    .pt-item.active:hover .pt-name { color:var(--bg); }
+    /* Accent-tinted whenever the choice is not GOG's default, so the gamepage shows at a
+       glance that this game starts through something other than the obvious executable. */
+    #btn-gamepage-playtask.active { border-color:var(--accent); color:var(--accent); }
+
     .screenshots-banner { position: relative; height: 160px; background-size: cover; background-position: center; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border_solid); box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: box-shadow 0.2s, border-color 0.2s; cursor: pointer; overflow: hidden; }
     .screenshots-banner:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-color: var(--accent); }
     .screenshots-banner-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 1; }
@@ -3714,6 +3730,9 @@
                         </button>
                         <button id="btn-gamepage-dlc" class="btn-hero btn-hero-sq" title="Manage DLCs" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.44 12.99l-.01.02c-.34.76-.1 1.66.57 2.14l.02.01c.9.64 1.12 1.9.48 2.8l-.44.62c-.64.9-1.9 1.11-2.8.48l-.02-.01a1.78 1.78 0 0 0-2.28.44 1.78 1.78 0 0 0-.35 1.06v.02c0 1.1-.9 2-2 2h-.76c-1.1 0-2-.9-2-2v-.02c-.01-.7-.44-1.32-1.08-1.59a1.78 1.78 0 0 0-1.98.36l-.02.01c-.9.64-2.16.42-2.8-.48l-.44-.62a2.01 2.01 0 0 1 .48-2.8l.02-.01c.67-.48.91-1.38.57-2.14l-.01-.02a1.78 1.78 0 0 0-1.62-1.08H2c-1.1 0-2-.9-2-2v-.76c0-1.1.9-2 2-2h.02c.7-.01 1.32-.44 1.59-1.08"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <button id="btn-gamepage-playtask" class="btn-hero btn-hero-sq" title="Choose what PLAY starts" style="display:none;">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="12" y2="6"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/><polygon points="14 8 22 13 14 18"/></svg>
                         </button>
                         <button id="btn-gamepage-saves" class="btn-hero btn-hero-sq" title="Save Manager" style="display:none;">
                           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>

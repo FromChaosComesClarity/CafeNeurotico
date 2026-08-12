@@ -245,7 +245,7 @@ ipcMain.handle('add-game', (_, data) => {
 });
 
 ipcMain.handle('update-game', (_, id, data) => {
-    const allowed = ['title','store','app_id','install_path','executable','prefix_path','proton_path','installed','version','notes','platform','platforms','custom_env','winetricks','use_esync','use_fsync','use_dxvk_nvapi','use_battleye','use_eac','launch_target','launch_args','custom_exe'];
+    const allowed = ['title','store','app_id','install_path','executable','prefix_path','proton_path','installed','version','notes','platform','platforms','custom_env','winetricks','use_esync','use_fsync','use_dxvk_nvapi','use_battleye','use_eac','launch_target','launch_task_index','launch_args','custom_exe'];
     const entries = Object.entries(data).filter(([k]) => allowed.includes(k));
     if (!entries.length) return false;
     const set = entries.map(([k]) => `${k}=?`).join(', ');
@@ -1046,20 +1046,8 @@ ipcMain.handle('gogdl-install-redist', async (event, appId, platform, _installPa
     return runRedist(event.sender, 'redist-progress', appId, platform, prefixPath, protonPath);
 });
 
-// Play tasks from goggame-<id>.info (GOG only)
-ipcMain.handle('get-play-tasks', (_, gameId) => {
-    const game = db.prepare('SELECT * FROM games WHERE id=?').get(gameId);
-    if (!game || !game.install_path || game.store !== 'gog') return [];
-    const infoFile = path.join(expandTilde(game.install_path), `goggame-${game.app_id}.info`);
-    if (!fs.existsSync(infoFile)) return [];
-    try {
-        const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
-        return (info.playTasks || [])
-            .filter(t => t.type === 'FileTask' && t.path)
-            .map(t => ({ name: t.name || t.path, path: t.path.replace(/\\/g, '/'),
-                         arguments: t.arguments || '', isPrimary: !!t.isPrimary }));
-    } catch { return []; }
-});
+// Play tasks from goggame-<id>.info (GOG only) — shared with the Manager face's picker.
+ipcMain.handle('get-play-tasks', (_, gameId) => grinderEngine.gogPlayTasks(gameId));
 
 // Run any .exe / .msi inside the game's Wine prefix (mod installers, tools, etc.)
 // Inject GOG game registry entries into a Wine prefix so DLC/tool .exe installers
