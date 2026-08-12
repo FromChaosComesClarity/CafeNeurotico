@@ -811,6 +811,9 @@ ipcMain.handle('grinder-install', async (event, { gameId, grinderGameId, install
     try {
         await grinderEngine.headlessInstall(parsed.store, parsed.appId, platform, dir, opts);
         if (installErr) return { ok: false, error: installErr };
+        // Before the games.db write, so nothing that reads install state in between can
+        // answer from a Set that predates this install and undo it.
+        invalidateGrinderInstalledCache();
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=1 WHERE id=?").run(gameId); } catch {} }
         try { event.sender.send('install-status-updated'); } catch {}
         return { ok: true };
@@ -852,6 +855,9 @@ ipcMain.handle('grinder-uninstall', async (event, { gameId, grinderGameId } = {}
     _grinderProgressCb = (data) => { try { event.sender.send('grinder-install-progress', data); } catch {} };
     try {
         await grinderEngine.headlessUninstall(parsed.store, parsed.appId);
+        // Mirror of the install case: a Set that still lists this game would make
+        // resolveInstallState() answer 1 and put Installed back, undoing the uninstall.
+        invalidateGrinderInstalledCache();
         if (gameId && db) { try { db.prepare("UPDATE games SET Installed=0 WHERE id=?").run(gameId); } catch {} }
         try { event.sender.send('install-status-updated'); } catch {}
         return { ok: true };
@@ -1712,14 +1718,34 @@ function launchCmdsOf(game) {
     return expandLaunchers(game).map(l => l.cmd);
 }
 
-// grinder.db's installed-id set (gog_* / epic_*), cached by file mtime so the watcher
-// and batch scans don't reopen the DB once per row.
+// grinder.db's installed-id set (gog_* / epic_*), cached so the watcher and batch scans
+// don't reopen the DB once per row.
+//
+// The key has to account for WAL. grinder.db runs in WAL mode, so an install's
+// `UPDATE games SET installed=1` lands in grinder.db-wal and leaves the main file's
+// mtime untouched — keying on that alone pinned this Set to whatever it held at boot,
+// for the whole session. The damage was not just a stale read: for a row fronting both
+// Steam and GOG, resolveInstallState() sees the Steam copy absent and the GOG copy
+// "not installed", concludes 0, and verify-install-status writes that back — actively
+// undoing the Installed=1 the install had just committed. Hence a freshly installed
+// game reverting to Install until the app was restarted.
+//
+// Both files, mtime and size: a checkpoint drains the WAL back to 0 bytes without
+// necessarily moving mtime, and that is a change too. Reading the files rather than
+// hooking our own writes also keeps it correct when the writer is another process —
+// standalone GRINDER, or CREMA.
 let _grinderInstalledCache = { key: '', set: new Set() };
+function grinderInstalledStamp(p) {
+    let key = p;
+    for (const f of [p, p + '-wal']) {
+        try { const s = fs.statSync(f); key += `:${s.mtimeMs}:${s.size}`; } catch { key += ':-'; }
+    }
+    return key;
+}
 function grinderInstalledSet() {
     const p = grinderDbPath();
     if (!p) { _grinderInstalledCache = { key: '', set: new Set() }; return _grinderInstalledCache.set; }
-    let key = p;
-    try { key += ':' + fs.statSync(p).mtimeMs; } catch {}
+    const key = grinderInstalledStamp(p);
     if (key === _grinderInstalledCache.key) return _grinderInstalledCache.set;
     const set = new Set();
     try {
@@ -1729,6 +1755,13 @@ function grinderInstalledSet() {
     } catch {}
     _grinderInstalledCache = { key, set };
     return set;
+}
+
+// Belt and braces for the in-process case: after our own install/uninstall we know the
+// set changed, so drop it outright rather than trusting a filesystem stamp to have moved
+// within the same tick.
+function invalidateGrinderInstalledCache() {
+    _grinderInstalledCache = { key: '', set: new Set() };
 }
 
 // Is one launch command's store copy installed on disk? Returns true/false for a
