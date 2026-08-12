@@ -2899,6 +2899,7 @@
     .mp-row input { margin-top:3px; flex-shrink:0; accent-color:var(--accent); }
     .mp-name { font-size:13px; font-weight:700; color:var(--text_main); word-break:break-all; }
     .mp-sub { font-size:11px; color:var(--text_dim); margin-top:2px; word-break:break-all; }
+    .mp-head { font-size:11px; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--border_solid); padding-bottom:5px; }
 
     /* Play-task picker: one GOG release can ship several ways to start, and they are not
        interchangeable — Quake's DOS build plays the CD soundtrack its GLQuake primary
@@ -5738,9 +5739,19 @@ LOADING...READY.</div>
        itself above the Control Panel. -->
   <div id="modal-modpick" class="modal-overlay" style="z-index:27000;">
     <div class="modal-box" style="width:620px; max-width:95vw; max-height:80vh; text-align:left; display:flex; flex-direction:column;">
-      <h3 id="modpick-title" style="margin:0; color:var(--accent); text-transform:uppercase;">What should load?</h3>
-      <div style="font-size:12px; color:var(--text_sec); margin:6px 0 10px;">This download contains more than one loadable file. The largest is usually the mod itself; the rest are normally optional extras you can add if you want them. Load order follows the file names.</div>
-      <div id="modpick-list" style="display:flex; flex-direction:column; gap:2px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
+      <h3 id="modpick-title" style="margin:0; color:var(--accent); text-transform:uppercase;">How should it run?</h3>
+      <div style="overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;">
+        <div id="modpick-files-wrap">
+          <div class="mp-head">Files to load</div>
+          <div style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;">This download contains more than one loadable file. The largest is usually the mod itself; the rest are normally optional extras you can add if you want them. Load order follows the file names.</div>
+          <div id="modpick-list" style="display:flex; flex-direction:column; gap:2px;"></div>
+        </div>
+        <div id="modpick-iwad-wrap" style="margin-top:14px;">
+          <div class="mp-head">Which Doom to play it on</div>
+          <div style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;">Every Doom you own has been linked next to the engine, so the mod can run on any of them.</div>
+          <div id="modpick-iwad-list" style="display:flex; flex-direction:column; gap:2px;"></div>
+        </div>
+      </div>
       <div class="row" style="margin-top:12px; flex-shrink:0;">
         <button id="btn-modpick-ok" class="primary" style="flex:2;">Install Selected</button>
         <button id="btn-modpick-cancel" style="flex:1; background:transparent; border:1px solid var(--border_solid); color:var(--text_sec);">Cancel</button>

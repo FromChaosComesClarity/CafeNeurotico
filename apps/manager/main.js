@@ -953,7 +953,7 @@ ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     return { ok: true, path: res.filePaths[0] };
 });
 
-ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, selected, overwrite } = {}) => {
+ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, selected, iwad, overwrite } = {}) => {
     if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
     const recipe = customInstallers.getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
@@ -984,7 +984,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
         }
 
         const mr = customInstallers.installMod({
-            recipeId, archivePath, selected,
+            recipeId, archivePath, selected, iwad,
             engineRoot: engine.install_path, engineExe: engine.executable,
             dataRows: _grinderRowsForData(),
         });

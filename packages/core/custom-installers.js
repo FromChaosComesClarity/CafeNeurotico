@@ -727,13 +727,55 @@ function listModCandidates(archivePath, recipe) {
     return out.sort((a, b) => b.size - a.size);   // biggest first: the mod, then its extras
 }
 
-function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, selected }) {
+// The IWADs sitting beside the engine, with names a person recognises. Anything unknown
+// is offered under its filename rather than hidden — a mod set can legitimately ship its
+// own IWAD, and Freedoom is a real answer for someone who owns nothing.
+const IWAD_LABELS = [
+    [/^doom2\.wad$/i,        'Doom II: Hell on Earth'],
+    [/^doomu\.wad$/i,        'The Ultimate Doom'],
+    [/^doom\.wad$/i,         'Doom / The Ultimate Doom'],
+    [/^doom1\.wad$/i,        'Doom (shareware)'],
+    [/^tnt\.wad$/i,          'Final Doom: TNT Evilution'],
+    [/^plutonia\.wad$/i,     'Final Doom: The Plutonia Experiment'],
+    [/^freedoom2\.wad$/i,    'Freedoom: Phase 2'],
+    [/^freedoom1?\.wad$/i,   'Freedoom: Phase 1'],
+    [/^heretic\.wad$/i,      'Heretic'],
+    [/^hexen\.wad$/i,        'Hexen'],
+];
+
+function listIwads(engineRoot) {
+    let names = [];
+    try { names = fs.readdirSync(engineRoot).filter(f => /\.wad$/i.test(f)); } catch { return []; }
+    return names
+        .map(file => {
+            const hit = IWAD_LABELS.find(([rx]) => rx.test(file));
+            return { file, label: hit ? hit[1] : file };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, selected, iwad }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
     if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall GZDoom or UZDoom.' };
     if (!recipe.archive.test(path.basename(archivePath))) {
         return { ok: false, error: `That file does not look like ${recipe.title}. ${recipe.source.hint}` };
+    }
+
+    // Which Doom to play it on is the user's call, not the recipe's. With Ultimate Doom,
+    // Doom II, TNT and Plutonia all linked beside the engine, defaulting to doom2.wad
+    // silently throws away three of them. `iwad` of '' is a deliberate choice too: it
+    // means "ask me at launch", which is GZDoom's own IWAD picker doing the job every run.
+    const iwads = listIwads(engineRoot);
+    const needIwad = recipe.data === 'doom' && iwads.length > 1 && iwad === undefined;
+
+    // Ask once for everything still unsettled, rather than a chain of dialogs.
+    const candidates = (ext => ext === '.pk3' || ext === '.wad' ? [] : listModCandidates(archivePath, recipe))(path.extname(archivePath).toLowerCase());
+    const needFiles = candidates.length > 1 && !(selected && selected.length) && !recipe.modAll;
+    if (needFiles || needIwad) {
+        if (!candidates.length && !iwads.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
+        return { ok: false, choose: needFiles ? candidates : [], iwads: needIwad ? iwads : [], title: recipe.title };
     }
 
     // Its own folder under the engine, so two mods never fight over a filename and
@@ -750,22 +792,13 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
         fs.copyFileSync(archivePath, dst);
         picked = [dst];
     } else {
-        const candidates = listModCandidates(archivePath, recipe);
         if (!candidates.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
 
-        let take;
-        if (selected && selected.length) {
-            take = candidates.filter(c => selected.includes(c.rel));
-            if (!take.length) return { ok: false, error: 'None of the chosen files are in that archive.' };
-        } else if (candidates.length === 1) {
-            take = candidates;
-        } else if (recipe.modAll) {
-            take = candidates;
-        } else {
-            // Hand the choice back rather than guessing. Sorted biggest-first, which puts
-            // the actual mod at the top for every pack seen so far.
-            return { ok: false, choose: candidates, title: recipe.title };
-        }
+        const take0 = (selected && selected.length)
+            ? candidates.filter(c => selected.includes(c.rel))
+            : candidates;                      // single candidate, or modAll
+        if (!take0.length) return { ok: false, error: 'None of the chosen files are in that archive.' };
+        let take = take0;
 
         // Load order matters once several files are loaded together, and these packs are
         // conventionally numbered ("10 DHTP normal.pk3", "11 HD SFX.wad"), so honour that.
@@ -791,13 +824,14 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
         } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
     }
 
-    // Point at an IWAD explicitly when the recipe prefers one, otherwise let the engine
-    // offer its own picker over whatever is linked beside it.
+    // The user's choice wins; '' means they asked to be prompted at launch, so no -iwad
+    // goes on the line and the engine's own picker handles it. With nothing chosen, fall
+    // back to the recipe's preference, and to the engine's picker if even that is absent.
     const args = [];
-    if (recipe.iwad) {
-        const iwad = fs.readdirSync(engineRoot).find(f => recipe.iwad.test(f));
-        if (iwad) args.push('-iwad', iwad);
-    }
+    const chosen = iwad !== undefined
+        ? iwad
+        : (recipe.iwad ? (iwads.find(i => recipe.iwad.test(i.file))?.file || '') : '');
+    if (chosen) args.push('-iwad', chosen);
     for (const f of picked) args.push('-file', path.relative(engineRoot, f));
 
     return {
@@ -810,11 +844,13 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
         platform: 'windows',
         launchArgs: args.map(a => (/\s/.test(a) ? `"${a}"` : a)).join(' '),
         modFiles: picked.map(f => path.basename(f)),
+        iwad: chosen,
+        iwadLabel: chosen ? (iwads.find(i => i.file === chosen)?.label || chosen) : 'chosen at launch',
     };
 }
 
 module.exports = {
-    RECIPES, DATA_SPECS, installMod, listModCandidates,
+    RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,

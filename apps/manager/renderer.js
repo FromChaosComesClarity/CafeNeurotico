@@ -198,13 +198,18 @@ function renderCustomList(recipes) {
 // Which files out of a mod archive should actually be loaded. Resolves to an array of
 // archive-relative paths, or null if the user backed out. The biggest file is ticked
 // because in every pack seen so far that is the mod itself and the rest are extras.
-function pickModFiles(recipe, candidates) {
+function pickModFiles(recipe, candidates, iwads) {
     return new Promise(resolve => {
         const modal = document.getElementById('modal-modpick');
         const list = document.getElementById('modpick-list');
-        document.getElementById('modpick-title').textContent = `${recipe.title} — what should load?`;
+        const iwadWrap = document.getElementById('modpick-iwad-wrap');
+        const iwadList = document.getElementById('modpick-iwad-list');
+        document.getElementById('modpick-title').textContent = `${recipe.title} — how should it run?`;
         list.innerHTML = '';
+        iwadList.innerHTML = '';
 
+        const filesWrap = document.getElementById('modpick-files-wrap');
+        filesWrap.style.display = candidates.length ? '' : 'none';
         candidates.forEach((c, i) => {
             const row = document.createElement('label');
             row.className = 'mp-row';
@@ -220,14 +225,39 @@ function pickModFiles(recipe, candidates) {
             list.appendChild(row);
         });
 
+        // Which Doom to play it on. "Ask me every time" is a real answer, not a cop-out:
+        // it hands the choice to the engine's own IWAD picker on every launch, which is
+        // what you want when you own four of them and pick by mood.
+        iwadWrap.style.display = (iwads && iwads.length) ? '' : 'none';
+        if (iwads && iwads.length) {
+            const opts = [...iwads, { file: '', label: 'Ask me every time I launch it' }];
+            opts.forEach((o, i) => {
+                const row = document.createElement('label');
+                row.className = 'mp-row';
+                const rb = document.createElement('input');
+                rb.type = 'radio';
+                rb.name = 'modpick-iwad';
+                rb.value = o.file;
+                rb.checked = i === 0;
+                const txt = document.createElement('div');
+                txt.innerHTML = `<div class="mp-name">${escHtml(o.label)}</div>` +
+                                (o.file ? `<div class="mp-sub">${escHtml(o.file)}</div>` : '');
+                row.appendChild(rb);
+                row.appendChild(txt);
+                iwadList.appendChild(row);
+            });
+        }
+
         const done = (val) => {
             modal.classList.remove('active');
             document.getElementById('btn-modpick-ok').onclick = null;
             document.getElementById('btn-modpick-cancel').onclick = null;
             resolve(val);
         };
-        document.getElementById('btn-modpick-ok').onclick = () =>
-            done([...list.querySelectorAll('input:checked')].map(i => i.value));
+        document.getElementById('btn-modpick-ok').onclick = () => done({
+            selected: [...list.querySelectorAll('input:checked')].map(i => i.value),
+            iwad: (iwads && iwads.length) ? (iwadList.querySelector('input:checked')?.value ?? '') : undefined,
+        });
         document.getElementById('btn-modpick-cancel').onclick = () => done(null);
         modal.classList.add('active');
     });
@@ -264,11 +294,15 @@ async function runCustomInstall(recipe, btn) {
         // The archive holds several loadable files — Black Edition ships the mod plus
         // thirty-odd optional voice and footstep packs. Which one is "the mod" is not
         // something to guess at, so ask, with the largest pre-ticked.
-        if (res && !res.ok && res.choose) {
-            const chosen = await pickModFiles(recipe, res.choose);
-            if (!chosen || !chosen.length) return;
+        if (res && !res.ok && (res.choose || res.iwads)) {
+            const chosen = await pickModFiles(recipe, res.choose || [], res.iwads || []);
+            if (!chosen) return;
+            if (res.choose && res.choose.length && !chosen.selected.length) return;
             btn.textContent = 'INSTALLING…';
-            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, selected: chosen });
+            res = await window.api.customInstall({
+                recipeId: recipe.id, archivePath: picked.path,
+                selected: chosen.selected, iwad: chosen.iwad,
+            });
         }
 
         if (res && !res.ok && res.exists) {
@@ -282,6 +316,7 @@ async function runCustomInstall(recipe, btn) {
         const bits = [];
         if (res.engineTitle) bits.push(`Running on ${res.engineTitle}.`);
         if (res.modFiles && res.modFiles.length) bits.push(`Loading ${res.modFiles.join(', ')}.`);
+        if (res.iwadLabel) bits.push(`Playing on ${res.iwadLabel}.`);
         if (res.dataFrom) bits.push(`Game data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).`);
         showAlert(`${res.title} is installed and added to your library.${bits.length ? '\n\n' + bits.join('\n') : ''}`);
         renderCustomList(await window.api.customRecipeList() || []);
