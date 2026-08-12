@@ -3693,6 +3693,7 @@ document.getElementById('gallery-sort').addEventListener('change', e => {
     window.api.setSetting('gallery_sort', _gallerySort);
     applyFilters();
 });
+document.getElementById('btn-gallery-random')?.addEventListener('click', pickRandomVisible);
 (async () => {
     const saved = await window.api.getSetting('gallery_sort');
     if (saved && ['alpha','played','favs','want','added','scraped'].includes(saved)) {
@@ -3784,6 +3785,31 @@ function searchBlob(game) {
         Object.defineProperty(game, _SEARCH_BLOB, { value: blob, enumerable: false, configurable: true });
     }
     return blob;
+}
+
+// ── Random pick ───────────────────────────────────────────────────────────────
+// The set the gallery last drew, kept so the dice can choose from exactly what is on
+// screen. Also remembers the last few picks: a shuffle that hands you the same game
+// twice in a row does not feel random even when it is.
+let _galleryVisible = [];
+let _recentPicks = [];
+
+function pickRandomVisible() {
+    const pool = _galleryVisible;
+    if (!pool.length) { showAlert('Nothing to pick from — no games match the current filters.'); return; }
+    if (pool.length === 1) { openHomeGameById(pool[0].id, pool[0]); return; }
+
+    // Avoid repeats, but never at the cost of refusing to pick: with a pool smaller than
+    // the memory, drop the oldest exclusions until something is available.
+    const memory = Math.min(_recentPicks.length, Math.max(0, pool.length - 1));
+    const recent = new Set(_recentPicks.slice(-memory));
+    const fresh = pool.filter(g => !recent.has(g.id));
+    const from = fresh.length ? fresh : pool;
+
+    const game = from[Math.floor(Math.random() * from.length)];
+    _recentPicks.push(game.id);
+    if (_recentPicks.length > 10) _recentPicks.shift();
+    openHomeGameById(game.id, game);
 }
 
 function applyFilters() {
@@ -3883,6 +3909,11 @@ function applyFilters() {
     // non-alphabetical sort the RECENTLY-PLAYED strip is skipped so the whole grid
     // reads in the selected order.
     filtered = sortGalleryGames(filtered);
+
+    // What the gallery is actually showing right now. The random pick reads this rather
+    // than re-deriving the filters, so "surprise me" always answers the question the
+    // screen is currently asking — search text, category, genre and playlist included.
+    _galleryVisible = filtered;
 
     let recentGames = [];
     let regularGames = [...filtered];

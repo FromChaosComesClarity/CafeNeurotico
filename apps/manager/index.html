@@ -204,6 +204,11 @@
     .panel-filter-btn.active { background: var(--text_main); color: var(--bg); border-color: var(--text_main); box-shadow: 0 0 10px var(--text_main); }
     #gallery-search-wrap { display: flex; align-items: center; gap: 14px; padding: 0 0 18px; }
     #gallery-search-inner { position: relative; flex: 1; }
+    /* Solid accent, so the one control that *does* something sits apart from the filters
+       that merely narrow. Matches the select height (12px/12px + the same radius). */
+    #btn-gallery-random { flex-shrink: 0; padding: 13px 18px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--accent); color: var(--bg); font-family: var(--ui-font, 'Raleway'), sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 0.6px; cursor: pointer; white-space: nowrap; transition: filter 0.15s, transform 0.1s; }
+    #btn-gallery-random:hover { filter: brightness(1.12); }
+    #btn-gallery-random:active { transform: translateY(1px); }
     #gallery-search { width: 100%; box-sizing: border-box; padding: 13px 44px 13px 46px; background: rgba(0,0,0,0.35); border: 1.5px solid var(--border_solid); border-radius: 12px; color: var(--text_main); font-family: var(--ui-font, 'Raleway'), sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; transition: border-color 0.2s, box-shadow 0.2s; }
     #gallery-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--border), 0 6px 24px rgba(0,0,0,0.4); }
     #gallery-search::placeholder { color: var(--text_dim); font-weight: 400; font-style: italic; letter-spacing: 0; }
@@ -3680,6 +3685,9 @@
             <select id="gallery-playlist" title="Playlist" aria-label="Playlist">
               <option value="none">No Playlist</option><!-- options rebuilt from allPlaylists at runtime -->
             </select>
+            <!-- Picks from whatever the filters above are currently showing, so it doubles as
+                 "pick me a GOG strategy game I haven't installed" once the row is set up. -->
+            <button id="btn-gallery-random" title="Pick a random game from what's shown">PICK A RANDOM GAME</button>
             <span id="gallery-search-count"></span>
           </div>
 
