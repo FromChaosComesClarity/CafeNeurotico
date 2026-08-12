@@ -181,31 +181,38 @@ function renderCustomList(recipes) {
 }
 
 async function runCustomInstall(recipe, btn) {
-    const picked = await window.api.customInstallPick(recipe.id);
-    if (!picked || !picked.ok) return;
-
     const label = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'INSTALLING…';
-    let res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path });
+    // Anything thrown on the main side arrives here as a rejected invoke. Unhandled, that
+    // is a button that does nothing at all — the worst possible failure, because there is
+    // nothing to report and nowhere to look. Every path below either succeeds or says why.
+    try {
+        const picked = await window.api.customInstallPick(recipe.id);
+        if (!picked || !picked.ok) return;   // cancelled the file dialog
 
-    // Reinstalling over an existing folder is a decision, not a default — ask rather than
-    // silently deleting whatever is already there.
-    if (!res.ok && res.exists) {
-        const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it with this download? Anything in its folder will be deleted.`, 'Replace', true);
-        if (ok) res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, overwrite: true });
-        else { btn.disabled = false; btn.textContent = label; return; }
+        btn.disabled = true;
+        btn.textContent = 'INSTALLING…';
+        let res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path });
+
+        // Reinstalling over an existing folder is a decision, not a default — ask rather
+        // than silently deleting whatever is already there.
+        if (res && !res.ok && res.exists) {
+            const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it with this download? Anything in its folder will be deleted.`, 'Replace', true);
+            if (!ok) return;
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, overwrite: true });
+        }
+
+        if (!res || !res.ok) { showAlert((res && res.error) || 'Could not install that.'); return; }
+
+        const from = res.dataFrom ? `\n\nGame data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).` : '';
+        showAlert(`${res.title} is installed and added to your library.${from}`);
+        renderCustomList(await window.api.customRecipeList() || []);
+        loadGames();
+    } catch (e) {
+        showAlert(`Something went wrong installing ${recipe.title}.\n\n${e && e.message ? e.message : e}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = label;
     }
-
-    btn.disabled = false;
-    btn.textContent = label;
-
-    if (!res.ok) { showAlert(res.error || 'Could not install that.'); return; }
-
-    const from = res.dataFrom ? `\n\nGame data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).` : '';
-    showAlert(`${res.title} is installed and added to your library.${from}`);
-    renderCustomList(await window.api.customRecipeList() || []);
-    loadGames();
 }
 
 document.getElementById('btn-custom-install')?.addEventListener('click', openCustomInstallModal);

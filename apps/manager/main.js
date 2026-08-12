@@ -885,7 +885,11 @@ ipcMain.handle('custom-recipe-list', () => {
 
 ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     const recipe = customInstallers.getRecipe(recipeId);
-    const res = await dialog.showOpenDialog(win, {
+    // There is no module-scope `win` in this file — every dialog derives the parent
+    // itself. Referencing one throws inside the handler, which reaches the renderer as
+    // a rejected invoke and looks exactly like a button that does nothing.
+    const parent = BrowserWindow.getFocusedWindow();
+    const res = await dialog.showOpenDialog(parent, {
         title: recipe ? `Select the ${recipe.title} download` : 'Select the download',
         filters: [{ name: 'Archives', extensions: ['zip', '7z', 'rar', 'tar', 'gz', 'xz'] }],
         properties: ['openFile'],
