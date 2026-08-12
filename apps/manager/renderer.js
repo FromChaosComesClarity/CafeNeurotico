@@ -119,6 +119,98 @@ function openSteamMenu(anchorBtn, appId) {
     setTimeout(() => document.addEventListener('click', _steamMenuOutside, true), 0);
 }
 
+// ── Fan games & source ports ─────────────────────────────────────────────────
+// The catalogue of things installable from a file the user already downloaded. Each entry
+// states where to get the download and what it is called, because "go find a source port"
+// is the step that actually stops people — and then reports whether the game data it needs
+// was located in their own library, which is the half worth automating.
+async function openCustomInstallModal() {
+    const modal = document.getElementById('modal-custom');
+    const list = document.getElementById('custom-list');
+    list.innerHTML = `<div class="hc-empty">Loading&hellip;</div>`;
+    modal.classList.add('active');
+    renderCustomList(await window.api.customRecipeList() || []);
+}
+
+function renderCustomList(recipes) {
+    const list = document.getElementById('custom-list');
+    list.innerHTML = '';
+    if (!recipes.length) { list.innerHTML = `<div class="hc-empty">Nothing in the catalogue yet.</div>`; return; }
+
+    for (const r of recipes) {
+        const row = document.createElement('div');
+        row.className = 'ci-row';
+
+        // Data status is the thing worth saying loudest: it decides whether this install
+        // will produce something playable, and the user can act on it.
+        let dataLine = '';
+        if (r.data) {
+            dataLine = r.data.ready
+                ? `<div class="ci-meta">Game data: <span class="ci-ok">ready</span> &mdash; from your copy of ${escHtml(r.data.from)}</div>`
+                : `<div class="ci-meta">Game data: <span class="ci-warn">${escHtml(r.data.label)} needed</span> &mdash; ${escHtml(r.data.message || '')}${
+                      r.data.owned && r.data.owned.length ? ` <span style="color:var(--text_sec);">(you own: ${escHtml(r.data.owned.slice(0, 3).join(', '))})</span>` : ''}</div>`;
+        }
+
+        row.innerHTML =
+            `<div class="ci-head"><span class="ci-title">${escHtml(r.title)}</span><span class="ci-kind">${escHtml(r.kind)}</span>${
+                r.game ? `<span class="ci-kind">for ${escHtml(r.game)}</span>` : ''}</div>` +
+            `<div class="ci-blurb">${escHtml(r.blurb)}</div>` +
+            `<div class="ci-meta">Get it from <a href="#" data-url="${escHtml(r.source.url)}">${escHtml(r.source.name)}</a><br>${escHtml(r.source.hint)}</div>` +
+            dataLine +
+            `<div class="ci-actions"></div>`;
+
+        const actions = row.querySelector('.ci-actions');
+        const btn = document.createElement('button');
+        btn.className = 'primary';
+        btn.textContent = r.installed ? 'REINSTALL' : 'INSTALL FROM FILE';
+        btn.onclick = () => runCustomInstall(r, btn);
+        actions.appendChild(btn);
+        if (r.installed) {
+            const tag = document.createElement('span');
+            tag.className = 'ci-installed';
+            tag.textContent = 'INSTALLED';
+            actions.appendChild(tag);
+        }
+
+        row.querySelector('a[data-url]')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.api.openExternal(e.target.dataset.url);
+        });
+        list.appendChild(row);
+    }
+}
+
+async function runCustomInstall(recipe, btn) {
+    const picked = await window.api.customInstallPick(recipe.id);
+    if (!picked || !picked.ok) return;
+
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'INSTALLING…';
+    let res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path });
+
+    // Reinstalling over an existing folder is a decision, not a default — ask rather than
+    // silently deleting whatever is already there.
+    if (!res.ok && res.exists) {
+        const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it with this download? Anything in its folder will be deleted.`, 'Replace', true);
+        if (ok) res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, overwrite: true });
+        else { btn.disabled = false; btn.textContent = label; return; }
+    }
+
+    btn.disabled = false;
+    btn.textContent = label;
+
+    if (!res.ok) { showAlert(res.error || 'Could not install that.'); return; }
+
+    const from = res.dataFrom ? `\n\nGame data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).` : '';
+    showAlert(`${res.title} is installed and added to your library.${from}`);
+    renderCustomList(await window.api.customRecipeList() || []);
+    loadGames();
+}
+
+document.getElementById('btn-custom-install')?.addEventListener('click', openCustomInstallModal);
+document.getElementById('btn-close-custom')?.addEventListener('click', () => document.getElementById('modal-custom').classList.remove('active'));
+
 // ── Play-task picker ──────────────────────────────────────────────────────────
 // A GOG release can ship several ways to start, and the one GOG marks primary is not
 // always the one you want: Quake: The Offering starts GLQuake, which reads its music off

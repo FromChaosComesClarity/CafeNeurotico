@@ -853,6 +853,82 @@ ipcMain.handle('set-launch-target', (_, grinderGameId, relPath, taskIndex) => {
     catch (e) { return { ok: false, error: e.message }; }
 });
 
+// ── Custom installers (fan games, source ports, custom engines) ──────────────
+// The user brings the download; we identify it, unpack it, and wire it to game data they
+// already own. See packages/core/custom-installers.js for why this is a catalogue of
+// specific recipes rather than one generic folder importer.
+const customInstallers = require('../../packages/core/custom-installers.js');
+
+const _grinderRowsForData = () => {
+    if (!ensureGrinderEngine()) return [];
+    try { return _grinderEngineDb.prepare('SELECT title, install_path, installed FROM games').all(); }
+    catch { return []; }
+};
+
+// The catalogue, each entry carrying what this machine can currently do with it: whether
+// the required game data is already resolvable, and whether it is installed already.
+ipcMain.handle('custom-recipe-list', () => {
+    const rows = _grinderRowsForData();
+    return customInstallers.listRecipes().map(r => {
+        const out = { ...r, installed: false, data: r.data ? { ...r.data } : null };
+        try { out.installed = !!_grinderEngineDb?.prepare('SELECT 1 FROM games WHERE id=?').get(`cn_${r.id}`); } catch {}
+        if (r.data) {
+            const d = customInstallers.resolveGameData(r.data.id, rows);
+            out.data.ready = d.ok;
+            out.data.from = d.ok ? d.title : '';
+            out.data.owned = d.owned || [];
+            out.data.message = d.ok ? '' : d.message;
+        }
+        return out;
+    });
+});
+
+ipcMain.handle('custom-install-pick', async (_, recipeId) => {
+    const recipe = customInstallers.getRecipe(recipeId);
+    const res = await dialog.showOpenDialog(win, {
+        title: recipe ? `Select the ${recipe.title} download` : 'Select the download',
+        filters: [{ name: 'Archives', extensions: ['zip', '7z', 'rar', 'tar', 'gz', 'xz'] }],
+        properties: ['openFile'],
+    });
+    if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+    return { ok: true, path: res.filePaths[0] };
+});
+
+ipcMain.handle('custom-install', async (_, { recipeId, archivePath, overwrite } = {}) => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
+
+    const r = customInstallers.installFromArchive({
+        recipeId, archivePath, overwrite: !!overwrite,
+        installRoot: grinderDefaultDir(),
+        dataRows: _grinderRowsForData(),
+    });
+    if (!r.ok) return r;
+
+    // Registered in grinder.db so the shared engine owns the launch — that is what buys
+    // Proton, the prefix, and every fix that lives in launchGame, for free. games.db then
+    // only needs to point at it, exactly like a GOG title does.
+    const gid = `cn_${r.recipeId}`;
+    try {
+        _grinderEngineDb.prepare(`INSERT INTO games (id,title,store,installed,install_path,executable,platform)
+                                  VALUES (?,?,?,1,?,?,?)
+                                  ON CONFLICT(id) DO UPDATE SET
+                                    installed=1, install_path=excluded.install_path,
+                                    executable=excluded.executable, platform=excluded.platform`)
+            .run(gid, r.title, 'custom', r.installPath, r.executable, r.platform);
+    } catch (e) { return { ok: false, error: `Installed, but could not register it: ${e.message}` }; }
+
+    const cmd = `grinder://launch/${gid}`;
+    try {
+        const existing = db.prepare('SELECT id FROM games WHERE GrinderGameId=?').get(gid);
+        if (existing) db.prepare('UPDATE games SET Installed=1, LaunchCommand=? WHERE id=?').run(cmd, existing.id);
+        else db.prepare(`INSERT INTO games (Game, Store, LaunchCommand, GrinderGameId, Installed, FAV, WANT_TO_PLAY)
+                         VALUES (?,?,?,?,1,'NO','NO')`).run(r.title, 'Others', cmd, gid);
+    } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
+
+    invalidateGrinderInstalledCache();
+    return r;
+});
+
 // Cancel the in-flight in-process download (kills gogdl/legendary). The install
 // promise then resolves as failed and the renderer's queue advances to the next.
 ipcMain.handle('grinder-install-cancel', () => {
