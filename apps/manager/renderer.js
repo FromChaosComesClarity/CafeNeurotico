@@ -468,9 +468,12 @@ function renderDownloadManager() {
         $('dlm-msg').textContent = _dlActive.message || '';
         // Stalled: colour the bar and the figure so a frozen percentage cannot be mistaken
         // for a working one, and put the explanation where the eye already is.
+        // Both of these carry their normal colour in the inline style attribute, so the
+        // "not stalled" branch has to restore var(--accent) explicitly — clearing to ''
+        // deletes the declaration and leaves the bar with no background at all (invisible).
         const stalled = !!_dlActive.stalled;
-        $('dlm-bar').style.background = stalled ? '#ef5350' : '';
-        $('dlm-pct').style.color = stalled ? '#ef5350' : '';
+        $('dlm-bar').style.background = stalled ? '#ef5350' : 'var(--accent)';
+        $('dlm-pct').style.color = stalled ? '#ef5350' : 'var(--accent)';
         const warn = $('dlm-stall-warning');
         if (warn) {
             warn.style.display = stalled ? 'flex' : 'none';
