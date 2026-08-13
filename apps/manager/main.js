@@ -983,14 +983,23 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
             engine = { install_path: er.installPath, executable: er.executable, title: er.title };
         }
 
-        const mr = customInstallers.installMod({
-            recipeId, archivePath, selected, iwad,
-            engineRoot: engine.install_path, engineExe: engine.executable,
-            dataRows: _grinderRowsForData(),
-        });
+        // A game on a shared engine brings no download of its own — it needs the engine
+        // and its data, and gets a folder of its own so two Build games never collide
+        // over tiles000.art.
+        const mr = recipe.onEngine
+            ? customInstallers.installGameOnEngine({
+                recipeId, dataPath, overwrite: !!overwrite,
+                engineRoot: engine.install_path, engineExe: engine.executable,
+                installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
+              })
+            : customInstallers.installMod({
+                recipeId, archivePath, selected, iwad,
+                engineRoot: engine.install_path, engineExe: engine.executable,
+                dataRows: _grinderRowsForData(),
+              });
         // Several loadable files inside — the renderer asks which, then calls back with
         // `selected`. Carries the engine title so the second pass can report it.
-        if (!mr.ok) return mr.choose ? { ...mr, engineTitle: engine.title } : mr;
+        if (!mr.ok) return (mr.choose || mr.needsData) ? { ...mr, engineTitle: engine.title } : mr;
         try { _registerCustomInstall(mr); } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
         invalidateGrinderInstalledCache();
         return { ...mr, engineTitle: engine.title };

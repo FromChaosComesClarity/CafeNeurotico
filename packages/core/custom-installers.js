@@ -238,6 +238,8 @@ const RECIPES = [
         entry: { exe: /^gameLauncher\.exe$/i, platform: 'windows' },
         data: null,
     },
+    // ── Build games, one entry each ─────────────────────────────────────────
+    // Filled in below from BUILD_GAMES so the list and the data specs cannot drift apart.
     // ── Mods ────────────────────────────────────────────────────────────────
     // These are what people actually want to play. Nobody sets out to install GZDoom;
     // they set out to install Brutal Doom, and the engine is a means to that end. So a
@@ -426,6 +428,82 @@ const DATA_SPECS = {
     },
 };
 
+// One spec per Build game, because each is its own library entry now. They share a shape:
+// a main container file that proves the game is there, plus whatever loose art and config
+// sits beside it. Blood is the fussy one and needs all three.
+const BUILD_GAMES = {
+    blood: {
+        label: 'Blood', main: /^blood\.rff$/i, extra: [/\.rff$/i, /\.art$/i, /^blood\.ini$/i],
+        titles: [/^blood:?\s*(fresh supply|one unit whole blood)?$/i, /^blood\b/i],
+        exclude: [/west|omen|bloodstained|bloodlines|rayne|money|dragon/i],
+    },
+    duke3d: {
+        label: 'Duke Nukem 3D', main: /^duke3d\.grp$/i, extra: [/\.grp$/i, /\.art$/i, /^duke3d\.def$/i],
+        titles: [/duke nukem 3d/i],
+        exclude: [/forever|manhattan|megaton.*soundtrack/i],
+    },
+    shadowwarrior: {
+        label: 'Shadow Warrior (1997)', main: /^sw\.grp$/i, extra: [/\.grp$/i, /\.art$/i],
+        titles: [/shadow warrior classic/i, /shadow warrior \(1997\)/i],
+        exclude: [/\(?20(13|16)\)?|shadow warrior [23]/i],
+    },
+    powerslave: {
+        // The DOS original keeps everything in STUFF.DAT. Nightdive's 2022 remaster is a
+        // different game entirely and is excluded — it has no Build data at all.
+        label: 'PowerSlave / Exhumed (the 1996 DOS game)', main: /^stuff\.dat$/i, extra: [/\.dat$/i, /\.art$/i],
+        titles: [/^powerslave$/i, /^exhumed$/i],
+        exclude: [/exhumed|remaster/i],
+    },
+    redneck: {
+        label: 'Redneck Rampage', main: /^redneck\.grp$/i, extra: [/\.grp$/i, /\.art$/i],
+        titles: [/redneck rampage/i], exclude: [],
+    },
+};
+
+// Each Build game is its own catalogue entry, running on whichever engine is installed.
+// Nobody wants "Raze" in their library; they want Blood, and Duke Nukem 3D, each with its
+// own name and its own cover.
+const BUILD_BLURB = {
+    blood: 'Monolith\'s 1997 shooter — cultists, a pitchfork, and the best voice acting of the era. Runs on Raze.',
+    duke3d: 'Hail to the king. The 1996 original with all four episodes, running on Raze.',
+    shadowwarrior: 'Lo Wang, katanas and sticky bombs — the 1997 original, running on Raze.',
+    powerslave: 'The 1996 DOS original (Exhumed in Europe), not the 2022 remaster. Egyptian tombs and a genuinely strange structure. Runs on Raze.',
+    redneck: 'Cuss, Bubba and a hillbilly arsenal. The 1997 Build shooter, running on Raze.',
+};
+for (const [id, g] of Object.entries(BUILD_GAMES)) {
+    RECIPES.push({
+        id: `raze-${id}`,
+        title: g.label.replace(/ \(.*\)$/, ''),
+        kind: 'Game',
+        game: 'Build engine games',
+        engine: ['raze'],
+        onEngine: true,                       // no download of its own — engine + data
+        blurb: BUILD_BLURB[id],
+        source: {
+            name: 'GitHub — ZDoom/Raze',
+            url: 'https://github.com/ZDoom/Raze/releases/latest',
+            hint: 'No download needed for the game itself. If Raze is not installed yet you will be asked for its Windows zip once, and every Build game after that reuses it.',
+        },
+        dirName: g.label.replace(/ \(.*\)$/, '').replace(/[/\\:*?"<>|]/g, ''),
+        data: `build-${id}`,
+    });
+}
+
+// Expand the compact table above into full data specs.
+for (const [id, g] of Object.entries(BUILD_GAMES)) {
+    DATA_SPECS[`build-${id}`] = {
+        label: g.label,
+        // The container proves the game is really there. Without this a folder holding one
+        // stray .art would pass as Blood, and the install would produce an empty shell.
+        mainFile: g.main,
+        files: [{ find: g.main, into: '' }, ...g.extra.map(rx => ({ find: rx, into: '' }))],
+        requireAny: true,
+        titles: g.titles,
+        exclude: g.exclude,
+        owned: `You own ${g.label} but it is not installed. Install it, or point at a folder holding your own copy of the game files.`,
+    };
+}
+
 // ── Catalogue self-check ─────────────────────────────────────────────────────
 // Two mistakes have cost real installs here, and both were invisible at the time: a
 // pattern that also matched a sibling's download (Mini Doom 2 installed as Mini Doom;
@@ -439,7 +517,7 @@ const DATA_SPECS = {
 function selfCheck() {
     const problems = [];
     for (const r of RECIPES) {
-        if (r.contains || r.generic) continue;        // matched on content or chosen deliberately
+        if (r.contains || r.generic || r.onEngine) continue;   // no archive of their own
         if (!r.samples || !r.samples.length) { problems.push(`${r.id}: no samples to check`); continue; }
         for (const s of r.samples) {
             const m = detectRecipe(s);
@@ -581,7 +659,7 @@ function findEntry(root, pattern, maxDepth = 3) {
 function listRecipes() {
     return RECIPES.map(r => ({
         id: r.id, title: r.title, kind: r.kind, game: r.game, blurb: r.blurb,
-        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic,
+        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic, onEngine: !!r.onEngine,
         data: r.data ? { id: r.data, label: DATA_SPECS[r.data]?.label || r.data } : null,
     }));
 }
@@ -595,7 +673,7 @@ function getRecipe(id) { return RECIPES.find(r => r.id === id) || null; }
 // by content at install time instead.
 function detectRecipe(fileName) {
     const base = path.basename(String(fileName || ''));
-    return RECIPES.filter(r => !r.contains && !r.generic && r.archive.test(base)).map(r => r.id);
+    return RECIPES.filter(r => !r.contains && !r.generic && r.archive && r.archive.test(base)).map(r => r.id);
 }
 
 // Find the user's own copy of the data a recipe needs.
@@ -614,7 +692,9 @@ function folderSatisfies(spec, root) {
         const dir = resolveCaseInsensitive(root, d.name);
         return dir && dirHasProbe(dir, d.probe);
     });
-    // File-shaped: at least one of the named files must turn up somewhere inside.
+    // A named container settles it on its own when the spec has one.
+    if (spec.mainFile) return dirsOk && findFiles(root, spec.mainFile).length > 0;
+    // Otherwise: at least one of the named files must turn up somewhere inside.
     const filesOk = spec.files ? spec.files.some(f => findFiles(root, f.find).length > 0) : true;
     return dirsOk && filesOk;
 }
@@ -920,6 +1000,72 @@ function addFromFolder({ folder, executable, title }) {
     };
 }
 
+// ── A game running on a shared engine ────────────────────────────────────────
+// Raze plays a dozen different games and BuildGDX a dozen more, but nobody wants "Raze" in
+// their library — they want Blood, and Duke Nukem 3D, and Shadow Warrior, each with its own
+// name and cover. And they cannot all share one folder: Duke and Blood both ship tiles000.art,
+// so whichever landed last would decide what the other one loaded.
+//
+// So each game gets its own folder with the engine **symlinked in** and only that game's
+// data beside it. No duplicated engine, no filename collisions, and no guessing at command
+// line switches — the engine starts in a directory containing exactly one game and finds it.
+// Verified: a fully symlinked engine folder launches and runs.
+
+// Engine files are everything that is not game data. raze.pk3 is the engine's own archive
+// and must come along; .grp/.rff/.art belong to whichever game was linked in previously.
+const IS_GAME_DATA = /\.(grp|rff|art|wl6|wl1|sod|sd[123])$|^blood\.ini$/i;
+
+function mirrorEngine(engineRoot, target) {
+    let entries = [];
+    try { entries = fs.readdirSync(engineRoot, { withFileTypes: true }); } catch { return 0; }
+    let n = 0;
+    for (const e of entries) {
+        if (IS_GAME_DATA.test(e.name)) continue;
+        if (e.name === 'mods' || e.name === 'games') continue;   // our own scaffolding
+        const dst = path.join(target, e.name);
+        try { fs.unlinkSync(dst); } catch {}
+        try { fs.symlinkSync(path.join(engineRoot, e.name), dst); n++; } catch {}
+    }
+    return n;
+}
+
+function installGameOnEngine({ recipeId, engineRoot, engineExe, installRoot, dataRows, dataPath, overwrite = false }) {
+    const recipe = getRecipe(recipeId);
+    if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
+    if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall it.' };
+
+    // Data before anything is created: a game folder with no game in it is worse than a
+    // refusal, and "you own it but it is not installed" is something the user can act on.
+    const data = dataPath ? resolveDataFolder(recipe.data, dataPath) : resolveGameData(recipe.data, dataRows);
+    if (!data.ok) {
+        return { ok: false, error: data.message, owned: data.owned || [],
+                 needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
+    }
+
+    const target = path.join(installRoot, recipe.dirName);
+    if (fs.existsSync(target) && fs.readdirSync(target).length && !overwrite) {
+        return { ok: false, error: `${target} already exists and is not empty.`, exists: true };
+    }
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.mkdirSync(target, { recursive: true });
+
+    if (!mirrorEngine(engineRoot, target)) return { ok: false, error: 'Could not mirror the engine into the game folder.' };
+
+    const linked = linkGameData(recipe.data, data.paths || data.path, target);
+    if (!linked.ok) return { ok: false, error: linked.error };
+
+    return {
+        ok: true,
+        recipeId: recipe.id,
+        key: recipe.id,
+        title: recipe.title,
+        installPath: target,
+        executable: engineExe,
+        platform: 'windows',
+        dataFrom: { path: data.path, title: data.title, linked: linked.linked },
+    };
+}
+
 // Install a mod alongside an engine that is already on disk. The engine is shared rather
 // than copied per mod — that is how ZDoom-family ports are designed to work, and it keeps
 // four Doom mods from meaning four copies of the same 50MB engine. Each mod still becomes
@@ -1105,7 +1251,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
-    scanFolderEntries, addFromFolder,
+    scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveDataFolder, folderSatisfies, resolveExtra, linkGameData, installFromArchive,

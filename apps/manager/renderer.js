@@ -222,7 +222,9 @@ function _customRow(r) {
         btn.className = 'primary';
         // A shape-based entry is never "reinstalled" — every OpenBOR archive is a different
         // game arriving through the same recipe, so it always reads as adding one.
-        btn.textContent = r.dynamic ? 'ADD FROM FILE' : (r.installed ? 'REINSTALL' : 'INSTALL FROM FILE');
+        btn.textContent = r.dynamic ? 'ADD FROM FILE'
+                        : r.onEngine ? (r.installed ? 'REINSTALL' : 'INSTALL')
+                        : (r.installed ? 'REINSTALL' : 'INSTALL FROM FILE');
         btn.onclick = () => runCustomInstall(r, btn);
         actions.appendChild(btn);
         const tagText = r.dynamic
@@ -383,12 +385,18 @@ async function runCustomInstall(recipe, btn) {
     // is a button that does nothing at all — the worst possible failure, because there is
     // nothing to report and nowhere to look. Every path below either succeeds or says why.
     try {
-        const picked = await window.api.customInstallPick(recipe.id);
-        if (!picked || !picked.ok) return;   // cancelled the file dialog
+        // A game on a shared engine has nothing to download — it is assembled from an
+        // engine that is already here (or asked for once) plus the game's own data.
+        let archivePath = null;
+        if (!recipe.onEngine) {
+            const picked = await window.api.customInstallPick(recipe.id);
+            if (!picked || !picked.ok) return;   // cancelled the file dialog
+            archivePath = picked.path;
+        }
 
         btn.disabled = true;
         btn.textContent = 'INSTALLING…';
-        let res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path });
+        let res = await window.api.customInstall({ recipeId: recipe.id, archivePath });
 
         // The mod needs an engine and there isn't one yet. Ask for that download too and
         // install both in this one click, rather than sending the user away to do it
@@ -404,7 +412,7 @@ async function runCustomInstall(recipe, btn) {
             const folder = await window.api.customFolderPick(`Select the folder containing ${res.dataLabel}`);
             if (!folder || !folder.ok) return;
             btn.textContent = 'INSTALLING…';
-            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, dataPath: folder.path });
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath, dataPath: folder.path });
         }
 
         if (res && !res.ok && res.needsEngine) {
@@ -414,7 +422,7 @@ async function runCustomInstall(recipe, btn) {
             const eng = await window.api.customInstallPick(res.engines[0].id);
             if (!eng || !eng.ok) return;
             btn.textContent = 'INSTALLING…';
-            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, engineArchivePath: eng.path });
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath, engineArchivePath: eng.path });
         }
 
         // Reinstalling over an existing folder is a decision, not a default — ask rather
@@ -438,14 +446,14 @@ async function runCustomInstall(recipe, btn) {
             if (!chosen || !chosen.selected.length) return;
             btn.textContent = 'INSTALLING…';
             res = await window.api.customInstall({
-                recipeId: recipe.id, archivePath: picked.path, selected: chosen.selected,
+                recipeId: recipe.id, archivePath, selected: chosen.selected,
             });
         }
 
         if (res && !res.ok && res.exists) {
-            const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it with this download? Anything in its folder will be deleted.`, 'Replace', true);
+            const ok = await showConfirm(`${recipe.title} is already installed.\n\nReplace it? Anything in its folder will be deleted.`, 'Replace', true);
             if (!ok) return;
-            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, overwrite: true });
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath, overwrite: true });
         }
 
         if (!res || !res.ok) { showAlert((res && res.error) || 'Could not install that.'); return; }
