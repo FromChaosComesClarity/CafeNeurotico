@@ -765,6 +765,30 @@ async function _iwadForLaunch(grinderGameId) {
     return opts.argsFor[chosen.choice];
 }
 
+// Blood plays on Raze and on BuildGDX, and they are different experiences — one is a
+// modern renderer, the other is closer to the DOS original and has its own tuning. If both
+// are installed the choice belongs to the moment you press Play, not to install time.
+// Returns the executable to run, '' for "as recorded", or null if cancelled.
+async function _engineForLaunch(grinderGameId) {
+    let opts = null;
+    try { opts = await window.api.customEngineOptions(grinderGameId); } catch (e) {}
+    if (!opts || !opts.engines || opts.engines.length < 2) return '';
+
+    const chosen = await pickRunOptions({
+        title: 'Which engine?',
+        okLabel: 'Play',
+        radios: {
+            header: 'Run this game on',
+            hint: 'Both are installed and both play this game. They render and behave differently, so pick whichever suits tonight.',
+            items: opts.engines.map(e => ({ value: e.exe, label: e.title, sub: e.exe })),
+            current: opts.current,
+        },
+    });
+    if (!chosen) return null;
+    try { await window.api.customSetEngine(grinderGameId, chosen.choice); } catch (e) {}
+    return chosen.choice;
+}
+
 async function _doLaunch(game, cmd) {
     // Route by the actual command so the multi-launcher picker is honoured:
     //  - a grinder:// (GOG/Epic) command — or a grinder-linked game with no cmd —
@@ -773,9 +797,11 @@ async function _doLaunch(game, cmd) {
     const isGrinderCmd = /grinder:\/\/launch/i.test(cmd || '');
     if (isGrinderCmd || (!cmd && game?.GrinderGameId)) {
         if (game?.GrinderGameId) {
+            const exe = await _engineForLaunch(game.GrinderGameId);
+            if (exe === null) return;              // the dialog was cancelled
             const args = await _iwadForLaunch(game.GrinderGameId);
-            if (args === null) return;             // the dialog was cancelled
-            window.api.launchGame('grinder://launch/' + game.GrinderGameId, args);
+            if (args === null) return;
+            window.api.launchGame('grinder://launch/' + game.GrinderGameId, args, exe);
         } else {
             window.api.openGrinder(game.Game);
         }

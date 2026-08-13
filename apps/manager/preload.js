@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('api', {
                                 autoFetch: (id, name, appId) => ipcRenderer.invoke('auto-fetch', id, name, appId),
                                 autoFetchText: (id, name, appId) => ipcRenderer.invoke('auto-fetch-text', id, name, appId),
                                 searchSteam: (name) => ipcRenderer.invoke('search-steam', name),
-                                launchGame: (cmd, launchArgs) => ipcRenderer.send('launch-game', cmd, launchArgs),
+                                launchGame: (cmd, launchArgs, executable) => ipcRenderer.send('launch-game', cmd, launchArgs, executable),
                                 syncGog: () => ipcRenderer.invoke('sync-gog'),
 
                                 // --- GAMING HISTORY ---
@@ -182,6 +182,8 @@ contextBridge.exposeInMainWorld('api', {
                                 customFolderScan: (folder) => ipcRenderer.invoke('custom-folder-scan', folder),
                                 customFolderAdd:  (payload) => ipcRenderer.invoke('custom-folder-add', payload),
                                 customIwadOptions:(grinderGameId) => ipcRenderer.invoke('custom-iwad-options', grinderGameId),
+                                customEngineOptions:(grinderGameId) => ipcRenderer.invoke('custom-engine-options', grinderGameId),
+                                customSetEngine: (grinderGameId, exe) => ipcRenderer.invoke('custom-set-engine', grinderGameId, exe),
                                 customSetIwad:    (grinderGameId, iwad) => ipcRenderer.invoke('custom-set-iwad', grinderGameId, iwad),
                                 setLaunchTarget:  (grinderGameId, relPath, taskIndex) => ipcRenderer.invoke('set-launch-target', grinderGameId, relPath, taskIndex),
                                 grinderCancelInstall: () => ipcRenderer.invoke('grinder-install-cancel'),

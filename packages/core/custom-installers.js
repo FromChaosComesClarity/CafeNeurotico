@@ -170,7 +170,7 @@ const RECIPES = [
         title: 'Raze',
         kind: 'Source port',
         game: 'Build engine games',
-        blurb: 'One engine for Duke Nukem 3D, Blood, Shadow Warrior, Redneck Rampage and Powerslave — from the GZDoom team.',
+        blurb: 'One engine for Duke Nukem 3D, Blood, Shadow Warrior, Redneck Rampage and Powerslave — from the GZDoom team. Install it once; the games below then install separately, each with its own entry. Opening this entry opens Raze itself, where the settings are.',
         source: {
             name: 'GitHub — ZDoom/Raze',
             url: 'https://github.com/ZDoom/Raze/releases/latest',
@@ -180,7 +180,12 @@ const RECIPES = [
         samples: ['Raze-1.11.0b-windows.zip'],
         dirName: 'Raze',
         entry: { exe: /^raze\.exe$/i, platform: 'windows' },
-        data: 'build',
+        // No data. The engine entry is the engine — clicking it opens Raze's own front end,
+        // where the options live. Games are separate entries (see BUILD_GAMES below), each
+        // in its own folder, which is also the only way two Build games can coexist without
+        // fighting over tiles000.art. Linking data here made "Raze" boot straight into
+        // whichever game happened to be linked, which is not what an engine entry is for.
+        data: null,
     },
     {
         id: 'buildgdx',
@@ -217,7 +222,10 @@ const RECIPES = [
         samples: ['cannonball.zip'],
         dirName: 'CannonBall',
         entry: { exe: /^cannonball\.exe$/i, platform: 'windows' },
-        data: null,
+        // Requiring the ROMs is what stops this installing into something that opens and
+        // closes in the same second. Nothing in a game library provides them, so the
+        // install asks for a folder — which is the only honest answer here.
+        data: 'outrun',
     },
     {
         id: 'swos2020',
@@ -458,6 +466,32 @@ const BUILD_GAMES = {
         label: 'Redneck Rampage', main: /^redneck\.grp$/i, extra: [/\.grp$/i, /\.art$/i],
         titles: [/redneck rampage/i], exclude: [],
     },
+    // Witchaven never used a .GRP — its data is loose files, and GOG never unpacks them:
+    // the release is a DOSBox setup around a 275MB .iso. Only BuildGDX plays these, and
+    // only once the disc has been opened, which is what `imageDir` is for.
+    witchaven: {
+        label: 'Witchaven', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
+        titles: [/^witchaven$/i, /witchaven i\b/i, /witchaven i ?& ?ii/i],
+        exclude: [/witchaven ii|witchaven 2/i],
+        imageDir: /^WHAVEN\//i, engines: ['buildgdx'],
+    },
+    witchaven2: {
+        label: 'Witchaven II: Blood Vengeance', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
+        titles: [/witchaven ii/i, /witchaven 2/i, /witchaven i ?& ?ii/i],
+        exclude: [],
+        imageDir: /^WHAVEN2\//i, engines: ['buildgdx'],
+    },
+};
+
+DATA_SPECS.outrun = {
+    label: "the OutRun arcade ROM set",
+    // CannonBall reads its ROMs from roms/, per its own config.xml.
+    mainFile: /^epr-1038\d[a-z]?\.\d+$/i,
+    files: [{ find: /^(epr|mpr|opr)-\d+[a-z]?\.[\w.]+$/i, into: 'roms' }],
+    requireAny: true,
+    titles: [],          // no storefront sells these; the folder picker is the only route
+    exclude: [],
+    owned: 'CannonBall needs the original OutRun arcade ROM set. No game library provides it — point at the folder holding your own copy.',
 };
 
 // Each Build game is its own catalogue entry, running on whichever engine is installed.
@@ -467,16 +501,18 @@ const BUILD_BLURB = {
     blood: 'Monolith\'s 1997 shooter — cultists, a pitchfork, and the best voice acting of the era. Runs on Raze.',
     duke3d: 'Hail to the king. The 1996 original with all four episodes, running on Raze.',
     shadowwarrior: 'Lo Wang, katanas and sticky bombs — the 1997 original, running on Raze.',
-    powerslave: 'The 1996 DOS original (Exhumed in Europe), not the 2022 remaster. Egyptian tombs and a genuinely strange structure. Runs on Raze.',
-    redneck: 'Cuss, Bubba and a hillbilly arsenal. The 1997 Build shooter, running on Raze.',
+    powerslave: 'The 1996 DOS original (Exhumed in Europe), not the 2022 remaster. Egyptian tombs and a genuinely strange structure.',
+    redneck: 'Cuss, Bubba and a hillbilly arsenal, from 1997.',
+    witchaven: 'The 1995 sword-and-sorcery Build game. GOG never unpacks it — the data is lifted straight out of the disc image. Plays on BuildGDX.',
+    witchaven2: 'The 1996 sequel, bloodier and better lit. Data lifted out of the disc image; plays on BuildGDX.',
 };
 for (const [id, g] of Object.entries(BUILD_GAMES)) {
     RECIPES.push({
-        id: `raze-${id}`,
+        id: `build-game-${id}`,
         title: g.label.replace(/ \(.*\)$/, ''),
         kind: 'Game',
         game: 'Build engine games',
-        engine: ['raze'],
+        engine: g.engines || ['raze', 'buildgdx'],
         onEngine: true,                       // no download of its own — engine + data
         blurb: BUILD_BLURB[id],
         source: {
@@ -496,6 +532,7 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
         // The container proves the game is really there. Without this a folder holding one
         // stray .art would pass as Blood, and the install would produce an empty shell.
         mainFile: g.main,
+        imageDir: g.imageDir || null,
         files: [{ find: g.main, into: '' }, ...g.extra.map(rx => ({ find: rx, into: '' }))],
         requireAny: true,
         titles: g.titles,
@@ -605,8 +642,16 @@ function findFiles(root, pattern, maxDepth = 4) {
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of entries) {
             const p = path.join(dir, e.name);
-            if (e.isFile() && pattern.test(e.name)) out.push(p);
-            else if (e.isDirectory() && depth < maxDepth) walk(p, depth + 1);
+            // A Dirent for a symlink reports neither isFile nor isDirectory, so following
+            // it matters: this feature links data in with symlinks itself, and a user's
+            // own folder can perfectly well be one.
+            let isFile = e.isFile(), isDir = e.isDirectory();
+            if (e.isSymbolicLink()) {
+                try { const st = fs.statSync(p); isFile = st.isFile(); isDir = st.isDirectory(); }
+                catch { continue; }   // broken link
+            }
+            if (isFile && pattern.test(e.name)) out.push(p);
+            else if (isDir && depth < maxDepth) walk(p, depth + 1);
         }
     };
     walk(root, 0);
@@ -682,6 +727,73 @@ function detectRecipe(fileName) {
 //   { ok: false, message }                 → nothing in the library matches
 // `rows` is grinder.db's games table; passing it in keeps this module free of any
 // database handle of its own.
+// ── Data sealed inside a disc image ──────────────────────────────────────────
+// GOG ships several of its DOSBox releases as an .iso the bundled DOSBox mounts, so the
+// game's files never exist loose on disk — Witchaven II is 275MB of exactly that. A source
+// port cannot mount an image, so the files have to come out of it. bsdtar reads ISO9660
+// directly, which means no mounting, no root, and no loop device.
+const DISC_IMAGE = /\.(iso|cue|bin|gog|img|mdf)$/i;
+
+// The disc image inside `root` that holds `mainFile`, or ''. Listing an image is cheap;
+// this only runs when the loose files are absent.
+function findDataImage(root, mainFile, maxDepth = 3) {
+    for (const img of findFiles(root, DISC_IMAGE, maxDepth)) {
+        const entries = inspectArchive(img);
+        if (entries.some(e => mainFile.test(path.basename(e)))) return img;
+    }
+    return '';
+}
+
+// Pull every file a spec wants out of a disc image. Real copies, not symlinks — there is
+// nothing on disk to point at. Extracted flat: these images are one game per disc and the
+// engine expects its data beside it.
+function extractFromImage(img, spec, target) {
+    const entries = inspectArchive(img).filter(e => !e.endsWith('/'));
+    const bsdtar = which('bsdtar');
+    if (!bsdtar) return { ok: false, error: 'bsdtar (libarchive) is needed to read disc images.' };
+
+    // A disc usually holds the whole game directory — Witchaven's WHAVEN2/ carries its
+    // maps, palettes and sound banks in subfolders. When the spec names that directory,
+    // take it entire and keep its shape; picking files out flat would strip the folders
+    // the game reads its sounds from. Otherwise fall back to matching by filename.
+    const inDir = spec.imageDir ? entries.filter(e => spec.imageDir.test(e)) : [];
+    const wanted = inDir.length ? inDir
+                                : entries.filter(e => (spec.files || []).some(f => f.find.test(path.basename(e))));
+    if (!wanted.length) return { ok: false, error: `Nothing matching ${spec.label} was found inside ${path.basename(img)}.` };
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cn-iso-'));
+    try {
+        const res = spawnSync(bsdtar, ['-xf', img, '-C', tmp, ...wanted], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        if (res.status !== 0) return { ok: false, error: `Could not read ${path.basename(img)}: ${(res.stderr || '').trim().slice(0, 200)}` };
+
+        const out = [];
+        if (inDir.length) {
+            // Strip the disc's own top folder so the data lands beside the engine.
+            const prefix = inDir[0].split('/')[0] + '/';
+            for (const rel of inDir) {
+                const src = path.join(tmp, rel);
+                if (!fs.existsSync(src)) continue;
+                const dst = path.join(target, rel.startsWith(prefix) ? rel.slice(prefix.length) : path.basename(rel));
+                fs.mkdirSync(path.dirname(dst), { recursive: true });
+                fs.copyFileSync(src, dst);
+                out.push(path.basename(rel));
+            }
+        } else {
+            const seen = new Set();
+            for (const rel of wanted.sort((a, b) => a.split('/').length - b.split('/').length)) {
+                const name = path.basename(rel).toLowerCase();
+                if (seen.has(name)) continue;
+                const src = path.join(tmp, rel);
+                if (!fs.existsSync(src)) continue;
+                seen.add(name);
+                fs.copyFileSync(src, path.join(target, name));
+                out.push(name);
+            }
+        }
+        return out.length ? { ok: true, linked: out } : { ok: false, error: `Could not extract ${spec.label} from ${path.basename(img)}.` };
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // Does this folder actually hold the data a spec needs? The same test whether the folder
 // came from the library or the user pointed at it — a shelf of DOS files they still have
 // is every bit as valid a source as a storefront install, and quite often the only one.
@@ -692,8 +804,11 @@ function folderSatisfies(spec, root) {
         const dir = resolveCaseInsensitive(root, d.name);
         return dir && dirHasProbe(dir, d.probe);
     });
-    // A named container settles it on its own when the spec has one.
-    if (spec.mainFile) return dirsOk && findFiles(root, spec.mainFile).length > 0;
+    // A named container settles it on its own when the spec has one — loose on disk, or
+    // sealed inside a disc image the release never unpacked.
+    if (spec.mainFile) {
+        return dirsOk && (findFiles(root, spec.mainFile).length > 0 || !!findDataImage(root, spec.mainFile));
+    }
     // Otherwise: at least one of the named files must turn up somewhere inside.
     const filesOk = spec.files ? spec.files.some(f => findFiles(root, f.find).length > 0) : true;
     return dirsOk && filesOk;
@@ -776,6 +891,18 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
     };
 
     const linked = [];
+
+    // Nothing loose to link, but a disc image that holds it — extract instead. Copies, not
+    // symlinks, because there is no file on disk to point at.
+    if (spec.mainFile && !roots.some(r => findFiles(r, spec.mainFile).length)) {
+        for (const root of roots) {
+            const img = findDataImage(root, spec.mainFile);
+            if (!img) continue;
+            const got = extractFromImage(img, spec, targetRoot);
+            if (!got.ok) return got;
+            return { ok: true, linked: got.linked, fromImage: path.basename(img) };
+        }
+    }
 
     // File-shaped specs: link each named file it finds beside the executable, which is
     // where these engines look. Deduplicated by target name across every source, so
@@ -1015,6 +1142,14 @@ function addFromFolder({ folder, executable, title }) {
 // and must come along; .grp/.rff/.art belong to whichever game was linked in previously.
 const IS_GAME_DATA = /\.(grp|rff|art|wl6|wl1|sod|sd[123])$|^blood\.ini$/i;
 
+// Written into each game folder: which engines were mirrored in and what starts them.
+// Read at Play time so a game both engines support can offer the choice.
+const ENGINES_FILE = 'cn-engines.json';
+function readEngines(gameRoot) {
+    try { return JSON.parse(fs.readFileSync(path.join(gameRoot, ENGINES_FILE), 'utf8')) || []; }
+    catch { return []; }
+}
+
 function mirrorEngine(engineRoot, target) {
     let entries = [];
     try { entries = fs.readdirSync(engineRoot, { withFileTypes: true }); } catch { return 0; }
@@ -1029,7 +1164,7 @@ function mirrorEngine(engineRoot, target) {
     return n;
 }
 
-function installGameOnEngine({ recipeId, engineRoot, engineExe, installRoot, dataRows, dataPath, overwrite = false }) {
+function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall it.' };
@@ -1049,7 +1184,16 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, installRoot, dat
     fs.rmSync(target, { recursive: true, force: true });
     fs.mkdirSync(target, { recursive: true });
 
-    if (!mirrorEngine(engineRoot, target)) return { ok: false, error: 'Could not mirror the engine into the game folder.' };
+    // Every engine that can play this game gets mirrored in, so the choice of which to
+    // use is made when you press Play rather than being fixed at install time.
+    const list = engines && engines.length ? engines : [{ id: 'engine', title: 'Engine', root: engineRoot, exe: engineExe }];
+    for (const e of list) {
+        if (!mirrorEngine(e.root, target)) return { ok: false, error: `Could not mirror ${e.title} into the game folder.` };
+    }
+    try {
+        fs.writeFileSync(path.join(target, ENGINES_FILE),
+            JSON.stringify(list.map(e => ({ id: e.id, title: e.title, exe: e.exe })), null, 2));
+    } catch {}
 
     const linked = linkGameData(recipe.data, data.paths || data.path, target);
     if (!linked.ok) return { ok: false, error: linked.error };
@@ -1251,7 +1395,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
-    scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine,
+    scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine, readEngines, ENGINES_FILE,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveDataFolder, folderSatisfies, resolveExtra, linkGameData, installFromArchive,

@@ -806,7 +806,9 @@ async function launchGame(gameId, opts = {}) {
     const resolvedExe = resolvePathCaseInsensitive((() => {
         if (game.custom_exe) return expandTilde(game.custom_exe);
         if (!installPath) return '';
-        const rel = game.launch_target || game.executable;
+        // opts.executable is a one-off override chosen at the moment of pressing Play —
+        // which engine to run a game on, when its folder holds more than one.
+        const rel = opts.executable || game.launch_target || game.executable;
         return rel ? path.join(installPath, ...rel.replace(/\\/g, '/').split('/')) : '';
     })());
 

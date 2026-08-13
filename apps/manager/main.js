@@ -868,16 +868,23 @@ const _grinderRowsForData = () => {
 // The first engine from an accepted group that is actually installed. Mods declare a group
 // (GZDoom or UZDoom) rather than one engine: they are the same 4.x lineage with the same
 // command line, so either satisfies the requirement and the user's existing one is reused.
-function _installedEngine(engineIds) {
-    if (!ensureGrinderEngine()) return null;
+function _installedEngines(engineIds) {
+    if (!ensureGrinderEngine()) return [];
+    const out = [];
     for (const id of engineIds) {
         try {
             const row = _grinderEngineDb.prepare('SELECT id,title,install_path,executable FROM games WHERE id=? AND installed=1').get(`cn_${id}`);
-            if (row && row.install_path && fs.existsSync(row.install_path)) return row;
+            if (row && row.install_path && fs.existsSync(row.install_path)) {
+                out.push({ id, title: row.title, root: row.install_path, exe: row.executable });
+            }
         } catch {}
     }
-    return null;
+    return out;
 }
+const _installedEngine = (ids) => {
+    const all = _installedEngines(ids);
+    return all.length ? { title: all[0].title, install_path: all[0].root, executable: all[0].exe } : null;
+};
 
 // Register an install in both databases. grinder.db owns the launch (so the shared engine
 // supplies Proton and the prefix); games.db points at it exactly as a GOG title does.
@@ -990,6 +997,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
             ? customInstallers.installGameOnEngine({
                 recipeId, dataPath, overwrite: !!overwrite,
                 engineRoot: engine.install_path, engineExe: engine.executable,
+                engines: _installedEngines(recipe.engine),
                 installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
               })
             : customInstallers.installMod({
@@ -1066,6 +1074,27 @@ ipcMain.handle('custom-iwad-options', (_, grinderGameId) => {
             argsFor: Object.fromEntries(iwads.map(i => [i.file, customInstallers.withIwad(row.launch_args, i.file)])),
         };
     } catch { return null; }
+});
+
+// Which engine to run this on, asked at Play time. Null unless the game folder really
+// holds more than one — a game with a single engine must never be slowed by a question.
+ipcMain.handle('custom-engine-options', (_, grinderGameId) => {
+    if (!grinderGameId || !ensureGrinderEngine()) return null;
+    try {
+        const row = _grinderEngineDb.prepare('SELECT install_path, executable FROM games WHERE id=?').get(grinderGameId);
+        if (!row || !row.install_path) return null;
+        const engines = customInstallers.readEngines(row.install_path)
+            .filter(e => fs.existsSync(path.join(row.install_path, e.exe)));
+        return engines.length > 1 ? { engines, current: row.executable } : null;
+    } catch { return null; }
+});
+
+ipcMain.handle('custom-set-engine', (_, grinderGameId, exe) => {
+    if (!grinderGameId || !ensureGrinderEngine() || !exe) return { ok: false };
+    try {
+        _grinderEngineDb.prepare('UPDATE games SET executable=? WHERE id=?').run(exe, grinderGameId);
+        return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
 });
 
 // Remember the choice as the new default, so the dialog opens on what you picked last.
@@ -3215,7 +3244,7 @@ ipcMain.handle('delete-game', (event, id) => {
     try { db.prepare(`DELETE FROM games WHERE id=?`).run(id); return true; } catch (err) { return false; }
 });
 
-ipcMain.on('launch-game', (event, cmd, launchArgs) => {
+ipcMain.on('launch-game', (event, cmd, launchArgs, executable) => {
     if (!cmd) return;
 
     // GOG/Epic via GRINDER, launched IN-PROCESS (cmd carries GRINDER's game id).
@@ -3226,7 +3255,7 @@ ipcMain.on('launch-game', (event, cmd, launchArgs) => {
     if (gLaunch) {
         const gid = gLaunch[1];
         if (ensureGrinderEngine()) {
-            grinderEngine.launchGame(gid, launchArgs !== undefined ? { launchArgs } : {})
+            grinderEngine.launchGame(gid, { ...(launchArgs !== undefined ? { launchArgs } : {}), ...(executable ? { executable } : {}) })
                 .then(r => console.log('[launch-game] launched via', r?.method))
                 .catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gid, e); });
         } else {
