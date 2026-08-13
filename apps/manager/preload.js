@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('api', {
                                 autoFetch: (id, name, appId) => ipcRenderer.invoke('auto-fetch', id, name, appId),
                                 autoFetchText: (id, name, appId) => ipcRenderer.invoke('auto-fetch-text', id, name, appId),
                                 searchSteam: (name) => ipcRenderer.invoke('search-steam', name),
-                                launchGame: (cmd) => ipcRenderer.send('launch-game', cmd),
+                                launchGame: (cmd, launchArgs) => ipcRenderer.send('launch-game', cmd, launchArgs),
                                 syncGog: () => ipcRenderer.invoke('sync-gog'),
 
                                 // --- GAMING HISTORY ---
@@ -178,6 +178,8 @@ contextBridge.exposeInMainWorld('api', {
                                 customRecipeList: () => ipcRenderer.invoke('custom-recipe-list'),
                                 customInstallPick:(recipeId) => ipcRenderer.invoke('custom-install-pick', recipeId),
                                 customInstall:    (payload) => ipcRenderer.invoke('custom-install', payload),
+                                customIwadOptions:(grinderGameId) => ipcRenderer.invoke('custom-iwad-options', grinderGameId),
+                                customSetIwad:    (grinderGameId, iwad) => ipcRenderer.invoke('custom-set-iwad', grinderGameId, iwad),
                                 setLaunchTarget:  (grinderGameId, relPath, taskIndex) => ipcRenderer.invoke('set-launch-target', grinderGameId, relPath, taskIndex),
                                 grinderCancelInstall: () => ipcRenderer.invoke('grinder-install-cancel'),
                                 grinderUninstall: (payload) => ipcRenderer.invoke('grinder-uninstall', payload),

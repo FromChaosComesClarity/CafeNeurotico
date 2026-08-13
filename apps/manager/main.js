@@ -1010,6 +1010,38 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
     return r;
 });
 
+// Asked at the moment of pressing Play, not at install time: which Doom this mod runs on
+// is a per-session decision, the way you would pick a disc off a shelf. Returns null when
+// there is nothing to ask — not a mod, or only one IWAD available — so the launch goes
+// straight through and nothing is put in the way of games that have no choice to make.
+ipcMain.handle('custom-iwad-options', (_, grinderGameId) => {
+    if (!grinderGameId || !ensureGrinderEngine()) return null;
+    try {
+        const row = _grinderEngineDb.prepare('SELECT install_path, launch_args FROM games WHERE id=?').get(grinderGameId);
+        if (!row || !row.install_path || !/-file\b/i.test(row.launch_args || '')) return null;
+        const iwads = customInstallers.listIwads(row.install_path);
+        if (iwads.length < 2) return null;
+        return {
+            iwads,
+            current: customInstallers.currentIwad(row.launch_args),
+            // The full line with the choice applied, ready to hand back to launch-game.
+            argsFor: Object.fromEntries(iwads.map(i => [i.file, customInstallers.withIwad(row.launch_args, i.file)])),
+        };
+    } catch { return null; }
+});
+
+// Remember the choice as the new default, so the dialog opens on what you picked last.
+ipcMain.handle('custom-set-iwad', (_, grinderGameId, iwad) => {
+    if (!grinderGameId || !ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
+    try {
+        const row = _grinderEngineDb.prepare('SELECT launch_args FROM games WHERE id=?').get(grinderGameId);
+        if (!row) return { ok: false, error: 'That game is no longer registered.' };
+        const next = customInstallers.withIwad(row.launch_args, iwad || '');
+        _grinderEngineDb.prepare('UPDATE games SET launch_args=? WHERE id=?').run(next || null, grinderGameId);
+        return { ok: true, launchArgs: next };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
 // Cancel the in-flight in-process download (kills gogdl/legendary). The install
 // promise then resolves as failed and the renderer's queue advances to the next.
 ipcMain.handle('grinder-install-cancel', () => {
@@ -3145,16 +3177,18 @@ ipcMain.handle('delete-game', (event, id) => {
     try { db.prepare(`DELETE FROM games WHERE id=?`).run(id); return true; } catch (err) { return false; }
 });
 
-ipcMain.on('launch-game', (event, cmd) => {
+ipcMain.on('launch-game', (event, cmd, launchArgs) => {
     if (!cmd) return;
 
     // GOG/Epic via GRINDER, launched IN-PROCESS (cmd carries GRINDER's game id).
     // This is the path used by games with a GrinderGameId (the common case).
+    // launchArgs, when present, is a one-off override chosen at the moment of pressing
+    // Play — the Doom a mod runs on — and is deliberately not written back.
     const gLaunch = cmd.match(/^grinder:\/\/(?:launch\/)?(.+)$/);
     if (gLaunch) {
         const gid = gLaunch[1];
         if (ensureGrinderEngine()) {
-            grinderEngine.launchGame(gid)
+            grinderEngine.launchGame(gid, launchArgs !== undefined ? { launchArgs } : {})
                 .then(r => console.log('[launch-game] launched via', r?.method))
                 .catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gid, e); });
         } else {

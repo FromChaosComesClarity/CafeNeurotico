@@ -198,13 +198,14 @@ function renderCustomList(recipes) {
 // Which files out of a mod archive should actually be loaded. Resolves to an array of
 // archive-relative paths, or null if the user backed out. The biggest file is ticked
 // because in every pack seen so far that is the mod itself and the rest are extras.
-function pickModFiles(recipe, candidates, iwads) {
+function pickRunOptions({ title, okLabel = 'Install Selected', candidates = [], iwads = [], current = '' }) {
     return new Promise(resolve => {
         const modal = document.getElementById('modal-modpick');
         const list = document.getElementById('modpick-list');
         const iwadWrap = document.getElementById('modpick-iwad-wrap');
         const iwadList = document.getElementById('modpick-iwad-list');
-        document.getElementById('modpick-title').textContent = `${recipe.title} — how should it run?`;
+        document.getElementById('modpick-title').textContent = title;
+        document.getElementById('btn-modpick-ok').textContent = okLabel;
         list.innerHTML = '';
         iwadList.innerHTML = '';
 
@@ -225,27 +226,26 @@ function pickModFiles(recipe, candidates, iwads) {
             list.appendChild(row);
         });
 
-        // Which Doom to play it on. "Ask me every time" is a real answer, not a cop-out:
-        // it hands the choice to the engine's own IWAD picker on every launch, which is
-        // what you want when you own four of them and pick by mood.
-        iwadWrap.style.display = (iwads && iwads.length) ? '' : 'none';
-        if (iwads && iwads.length) {
-            const opts = [...iwads, { file: '', label: 'Ask me every time I launch it' }];
-            opts.forEach((o, i) => {
-                const row = document.createElement('label');
-                row.className = 'mp-row';
-                const rb = document.createElement('input');
-                rb.type = 'radio';
-                rb.name = 'modpick-iwad';
-                rb.value = o.file;
-                rb.checked = i === 0;
-                const txt = document.createElement('div');
-                txt.innerHTML = `<div class="mp-name">${escHtml(o.label)}</div>` +
-                                (o.file ? `<div class="mp-sub">${escHtml(o.file)}</div>` : '');
-                row.appendChild(rb);
-                row.appendChild(txt);
-                iwadList.appendChild(row);
-            });
+        // Which Doom to play on. Opens on whatever was chosen last, so the common case is
+        // Enter and go, while switching to TNT for the evening stays one click away.
+        iwadWrap.style.display = iwads.length ? '' : 'none';
+        iwads.forEach((o, i) => {
+            const row = document.createElement('label');
+            row.className = 'mp-row';
+            const rb = document.createElement('input');
+            rb.type = 'radio';
+            rb.name = 'modpick-iwad';
+            rb.value = o.file;
+            rb.checked = current ? o.file === current : i === 0;
+            const txt = document.createElement('div');
+            txt.innerHTML = `<div class="mp-name">${escHtml(o.label)}</div>` +
+                            `<div class="mp-sub">${escHtml(o.file)}</div>`;
+            row.appendChild(rb);
+            row.appendChild(txt);
+            iwadList.appendChild(row);
+        });
+        if (iwads.length && !iwadList.querySelector('input:checked')) {
+            iwadList.querySelector('input').checked = true;   // stored IWAD no longer present
         }
 
         const done = (val) => {
@@ -256,7 +256,7 @@ function pickModFiles(recipe, candidates, iwads) {
         };
         document.getElementById('btn-modpick-ok').onclick = () => done({
             selected: [...list.querySelectorAll('input:checked')].map(i => i.value),
-            iwad: (iwads && iwads.length) ? (iwadList.querySelector('input:checked')?.value ?? '') : undefined,
+            iwad: iwads.length ? (iwadList.querySelector('input:checked')?.value ?? '') : undefined,
         });
         document.getElementById('btn-modpick-cancel').onclick = () => done(null);
         modal.classList.add('active');
@@ -294,14 +294,16 @@ async function runCustomInstall(recipe, btn) {
         // The archive holds several loadable files — Black Edition ships the mod plus
         // thirty-odd optional voice and footstep packs. Which one is "the mod" is not
         // something to guess at, so ask, with the largest pre-ticked.
-        if (res && !res.ok && (res.choose || res.iwads)) {
-            const chosen = await pickModFiles(recipe, res.choose || [], res.iwads || []);
-            if (!chosen) return;
-            if (res.choose && res.choose.length && !chosen.selected.length) return;
+        if (res && !res.ok && res.choose) {
+            const chosen = await pickRunOptions({
+                title: `${recipe.title} — what should load?`,
+                okLabel: 'Install Selected',
+                candidates: res.choose,
+            });
+            if (!chosen || !chosen.selected.length) return;
             btn.textContent = 'INSTALLING…';
             res = await window.api.customInstall({
-                recipeId: recipe.id, archivePath: picked.path,
-                selected: chosen.selected, iwad: chosen.iwad,
+                recipeId: recipe.id, archivePath: picked.path, selected: chosen.selected,
             });
         }
 
@@ -316,7 +318,7 @@ async function runCustomInstall(recipe, btn) {
         const bits = [];
         if (res.engineTitle) bits.push(`Running on ${res.engineTitle}.`);
         if (res.modFiles && res.modFiles.length) bits.push(`Loading ${res.modFiles.join(', ')}.`);
-        if (res.iwadLabel) bits.push(`Playing on ${res.iwadLabel}.`);
+        if (res.iwadLabel) bits.push(`You will be asked which Doom to play it on each time you press Play.`);
         if (res.dataFrom) bits.push(`Game data linked from your copy of ${res.dataFrom.title} (${res.dataFrom.linked.join(', ')}).`);
         showAlert(`${res.title} is installed and added to your library.${bits.length ? '\n\n' + bits.join('\n') : ''}`);
         renderCustomList(await window.api.customRecipeList() || []);
@@ -594,6 +596,28 @@ document.getElementById('modal-launcher-pick').addEventListener('click', e => {
         document.getElementById('modal-launcher-pick').classList.remove('active');
 });
 
+// A Doom mod runs on whichever Doom you feel like tonight, so the choice belongs at the
+// moment you press Play rather than baked in at install time. Returns the launch line to
+// use, '' to cancel the launch, or undefined when there is nothing to ask about — which is
+// every game that is not a mod with more than one IWAD beside it, so nothing else is slowed
+// down by a round trip it does not need.
+async function _iwadForLaunch(grinderGameId) {
+    let opts = null;
+    try { opts = await window.api.customIwadOptions(grinderGameId); } catch (e) {}
+    if (!opts || !opts.iwads || opts.iwads.length < 2) return undefined;
+
+    const chosen = await pickRunOptions({
+        title: 'Which Doom?',
+        okLabel: 'Play',
+        iwads: opts.iwads,
+        current: opts.current,
+    });
+    if (!chosen) return null;                     // cancelled — do not launch
+    // Remembered as the new default so the dialog opens on last night's choice.
+    try { await window.api.customSetIwad(grinderGameId, chosen.iwad); } catch (e) {}
+    return opts.argsFor[chosen.iwad];
+}
+
 async function _doLaunch(game, cmd) {
     // Route by the actual command so the multi-launcher picker is honoured:
     //  - a grinder:// (GOG/Epic) command — or a grinder-linked game with no cmd —
@@ -602,7 +626,9 @@ async function _doLaunch(game, cmd) {
     const isGrinderCmd = /grinder:\/\/launch/i.test(cmd || '');
     if (isGrinderCmd || (!cmd && game?.GrinderGameId)) {
         if (game?.GrinderGameId) {
-            window.api.launchGame('grinder://launch/' + game.GrinderGameId);
+            const args = await _iwadForLaunch(game.GrinderGameId);
+            if (args === null) return;             // the dialog was cancelled
+            window.api.launchGame('grinder://launch/' + game.GrinderGameId, args);
         } else {
             window.api.openGrinder(game.Game);
         }

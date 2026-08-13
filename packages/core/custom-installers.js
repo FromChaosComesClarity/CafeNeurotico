@@ -754,6 +754,42 @@ function listIwads(engineRoot) {
         .sort((a, b) => a.label.localeCompare(b.label));
 }
 
+// launch_args is a shell-ish string because that is what the engine parses. Splitting it
+// the same way lets the IWAD be changed after the fact without reinstalling the mod —
+// swapping which Doom you play on should not mean re-extracting an 83MB pk3.
+function parseArgs(str) {
+    const out = [];
+    let cur = '', inQ = false, q = '';
+    for (const ch of String(str || '').trim()) {
+        if (inQ) { if (ch === q) inQ = false; else cur += ch; }
+        else if (ch === '"' || ch === "'") { inQ = true; q = ch; }
+        else if (ch === ' ' || ch === '\t') { if (cur) { out.push(cur); cur = ''; } }
+        else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+}
+
+const formatArgs = (arr) => arr.map(a => (/\s/.test(a) ? `"${a}"` : a)).join(' ');
+
+// Replace, add or drop the -iwad in an existing launch line. An empty iwad removes it,
+// which is what hands the choice back to the engine's own picker at every launch.
+function withIwad(launchArgs, iwad) {
+    const args = parseArgs(launchArgs);
+    const out = [];
+    for (let i = 0; i < args.length; i++) {
+        if (args[i].toLowerCase() === '-iwad') { i++; continue; }   // drop flag and its value
+        out.push(args[i]);
+    }
+    return formatArgs(iwad ? ['-iwad', iwad, ...out] : out);
+}
+
+const currentIwad = (launchArgs) => {
+    const args = parseArgs(launchArgs);
+    const i = args.findIndex(a => a.toLowerCase() === '-iwad');
+    return i >= 0 && args[i + 1] ? args[i + 1] : '';
+};
+
 function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, selected, iwad }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
@@ -763,19 +799,16 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
         return { ok: false, error: `That file does not look like ${recipe.title}. ${recipe.source.hint}` };
     }
 
-    // Which Doom to play it on is the user's call, not the recipe's. With Ultimate Doom,
-    // Doom II, TNT and Plutonia all linked beside the engine, defaulting to doom2.wad
-    // silently throws away three of them. `iwad` of '' is a deliberate choice too: it
-    // means "ask me at launch", which is GZDoom's own IWAD picker doing the job every run.
+    // Which Doom to play on is asked at *launch*, not here — see _iwadForLaunch in the
+    // renderer. It is a per-session decision, like picking a disc off a shelf, and asking
+    // once at install time answers it for all time. The recipe's preference is written in
+    // as the starting default so that dialog opens somewhere sensible.
     const iwads = listIwads(engineRoot);
-    const needIwad = recipe.data === 'doom' && iwads.length > 1 && iwad === undefined;
 
-    // Ask once for everything still unsettled, rather than a chain of dialogs.
     const candidates = (ext => ext === '.pk3' || ext === '.wad' ? [] : listModCandidates(archivePath, recipe))(path.extname(archivePath).toLowerCase());
     const needFiles = candidates.length > 1 && !(selected && selected.length) && !recipe.modAll;
-    if (needFiles || needIwad) {
-        if (!candidates.length && !iwads.length) return { ok: false, error: `No .pk3 or .wad was found inside that archive. ${recipe.source.hint}` };
-        return { ok: false, choose: needFiles ? candidates : [], iwads: needIwad ? iwads : [], title: recipe.title };
+    if (needFiles) {
+        return { ok: false, choose: candidates, iwads: [], title: recipe.title };
     }
 
     // Its own folder under the engine, so two mods never fight over a filename and
@@ -851,6 +884,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
+    parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,

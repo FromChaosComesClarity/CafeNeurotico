@@ -854,11 +854,15 @@ async function launchGame(gameId, opts = {}) {
         } catch { return []; }
     })();
 
-    // User-defined additional arguments — appended after auto-detected playTask args
+    // User-defined additional arguments — appended after auto-detected playTask args.
+    // opts.launchArgs overrides the stored line for this launch only, which is how a
+    // choice made at the moment of pressing Play (which Doom to run a mod on) reaches the
+    // command line without being written back to the database.
+    const argSource = opts.launchArgs !== undefined ? opts.launchArgs : game.launch_args;
     const userArgs = (() => {
-        if (!game.launch_args?.trim()) return [];
+        if (!argSource?.trim()) return [];
         const args = []; let cur = ''; let inQ = false; let q = '';
-        for (const ch of game.launch_args.trim()) {
+        for (const ch of argSource.trim()) {
             if (inQ) { if (ch === q) inQ = false; else cur += ch; }
             else if (ch === '"' || ch === "'") { inQ = true; q = ch; }
             else if (ch === ' ' || ch === '\t') { if (cur) { args.push(cur); cur = ''; } }
