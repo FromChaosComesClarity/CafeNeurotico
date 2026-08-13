@@ -699,19 +699,35 @@ function prefixPathForGame(game, opts = {}) {
     return path.join(prefixesDir, safeName);
 }
 
-// The bundled opengl32.dll a pre-2000 game would load on Windows, or ''. Looked for beside
-// the executable first, because that is the directory Windows searches, then at the install
-// root for the layouts that keep the exe in a subfolder. Scanned case-insensitively: these
-// releases are as likely to ship OPENGL32.DLL as opengl32.dll.
-function findShippedOpengl32(resolvedExe, installPath) {
+// The wrapper DLLs a game ships beside its executable. On Windows the application
+// directory is searched first, so these are what the game would load; Wine reverses that
+// for DLLs it implements itself, and the bundled one never runs.
+//
+// Two proven cases, both of which looked like the game simply not starting:
+//   • GOG's Quake ships 3dfx's "Voodoo Quake Driver" as opengl32.dll. Against Wine's
+//     builtin, GLQuake dies on a stack overflow before a window appears.
+//   • Resident Evil 2's Classic REbirth patch is a ddraw.dll. Shadowed by Wine's builtin
+//     it never loads, so the game runs untranslated and stops at a Japanese dialog —
+//     confirmed by WINEDEBUG=+loaddll reporting "builtin" for a file that is right there.
+//
+// Deliberately a short list of *wrappers*. d3d9, dxgi and d3d11 are excluded on purpose:
+// a game shipping one of those is usually shipping something DXVK does better.
+const SHIPPED_WRAPPERS = ['opengl32.dll', 'ddraw.dll', 'dsound.dll', 'dinput.dll'];
+
+function findShippedWrappers(resolvedExe, installPath) {
     const dirs = [resolvedExe && path.dirname(resolvedExe), installPath].filter(Boolean);
+    const found = [];
     for (const dir of [...new Set(dirs)]) {
         let entries = [];
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-        const hit = entries.find(e => e.isFile() && e.name.toLowerCase() === 'opengl32.dll');
-        if (hit) return path.join(dir, hit.name);
+        for (const e of entries) {
+            if (!e.isFile()) continue;
+            const name = e.name.toLowerCase();
+            if (SHIPPED_WRAPPERS.includes(name) && !found.includes(name)) found.push(name);
+        }
+        if (found.length) break;   // the executable's own directory wins
     }
-    return '';
+    return found;
 }
 
 // ── GOG play tasks ───────────────────────────────────────────────────────────
@@ -901,15 +917,21 @@ async function launchGame(gameId, opts = {}) {
     // before a window ever appears, which reads to the player as "the game closed
     // immediately". Restoring Windows' own resolution order is the whole fix, and it hands
     // the game the driver stack GOG shipped it with (MiniGL → nGlide → D3D → DXVK).
-    const shippedOpengl = usingProton && findShippedOpengl32(resolvedExe, installPath);
-    if (shippedOpengl && !/\bopengl32\b/i.test(customEnv.WINEDLLOVERRIDES || '')) {
-        const existing = (customEnv.WINEDLLOVERRIDES || '').trim().replace(/;$/, '');
-        compatEnv.WINEDLLOVERRIDES = existing ? `${existing};opengl32=n` : 'opengl32=n';
-        console.log(`[launch] ${path.basename(shippedOpengl)} ships with this game — using it instead of Wine's builtin`);
+    const wrappers = usingProton ? findShippedWrappers(resolvedExe, installPath) : [];
+    if (wrappers.length) {
+        // Entries are separated by ';' — ',' separates load orders for one DLL, so a
+        // comma-joined list silently sets only the first and mangles the rest.
+        const already = (customEnv.WINEDLLOVERRIDES || '');
+        const add = wrappers
+            .map(w => w.replace(/\.dll$/, ''))
+            .filter(n => !new RegExp(`\\b${n}\\b`, 'i').test(already))
+            .map(n => `${n}=n`);
+        if (add.length) {
+            const existing = already.trim().replace(/;$/, '');
+            compatEnv.WINEDLLOVERRIDES = existing ? `${existing};${add.join(';')}` : add.join(';');
+            console.log(`[launch] using the ${add.map(a => a.split('=')[0]).join(', ')} shipped with this game rather than Wine's`);
+        }
     }
-
-    // Base env: system → custom user vars → compat flags → GRINDER's required vars (highest priority)
-    const baseEnv = (extra = {}) => ({ ...process.env, ...customEnv, ...compatEnv, ...extra });
 
     // Launch Comet sidecar for GOG games (enables achievement unlocking via Galaxy SDK proxy)
     let cometProc = null;
@@ -2236,6 +2258,7 @@ module.exports = {
     gogListDlcs, gogInstalledDlcs,
     gogExchangeCode, gogStatus, gogLogout, epicAuthCode, epicStatus,
     findNativeDosbox, dosboxInstallHint, isGogDosGame, applyGogSupportFiles, engineSetting,
+    findShippedWrappers,
     gogPlayTasks, setGogLaunchTarget,
     findGogCdAudioImages, gogCdAudioConfArgs,
     gogListManuals, gogDownloadManual,
