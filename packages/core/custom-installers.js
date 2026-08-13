@@ -625,8 +625,11 @@ function findExtractor(archivePath) {
 
 // Installer plumbing that is never the game: NSIS's own scratch folder and the
 // redistributables setups bundle for the benefit of Windows.
-const INSTALLER_JUNK = /^\$PLUGINSDIR$|^\$?TEMP$|^(vc_?redist|dxwebsetup|dotnet).*\.exe$/i;
-const INSTALLER_JUNK_PATH = /(^|\/)(\$PLUGINSDIR|\$?TEMP)\//i;
+// The leading $ is required, not optional. NSIS names its scratch folders $PLUGINSDIR and
+// $TEMP; a plain "temp" is the game's own working directory and deleting it breaks the
+// game — SWOS writes its pitch and background data there and refuses to start without it.
+const INSTALLER_JUNK = /^\$(PLUGINSDIR|TEMP)$|^(vc_?redist|dxwebsetup|dotnet).*\.exe$/i;
+const INSTALLER_JUNK_PATH = /(^|\/)\$(PLUGINSDIR|TEMP)\//i;
 
 // Unpack a Windows installer by naming the members we want. Asking 7z for the whole thing
 // fails on NSIS-2 with E_NOTIMPL partway through — it stumbles over the installer's own
