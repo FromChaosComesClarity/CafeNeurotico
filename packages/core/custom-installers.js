@@ -474,13 +474,13 @@ const BUILD_GAMES = {
         label: 'Witchaven', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/^witchaven$/i, /witchaven i\b/i, /witchaven i ?& ?ii/i],
         exclude: [/witchaven ii|witchaven 2/i],
-        imageDir: /^WHAVEN\//i, engines: ['buildgdx'],
+        dataDir: /^WHAVEN$/i, imageDir: /^WHAVEN\//i, engines: ['buildgdx'],
     },
     witchaven2: {
         label: 'Witchaven II: Blood Vengeance', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/witchaven ii/i, /witchaven 2/i, /witchaven i ?& ?ii/i],
         exclude: [],
-        imageDir: /^WHAVEN2\//i, engines: ['buildgdx'],
+        dataDir: /^WHAVEN2$/i, imageDir: /^WHAVEN2\//i, engines: ['buildgdx'],
     },
 };
 
@@ -551,6 +551,7 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
         // The container proves the game is really there. Without this a folder holding one
         // stray .art would pass as Blood, and the install would produce an empty shell.
         mainFile: g.main,
+        dataDir: g.dataDir || null,
         imageDir: g.imageDir || null,
         files: [{ find: g.main, into: '' }, ...g.extra.map(rx => ({ find: rx, into: '' }))],
         requireAny: true,
@@ -844,10 +845,16 @@ const DISC_IMAGE = /\.(iso|cue|bin|gog|img|mdf)$/i;
 
 // The disc image inside `root` that holds `mainFile`, or ''. Listing an image is cheap;
 // this only runs when the loose files are absent.
-function findDataImage(root, mainFile, maxDepth = 3) {
+function findDataImage(root, spec, maxDepth = 3) {
+    const mainFile = spec instanceof RegExp ? spec : spec.mainFile;
+    const imageDir = spec instanceof RegExp ? null : spec.imageDir;
     for (const img of findFiles(root, DISC_IMAGE, maxDepth)) {
         const entries = inspectArchive(img);
-        if (entries.some(e => mainFile.test(path.basename(e)))) return img;
+        // When the spec names a directory inside the disc, that is what identifies the
+        // game. Checking only the container file would let Witchaven II's disc satisfy
+        // Witchaven I, since TILES000.ART is generic Build data present in both.
+        if (imageDir) { if (entries.some(e => imageDir.test(e))) return img; continue; }
+        if (mainFile && entries.some(e => mainFile.test(path.basename(e)))) return img;
     }
     return '';
 }
@@ -902,6 +909,55 @@ function extractFromImage(img, spec, target) {
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+// ── Games whose data is a whole directory ────────────────────────────────────
+// Some games are not one container file but a folder of loose parts. Witchaven's are
+// TILES000.ART, TABLES.DAT, PALETTE.DAT, LOOKUP.DAT, the LEVEL*.MAP set, and two
+// extension-less files named SONGS and JOESND — so any spec written as a list of
+// extensions misses half of it, which is precisely what BuildGDX reported.
+//
+// Naming the directory solves the other half too. TILES000.ART is generic Build data and
+// appears in every one of these games, so it cannot tell Witchaven from Witchaven II —
+// both specs happily accepted the other's files. WHAVEN/ and WHAVEN2/ can.
+function findDataDir(root, spec, maxDepth = 4) {
+    if (!spec.dataDir) return '';
+    const walk = (dir, depth) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return ''; }
+        for (const e of entries) {
+            if (!e.isDirectory() && !e.isSymbolicLink()) continue;
+            const p = path.join(dir, e.name);
+            if (spec.dataDir.test(e.name) && (!spec.mainFile || dirHasProbe(p, spec.mainFile))) return p;
+            if (depth < maxDepth) { const hit = walk(p, depth + 1); if (hit) return hit; }
+        }
+        return '';
+    };
+    // The directory may itself be what was handed to us.
+    if (spec.dataDir.test(path.basename(root)) && (!spec.mainFile || dirHasProbe(root, spec.mainFile))) return root;
+    return walk(root, 0);
+}
+
+// Reproduce a directory tree: symlink each entry, or copy it when the source is the
+// user's own folder and might not stay where it is.
+function mirrorTree(src, dst, copy) {
+    fs.mkdirSync(dst, { recursive: true });
+    const out = [];
+    for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+        const from = path.join(src, e.name);
+        const to = path.join(dst, e.name.toLowerCase());
+        try { fs.rmSync(to, { recursive: true, force: true }); } catch {}
+        let isDir = e.isDirectory();
+        if (e.isSymbolicLink()) { try { isDir = fs.statSync(from).isDirectory(); } catch { continue; } }
+        if (copy) {
+            if (isDir) fs.cpSync(from, to, { recursive: true });
+            else fs.copyFileSync(from, to);
+        } else {
+            fs.symlinkSync(from, to);
+        }
+        out.push(e.name);
+    }
+    return out;
+}
+
 // Does this folder actually hold the data a spec needs? The same test whether the folder
 // came from the library or the user pointed at it — a shelf of DOS files they still have
 // is every bit as valid a source as a storefront install, and quite often the only one.
@@ -916,10 +972,16 @@ function folderSatisfies(spec, root) {
     // without a word. Reported by name so the gap is actionable.
     if (spec.requireAllOf) return dirsOk && missingFrom(spec, root).length === 0;
 
+    // A named data directory is the strictest test and the one that tells sibling games
+    // apart, so it wins when a spec has one — on disk, or inside a disc image.
+    if (spec.dataDir) {
+        return dirsOk && (!!findDataDir(root, spec) || !!findDataImage(root, spec));
+    }
+
     // A named container settles it on its own when the spec has one — loose on disk, or
     // sealed inside a disc image the release never unpacked.
     if (spec.mainFile) {
-        return dirsOk && (findFiles(root, spec.mainFile).length > 0 || !!findDataImage(root, spec.mainFile));
+        return dirsOk && (findFiles(root, spec.mainFile).length > 0 || !!findDataImage(root, spec));
     }
     // Otherwise: at least one of the named files must turn up somewhere inside.
     const filesOk = spec.files ? spec.files.some(f => findFiles(root, f.find).length > 0) : true;
@@ -1030,11 +1092,21 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource, { copy = fals
 
     const linked = [];
 
+    // A whole-directory game: take everything in it, structure and all. Selecting by
+    // extension would drop the parts with no extension at all.
+    if (spec.dataDir) {
+        for (const root of roots) {
+            const dir = findDataDir(root, spec);
+            if (!dir) continue;
+            return { ok: true, linked: mirrorTree(dir, targetRoot, copy), fromDir: path.basename(dir) };
+        }
+    }
+
     // Nothing loose to link, but a disc image that holds it — extract instead. Copies, not
     // symlinks, because there is no file on disk to point at.
     if (spec.mainFile && !roots.some(r => findFiles(r, spec.mainFile).length)) {
         for (const root of roots) {
-            const img = findDataImage(root, spec.mainFile);
+            const img = findDataImage(root, spec);
             if (!img) continue;
             const got = extractFromImage(img, spec, targetRoot);
             if (!got.ok) return got;
