@@ -1316,6 +1316,28 @@ function mirrorEngine(engineRoot, target) {
     return n;
 }
 
+// A ZDoom-family engine with no game data beside it prints "Unable to find any game data"
+// and quits — which is what an engine entry became once the games moved into folders of
+// their own. It has a real front end though: a game picker at startup and the whole options
+// tree behind it. Pointing it at the folders where the games now live gets that back, and
+// turns the engine entry into a menu of everything you have installed.
+//
+// Verified against Raze: portable ini beside the exe, Wine's Z: drive for the Linux path.
+function writeEngineSearchPaths(engineId, engineRoot, gameFolders) {
+    if (engineId !== 'raze') return false;          // only Raze's format is known-good
+    const toWine = (p) => 'Z:' + p.replace(/\//g, '\\');
+    const body =
+        '# Written by Cafe Neurotico. Lists the folders your Build games are installed in,\n' +
+        '# so opening Raze on its own shows a picker for all of them.\n\n' +
+        '[GlobalSettings]\n\n' +
+        '[GameSearch.Directories]\n' +
+        gameFolders.map(f => `Path=${toWine(f)}`).join('\n') + '\n';
+    try {
+        fs.writeFileSync(path.join(engineRoot, 'raze_portable.ini'), body);
+        return true;
+    } catch { return false; }
+}
+
 function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
@@ -1549,6 +1571,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
     scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine, readEngines, ENGINES_FILE,
+    writeEngineSearchPaths,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveDataFolder, folderSatisfies, resolveExtra, linkGameData, installFromArchive,

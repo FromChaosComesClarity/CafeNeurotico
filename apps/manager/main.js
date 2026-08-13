@@ -1011,6 +1011,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
         // `selected`. Carries the engine title so the second pass can report it.
         if (!mr.ok) return (mr.choose || mr.needsData) ? { ...mr, engineTitle: engine.title } : mr;
         try { _registerCustomInstall(mr); } catch (e) { return { ok: false, error: `Installed, but could not add it to the library: ${e.message}` }; }
+        if (recipe.onEngine) _refreshEngineSearchPaths(recipe.engine);
         invalidateGrinderInstalledCache();
         return { ...mr, engineTitle: engine.title };
     }
@@ -1077,6 +1078,22 @@ ipcMain.handle('custom-iwad-options', (_, grinderGameId) => {
         };
     } catch { return null; }
 });
+
+// Tell each engine where the games ended up. Without this an engine opened on its own
+// finds nothing and quits, which is what happened once the games moved into their own
+// folders — see writeEngineSearchPaths.
+function _refreshEngineSearchPaths(engineIds) {
+    for (const e of _installedEngines(engineIds || [])) {
+        let folders = [];
+        try {
+            folders = _grinderEngineDb.prepare(
+                // Tolerates the pre-rename `cn_raze-*` ids as well as the current ones.
+                "SELECT install_path FROM games WHERE (id LIKE 'cn_build-game-%' OR id LIKE 'cn_raze-%') AND installed=1"
+            ).all().map(r => r.install_path).filter(p => p && fs.existsSync(p));
+        } catch {}
+        if (folders.length) customInstallers.writeEngineSearchPaths(e.id, e.root, folders);
+    }
+}
 
 // Which engine to run this on, asked at Play time. Null unless the game folder really
 // holds more than one — a game with a single engine must never be slowed by a question.
