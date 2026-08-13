@@ -483,15 +483,32 @@ const BUILD_GAMES = {
     },
 };
 
+// CannonBall wants OutRun **Revision B** specifically, and it is all-or-nothing: a set
+// missing one ROM starts and closes in the same second, with no message. So the whole
+// manifest is checked up front and the missing names are reported. This is CannonBall's
+// own roms.txt list, verbatim.
+const OUTRUN_REV_B = [
+    'epr-10187.88', 'epr-10327a.76', 'epr-10328a.75', 'epr-10329a.58', 'epr-10330a.57',
+    'epr-10380b.133', 'epr-10381a.132', 'epr-10382b.118', 'epr-10383b.117',
+    'mpr-10371.9', 'mpr-10372.13', 'mpr-10373.10', 'mpr-10374.14',
+    'mpr-10375.11', 'mpr-10376.15', 'mpr-10377.12', 'mpr-10378.16',
+    'opr-10185.11', 'opr-10186.47', 'opr-10188.71', 'opr-10189.70', 'opr-10190.69',
+    'opr-10191.68', 'opr-10192.67', 'opr-10193.66', 'opr-10230.104', 'opr-10231.103',
+    'opr-10232.102', 'opr-10266.101', 'opr-10267.100', 'opr-10268.99',
+];
+
 DATA_SPECS.outrun = {
-    label: "the OutRun arcade ROM set",
-    // CannonBall reads its ROMs from roms/, per its own config.xml.
+    label: 'the OutRun Revision B arcade ROM set',
     mainFile: /^epr-1038\d[a-z]?\.\d+$/i,
+    requireAllOf: OUTRUN_REV_B,
+    // Everything matching comes along, so the optional Japanese-course ROMs and the fixed
+    // audio ROM are carried over too when the user has them. CannonBall reads from roms/,
+    // per its own config.xml.
     files: [{ find: /^(epr|mpr|opr)-\d+[a-z]?\.[\w.]+$/i, into: 'roms' }],
     requireAny: true,
     titles: [],          // no storefront sells these; the folder picker is the only route
     exclude: [],
-    owned: 'CannonBall needs the original OutRun arcade ROM set. No game library provides it — point at the folder holding your own copy.',
+    owned: 'CannonBall needs the original OutRun Revision B arcade ROM set. No game library provides it — point at the folder holding your own copy.',
 };
 
 // Each Build game is its own catalogue entry, running on whichever engine is installed.
@@ -804,6 +821,10 @@ function folderSatisfies(spec, root) {
         const dir = resolveCaseInsensitive(root, d.name);
         return dir && dirHasProbe(dir, d.probe);
     });
+    // An all-or-nothing set: every named file must be there, or the game starts and dies
+    // without a word. Reported by name so the gap is actionable.
+    if (spec.requireAllOf) return dirsOk && missingFrom(spec, root).length === 0;
+
     // A named container settles it on its own when the spec has one — loose on disk, or
     // sealed inside a disc image the release never unpacked.
     if (spec.mainFile) {
@@ -814,6 +835,13 @@ function folderSatisfies(spec, root) {
     return dirsOk && filesOk;
 }
 
+// Which files of an all-or-nothing set are absent from a folder.
+function missingFrom(spec, root) {
+    if (!spec.requireAllOf) return [];
+    const have = new Set(findFiles(root, /./, 4).map(f => path.basename(f).toLowerCase()));
+    return spec.requireAllOf.filter(n => !have.has(n.toLowerCase()));
+}
+
 // Validate a folder the user chose themselves, so the failure is reported before anything
 // is unpacked and says which files were expected rather than just "no".
 function resolveDataFolder(dataId, folder) {
@@ -821,6 +849,14 @@ function resolveDataFolder(dataId, folder) {
     if (!spec) return { ok: false, message: `Unknown data requirement "${dataId}".` };
     if (!folder || !fs.existsSync(folder)) return { ok: false, message: 'That folder no longer exists.' };
     if (!folderSatisfies(spec, folder)) {
+        if (spec.requireAllOf) {
+            const missing = missingFrom(spec, folder);
+            // A near-complete set is a different problem from the wrong folder entirely,
+            // and deserves a different sentence.
+            return { ok: false, message: missing.length === spec.requireAllOf.length
+                ? `No part of ${spec.label} is in that folder.`
+                : `That set is incomplete — ${missing.length} of ${spec.requireAllOf.length} ROMs are missing: ${missing.slice(0, 6).join(', ')}${missing.length > 6 ? `, and ${missing.length - 6} more` : ''}. CannonBall needs the full Revision B set or it will not start.` };
+        }
         const want = (spec.files || []).map(f => f.find.source.replace(/[\\^$()?:]/g, '').replace(/\|/g, ', '))
             .concat((spec.dirs || []).filter(d => d.required).map(d => `${d.name}/`)).join(' or ');
         return { ok: false, message: `That folder does not contain ${spec.label}. Looking for ${want}. Point at the folder holding the game's own data files.` };
