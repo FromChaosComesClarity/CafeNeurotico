@@ -921,14 +921,21 @@ function resolveExtra(extra, rows) {
 // install. Symlinking the pak files (not the folders) means the port writes its configs and
 // saves into its own id1/ while the multi-gigabyte data stays in one place — and the game
 // CN installed for you is never written into by something else.
-function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
+// `copy` decides how data is attached, and the rule is about who owns the source, not
+// about size. Data resolved from the library lives in a folder Cafe Neurotico installed
+// and manages, so a symlink is safe and saves duplicating gigabytes. Data the user pointed
+// at is theirs — a USB stick, a folder they extracted to look inside, somewhere they will
+// tidy up next week — so it is copied. A game that stops working because a folder moved is
+// not a game that was really installed.
+function linkGameData(dataId, sourceRoot, targetRoot, extraSource, { copy = false } = {}) {
     const spec = DATA_SPECS[dataId];
     if (!spec) return { ok: false, error: `Unknown data requirement "${dataId}".` };
 
     const roots = Array.isArray(sourceRoot) ? sourceRoot : [sourceRoot];
     const link = (from, to) => {
         try { fs.unlinkSync(to); } catch {}
-        fs.symlinkSync(from, to);
+        if (copy) fs.copyFileSync(from, to);
+        else fs.symlinkSync(from, to);
     };
 
     const linked = [];
@@ -1081,7 +1088,7 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, data
         if (spec && spec.extras) extra = resolveExtra(spec.extras[0], dataRows);
         // Link beside the executable — that is the engine's basedir, which is not always
         // the top of the archive.
-        linked = linkGameData(recipe.data, data.paths || data.path, path.dirname(exe), extra);
+        linked = linkGameData(recipe.data, data.paths || data.path, path.dirname(exe), extra, { copy: !!dataPath });
         if (!linked.ok) return { ok: false, error: linked.error };
     }
 
@@ -1238,7 +1245,7 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
             JSON.stringify(list.map(e => ({ id: e.id, title: e.title, exe: e.exe })), null, 2));
     } catch {}
 
-    const linked = linkGameData(recipe.data, data.paths || data.path, target);
+    const linked = linkGameData(recipe.data, data.paths || data.path, target, null, { copy: !!dataPath });
     if (!linked.ok) return { ok: false, error: linked.error };
 
     return {
