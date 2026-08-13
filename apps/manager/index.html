@@ -2900,6 +2900,12 @@
     .mp-name { font-size:13px; font-weight:700; color:var(--text_main); word-break:break-all; }
     .mp-sub { font-size:11px; color:var(--text_dim); margin-top:2px; word-break:break-all; }
     .mp-head { font-size:11px; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--border_solid); padding-bottom:5px; }
+    /* Catalogue groups — one section per game, click the header to fold it away. */
+    .ci-group { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; padding:9px 4px 6px; font-size:11px; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--border_solid); }
+    .ci-group:hover { color:var(--text_main); }
+    .ci-group-caret { font-size:10px; width:10px; }
+    .ci-group-n { margin-left:auto; color:var(--text_dim); font-weight:700; }
+    .ci-group-body { display:flex; flex-direction:column; gap:10px; padding:10px 0 4px; }
 
     /* Play-task picker: one GOG release can ship several ways to start, and they are not
        interchangeable — Quake's DOS build plays the CD soundtrack its GLQuake primary
@@ -5730,7 +5736,12 @@ LOADING...READY.</div>
     <div class="modal-box" style="width:660px; max-width:95vw; max-height:84vh; text-align:left; display:flex; flex-direction:column;">
       <h3 style="margin:0; color:var(--accent); text-transform:uppercase;">Fan Games &amp; Source Ports</h3>
       <div style="font-size:12px; color:var(--text_sec); margin:6px 0 10px;">You download the port; Cafe Neurotico does the rest. Each one below says exactly where to get it and what the file is called &mdash; the game data comes from a title you already own.</div>
-      <div id="custom-list" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
+      <div class="row" style="gap:8px; margin-bottom:10px; flex-shrink:0;">
+        <input type="text" id="custom-search" placeholder="Search the catalogue&hellip;" autocomplete="off" spellcheck="false"
+               style="flex:1; box-sizing:border-box; padding:9px 12px; background:var(--bg); border:1.5px solid var(--border_solid); border-radius:8px; color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:12px; font-weight:700;">
+        <button id="btn-custom-folder" style="flex-shrink:0; font-size:11px; padding:9px 14px; letter-spacing:0.4px; background:transparent; border:1.5px solid var(--border_solid); color:var(--text_sec);">ADD FROM A FOLDER</button>
+      </div>
+      <div id="custom-list" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;"></div>
       <button id="btn-close-custom" style="margin-top:12px; flex-shrink:0;">Close</button>
     </div>
   </div>
@@ -5742,14 +5753,19 @@ LOADING...READY.</div>
       <h3 id="modpick-title" style="margin:0; color:var(--accent); text-transform:uppercase;">How should it run?</h3>
       <div style="overflow-y:auto; overflow-x:hidden; padding-right:4px; flex:1 1 auto;">
         <div id="modpick-files-wrap">
-          <div class="mp-head">Files to load</div>
-          <div style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;">This download contains more than one loadable file. The largest is usually the mod itself; the rest are normally optional extras you can add if you want them. Load order follows the file names.</div>
+          <div class="mp-head" id="modpick-files-head">Files to load</div>
+          <div id="modpick-files-hint" style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;"></div>
           <div id="modpick-list" style="display:flex; flex-direction:column; gap:2px;"></div>
         </div>
         <div id="modpick-iwad-wrap" style="margin-top:14px;">
-          <div class="mp-head">Which Doom to play it on</div>
-          <div style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;">Every Doom you own has been linked next to the engine, so the mod can run on any of them.</div>
+          <div class="mp-head" id="modpick-iwad-head">Which Doom to play it on</div>
+          <div id="modpick-iwad-hint" style="font-size:12px; color:var(--text_sec); margin:2px 0 8px;"></div>
           <div id="modpick-iwad-list" style="display:flex; flex-direction:column; gap:2px;"></div>
+        </div>
+        <div id="modpick-name-wrap" style="margin-top:14px;">
+          <div class="mp-head" id="modpick-name-head">Name in your library</div>
+          <input type="text" id="modpick-name" autocomplete="off" spellcheck="false"
+                 style="width:100%; box-sizing:border-box; margin-top:8px; padding:9px 12px; background:var(--bg); border:1.5px solid var(--border_solid); border-radius:8px; color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:13px; font-weight:700;">
         </div>
       </div>
       <div class="row" style="margin-top:12px; flex-shrink:0;">

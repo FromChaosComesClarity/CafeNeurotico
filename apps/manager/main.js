@@ -1010,6 +1010,35 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
     return r;
 });
 
+// Adding a Windows game from a folder that is already unpacked. Registered in place —
+// nothing is copied — so this also covers folders living on another drive.
+ipcMain.handle('custom-folder-pick', async () => {
+    const parent = BrowserWindow.getFocusedWindow();
+    const res = await dialog.showOpenDialog(parent, {
+        title: "Select the game's folder",
+        properties: ['openDirectory'],
+    });
+    if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+    return { ok: true, path: res.filePaths[0] };
+});
+
+ipcMain.handle('custom-folder-scan', (_, folder) => {
+    try {
+        if (!folder || !fs.existsSync(folder)) return { ok: false, error: 'That folder no longer exists.' };
+        return { ok: true, entries: customInstallers.scanFolderEntries(folder), suggestedTitle: path.basename(folder) };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('custom-folder-add', (_, { folder, executable, title } = {}) => {
+    if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
+    const r = customInstallers.addFromFolder({ folder, executable, title });
+    if (!r.ok) return r;
+    try { _registerCustomInstall(r); }
+    catch (e) { return { ok: false, error: `Could not add it to the library: ${e.message}` }; }
+    invalidateGrinderInstalledCache();
+    return r;
+});
+
 // Asked at the moment of pressing Play, not at install time: which Doom this mod runs on
 // is a per-session decision, the way you would pick a disc off a shelf. Returns null when
 // there is nothing to ask — not a mod, or only one IWAD available — so the launch goes

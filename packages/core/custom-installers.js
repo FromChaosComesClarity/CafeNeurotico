@@ -819,6 +819,76 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
     };
 }
 
+// ── Adding a Windows game from a folder already on disk ──────────────────────
+// The other half of the same problem: plenty of things arrive as a folder you have already
+// unpacked, and until now the only route was GRINDER's importer, which scans one level deep
+// and so finds nothing in the many releases that put the executable in a subfolder.
+//
+// Nothing is copied or moved — the folder is registered where it sits.
+
+// Executables that are never the game. Not used to hide anything, only to sort: the aim is
+// to put the right answer at the top, not to decide for the user and be wrong about SWOS,
+// whose real entry point is called gameLauncher.exe.
+const NOT_THE_GAME = /^(unins|uninst|setup|install|vc_?redist|dxwebsetup|directx|dotnet|oalinst|openal|crash|report|.*ded(icated)?|console|versionmaintainer|dlcmanager|databasebrowser|benchmark|editor|mapper|server)/i;
+
+function scanFolderEntries(folder, maxDepth = 3) {
+    const out = [];
+    const walk = (dir, depth) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+            const p = path.join(dir, e.name);
+            if (e.isFile() && /\.(exe|bat|cmd|sh|jar)$/i.test(e.name)) {
+                let size = 0;
+                try { size = fs.statSync(p).size; } catch {}
+                const rel = path.relative(folder, p);
+                out.push({
+                    rel, name: e.name, dir: path.dirname(rel) === '.' ? '' : path.dirname(rel),
+                    size, junk: NOT_THE_GAME.test(e.name),
+                    // A .bat beside an .exe usually *is* the entry point — it carries the
+                    // command line the game needs (Brutal Doom's launcher, DOSBox wrappers).
+                    bat: /\.(bat|cmd)$/i.test(e.name),
+                    depth,
+                });
+            } else if (e.isDirectory() && depth < maxDepth && !/^(__redist|redist|_?commonredist|directx|dotnet|vcredist)$/i.test(e.name)) {
+                walk(p, depth + 1);
+            }
+        }
+    };
+    walk(folder, 0);
+
+    // Best guess first: never-the-game last, then shallower, then bigger. Depth beats
+    // everything because the real entry point lives at the top of a release far more often
+    // than not — sorting batch files first instead put SWOS's sysinfo.bat above its actual
+    // gameLauncher.exe. Batch files are flagged rather than promoted: sometimes the .bat is
+    // the game (Brutal Doom's launcher carries the whole -iwad/-file line) and sometimes it
+    // is a utility, so the list says which is which and lets the user decide.
+    return out.sort((a, b) =>
+        (a.junk - b.junk) || (a.depth - b.depth) || (b.size - a.size));
+}
+
+// Register a folder as it stands. Returns the same shape installFromArchive does, so the
+// caller's registration path is shared and there is one way for a custom game to exist.
+function addFromFolder({ folder, executable, title }) {
+    if (!folder || !fs.existsSync(folder)) return { ok: false, error: 'That folder no longer exists.' };
+    const exe = path.join(folder, executable || '');
+    if (!executable || !fs.existsSync(exe)) return { ok: false, error: 'Pick the file that starts the game.' };
+
+    const name = (title || path.basename(folder)).trim();
+    return {
+        ok: true,
+        recipeId: 'folder',
+        key: `folder_${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || Date.now().toString(36)}`,
+        title: name,
+        installPath: folder,
+        executable,
+        // .sh is the only thing here that is plausibly a native Linux game; everything
+        // else goes through Proton, which is what these folders are.
+        platform: /\.sh$/i.test(executable) ? 'linux' : 'windows',
+        category: '',
+    };
+}
+
 // Install a mod alongside an engine that is already on disk. The engine is shared rather
 // than copied per mod — that is how ZDoom-family ports are designed to work, and it keeps
 // four Doom mods from meaning four copies of the same 50MB engine. Each mod still becomes
@@ -1004,6 +1074,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
+    scanFolderEntries, addFromFolder,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
     resolveGameData, resolveExtra, linkGameData, installFromArchive,

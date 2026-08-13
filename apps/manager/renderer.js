@@ -124,20 +124,63 @@ function openSteamMenu(anchorBtn, appId) {
 // states where to get the download and what it is called, because "go find a source port"
 // is the step that actually stops people — and then reports whether the game data it needs
 // was located in their own library, which is the half worth automating.
+let _customRecipes = [];
+
 async function openCustomInstallModal() {
     const modal = document.getElementById('modal-custom');
     const list = document.getElementById('custom-list');
     list.innerHTML = `<div class="hc-empty">Loading&hellip;</div>`;
     modal.classList.add('active');
-    renderCustomList(await window.api.customRecipeList() || []);
+    _customRecipes = await window.api.customRecipeList() || [];
+    document.getElementById('custom-search').value = '';
+    renderCustomList(_customRecipes);
+}
+
+// Grouped by the game they belong to, because that is how anyone looks for them: you come
+// here wanting "something for Doom", not "a source port". Ports, mods and fan games for the
+// same game sit together, and the kind chip on each row still says which is which.
+const CUSTOM_GROUP_ORDER = ['Doom', 'Quake', 'Wolfenstein 3D', 'Build engine games', 'OutRun'];
+function _customGroupOf(r) {
+    if (r.kind === 'OpenBOR') return 'OpenBOR';
+    return r.game || 'Standalone games';
 }
 
 function renderCustomList(recipes) {
     const list = document.getElementById('custom-list');
     list.innerHTML = '';
-    if (!recipes.length) { list.innerHTML = `<div class="hc-empty">Nothing in the catalogue yet.</div>`; return; }
+    if (!recipes.length) { list.innerHTML = `<div class="hc-empty">Nothing matches that.</div>`; return; }
 
+    const groups = new Map();
     for (const r of recipes) {
+        const g = _customGroupOf(r);
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push(r);
+    }
+    const names = [...groups.keys()].sort((a, b) => {
+        const ia = CUSTOM_GROUP_ORDER.indexOf(a), ib = CUSTOM_GROUP_ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+
+    for (const name of names) {
+        const rows = groups.get(name);
+        const head = document.createElement('div');
+        head.className = 'ci-group';
+        head.innerHTML = `<span class="ci-group-caret">▾</span><span>${escHtml(name)}</span><span class="ci-group-n">${rows.length}</span>`;
+        const body = document.createElement('div');
+        body.className = 'ci-group-body';
+        head.onclick = () => {
+            const hidden = body.style.display === 'none';
+            body.style.display = hidden ? '' : 'none';
+            head.querySelector('.ci-group-caret').textContent = hidden ? '▾' : '▸';
+        };
+        list.appendChild(head);
+        list.appendChild(body);
+        for (const r of rows) body.appendChild(_customRow(r));
+    }
+}
+
+function _customRow(r) {
+    {
         const row = document.createElement('div');
         row.className = 'ci-row';
 
@@ -191,61 +234,122 @@ function renderCustomList(recipes) {
             e.preventDefault();
             window.api.openExternal(e.target.dataset.url);
         });
-        list.appendChild(row);
+        return row;
     }
 }
+
+// Free-text filter over the whole catalogue — title, kind, game and blurb — so "quake",
+// "mod" and "openbor" all find what you would expect.
+document.getElementById('custom-search')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    renderCustomList(!q ? _customRecipes : _customRecipes.filter(r =>
+        [r.title, r.kind, r.game, r.blurb].some(v => String(v || '').toLowerCase().includes(q))));
+});
+
+// ── Adding a Windows game from a folder you already have ─────────────────────
+// The same machinery, minus the download: scan for what could start the game, let the user
+// confirm which, and register the folder where it sits without copying anything.
+async function addWindowsGameFromFolder() {
+    const picked = await window.api.customFolderPick();
+    if (!picked || !picked.ok) return;
+
+    const scan = await window.api.customFolderScan(picked.path);
+    if (!scan || !scan.ok) { showAlert((scan && scan.error) || 'Could not read that folder.'); return; }
+    if (!scan.entries.length) {
+        showAlert('Nothing in that folder looks like it starts a game — no .exe, .bat or .sh was found.');
+        return;
+    }
+
+    const chosen = await pickRunOptions({
+        title: 'Add a game from a folder',
+        okLabel: 'Add to Library',
+        radios: {
+            header: 'What starts the game?',
+            hint: 'Best guess first. A .bat is sometimes the real entry point — it can carry the command line a mod needs — and sometimes just a utility, so check the name.',
+            items: scan.entries.map(e => ({
+                value: e.rel,
+                label: e.name + (e.bat ? '   (batch file)' : ''),
+                sub: `${e.dir ? e.dir + ' · ' : ''}${_fmtBytes(e.size)}${e.junk ? ' · probably not the game' : ''}`,
+            })),
+        },
+        nameInput: { label: 'Name in your library', value: scan.suggestedTitle },
+    });
+    if (!chosen || !chosen.choice) return;
+
+    const res = await window.api.customFolderAdd({
+        folder: picked.path, executable: chosen.choice, title: chosen.name || scan.suggestedTitle,
+    });
+    if (!res || !res.ok) { showAlert((res && res.error) || 'Could not add that folder.'); return; }
+    showAlert(`${res.title} was added to your library.\n\nIt runs ${res.executable} from the folder where it already lives — nothing was copied.`);
+    loadGames();
+}
+
+document.getElementById('btn-custom-folder')?.addEventListener('click', () =>
+    addWindowsGameFromFolder().catch(e => showAlert(`Something went wrong.\n\n${e && e.message ? e.message : e}`)));
 
 // Which files out of a mod archive should actually be loaded. Resolves to an array of
 // archive-relative paths, or null if the user backed out. The biggest file is ticked
 // because in every pack seen so far that is the mod itself and the rest are extras.
-function pickRunOptions({ title, okLabel = 'Install Selected', candidates = [], iwads = [], current = '' }) {
+// One dialog for every "before we go, which one?" question in this feature: which files
+// out of a mod pack to load, which Doom to run it on, which executable in a folder starts
+// the game. Sections appear only when there is something to ask.
+//   checks — multi-select list   {header, hint, items:[{value,label,sub,checked}]}
+//   radios — single-select list  {header, hint, items:[{value,label,sub}], current}
+//   nameInput — optional free text {label, value}
+// Resolves to {selected:[], choice:'', name:''} or null if cancelled.
+function pickRunOptions({ title, okLabel = 'Install Selected', checks = null, radios = null, nameInput = null }) {
     return new Promise(resolve => {
         const modal = document.getElementById('modal-modpick');
         const list = document.getElementById('modpick-list');
-        const iwadWrap = document.getElementById('modpick-iwad-wrap');
-        const iwadList = document.getElementById('modpick-iwad-list');
+        const radioWrap = document.getElementById('modpick-iwad-wrap');
+        const radioList = document.getElementById('modpick-iwad-list');
+        const nameWrap = document.getElementById('modpick-name-wrap');
+        const nameEl = document.getElementById('modpick-name');
         document.getElementById('modpick-title').textContent = title;
         document.getElementById('btn-modpick-ok').textContent = okLabel;
         list.innerHTML = '';
-        iwadList.innerHTML = '';
+        radioList.innerHTML = '';
 
-        const filesWrap = document.getElementById('modpick-files-wrap');
-        filesWrap.style.display = candidates.length ? '' : 'none';
-        candidates.forEach((c, i) => {
+        const rowFor = (type, group, o, checked) => {
             const row = document.createElement('label');
             row.className = 'mp-row';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = c.rel;
-            cb.checked = i === 0;
-            const txt = document.createElement('div');
-            txt.innerHTML = `<div class="mp-name">${escHtml(c.name)}</div>` +
-                            `<div class="mp-sub">${_fmtBytes(c.size)}${c.dir && c.dir !== '.' ? ' · ' + escHtml(c.dir) : ''}</div>`;
-            row.appendChild(cb);
-            row.appendChild(txt);
-            list.appendChild(row);
-        });
-
-        // Which Doom to play on. Opens on whatever was chosen last, so the common case is
-        // Enter and go, while switching to TNT for the evening stays one click away.
-        iwadWrap.style.display = iwads.length ? '' : 'none';
-        iwads.forEach((o, i) => {
-            const row = document.createElement('label');
-            row.className = 'mp-row';
-            const rb = document.createElement('input');
-            rb.type = 'radio';
-            rb.name = 'modpick-iwad';
-            rb.value = o.file;
-            rb.checked = current ? o.file === current : i === 0;
+            const input = document.createElement('input');
+            input.type = type;
+            if (group) input.name = group;
+            input.value = o.value;
+            input.checked = !!checked;
             const txt = document.createElement('div');
             txt.innerHTML = `<div class="mp-name">${escHtml(o.label)}</div>` +
-                            `<div class="mp-sub">${escHtml(o.file)}</div>`;
-            row.appendChild(rb);
+                            (o.sub ? `<div class="mp-sub">${escHtml(o.sub)}</div>` : '');
+            row.appendChild(input);
             row.appendChild(txt);
-            iwadList.appendChild(row);
-        });
-        if (iwads.length && !iwadList.querySelector('input:checked')) {
-            iwadList.querySelector('input').checked = true;   // stored IWAD no longer present
+            return row;
+        };
+
+        const filesWrap = document.getElementById('modpick-files-wrap');
+        filesWrap.style.display = checks ? '' : 'none';
+        if (checks) {
+            document.getElementById('modpick-files-head').textContent = checks.header;
+            document.getElementById('modpick-files-hint').textContent = checks.hint || '';
+            checks.items.forEach((o, i) => list.appendChild(rowFor('checkbox', '', o, o.checked ?? i === 0)));
+        }
+
+        radioWrap.style.display = radios ? '' : 'none';
+        if (radios) {
+            document.getElementById('modpick-iwad-head').textContent = radios.header;
+            document.getElementById('modpick-iwad-hint').textContent = radios.hint || '';
+            radios.items.forEach((o, i) => radioList.appendChild(
+                rowFor('radio', 'modpick-radio', o, radios.current ? o.value === radios.current : i === 0)));
+            // The remembered choice may no longer exist — never leave the list unanswered.
+            if (radios.items.length && !radioList.querySelector('input:checked')) {
+                radioList.querySelector('input').checked = true;
+            }
+        }
+
+        nameWrap.style.display = nameInput ? '' : 'none';
+        if (nameInput) {
+            document.getElementById('modpick-name-head').textContent = nameInput.label;
+            nameEl.value = nameInput.value || '';
         }
 
         const done = (val) => {
@@ -255,11 +359,13 @@ function pickRunOptions({ title, okLabel = 'Install Selected', candidates = [], 
             resolve(val);
         };
         document.getElementById('btn-modpick-ok').onclick = () => done({
-            selected: [...list.querySelectorAll('input:checked')].map(i => i.value),
-            iwad: iwads.length ? (iwadList.querySelector('input:checked')?.value ?? '') : undefined,
+            selected: checks ? [...list.querySelectorAll('input:checked')].map(i => i.value) : [],
+            choice: radios ? (radioList.querySelector('input:checked')?.value ?? '') : undefined,
+            name: nameInput ? nameEl.value.trim() : '',
         });
         document.getElementById('btn-modpick-cancel').onclick = () => done(null);
         modal.classList.add('active');
+        if (nameInput) setTimeout(() => nameEl.focus(), 30);
     });
 }
 
@@ -298,7 +404,14 @@ async function runCustomInstall(recipe, btn) {
             const chosen = await pickRunOptions({
                 title: `${recipe.title} — what should load?`,
                 okLabel: 'Install Selected',
-                candidates: res.choose,
+                checks: {
+                    header: 'Files to load',
+                    hint: 'This download contains more than one loadable file. The largest is usually the mod itself; the rest are normally optional extras. Load order follows the file names.',
+                    items: res.choose.map(c => ({
+                        value: c.rel, label: c.name,
+                        sub: `${_fmtBytes(c.size)}${c.dir && c.dir !== '.' ? ' · ' + c.dir : ''}`,
+                    })),
+                },
             });
             if (!chosen || !chosen.selected.length) return;
             btn.textContent = 'INSTALLING…';
@@ -609,13 +722,17 @@ async function _iwadForLaunch(grinderGameId) {
     const chosen = await pickRunOptions({
         title: 'Which Doom?',
         okLabel: 'Play',
-        iwads: opts.iwads,
-        current: opts.current,
+        radios: {
+            header: 'Which Doom to play it on',
+            hint: 'Every Doom you own is linked next to the engine, so this mod can run on any of them.',
+            items: opts.iwads.map(i => ({ value: i.file, label: i.label, sub: i.file })),
+            current: opts.current,
+        },
     });
     if (!chosen) return null;                     // cancelled — do not launch
     // Remembered as the new default so the dialog opens on last night's choice.
-    try { await window.api.customSetIwad(grinderGameId, chosen.iwad); } catch (e) {}
-    return opts.argsFor[chosen.iwad];
+    try { await window.api.customSetIwad(grinderGameId, chosen.choice); } catch (e) {}
+    return opts.argsFor[chosen.choice];
 }
 
 async function _doLaunch(game, cmd) {
