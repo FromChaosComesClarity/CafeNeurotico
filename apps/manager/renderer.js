@@ -1569,6 +1569,16 @@ _refreshDosboxCard();
 
 // ── PICO-8 VISIBILITY ─────────────────────────────────────────────────────
 let _hidePico8 = false;
+
+// "Hide PICO-8" must mean *only* PICO-8. A library row can front several stores at once
+// (Store = "PICO-8, GOG"), and a substring test reads that as a PICO-8 game and hides it —
+// which is how a GOG copy of Wolfenstein 3D vanished from the gallery entirely because a
+// PICO-8 demake happens to share its name. Same principle as resolveInstallState: only act
+// on a multi-store row when *every* store agrees.
+function _isPico8Only(store) {
+    const toks = String(store || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    return toks.length > 0 && toks.every(t => t.includes('pico-8') || t.includes('pico8'));
+}
 function applyPico8Visibility(hide) {
     _hidePico8 = hide;
     window.api.setSetting('hide_pico8', hide ? '1' : '');
@@ -4067,10 +4077,8 @@ function applyFilters() {
         if (isHidden(game)) return false;
 
         // PICO-8 visibility: hide unless pico8 filter is active or user explicitly searches for it
-        if (_hidePico8) {
-            const isPico8 = storeLower.includes('pico-8') || storeLower.includes('pico8');
-            if (isPico8 && !activeFilters.has('pico8') && !query.includes('pico')) return false;
-        }
+        if (_hidePico8 && _isPico8Only(game.Store)
+            && !activeFilters.has('pico8') && !query.includes('pico')) return false;
 
         // Free-to-play visibility: hide tagged games everywhere when the toggle is off
         if (_hideFreeGames && isFreeToPlay(game)) return false;
@@ -6155,7 +6163,7 @@ function _c64GetGames() {
     const f = _c64Filter;
     const base = allGames.filter(g => {
         const store = (g.Store||'').toLowerCase();
-        if (_hidePico8 && f !== 'pico8' && (store.includes('pico-8') || store.includes('pico8'))) return false;
+        if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
         if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
         if (f === 'favs')      return g.is_favourite == 1;
@@ -6333,7 +6341,7 @@ function _nxGetGames() {
     const f = _nxFilter;
     const base = allGames.filter(g => {
         const store = (g.Store||'').toLowerCase();
-        if (_hidePico8 && f !== 'pico8' && (store.includes('pico-8') || store.includes('pico8'))) return false;
+        if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
         if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
         if (f === 'favs')      return g.is_favourite == 1;
@@ -6538,7 +6546,7 @@ function _w95GetGames() {
     const f = _w95Filter;
     const base = allGames.filter(g => {
         const store = (g.Store||'').toLowerCase();
-        if (_hidePico8 && f !== 'pico8' && (store.includes('pico-8') || store.includes('pico8'))) return false;
+        if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
         if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
         if (f === 'favs')      return g.is_favourite == 1;
@@ -6754,7 +6762,7 @@ function _beosGetGames() {
     const f = _beosFilter;
     const base = allGames.filter(g => {
         const store = (g.Store||'').toLowerCase();
-        if (_hidePico8 && f !== 'pico8' && (store.includes('pico-8') || store.includes('pico8'))) return false;
+        if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
         if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
         if (f === 'favs')      return g.is_favourite == 1;
@@ -6947,7 +6955,7 @@ function _amigaGetGames() {
     const f = _amigaFilter;
     const base = allGames.filter(g => {
         const store = (g.Store||'').toLowerCase();
-        if (_hidePico8 && f !== 'pico8' && (store.includes('pico-8') || store.includes('pico8'))) return false;
+        if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
         if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
         if (f === 'favs')      return g.is_favourite == 1;
@@ -7424,10 +7432,7 @@ function _flatFilter(query, bypassPicoHide = false) {
     const base = currentPlaylistGames !== null ? currentPlaylistGames : allGames;
     const qualifierActive = [...activeFilters].filter(f => QUALIFIER_FILTERS.has(f));
     return base.filter(g => {
-        if (_hidePico8 && !picoSearch && !bypassPicoHide) {
-            const s = (g.Store||'').toLowerCase();
-            if (s.includes('pico-8') || s.includes('pico8')) return false;
-        }
+        if (_hidePico8 && !picoSearch && !bypassPicoHide && _isPico8Only(g.Store)) return false;
         for (const f of qualifierActive) {
             if (f === 'favs'      && g.FAV !== 'YES') return false;
             if (f === 'want'      && g.WANT_TO_PLAY !== 'YES') return false;
@@ -10926,7 +10931,9 @@ document.getElementById('tools-search').addEventListener('input', (e) => {
 function gamesMissingData(list) {
     const hasImg = (v) => v && String(v).startsWith('GameManagerConfig');
     const hasText = (v) => v && String(v).trim() !== '';
-    const isPico8 = (g) => { const s = (g.store || '').toLowerCase(); return s.includes('pico-8') || s.includes('pico8'); };
+    // Carts carry their own art and never want scraping — but a row that is PICO-8 *and*
+    // something else is a real game that does, so only a pure cart is skipped.
+    const isPico8 = (g) => _isPico8Only(g.store || g.Store);
     return list.filter(g =>
         !isPico8(g) && (
         !hasImg(g.CoverArt) || !hasImg(g.HeroArt) || !hasImg(g.Logo) ||
