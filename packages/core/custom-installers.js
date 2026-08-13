@@ -474,13 +474,13 @@ const BUILD_GAMES = {
         label: 'Witchaven', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/^witchaven$/i, /witchaven i\b/i, /witchaven i ?& ?ii/i],
         exclude: [/witchaven ii|witchaven 2/i],
-        dataDir: /^WHAVEN$/i, imageDir: /^WHAVEN\//i, engines: ['buildgdx'], gdxApp: 'WitchavenGDX',
+        dataDir: /^WHAVEN$/i, imageDir: /^WHAVEN\//i, engines: ['buildgdx'], gdxApp: 'WitchavenGDX', gdxGame: 'Witchaven',
     },
     witchaven2: {
         label: 'Witchaven II: Blood Vengeance', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/witchaven ii/i, /witchaven 2/i, /witchaven i ?& ?ii/i],
         exclude: [],
-        dataDir: /^WHAVEN2$/i, imageDir: /^WHAVEN2\//i, engines: ['buildgdx'], gdxApp: 'Witchaven2GDX',
+        dataDir: /^WHAVEN2$/i, imageDir: /^WHAVEN2\//i, engines: ['buildgdx'], gdxApp: 'Witchaven2GDX', gdxGame: 'Witchaven II',
     },
 };
 
@@ -541,6 +541,7 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
         },
         dirName: g.label.replace(/ \(.*\)$/, '').replace(/[/\\:*?"<>|]/g, ''),
         gdxApp: g.gdxApp || null,
+        gdxGame: g.gdxGame || null,
         data: `build-${id}`,
     });
 }
@@ -1493,15 +1494,26 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     // is what its launcher reads when deciding whether the resources are there.
     // (Names and keys read out of the jar: WHEntry names the ini and the required files,
     // GameConfig has gamePath/Path, ConfigContext writes [Main].)
+    // BuildGDX's own help settles it: `-game "name"` forces the game to start without
+    // showing the launcher, and "should be used with -path". That is why -path alone did
+    // nothing — on its own it is ignored, and the launcher went on reading its stored
+    // configuration, which had no folder for this game.
+    //
+    // The names come from its Game enum (WITCHAVEN, WITCHAVEN_2, BLOOD, …); parseGame
+    // compares case-insensitively against the enum name, the display name and the short
+    // name, so the display name is safe to pass.
     const usesGdx = (engines || []).some(e => e.id === 'buildgdx') || /buildgdx/i.test(engineExe || '');
+    const winPath = 'Z:' + target.replace(/\//g, '\\');
     if (usesGdx && recipe.gdxApp) {
-        const winPath = 'Z:' + target.replace(/\//g, '\\');
+        // Still written: it is what the launcher reads if it is ever opened on its own.
         try {
             fs.writeFileSync(path.join(target, `${recipe.gdxApp}.ini`),
                 `[Main]\nPath = ${winPath}\nAutoloadFolder = ${winPath}\\autoload\n`);
         } catch {}
     }
-    const launchArgs = usesGdx ? `-path "Z:${target.replace(/\//g, '\\')}"` : null;
+    const launchArgs = (usesGdx && recipe.gdxGame)
+        ? `-game "${recipe.gdxGame}" -path "${winPath}"`
+        : null;
 
     return {
         ok: true,
