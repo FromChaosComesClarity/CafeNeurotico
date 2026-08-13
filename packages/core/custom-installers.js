@@ -170,7 +170,7 @@ const RECIPES = [
         title: 'Raze',
         kind: 'Source port',
         game: 'Build engine games',
-        blurb: 'One engine for Duke Nukem 3D, Blood, Shadow Warrior, Redneck Rampage and Powerslave — from the GZDoom team. Install it once; the games below then install separately, each with its own entry. Opening this entry opens Raze itself, where the settings are.',
+        blurb: 'One engine for Duke Nukem 3D, Blood, Shadow Warrior, Redneck Rampage and Powerslave — from the GZDoom team. Install it once; the games below then install separately, each with its own entry. Opening this entry shows Raze\'s game picker once you have more than one Build game — with a single one it just starts it, and holding Shift as it launches forces the picker. Raze\'s settings live in the in-game menu, reachable from any of the games.',
         source: {
             name: 'GitHub — ZDoom/Raze',
             url: 'https://github.com/ZDoom/Raze/releases/latest',
