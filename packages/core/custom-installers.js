@@ -857,7 +857,10 @@ function findEntry(root, pattern, maxDepth = 3) {
 function listRecipes() {
     return RECIPES.map(r => ({
         id: r.id, title: r.title, kind: r.kind, game: r.game, blurb: r.blurb,
-        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic, onEngine: !!r.onEngine, folder: !!r.folder,
+        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic,
+        // needsArchive must travel with onEngine: an engine-based recipe normally has
+        // nothing to download, and a Quake mod is the exception that does.
+        onEngine: !!r.onEngine, needsArchive: !!r.needsArchive, folder: !!r.folder,
         data: r.data ? { id: r.data, label: DATA_SPECS[r.data]?.label || r.data } : null,
     }));
 }
