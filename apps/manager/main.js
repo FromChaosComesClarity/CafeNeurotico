@@ -1091,6 +1091,31 @@ ipcMain.handle('custom-iwad-options', (_, grinderGameId) => {
     } catch { return null; }
 });
 
+// BuildGDX is a Java program, and Java asks Windows whether a folder is writable rather
+// than trying. Wine answers that question for its Z: drive — the one that maps the whole
+// Linux filesystem — by saying no, even where writing plainly works: a cmd.exe redirect
+// into the same folder succeeds. So BuildGDX refused every game folder with
+// "AccessDeniedException: You don't have write permissions".
+//
+// A path on C: is answered correctly, so each such game is mapped into its own prefix at
+// C:\cn\<name> and handed that instead. Done before every launch rather than at install,
+// because a rebuilt prefix would otherwise silently lose the mapping.
+function _ensureGdxDriveMapping(gid) {
+    if (!_grinderEngineDb) return;
+    let row;
+    try { row = _grinderEngineDb.prepare('SELECT * FROM games WHERE id=?').get(gid); } catch { return; }
+    const m = row && row.launch_args && row.launch_args.match(/C:\\cn\\([^"\\]+)/i);
+    if (!m || !row.install_path) return;
+    try {
+        const driveC = path.join(grinderEngine.prefixPathForGame(row), 'pfx', 'drive_c', 'cn');
+        fs.mkdirSync(driveC, { recursive: true });
+        const link = path.join(driveC, m[1]);
+        try { if (fs.realpathSync(link) === fs.realpathSync(row.install_path)) return; } catch {}
+        try { fs.unlinkSync(link); } catch {}
+        fs.symlinkSync(row.install_path, link);
+    } catch (e) { console.error('[launch] could not map', gid, 'into its prefix:', e.message); }
+}
+
 // Tell each engine where the games ended up. Without this an engine opened on its own
 // finds nothing and quits, which is what happened once the games moved into their own
 // folders — see writeEngineSearchPaths.
@@ -3286,6 +3311,7 @@ ipcMain.on('launch-game', (event, cmd, launchArgs, executable) => {
     if (gLaunch) {
         const gid = gLaunch[1];
         if (ensureGrinderEngine()) {
+            _ensureGdxDriveMapping(gid);
             grinderEngine.launchGame(gid, { ...(launchArgs !== undefined ? { launchArgs } : {}), ...(executable ? { executable } : {}) })
                 .then(r => console.log('[launch-game] launched via', r?.method))
                 .catch(e => { console.error('[launch-game] grinder launch failed:', e.message); reportLaunchThrow(gid, e); });

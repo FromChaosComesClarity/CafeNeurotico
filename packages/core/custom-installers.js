@@ -1521,8 +1521,11 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
                 `[Main]\nPath = ${winPath}\nAutoloadFolder = ${winPath}\\autoload\n`);
         } catch {}
     }
+    // C:, not Z:. Java asks Wine whether the folder is writable and Wine says no for its
+    // unix drive, however writable it actually is — so the launcher is handed a path on the
+    // prefix's own C: drive, which the Manager maps to this folder before every launch.
     const launchArgs = (usesGdx && recipe.gdxGame)
-        ? `-game "${recipe.gdxGame}" -path "${winPath}"`
+        ? `-game "${recipe.gdxGame}" -path "C:\\cn\\${path.basename(target)}"`
         : null;
 
     return {
