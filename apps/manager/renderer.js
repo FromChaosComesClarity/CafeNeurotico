@@ -145,7 +145,10 @@ function _customGroupOf(r) {
     return r.game || 'Standalone games';
 }
 
-function renderCustomList(recipes) {
+// Opens folded: the catalogue is long enough that a wall of entries buries the shape of
+// it, and the group names are the fastest way to find what you came for. A search is the
+// exception — hiding matches behind a closed header would defeat the search.
+function renderCustomList(recipes, { collapsed = true } = {}) {
     const list = document.getElementById('custom-list');
     list.innerHTML = '';
     if (!recipes.length) { list.innerHTML = `<div class="hc-empty">Nothing matches that.</div>`; return; }
@@ -165,9 +168,10 @@ function renderCustomList(recipes) {
         const rows = groups.get(name);
         const head = document.createElement('div');
         head.className = 'ci-group';
-        head.innerHTML = `<span class="ci-group-caret">▾</span><span>${escHtml(name)}</span><span class="ci-group-n">${rows.length}</span>`;
+        head.innerHTML = `<span class="ci-group-caret">${collapsed ? '▸' : '▾'}</span><span>${escHtml(name)}</span><span class="ci-group-n">${rows.length}</span>`;
         const body = document.createElement('div');
         body.className = 'ci-group-body';
+        if (collapsed) body.style.display = 'none';
         head.onclick = () => {
             const hidden = body.style.display === 'none';
             body.style.display = hidden ? '' : 'none';
@@ -242,8 +246,11 @@ function _customRow(r) {
 // "mod" and "openbor" all find what you would expect.
 document.getElementById('custom-search')?.addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
-    renderCustomList(!q ? _customRecipes : _customRecipes.filter(r =>
-        [r.title, r.kind, r.game, r.blurb].some(v => String(v || '').toLowerCase().includes(q))));
+    if (!q) { renderCustomList(_customRecipes); return; }        // back to folded
+    renderCustomList(
+        _customRecipes.filter(r => [r.title, r.kind, r.game, r.blurb]
+            .some(v => String(v || '').toLowerCase().includes(q))),
+        { collapsed: false });                                    // matches must be visible
 });
 
 // ── Adding a Windows game from a folder you already have ─────────────────────
