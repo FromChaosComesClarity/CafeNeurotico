@@ -1177,7 +1177,7 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource, { copy = fals
 
 // Unpack a download into its own folder under `installRoot` and work out how to start it.
 // Does not touch any database — the caller decides how to register the result.
-function installFromArchive({ recipeId, archivePath, installRoot, dataRows, dataPath, overwrite = false }) {
+function installFromArchive({ recipeId, archivePath, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
@@ -1216,10 +1216,12 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, data
         }
     }
 
-    const target = path.join(installRoot, dirName);
+    const picked = safeTarget(installRoot, dirName, reserved);
+    const target = picked.target;
     if (fs.existsSync(target) && fs.readdirSync(target).length) {
         if (!overwrite) return { ok: false, error: `${target} already exists and is not empty.`, exists: true };
-        fs.rmSync(target, { recursive: true, force: true });
+        const cleared = clearTarget(target, reserved);
+        if (!cleared.ok) return cleared;
     }
     fs.mkdirSync(target, { recursive: true });
 
@@ -1329,6 +1331,34 @@ function scanFolderEntries(folder, maxDepth = 3) {
         (a.junk - b.junk) || (a.depth - b.depth) || (b.size - a.size));
 }
 
+// ── Never write over a game that is already there ────────────────────────────
+// Custom installs share one folder with the library's own installs, and the names
+// collide: GOG puts Witchaven in <root>/Witchaven, and a recipe called Witchaven wants
+// exactly the same place. The install then clears its target before unpacking — and
+// clears somebody's game.
+//
+// `reserved` is every path the library already claims. A target that lands on one is
+// renamed rather than emptied, and nothing reserved is ever deleted.
+function safeTarget(installRoot, dirName, reserved = []) {
+    const taken = new Set(reserved.filter(Boolean).map(p => path.resolve(p)));
+    let target = path.join(installRoot, dirName);
+    if (!taken.has(path.resolve(target))) return { target, renamed: false };
+    for (let i = 2; i < 50; i++) {
+        const next = path.join(installRoot, `${dirName} (${i})`);
+        if (!taken.has(path.resolve(next))) return { target: next, renamed: true };
+    }
+    return { target, renamed: false, blocked: true };
+}
+
+// Clearing a folder is only ever safe when nothing else claims it.
+function clearTarget(target, reserved = []) {
+    if (reserved.filter(Boolean).some(p => path.resolve(p) === path.resolve(target))) {
+        return { ok: false, error: `${target} belongs to another game in your library. Refusing to overwrite it.` };
+    }
+    fs.rmSync(target, { recursive: true, force: true });
+    return { ok: true };
+}
+
 // Register a folder as it stands. Returns the same shape installFromArchive does, so the
 // caller's registration path is shared and there is one way for a custom game to exist.
 function addFromFolder({ folder, executable, title }) {
@@ -1410,7 +1440,7 @@ function writeEngineSearchPaths(engineId, engineRoot, gameFolders) {
     } catch { return false; }
 }
 
-function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, overwrite = false }) {
+function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall it.' };
@@ -1424,11 +1454,13 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
                  needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
     }
 
-    const target = path.join(installRoot, recipe.dirName);
+    const picked = safeTarget(installRoot, recipe.dirName, reserved);
+    const target = picked.target;
     if (fs.existsSync(target) && fs.readdirSync(target).length && !overwrite) {
         return { ok: false, error: `${target} already exists and is not empty.`, exists: true };
     }
-    fs.rmSync(target, { recursive: true, force: true });
+    const cleared = clearTarget(target, reserved);
+    if (!cleared.ok) return cleared;
     fs.mkdirSync(target, { recursive: true });
 
     // Every engine that can play this game gets mirrored in, so the choice of which to
@@ -1643,6 +1675,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
     scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine, readEngines, ENGINES_FILE,
+    safeTarget, clearTarget,
     writeEngineSearchPaths,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,

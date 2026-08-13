@@ -859,6 +859,18 @@ ipcMain.handle('set-launch-target', (_, grinderGameId, relPath, taskIndex) => {
 // specific recipes rather than one generic folder importer.
 const customInstallers = require('../../packages/core/custom-installers.js');
 
+// Paths other games already occupy. Custom installs share a folder with GOG and Epic
+// installs and the names collide — <root>/Witchaven is where GOG puts Witchaven and where
+// a recipe called Witchaven wants to go — so a target that lands on one must be renamed,
+// never emptied.
+function _reservedPaths(exceptId) {
+    if (!ensureGrinderEngine()) return [];
+    try {
+        return _grinderEngineDb.prepare('SELECT id, install_path FROM games WHERE install_path IS NOT NULL')
+            .all().filter(r => r.id !== exceptId && r.install_path).map(r => r.install_path);
+    } catch { return []; }
+}
+
 const _grinderRowsForData = () => {
     if (!ensureGrinderEngine()) return [];
     try { return _grinderEngineDb.prepare('SELECT title, install_path, installed FROM games').all(); }
@@ -984,7 +996,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
                 return { ok: false, error: `That file does not look like ${recipe.engine.map(id => customInstallers.getRecipe(id)?.title).join(' or ')}.` };
             }
             const er = customInstallers.installFromArchive({
-                recipeId: engineId, archivePath: engineArchivePath, dataPath, overwrite: true,
+                recipeId: engineId, archivePath: engineArchivePath, dataPath, overwrite: true, reserved: _reservedPaths(`cn_${engineId}`),
                 installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
             });
             if (!er.ok) return er;
@@ -997,7 +1009,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
         // over tiles000.art.
         const mr = recipe.onEngine
             ? customInstallers.installGameOnEngine({
-                recipeId, dataPath, overwrite: !!overwrite,
+                recipeId, dataPath, overwrite: !!overwrite, reserved: _reservedPaths(`cn_${recipeId}`),
                 engineRoot: engine.install_path, engineExe: engine.executable,
                 engines: _installedEngines(recipe.engine),
                 installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
@@ -1017,7 +1029,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
     }
 
     const r = customInstallers.installFromArchive({
-        recipeId, archivePath, dataPath, overwrite: !!overwrite,
+        recipeId, archivePath, dataPath, overwrite: !!overwrite, reserved: _reservedPaths(`cn_${recipeId}`),
         installRoot: grinderDefaultDir(),
         dataRows: _grinderRowsForData(),
     });
