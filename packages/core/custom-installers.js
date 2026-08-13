@@ -247,6 +247,25 @@ const RECIPES = [
         entry: { exe: /^gameLauncher\.exe$/i, platform: 'windows' },
         data: null,
     },
+    // A folder you already have, rather than a download. The catalogue lists it so it is
+    // findable — Decadence, Duake and an assembled Dwell setup are all self-contained
+    // folders with their own engine, and no recipe can improve on simply registering them.
+    {
+        id: 'folder',
+        title: 'A game folder you already have',
+        kind: 'Folder',
+        game: '',
+        folder: true,
+        blurb: 'Point at any folder holding a Windows game and it joins your library, staying where it is. Best for anything self-contained — a fan game that ships its own engine, a mod setup you assembled yourself, or a port with no recipe here yet. Nothing is copied or moved.',
+        source: {
+            name: 'Your own disk',
+            url: '',
+            hint: 'Cafe Neurotico scans three levels deep, sorts the likely entry point first, and lets you choose and name it.',
+        },
+        archive: null,
+        dirName: '',
+        data: null,
+    },
     // ── Build games, one entry each ─────────────────────────────────────────
     // Filled in below from BUILD_GAMES so the list and the data specs cannot drift apart.
     // ── Mods ────────────────────────────────────────────────────────────────
@@ -576,7 +595,7 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
 function selfCheck() {
     const problems = [];
     for (const r of RECIPES) {
-        if (r.contains || r.generic || r.onEngine) continue;   // no archive of their own
+        if (r.contains || r.generic || r.onEngine || r.folder) continue;   // no archive of their own
         if (!r.samples || !r.samples.length) { problems.push(`${r.id}: no samples to check`); continue; }
         for (const s of r.samples) {
             const m = detectRecipe(s);
@@ -815,7 +834,7 @@ function findEntry(root, pattern, maxDepth = 3) {
 function listRecipes() {
     return RECIPES.map(r => ({
         id: r.id, title: r.title, kind: r.kind, game: r.game, blurb: r.blurb,
-        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic, onEngine: !!r.onEngine,
+        source: r.source, dirName: r.dirName, dynamic: !!r.dynamic, generic: !!r.generic, onEngine: !!r.onEngine, folder: !!r.folder,
         data: r.data ? { id: r.data, label: DATA_SPECS[r.data]?.label || r.data } : null,
     }));
 }

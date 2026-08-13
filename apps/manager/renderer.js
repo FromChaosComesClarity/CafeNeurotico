@@ -219,7 +219,9 @@ function _customRow(r) {
             `<div class="ci-head"><span class="ci-title">${escHtml(r.title)}</span><span class="ci-kind">${escHtml(r.kind)}</span>${
                 r.game ? `<span class="ci-kind">for ${escHtml(r.game)}</span>` : ''}</div>` +
             `<div class="ci-blurb">${escHtml(r.blurb)}</div>` +
-            `<div class="ci-meta">Get it from <a href="#" data-url="${escHtml(r.source.url)}">${escHtml(r.source.name)}</a><br>${escHtml(r.source.hint)}</div>` +
+            (r.source.url
+                ? `<div class="ci-meta">Get it from <a href="#" data-url="${escHtml(r.source.url)}">${escHtml(r.source.name)}</a><br>${escHtml(r.source.hint)}</div>`
+                : `<div class="ci-meta">${escHtml(r.source.hint)}</div>`) +
             engineLine +
             dataLine +
             `<div class="ci-actions"></div>`;
@@ -229,10 +231,13 @@ function _customRow(r) {
         btn.className = 'primary';
         // A shape-based entry is never "reinstalled" — every OpenBOR archive is a different
         // game arriving through the same recipe, so it always reads as adding one.
-        btn.textContent = r.dynamic ? 'ADD FROM FILE'
+        btn.textContent = r.folder ? 'CHOOSE A FOLDER'
+                        : r.dynamic ? 'ADD FROM FILE'
                         : r.onEngine ? (r.installed ? 'REINSTALL' : 'INSTALL')
                         : (r.installed ? 'REINSTALL' : 'INSTALL FROM FILE');
-        btn.onclick = () => runCustomInstall(r, btn);
+        btn.onclick = r.folder
+            ? () => addWindowsGameFromFolder().catch(e => showAlert(`Something went wrong.\n\n${e && e.message ? e.message : e}`))
+            : () => runCustomInstall(r, btn);
         actions.appendChild(btn);
         const tagText = r.dynamic
             ? (r.installedCount ? `${r.installedCount} INSTALLED` : '')
