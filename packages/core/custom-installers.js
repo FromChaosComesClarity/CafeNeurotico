@@ -508,6 +508,7 @@ DATA_SPECS.outrun = {
     requireAny: true,
     titles: [],          // no storefront sells these; the folder picker is the only route
     exclude: [],
+    userSupplied: true,
     owned: 'CannonBall needs the original OutRun Revision B arcade ROM set. No game library provides it — point at the folder holding your own copy.',
 };
 
@@ -889,6 +890,10 @@ function resolveGameData(dataId, rows) {
 
     const owned = named.map(g => g.title);
     if (owned.length) return { ok: false, owned, message: spec.owned || 'Install it first.' };
+    // Some data was never sold in a form a library can hold — arcade ROMs, files off an
+    // old disc. Reporting that as a failed library search reads like something is wrong
+    // and invites the user to go looking for a purchase that does not exist.
+    if (spec.userSupplied) return { ok: false, userSupplied: true, message: spec.owned || `You provide ${spec.label} yourself.` };
     return { ok: false, message: `No copy of ${spec.label} found in your library.` };
 }
 
@@ -1037,6 +1042,7 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, data
         data = dataPath ? resolveDataFolder(recipe.data, dataPath) : resolveGameData(recipe.data, dataRows);
         if (!data.ok) {
             return { ok: false, error: data.message, owned: data.owned || [],
+                     userSupplied: !!data.userSupplied,
                      needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
         }
     }
@@ -1210,6 +1216,7 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     const data = dataPath ? resolveDataFolder(recipe.data, dataPath) : resolveGameData(recipe.data, dataRows);
     if (!data.ok) {
         return { ok: false, error: data.message, owned: data.owned || [],
+                 userSupplied: !!data.userSupplied,
                  needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
     }
 

@@ -192,11 +192,18 @@ function _customRow(r) {
         // will produce something playable, and the user can act on it.
         let dataLine = '';
         if (r.data) {
-            dataLine = r.data.ready
-                ? `<div class="ci-meta">Game data: <span class="ci-ok">ready</span> &mdash; from your copy of ${escHtml(r.data.from)}</div>`
-                : `<div class="ci-meta">Game data: <span class="ci-warn">${escHtml(r.data.label)} needed</span> &mdash; ${escHtml(r.data.message || '')}${
+            if (r.data.ready) {
+                dataLine = `<div class="ci-meta">Game data: <span class="ci-ok">ready</span> &mdash; from your copy of ${escHtml(r.data.from)}</div>`;
+            } else if (r.data.userSupplied) {
+                // Never sold in a form a library can hold. Saying "not found in your
+                // library" would read as a fault and send the user looking for a purchase
+                // that does not exist.
+                dataLine = `<div class="ci-meta">Game data: <span style="color:var(--text_sec);">you provide it</span> &mdash; ${escHtml(r.data.message || '')} You will be asked for the folder during install.</div>`;
+            } else {
+                dataLine = `<div class="ci-meta">Game data: <span class="ci-warn">${escHtml(r.data.label)} needed</span> &mdash; ${escHtml(r.data.message || '')}${
                       r.data.owned && r.data.owned.length ? ` <span style="color:var(--text_sec);">(you own: ${escHtml(r.data.owned.slice(0, 3).join(', '))})</span>` : ''
                     }<br><span style="color:var(--text_sec);">Or install anyway and point at a folder holding your own copy of the game files.</span></div>`;
+            }
         }
 
         // Mods need an engine. Say so up front, including that we will install it in the
@@ -405,10 +412,14 @@ async function runCustomInstall(recipe, btn) {
         // or in a folder from a disc they still own. Offer that rather than dead-ending:
         // for anything the storefronts never sold, it is the only route there is.
         if (res && !res.ok && res.needsData) {
-            const ok = await showConfirm(
-                `${recipe.title} needs ${res.dataLabel}.\n\n${res.error}\n\nDo you have those game files in a folder? Point at it and they will be used.`,
-                'Choose folder', false);
-            if (!ok) return;
+            // When the data was never sold in a form a library can hold, asking "do you
+            // have it?" is a wasted click — the folder picker is the only route anyway.
+            if (!res.userSupplied) {
+                const ok = await showConfirm(
+                    `${recipe.title} needs ${res.dataLabel}.\n\n${res.error}\n\nDo you have those game files in a folder? Point at it and they will be used.`,
+                    'Choose folder', false);
+                if (!ok) return;
+            }
             const folder = await window.api.customFolderPick(`Select the folder containing ${res.dataLabel}`);
             if (!folder || !folder.ok) return;
             btn.textContent = 'INSTALLING…';

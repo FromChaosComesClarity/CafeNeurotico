@@ -931,6 +931,7 @@ ipcMain.handle('custom-recipe-list', () => {
             out.data.ready = d.ok;
             out.data.from = d.ok ? d.title : '';
             out.data.owned = d.owned || [];
+            out.data.userSupplied = !!d.userSupplied;
             out.data.message = d.ok ? '' : d.message;
         }
         // A mod needs an engine. Report which of its accepted engines is already here, so
