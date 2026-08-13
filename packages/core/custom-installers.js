@@ -247,6 +247,29 @@ const RECIPES = [
         entry: { exe: /^gameLauncher\.exe$/i, platform: 'windows' },
         data: null,
     },
+    // Quake mods are folders — pak0.pak, progs.dat, maps — loaded with `-game <folder>`
+    // from the engine's own directory. Hundreds exist and they all work the same way, so
+    // one entry serves them all rather than a recipe per mod. Generic, so it is only ever
+    // chosen deliberately and never claims someone else's download.
+    {
+        id: 'quake-mod',
+        title: 'Any Quake mod or episode',
+        kind: 'Mod',
+        game: 'Quake',
+        engine: ['ironwail', 'vkquake', 'quake-rt'],
+        onEngine: true,
+        needsArchive: true,
+        generic: true,
+        blurb: 'Dwell, Arcane Dimensions, Alkaline, Copper — any mod that ships as a folder. It gets its own entry with Quake\'s data and every installed Quake engine beside it, so you pick the engine when you press Play.',
+        source: {
+            name: 'Quaddicted / ModDB / Slipseer',
+            url: 'https://www.quaddicted.com/reviews/',
+            hint: 'Download the mod archive — dwellv2p2.zip, ad_v1_80final.zip and so on. The folder inside it is what the engine loads.',
+        },
+        archive: /\.(zip|7z|rar|pak)$/i,
+        dirName: 'Quake Mod',
+        data: 'quake',
+    },
     // A folder you already have, rather than a download. The catalogue lists it so it is
     // findable — Decadence, Duake and an assembled Dwell setup are all self-contained
     // folders with their own engine, and no recipe can improve on simply registering them.
@@ -1164,9 +1187,16 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource, { copy = fals
 
     const extra = spec.extras && spec.extras[0];
     for (const d of (spec.dirs || [])) {
-        const src = resolveCaseInsensitive(sourceRoot, d.name);
-        if (!src || !dirHasProbe(src, d.probe)) {
-            if (d.required) return { ok: false, error: `${sourceRoot} has no ${d.name}/ with the expected data.` };
+        // Search every root, not the parameter — callers pass an array of them now, and
+        // resolving a folder against an array silently finds nothing. This is why a Quake
+        // port could no longer link id1: the check failed on the array itself.
+        let src = '';
+        for (const root of roots) {
+            const hit = resolveCaseInsensitive(root, d.name);
+            if (hit && dirHasProbe(hit, d.probe)) { src = hit; break; }
+        }
+        if (!src) {
+            if (d.required) return { ok: false, error: `${roots.join(', ')} has no ${d.name}/ with the expected data.` };
             continue;
         }
         const dst = path.join(targetRoot, d.name);   // lowercase: what engines ask for
@@ -1418,6 +1448,46 @@ function addFromFolder({ folder, executable, title }) {
     };
 }
 
+// The folder inside a Quake mod archive that the engine will load. Identified by what it
+// holds — pak0.pak or progs.dat — rather than by position, because archives vary: some wrap
+// everything in a version folder, some do not.
+function findModFolderName(archivePath) {
+    const entries = inspectArchive(archivePath).map(e => e.replace(/\\/g, '/'));
+    const marker = /(^|\/)([^/]+)\/(pak\d+\.pak|progs\.dat)$/i;
+    const seen = [];
+    for (const e of entries) {
+        const m = e.match(marker);
+        if (!m) continue;
+        // id1 is Quake's own data, never the mod.
+        if (/^(id1|hipnotic|rogue|qw)$/i.test(m[2])) continue;
+        if (!seen.includes(m[2])) seen.push(m[2]);
+    }
+    // Shallowest wins when an archive nests the mod inside a release folder.
+    seen.sort((a, b) => {
+        const da = entries.find(e => e.includes(`/${a}/`) || e.startsWith(`${a}/`)) || '';
+        const db = entries.find(e => e.includes(`/${b}/`) || e.startsWith(`${b}/`)) || '';
+        return da.split('/').length - db.split('/').length;
+    });
+    return seen[0] || '';
+}
+
+// Pull that one folder out, dropping whatever the archive wrapped it in.
+function extractModFolder(archivePath, modDir, target) {
+    const ex = findExtractor(archivePath);
+    if (!ex) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive).' };
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cn-qmod-'));
+    try {
+        const res = spawnSync(ex.cmd, ex.args(archivePath, tmp), { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        if (res.status !== 0) return { ok: false, error: `Could not unpack the mod: ${(res.stderr || '').trim().slice(0, 200)}` };
+        const found = findFiles(tmp, /^(pak\d+\.pak|progs\.dat)$/i, 5)
+            .map(f => path.dirname(f))
+            .find(d => path.basename(d).toLowerCase() === modDir.toLowerCase());
+        if (!found) return { ok: false, error: `Could not find ${modDir} inside that archive after unpacking.` };
+        fs.cpSync(found, path.join(target, modDir), { recursive: true });
+        return { ok: true };
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // ── A game running on a shared engine ────────────────────────────────────────
 // Raze plays a dozen different games and BuildGDX a dozen more, but nobody wants "Raze" in
 // their library — they want Blood, and Duke Nukem 3D, and Shadow Warrior, each with its own
@@ -1477,7 +1547,7 @@ function writeEngineSearchPaths(engineId, engineRoot, gameFolders) {
     } catch { return false; }
 }
 
-function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
+function installGameOnEngine({ recipeId, archivePath, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall it.' };
@@ -1491,7 +1561,18 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
                  needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
     }
 
-    const picked = safeTarget(installRoot, recipe.dirName, reserved, { spaceless: !!recipe.gdxGame });
+    // A mod brings its own folder, and that folder's name is the game's name: the engine
+    // loads it with -game <folder>, and "dwellv2p2" is what the author called it.
+    let modDir = '';
+    if (recipe.needsArchive) {
+        if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
+        modDir = findModFolderName(archivePath);
+        if (!modDir) {
+            return { ok: false, error: `No mod folder was found inside that archive. A Quake mod is a folder holding pak0.pak or progs.dat. ${recipe.source.hint}` };
+        }
+    }
+    const dirName = modDir || recipe.dirName;
+    const picked = safeTarget(installRoot, dirName, reserved, { spaceless: !!recipe.gdxGame });
     const target = picked.target;
     // Two entries called "Witchaven" in one library is worse than a longer name.
     const shownTitle = picked.renamed ? `${recipe.title} (Source Port)` : recipe.title;
@@ -1505,16 +1586,34 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     // Every engine that can play this game gets mirrored in, so the choice of which to
     // use is made when you press Play rather than being fixed at install time.
     const list = engines && engines.length ? engines : [{ id: 'engine', title: 'Engine', root: engineRoot, exe: engineExe }];
+    const mirrored = [];
+    const takenExe = new Set();
     for (const e of list) {
+        // vkQuake and Quake: Ray Traced both ship vkQuake.exe. Mirroring both would leave
+        // one quietly shadowing the other and the Play-time picker offering a choice that
+        // is not real, so the first one in wins and the clash is reported rather than hidden.
+        const key = String(e.exe || '').toLowerCase();
+        if (takenExe.has(key)) continue;
         if (!mirrorEngine(e.root, target)) return { ok: false, error: `Could not mirror ${e.title} into the game folder.` };
+        takenExe.add(key);
+        mirrored.push(e);
     }
+    const shadowed = list.filter(e => !mirrored.includes(e)).map(e => e.title);
     try {
         fs.writeFileSync(path.join(target, ENGINES_FILE),
-            JSON.stringify(list.map(e => ({ id: e.id, title: e.title, exe: e.exe })), null, 2));
+            JSON.stringify(mirrored.map(e => ({ id: e.id, title: e.title, exe: e.exe })), null, 2));
     } catch {}
 
-    const linked = linkGameData(recipe.data, data.paths || data.path, target, null, { copy: !!dataPath });
+    const spec = DATA_SPECS[recipe.data];
+    const extra = spec && spec.extras ? resolveExtra(spec.extras[0], dataRows) : null;
+    const linked = linkGameData(recipe.data, data.paths || data.path, target, extra, { copy: !!dataPath });
     if (!linked.ok) return { ok: false, error: linked.error };
+
+    // Unpack the mod beside the data, as its own folder, which is what -game names.
+    if (recipe.needsArchive) {
+        const got = extractModFolder(archivePath, modDir, target);
+        if (!got.ok) return got;
+    }
 
     // BuildGDX keeps a configured folder per game and does not look in its own directory,
     // so it reports every resource missing even with the data sitting beside it, and -path
@@ -1545,18 +1644,21 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     // prefix's own C: drive, which the Manager maps to this folder before every launch.
     const launchArgs = (usesGdx && recipe.gdxGame)
         ? `-game "${recipe.gdxGame}" -path "C:\\cn\\${path.basename(target)}"`
-        : null;
+        : (modDir ? `-game ${modDir}` : null);
 
     return {
         ok: true,
         recipeId: recipe.id,
         key: recipe.id,
-        title: shownTitle,
+        title: modDir ? (picked.renamed ? `${modDir} (Source Port)` : modDir) : shownTitle,
+        key: modDir ? `${recipe.id}_${modDir.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : recipe.id,
         launchArgs,
         installPath: target,
         executable: engineExe,
         platform: 'windows',
         dataFrom: { path: data.path, title: data.title, linked: linked.linked },
+        extraFrom: extra ? extra.title : null,
+        shadowed,
     };
 }
 
@@ -1746,6 +1848,7 @@ function installMod({ recipeId, archivePath, engineRoot, engineExe, dataRows, se
 module.exports = {
     RECIPES, DATA_SPECS, installMod, listModCandidates, listIwads,
     scanFolderEntries, addFromFolder, installGameOnEngine, mirrorEngine, readEngines, ENGINES_FILE,
+    findModFolderName, extractModFolder,
     safeTarget, clearTarget,
     writeEngineSearchPaths,
     parseArgs, formatArgs, withIwad, currentIwad,

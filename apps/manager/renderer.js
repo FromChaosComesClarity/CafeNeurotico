@@ -400,7 +400,7 @@ async function runCustomInstall(recipe, btn) {
         // A game on a shared engine has nothing to download — it is assembled from an
         // engine that is already here (or asked for once) plus the game's own data.
         let archivePath = null;
-        if (!recipe.onEngine) {
+        if (!recipe.onEngine || recipe.needsArchive) {
             const picked = await window.api.customInstallPick(recipe.id);
             if (!picked || !picked.ok) return;   // cancelled the file dialog
             archivePath = picked.path;

@@ -1009,7 +1009,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
         // over tiles000.art.
         const mr = recipe.onEngine
             ? customInstallers.installGameOnEngine({
-                recipeId, dataPath, overwrite: !!overwrite, reserved: _reservedPaths(`cn_${recipeId}`),
+                recipeId, archivePath, dataPath, overwrite: !!overwrite, reserved: _reservedPaths(`cn_${recipeId}`),
                 engineRoot: engine.install_path, engineExe: engine.executable,
                 engines: _installedEngines(recipe.engine),
                 installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
