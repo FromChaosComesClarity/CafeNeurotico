@@ -1344,18 +1344,28 @@ function scanFolderEntries(folder, maxDepth = 3) {
 // The suffix says *why* there are two, which "(2)" does not. A collision here means the
 // user owns the same game in their library — GOG's Witchaven runs under DOSBox, this one
 // runs on a source port — so naming it after that is the useful distinction.
-function safeTarget(installRoot, dirName, reserved = [], suffix = 'Source Port') {
+// `spaceless` matters more than it looks. BuildGDX.exe re-parses its own command line and
+// drops the quoting, so a -path containing a space arrives truncated: passing
+// "…/Witchaven (Source Port)" got it "…/Witchaven", which is the GOG install, and it
+// failed trying to write there. GZDoom quotes correctly and is unaffected — this is one
+// launcher's behaviour, so only the recipes whose folder is handed to it pay the cost.
+function safeTarget(installRoot, dirName, reserved = [], { suffix = 'Source Port', spaceless = false } = {}) {
     const taken = new Set(reserved.filter(Boolean).map(p => path.resolve(p)));
     const free = (name) => !taken.has(path.resolve(path.join(installRoot, name)));
-    if (free(dirName)) return { target: path.join(installRoot, dirName), name: dirName, renamed: false };
-    if (free(`${dirName} (${suffix})`)) {
-        return { target: path.join(installRoot, `${dirName} (${suffix})`), name: `${dirName} (${suffix})`, renamed: true };
-    }
+    const base = spaceless ? dirName.replace(/[^A-Za-z0-9._-]+/g, '') : dirName;
+    const withSuffix = spaceless
+        ? `${base}-${suffix.replace(/\s+/g, '')}`
+        : `${base} (${suffix})`;
+    const nth = (i) => spaceless
+        ? `${base}-${suffix.replace(/\s+/g, '')}${i}`
+        : `${base} (${suffix} ${i})`;
+
+    if (free(base)) return { target: path.join(installRoot, base), name: base, renamed: false };
+    if (free(withSuffix)) return { target: path.join(installRoot, withSuffix), name: withSuffix, renamed: true };
     for (let i = 2; i < 50; i++) {
-        const name = `${dirName} (${suffix} ${i})`;
-        if (free(name)) return { target: path.join(installRoot, name), name, renamed: true };
+        if (free(nth(i))) return { target: path.join(installRoot, nth(i)), name: nth(i), renamed: true };
     }
-    return { target: path.join(installRoot, dirName), name: dirName, renamed: false, blocked: true };
+    return { target: path.join(installRoot, base), name: base, renamed: false, blocked: true };
 }
 
 // Clearing a folder is only ever safe when nothing else claims it.
@@ -1462,7 +1472,7 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
                  needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
     }
 
-    const picked = safeTarget(installRoot, recipe.dirName, reserved);
+    const picked = safeTarget(installRoot, recipe.dirName, reserved, { spaceless: !!recipe.gdxGame });
     const target = picked.target;
     // Two entries called "Witchaven" in one library is worse than a longer name.
     const shownTitle = picked.renamed ? `${recipe.title} (Source Port)` : recipe.title;
