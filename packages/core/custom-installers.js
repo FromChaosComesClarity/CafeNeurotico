@@ -148,6 +148,96 @@ const RECIPES = [
         entry: { exe: /^mini\s*doom(?![\s_-]*2).*\.exe$/i, platform: 'windows' },
         data: null,
     },
+    {
+        id: 'ecwolf',
+        title: 'ECWolf',
+        kind: 'Source port',
+        game: 'Wolfenstein 3D',
+        blurb: 'Wolfenstein 3D and Spear of Destiny with modern resolutions, mouselook and mod support, built on the ZDoom lineage.',
+        source: {
+            name: 'maniacsvault.net — ECWolf',
+            url: 'https://maniacsvault.net/ecwolf/download.php',
+            hint: 'Download the Windows x86-64 zip — it is named like ecwolf-1.4.1_x64.zip.',
+        },
+        archive: /ecwolf.*\.(zip|7z)$/i,
+        samples: ['ecwolf-1.4.1_x64.zip'],
+        dirName: 'ECWolf',
+        entry: { exe: /^ecwolf\.exe$/i, platform: 'windows' },
+        data: 'wolf3d',
+    },
+    {
+        id: 'raze',
+        title: 'Raze',
+        kind: 'Source port',
+        game: 'Build engine games',
+        blurb: 'One engine for Duke Nukem 3D, Blood, Shadow Warrior, Redneck Rampage and Powerslave — from the GZDoom team.',
+        source: {
+            name: 'GitHub — ZDoom/Raze',
+            url: 'https://github.com/ZDoom/Raze/releases/latest',
+            hint: 'On the Releases page, download the Windows zip — it is named like Raze-1.11.0b-windows.zip.',
+        },
+        archive: /raze.*\.(zip|7z)$/i,
+        samples: ['Raze-1.11.0b-windows.zip'],
+        dirName: 'Raze',
+        entry: { exe: /^raze\.exe$/i, platform: 'windows' },
+        data: 'build',
+    },
+    {
+        id: 'buildgdx',
+        title: 'BuildGDX',
+        kind: 'Source port',
+        game: 'Build engine games',
+        blurb: 'Java port covering the Build games Raze does not, including Witchaven I and II, TekWar and Legend of the Seven Paladins. It asks you to point it at each game folder itself the first time.',
+        source: {
+            name: 'm210.duke4.net — BuildGDX',
+            url: 'https://m210.duke4.net/index.php/downloads/download/8-java/53-buildgdx',
+            hint: 'Download the Windows build — the bundle with a JRE included is named like BuildGDX_with_JRE.zip.',
+        },
+        archive: /buildgdx.*\.(zip|7z)$/i,
+        samples: ['BuildGDX_with_JRE.zip'],
+        dirName: 'BuildGDX',
+        entry: { exe: /^buildgdx\.exe$/i, platform: 'windows' },
+        // No data linking: BuildGDX browses for each game folder on first run, and the one
+        // Build game installed here (Witchaven II) keeps its data inside a 275MB ISO rather
+        // than as loose files, so there is nothing to link even if we wanted to.
+        data: null,
+    },
+    {
+        id: 'cannonball',
+        title: 'CannonBall',
+        kind: 'Custom engine',
+        game: 'OutRun',
+        blurb: 'OutRun rewritten in C++ — 60fps, true widescreen, time trial and continuous modes. Not an emulator.',
+        source: {
+            name: 'GitHub — djyt/cannonball',
+            url: 'https://github.com/djyt/cannonball/releases',
+            hint: 'Download the Windows build from the Releases page. It needs the original OutRun arcade ROM set, which you must place in the folder yourself — nothing in a game library provides it.',
+        },
+        archive: /cannonball.*\.(zip|7z|rar)$/i,
+        samples: ['cannonball.zip'],
+        dirName: 'CannonBall',
+        entry: { exe: /^cannonball\.exe$/i, platform: 'windows' },
+        data: null,
+    },
+    {
+        id: 'swos2020',
+        title: 'SWOS 2020',
+        kind: 'Fan game',
+        game: '',
+        blurb: 'Sensible World of Soccer rebuilt for modern machines by SWOS United — widescreen, USB controllers and updated team data.',
+        source: {
+            name: 'sensiblesoccer.de — SWOS 2020',
+            url: 'https://sensiblesoccer.de/swos-2020',
+            hint: 'Download the Windows build from the SWOS 2020 page.',
+        },
+        archive: /swos.*\.(zip|7z|rar)$/i,
+        samples: ['SWOS 2020.zip'],
+        dirName: 'SWOS 2020',
+        // Six executables ship here and most are traps — a DLC manager, a database browser,
+        // an uninstaller, a VC redistributable. Only gameLauncher.exe starts the game.
+        entry: { exe: /^gameLauncher\.exe$/i, platform: 'windows' },
+        data: null,
+    },
     // ── Mods ────────────────────────────────────────────────────────────────
     // These are what people actually want to play. Nobody sets out to install GZDoom;
     // they set out to install Brutal Doom, and the engine is a means to that end. So a
@@ -299,6 +389,36 @@ const DATA_SPECS = {
         titles: [/^(the ultimate )?doom$/i, /^doom \+ doom ii/i, /^doom ii/i, /^final doom$/i, /^doom (i|ii) enhanced$/i, /^doom$/i],
         exclude: [/doom 3|doom 64|eternal|dark ages|\(2016\)|resurrection|phobos|akalabeth/i],
         owned: 'You own Doom but it is not installed. Install it first and this will find the IWAD automatically.',
+    },
+
+    // Wolfenstein's whole data set shares one extension per release — VSWAP, MAPHEAD,
+    // GAMEMAPS, AUDIOHED, AUDIOT, VGAHEAD, VGADICT, VGAGRAPH are all .WL6 for the full
+    // game, .WL1 for shareware, .SOD/.SD1-3 for Spear of Destiny. So one pattern per
+    // release takes the complete set and there is no list of filenames to get wrong.
+    wolf3d: {
+        label: 'Wolfenstein 3D or Spear of Destiny',
+        files: [{ find: /\.(wl6|wl1|sod|sd[123])$/i, into: '' }],
+        requireAny: true,
+        titles: [/wolfenstein\s*3-?d/i, /spear of destiny/i],
+        // The modern shooters share the name and have nothing to do with this.
+        exclude: [/new order|old blood|new colossus|youngblood|cyberpilot|enemy territory|return to castle/i],
+        owned: 'You own Wolfenstein 3D but it is not installed. Install it first and this will find the data automatically.',
+    },
+
+    // Build games keep everything in one or two big containers: DUKE3D.GRP, SW.GRP,
+    // BLOOD.RFF and its companions. Blood is the fussy one — it wants its .ART tiles and
+    // BLOOD.INI beside the RFF — so those are taken too when present.
+    build: {
+        label: 'a Build engine game (Duke 3D, Blood, Shadow Warrior, Powerslave…)',
+        files: [
+            { find: /\.(grp|rff)$/i, into: '' },
+            { find: /\.art$/i,       into: '' },
+            { find: /^blood\.ini$/i, into: '' },
+        ],
+        requireAny: true,
+        titles: [/duke nukem 3d/i, /^blood/i, /shadow warrior classic/i, /powerslave|exhumed/i, /redneck rampage/i, /nam$|^nam\b/i, /wwii gi/i],
+        exclude: [/forever|manhattan|blood west|blood omen|bloodstained|bloodlines|shadow warrior \(?20(13|16)|shadow warrior [23]/i],
+        owned: 'You own a Build engine game but it is not installed. Install it first and this will find the data automatically.',
     },
 };
 
