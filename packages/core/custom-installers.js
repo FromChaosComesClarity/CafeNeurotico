@@ -236,10 +236,11 @@ const RECIPES = [
         source: {
             name: 'sensiblesoccer.de — SWOS 2020',
             url: 'https://sensiblesoccer.de/swos-2020',
-            hint: 'Download the Windows build from the SWOS 2020 page.',
+            hint: 'Download the Windows build from the SWOS 2020 page — it is an installer named like swos2020_v7.7_setup.exe. It is unpacked rather than run, so no wizard.',
         },
-        archive: /swos.*\.(zip|7z|rar)$/i,
-        samples: ['SWOS 2020.zip'],
+        // Shipped as an NSIS setup.exe, not an archive — see findExtractor.
+        archive: /swos.*\.(zip|7z|rar|exe)$/i,
+        samples: ['swos2020_v7.7_setup.exe'],
         dirName: 'SWOS 2020',
         // Six executables ship here and most are traps — a DLC manager, a database browser,
         // an uninstaller, a VC redistributable. Only gameLauncher.exe starts the game.
@@ -599,16 +600,90 @@ function dirHasProbe(dir, probe) {
 }
 
 // bsdtar first: one binary that reads zip, 7z, rar and tar alike. unzip is the fallback
-// and only covers zip — which is what every recipe here actually ships.
+// and only covers zip.
+//
+// Windows installers are the exception. Plenty of projects ship a setup.exe rather than an
+// archive — SWOS 2020 is an NSIS installer — and bsdtar cannot read those at all, while 7z
+// unpacks them happily without running anything. Running the installer under Proton would
+// be the alternative, and it would mean a wizard, an install path we do not control, and a
+// registry write for something that is meant to sit in its own folder.
 function findExtractor(archivePath) {
     const ext = path.extname(archivePath).toLowerCase();
+    const sevenZip = which('7z') || which('7za') || which('7zz');
+    if (ext === '.exe') {
+        return sevenZip ? { cmd: sevenZip, args: (a, d) => ['x', '-y', `-o${d}`, a] } : null;
+    }
     const bsdtar = which('bsdtar');
     if (bsdtar) return { cmd: bsdtar, args: (a, d) => ['-xf', a, '-C', d] };
+    if (sevenZip) return { cmd: sevenZip, args: (a, d) => ['x', '-y', `-o${d}`, a] };
     if (ext === '.zip') {
         const unzip = which('unzip');
         if (unzip) return { cmd: unzip, args: (a, d) => ['-q', '-o', a, '-d', d] };
     }
     return null;
+}
+
+// Installer plumbing that is never the game: NSIS's own scratch folder and the
+// redistributables setups bundle for the benefit of Windows.
+const INSTALLER_JUNK = /^\$PLUGINSDIR$|^\$?TEMP$|^(vc_?redist|dxwebsetup|dotnet).*\.exe$/i;
+const INSTALLER_JUNK_PATH = /(^|\/)(\$PLUGINSDIR|\$?TEMP)\//i;
+
+// Unpack a Windows installer by naming the members we want. Asking 7z for the whole thing
+// fails on NSIS-2 with E_NOTIMPL partway through — it stumbles over the installer's own
+// script and scratch entries — but extracting the payload by name succeeds cleanly. So:
+// list, drop the plumbing, take the rest.
+function extractInstaller(archivePath, target) {
+    const sevenZip = which('7z') || which('7za') || which('7zz');
+    if (!sevenZip) return { ok: false, error: 'Unpacking a Windows installer needs 7z (p7zip).' };
+
+    const members = inspectArchive(archivePath)
+        .filter(m => !INSTALLER_JUNK_PATH.test(m) && !INSTALLER_JUNK.test(path.basename(m)));
+    if (!members.length) return { ok: false, error: 'Nothing usable was found inside that installer.' };
+
+    const res = spawnSync(sevenZip, ['x', '-y', `-o${target}`, archivePath, ...members],
+                          { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    // 7z still reports a non-zero status for the entries it skipped; what matters is
+    // whether anything actually landed.
+    let got = [];
+    try { got = fs.readdirSync(target); } catch {}
+    if (!got.length) {
+        return { ok: false, error: `Could not unpack that installer: ${(res.stderr || res.stdout || '').trim().slice(0, 200)}` };
+    }
+    return { ok: true };
+}
+
+// An installer often carries the payload as a second archive inside itself — SWOS 2020's
+// setup.exe holds an 83MB data.7z. One level of unwrapping, and only when the first pass
+// produced no executable, so this never fires for a normal download.
+function unwrapNestedArchive(dir) {
+    let inner = [];
+    try {
+        inner = fs.readdirSync(dir, { withFileTypes: true })
+            .filter(e => e.isFile() && /\.(7z|zip|rar|tar|gz|xz|cab)$/i.test(e.name))
+            .map(e => path.join(dir, e.name));
+    } catch { return false; }
+    if (!inner.length) return false;
+
+    // The payload is the big one; a small extra zip beside it is usually documentation.
+    inner.sort((a, b) => {
+        try { return fs.statSync(b).size - fs.statSync(a).size; } catch { return 0; }
+    });
+    const ex = findExtractor(inner[0]);
+    if (!ex) return false;
+    const res = spawnSync(ex.cmd, ex.args(inner[0], dir), { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    if (res.status !== 0) return false;
+    try { fs.unlinkSync(inner[0]); } catch {}
+    return true;
+}
+
+// Strip the installer's own scaffolding so it cannot be mistaken for the game.
+function dropInstallerJunk(dir) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+        if (!INSTALLER_JUNK.test(e.name)) continue;
+        try { fs.rmSync(path.join(dir, e.name), { recursive: true, force: true }); } catch {}
+    }
 }
 
 function which(bin) {
@@ -637,6 +712,18 @@ function flattenSingleRoot(dir) {
 // rather than by what someone named the file. OpenBOR needs this: every one of its games is
 // a differently-named archive around an identical layout.
 function inspectArchive(archivePath) {
+    // A Windows installer is not something bsdtar can read; 7z can list it. -slt gives one
+    // "Path = …" per entry, which beats parsing the column layout.
+    if (path.extname(archivePath).toLowerCase() === '.exe') {
+        const sevenZip = which('7z') || which('7za') || which('7zz');
+        if (!sevenZip) return [];
+        const r = spawnSync(sevenZip, ['l', '-slt', archivePath], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+        if (r.status !== 0) return [];
+        return r.stdout.split('\n')
+            .filter(l => l.startsWith('Path = '))
+            .map(l => l.slice(7).trim())
+            .filter(p => p && p !== archivePath);
+    }
     const bsdtar = which('bsdtar');
     if (bsdtar) {
         const r = spawnSync(bsdtar, ['-tf', archivePath], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
@@ -1061,14 +1148,27 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, data
     }
     fs.mkdirSync(target, { recursive: true });
 
-    const ex = findExtractor(archivePath);
-    if (!ex) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive) or unzip.' };
-    const res = spawnSync(ex.cmd, ex.args(archivePath, target), { encoding: 'utf8' });
-    if (res.status !== 0) {
-        return { ok: false, error: `Could not unpack the archive: ${(res.stderr || '').trim().slice(0, 300)}` };
+    if (path.extname(archivePath).toLowerCase() === '.exe') {
+        const got = extractInstaller(archivePath, target);
+        if (!got.ok) return got;
+    } else {
+        const ex = findExtractor(archivePath);
+        if (!ex) return { ok: false, error: 'No archive tool available. Install bsdtar (libarchive) or unzip.' };
+        const res = spawnSync(ex.cmd, ex.args(archivePath, target), { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        if (res.status !== 0) {
+            return { ok: false, error: `Could not unpack the archive: ${(res.stderr || '').trim().slice(0, 300)}` };
+        }
     }
 
+    dropInstallerJunk(target);
     flattenSingleRoot(target);
+
+    // Nothing runnable yet, but an archive inside — an installer carrying its payload as a
+    // second archive. Unwrap once and look again.
+    if (!recipe.contains && !findEntry(target, recipe.entry.exe) && unwrapNestedArchive(target)) {
+        dropInstallerJunk(target);
+        flattenSingleRoot(target);
+    }
 
     // For a shape-based recipe the entry point is defined by position, not by name: the
     // OpenBOR engine is renamed per game, so the only reliable rule is "the exe that sits

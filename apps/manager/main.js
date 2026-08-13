@@ -954,7 +954,8 @@ ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     const parent = BrowserWindow.getFocusedWindow();
     const res = await dialog.showOpenDialog(parent, {
         title: recipe ? `Select the ${recipe.title} download` : 'Select the download',
-        filters: [{ name: 'Archives', extensions: ['zip', '7z', 'rar', 'tar', 'gz', 'xz'] }],
+        // Some projects ship a setup.exe rather than an archive; it is unpacked, not run.
+        filters: [{ name: 'Downloads', extensions: ['zip', '7z', 'rar', 'exe', 'tar', 'gz', 'xz'] }],
         properties: ['openFile'],
     });
     if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
