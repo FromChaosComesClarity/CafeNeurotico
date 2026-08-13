@@ -1339,15 +1339,21 @@ function scanFolderEntries(folder, maxDepth = 3) {
 //
 // `reserved` is every path the library already claims. A target that lands on one is
 // renamed rather than emptied, and nothing reserved is ever deleted.
-function safeTarget(installRoot, dirName, reserved = []) {
+// The suffix says *why* there are two, which "(2)" does not. A collision here means the
+// user owns the same game in their library — GOG's Witchaven runs under DOSBox, this one
+// runs on a source port — so naming it after that is the useful distinction.
+function safeTarget(installRoot, dirName, reserved = [], suffix = 'Source Port') {
     const taken = new Set(reserved.filter(Boolean).map(p => path.resolve(p)));
-    let target = path.join(installRoot, dirName);
-    if (!taken.has(path.resolve(target))) return { target, renamed: false };
-    for (let i = 2; i < 50; i++) {
-        const next = path.join(installRoot, `${dirName} (${i})`);
-        if (!taken.has(path.resolve(next))) return { target: next, renamed: true };
+    const free = (name) => !taken.has(path.resolve(path.join(installRoot, name)));
+    if (free(dirName)) return { target: path.join(installRoot, dirName), name: dirName, renamed: false };
+    if (free(`${dirName} (${suffix})`)) {
+        return { target: path.join(installRoot, `${dirName} (${suffix})`), name: `${dirName} (${suffix})`, renamed: true };
     }
-    return { target, renamed: false, blocked: true };
+    for (let i = 2; i < 50; i++) {
+        const name = `${dirName} (${suffix} ${i})`;
+        if (free(name)) return { target: path.join(installRoot, name), name, renamed: true };
+    }
+    return { target: path.join(installRoot, dirName), name: dirName, renamed: false, blocked: true };
 }
 
 // Clearing a folder is only ever safe when nothing else claims it.
@@ -1456,6 +1462,8 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
 
     const picked = safeTarget(installRoot, recipe.dirName, reserved);
     const target = picked.target;
+    // Two entries called "Witchaven" in one library is worse than a longer name.
+    const shownTitle = picked.renamed ? `${recipe.title} (Source Port)` : recipe.title;
     if (fs.existsSync(target) && fs.readdirSync(target).length && !overwrite) {
         return { ok: false, error: `${target} already exists and is not empty.`, exists: true };
     }
@@ -1477,11 +1485,18 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     const linked = linkGameData(recipe.data, data.paths || data.path, target, null, { copy: !!dataPath });
     if (!linked.ok) return { ok: false, error: linked.error };
 
+    // BuildGDX keeps a configured folder per game and does not look in its own directory,
+    // so it reports every resource missing even with the data sitting beside it. It accepts
+    // -path, which points it at this game's folder without touching its settings.
+    const usesGdx = (engines || []).some(e => e.id === 'buildgdx') || /buildgdx/i.test(engineExe || '');
+    const launchArgs = usesGdx ? `-path "Z:${target.replace(/\//g, '\\')}"` : null;
+
     return {
         ok: true,
         recipeId: recipe.id,
         key: recipe.id,
-        title: recipe.title,
+        title: shownTitle,
+        launchArgs,
         installPath: target,
         executable: engineExe,
         platform: 'windows',
