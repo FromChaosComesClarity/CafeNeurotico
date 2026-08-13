@@ -474,13 +474,13 @@ const BUILD_GAMES = {
         label: 'Witchaven', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/^witchaven$/i, /witchaven i\b/i, /witchaven i ?& ?ii/i],
         exclude: [/witchaven ii|witchaven 2/i],
-        dataDir: /^WHAVEN$/i, imageDir: /^WHAVEN\//i, engines: ['buildgdx'],
+        dataDir: /^WHAVEN$/i, imageDir: /^WHAVEN\//i, engines: ['buildgdx'], gdxApp: 'WitchavenGDX',
     },
     witchaven2: {
         label: 'Witchaven II: Blood Vengeance', main: /^tiles000\.art$/i, extra: [/\.art$/i, /\.dat$/i, /\.map$/i],
         titles: [/witchaven ii/i, /witchaven 2/i, /witchaven i ?& ?ii/i],
         exclude: [],
-        dataDir: /^WHAVEN2$/i, imageDir: /^WHAVEN2\//i, engines: ['buildgdx'],
+        dataDir: /^WHAVEN2$/i, imageDir: /^WHAVEN2\//i, engines: ['buildgdx'], gdxApp: 'Witchaven2GDX',
     },
 };
 
@@ -540,6 +540,7 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
             hint: 'No download needed for the game itself. If Raze is not installed yet you will be asked for its Windows zip once, and every Build game after that reuses it.',
         },
         dirName: g.label.replace(/ \(.*\)$/, '').replace(/[/\\:*?"<>|]/g, ''),
+        gdxApp: g.gdxApp || null,
         data: `build-${id}`,
     });
 }
@@ -1486,9 +1487,20 @@ function installGameOnEngine({ recipeId, engineRoot, engineExe, engines, install
     if (!linked.ok) return { ok: false, error: linked.error };
 
     // BuildGDX keeps a configured folder per game and does not look in its own directory,
-    // so it reports every resource missing even with the data sitting beside it. It accepts
-    // -path, which points it at this game's folder without touching its settings.
+    // so it reports every resource missing even with the data sitting beside it, and -path
+    // on the command line did not change that. It stores the folder in a per-game ini —
+    // WitchavenGDX.ini, Witchaven2GDX.ini — under a [Main] section with a Path key, which
+    // is what its launcher reads when deciding whether the resources are there.
+    // (Names and keys read out of the jar: WHEntry names the ini and the required files,
+    // GameConfig has gamePath/Path, ConfigContext writes [Main].)
     const usesGdx = (engines || []).some(e => e.id === 'buildgdx') || /buildgdx/i.test(engineExe || '');
+    if (usesGdx && recipe.gdxApp) {
+        const winPath = 'Z:' + target.replace(/\//g, '\\');
+        try {
+            fs.writeFileSync(path.join(target, `${recipe.gdxApp}.ini`),
+                `[Main]\nPath = ${winPath}\nAutoloadFolder = ${winPath}\\autoload\n`);
+        } catch {}
+    }
     const launchArgs = usesGdx ? `-path "Z:${target.replace(/\//g, '\\')}"` : null;
 
     return {
