@@ -416,8 +416,12 @@ const DATA_SPECS = {
             { find: /^blood\.ini$/i, into: '' },
         ],
         requireAny: true,
-        titles: [/duke nukem 3d/i, /^blood/i, /shadow warrior classic/i, /powerslave|exhumed/i, /redneck rampage/i, /nam$|^nam\b/i, /wwii gi/i],
-        exclude: [/forever|manhattan|blood west|blood omen|bloodstained|bloodlines|shadow warrior \(?20(13|16)|shadow warrior [23]/i],
+        titles: [/duke nukem 3d/i, /^blood/i, /shadow warrior classic/i, /^powerslave$|^exhumed$/i, /redneck rampage/i, /nam$|^nam\b/i, /wwii gi/i],
+        // PowerSlave *Exhumed* is Nightdive's 2022 KEX remaster and carries no Build data,
+        // the same trap as Quake Enhanced. The probe would reject it anyway, but naming it
+        // in "you own…" would send someone to install 3GB that cannot help.
+        exclude: [/powerslave exhumed|exhumed \(2022\)/i,
+                  /forever|manhattan|blood west|blood omen|bloodstained|bloodlines|shadow warrior \(?20(13|16)|shadow warrior [23]/i],
         owned: 'You own a Build engine game but it is not installed. Install it first and this will find the data automatically.',
     },
 };
@@ -600,6 +604,35 @@ function detectRecipe(fileName) {
 //   { ok: false, message }                 → nothing in the library matches
 // `rows` is grinder.db's games table; passing it in keeps this module free of any
 // database handle of its own.
+// Does this folder actually hold the data a spec needs? The same test whether the folder
+// came from the library or the user pointed at it — a shelf of DOS files they still have
+// is every bit as valid a source as a storefront install, and quite often the only one.
+function folderSatisfies(spec, root) {
+    if (!root || !fs.existsSync(root)) return false;
+    // Folder-shaped: every required folder must exist and hold its proving file.
+    const dirsOk = (spec.dirs || []).filter(d => d.required).every(d => {
+        const dir = resolveCaseInsensitive(root, d.name);
+        return dir && dirHasProbe(dir, d.probe);
+    });
+    // File-shaped: at least one of the named files must turn up somewhere inside.
+    const filesOk = spec.files ? spec.files.some(f => findFiles(root, f.find).length > 0) : true;
+    return dirsOk && filesOk;
+}
+
+// Validate a folder the user chose themselves, so the failure is reported before anything
+// is unpacked and says which files were expected rather than just "no".
+function resolveDataFolder(dataId, folder) {
+    const spec = DATA_SPECS[dataId];
+    if (!spec) return { ok: false, message: `Unknown data requirement "${dataId}".` };
+    if (!folder || !fs.existsSync(folder)) return { ok: false, message: 'That folder no longer exists.' };
+    if (!folderSatisfies(spec, folder)) {
+        const want = (spec.files || []).map(f => f.find.source.replace(/[\\^$()?:]/g, '').replace(/\|/g, ', '))
+            .concat((spec.dirs || []).filter(d => d.required).map(d => `${d.name}/`)).join(' or ');
+        return { ok: false, message: `That folder does not contain ${spec.label}. Looking for ${want}. Point at the folder holding the game's own data files.` };
+    }
+    return { ok: true, path: folder, paths: [folder], title: path.basename(folder) };
+}
+
 function resolveGameData(dataId, rows) {
     const spec = DATA_SPECS[dataId];
     if (!spec) return { ok: false, message: `Unknown data requirement "${dataId}".` };
@@ -610,22 +643,9 @@ function resolveGameData(dataId, rows) {
         return spec.titles.some(rx => rx.test(t));
     });
 
-    const required = (spec.dirs || []).filter(d => d.required);
     const hits = [];
     for (const g of named.filter(g => g.installed && g.install_path)) {
-        const root = g.install_path;
-        // Folder-shaped spec: every required folder must exist and hold its proving file.
-        const dirsOk = required.length
-            ? required.every(d => {
-                const dir = resolveCaseInsensitive(root, d.name);
-                return dir && dirHasProbe(dir, d.probe);
-            })
-            : true;
-        // File-shaped spec: at least one of the named files must turn up somewhere inside.
-        const filesOk = spec.files
-            ? spec.files.some(f => findFiles(root, f.find).length > 0)
-            : true;
-        if (dirsOk && filesOk) hits.push({ path: root, title: g.title });
+        if (folderSatisfies(spec, g.install_path)) hits.push({ path: g.install_path, title: g.title });
     }
     // File-shaped specs take from *every* matching product rather than the first, so
     // owning Ultimate Doom, Final Doom and both Enhanced releases puts doom.wad, doom2.wad,
@@ -683,13 +703,19 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
     const seen = new Set();
     for (const f of (spec.files || [])) {
         for (const root of roots) {
-            for (const found of findFiles(root, f.find)) {
-                const name = path.basename(found).toLowerCase();
+            // Shallowest wins. Blood: Fresh Supply keeps the base game's tiles at its root
+            // and Cryptic Passage's replacements in addons/, under the same filenames — so
+            // whichever the directory walk happened to reach first would silently decide
+            // which tileset the game loads. Depth is the rule that gets it right.
+            const found = findFiles(root, f.find)
+                .sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
+            for (const hit of found) {
+                const name = path.basename(hit).toLowerCase();
                 if (seen.has(name)) continue;
                 seen.add(name);
                 const dstDir = path.join(targetRoot, f.into || '');
                 fs.mkdirSync(dstDir, { recursive: true });
-                link(found, path.join(dstDir, name));
+                link(hit, path.join(dstDir, name));
                 linked.push(name);
             }
         }
@@ -734,7 +760,7 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource) {
 
 // Unpack a download into its own folder under `installRoot` and work out how to start it.
 // Does not touch any database — the caller decides how to register the result.
-function installFromArchive({ recipeId, archivePath, installRoot, dataRows, overwrite = false }) {
+function installFromArchive({ recipeId, archivePath, installRoot, dataRows, dataPath, overwrite = false }) {
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
@@ -761,10 +787,15 @@ function installFromArchive({ recipeId, archivePath, installRoot, dataRows, over
 
     // Resolve the data before unpacking anything: an install that cannot be played is
     // worse than a refusal, and this is the failure the user can actually act on.
+    // A folder the user pointed at wins over the library — they know which copy they meant,
+    // and for anything the storefronts never sold (their own DOS files) it is the only way.
     let data = null;
     if (recipe.data) {
-        data = resolveGameData(recipe.data, dataRows);
-        if (!data.ok) return { ok: false, error: data.message, owned: data.owned || [], needsData: recipe.data };
+        data = dataPath ? resolveDataFolder(recipe.data, dataPath) : resolveGameData(recipe.data, dataRows);
+        if (!data.ok) {
+            return { ok: false, error: data.message, owned: data.owned || [],
+                     needsData: recipe.data, dataLabel: DATA_SPECS[recipe.data]?.label || recipe.data };
+        }
     }
 
     const target = path.join(installRoot, dirName);
@@ -1077,6 +1108,6 @@ module.exports = {
     scanFolderEntries, addFromFolder,
     parseArgs, formatArgs, withIwad, currentIwad,
     listRecipes, getRecipe, detectRecipe, selfCheck,
-    resolveGameData, resolveExtra, linkGameData, installFromArchive,
+    resolveGameData, resolveDataFolder, folderSatisfies, resolveExtra, linkGameData, installFromArchive,
     findEntry, flattenSingleRoot, findExtractor,
 };

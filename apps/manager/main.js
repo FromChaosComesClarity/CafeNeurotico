@@ -953,7 +953,7 @@ ipcMain.handle('custom-install-pick', async (_, recipeId) => {
     return { ok: true, path: res.filePaths[0] };
 });
 
-ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, selected, iwad, overwrite } = {}) => {
+ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchivePath, selected, iwad, dataPath, overwrite } = {}) => {
     if (!ensureGrinderEngine(true)) return { ok: false, error: 'GRINDER data could not be created.' };
     const recipe = customInstallers.getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
@@ -975,7 +975,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
                 return { ok: false, error: `That file does not look like ${recipe.engine.map(id => customInstallers.getRecipe(id)?.title).join(' or ')}.` };
             }
             const er = customInstallers.installFromArchive({
-                recipeId: engineId, archivePath: engineArchivePath, overwrite: true,
+                recipeId: engineId, archivePath: engineArchivePath, dataPath, overwrite: true,
                 installRoot: grinderDefaultDir(), dataRows: _grinderRowsForData(),
             });
             if (!er.ok) return er;
@@ -997,7 +997,7 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
     }
 
     const r = customInstallers.installFromArchive({
-        recipeId, archivePath, overwrite: !!overwrite,
+        recipeId, archivePath, dataPath, overwrite: !!overwrite,
         installRoot: grinderDefaultDir(),
         dataRows: _grinderRowsForData(),
     });
@@ -1012,10 +1012,10 @@ ipcMain.handle('custom-install', async (_, { recipeId, archivePath, engineArchiv
 
 // Adding a Windows game from a folder that is already unpacked. Registered in place —
 // nothing is copied — so this also covers folders living on another drive.
-ipcMain.handle('custom-folder-pick', async () => {
+ipcMain.handle('custom-folder-pick', async (_, title) => {
     const parent = BrowserWindow.getFocusedWindow();
     const res = await dialog.showOpenDialog(parent, {
-        title: "Select the game's folder",
+        title: title || "Select the game's folder",
         properties: ['openDirectory'],
     });
     if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };

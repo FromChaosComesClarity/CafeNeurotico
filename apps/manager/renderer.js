@@ -195,7 +195,8 @@ function _customRow(r) {
             dataLine = r.data.ready
                 ? `<div class="ci-meta">Game data: <span class="ci-ok">ready</span> &mdash; from your copy of ${escHtml(r.data.from)}</div>`
                 : `<div class="ci-meta">Game data: <span class="ci-warn">${escHtml(r.data.label)} needed</span> &mdash; ${escHtml(r.data.message || '')}${
-                      r.data.owned && r.data.owned.length ? ` <span style="color:var(--text_sec);">(you own: ${escHtml(r.data.owned.slice(0, 3).join(', '))})</span>` : ''}</div>`;
+                      r.data.owned && r.data.owned.length ? ` <span style="color:var(--text_sec);">(you own: ${escHtml(r.data.owned.slice(0, 3).join(', '))})</span>` : ''
+                    }<br><span style="color:var(--text_sec);">Or install anyway and point at a folder holding your own copy of the game files.</span></div>`;
         }
 
         // Mods need an engine. Say so up front, including that we will install it in the
@@ -392,6 +393,20 @@ async function runCustomInstall(recipe, btn) {
         // The mod needs an engine and there isn't one yet. Ask for that download too and
         // install both in this one click, rather than sending the user away to do it
         // themselves — installing GZDoom was never the thing they wanted.
+        // The library has no copy of the data — but the user very likely does, on a shelf
+        // or in a folder from a disc they still own. Offer that rather than dead-ending:
+        // for anything the storefronts never sold, it is the only route there is.
+        if (res && !res.ok && res.needsData) {
+            const ok = await showConfirm(
+                `${recipe.title} needs ${res.dataLabel}.\n\n${res.error}\n\nDo you have those game files in a folder? Point at it and they will be used.`,
+                'Choose folder', false);
+            if (!ok) return;
+            const folder = await window.api.customFolderPick(`Select the folder containing ${res.dataLabel}`);
+            if (!folder || !folder.ok) return;
+            btn.textContent = 'INSTALLING…';
+            res = await window.api.customInstall({ recipeId: recipe.id, archivePath: picked.path, dataPath: folder.path });
+        }
+
         if (res && !res.ok && res.needsEngine) {
             const names = res.engines.map(e => e.title).join(' or ');
             const ok = await showConfirm(`${recipe.title} runs on ${names}, which isn't installed yet.\n\nPick your ${names} download next and both will be installed together.`, 'Choose file', false);
