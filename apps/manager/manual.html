@@ -403,6 +403,11 @@
             </ul>
             <p><strong>To get a native DOSBox</strong>, install <code>dosbox-staging</code> with your package manager &mdash; the card shows the exact command for your distribution, or <code>flatpak install flathub io.github.dosbox-staging</code>, which works anywhere. <code>dosbox</code> and <code>dosbox-x</code> are recognised too. Restart nothing; the card notices it immediately. If you install the Flatpak and a game refuses to start, its folder is probably outside the sandbox &mdash; give it access, or use the packaged build instead.</p>
 
+            <h3>Which Screen Games Open On</h3>
+            <p>On a multi-monitor machine games land on whichever screen the desktop calls primary, and most of them offer no way to change that. Control Panel &rarr; <strong>Which Screen Games Open On</strong> lists your monitors by name and size &mdash; a connector called DP-4 tells nobody anything &mdash; and every game opens on the one you pick. <strong>Default</strong> hands the decision back to the desktop.</p>
+            <p>This is <strong>KDE only</strong>, and the card is hidden entirely elsewhere, and on a single-monitor machine. It works by asking KWin to place the window, which is the only thing that can decide this under Wayland &mdash; nothing inside the game has a say. Nothing is written to your KDE settings, and the change applies to the next game you start, with no logout.</p>
+            <p>One caveat worth knowing: a game that runs fullscreen is re-fitted to the monitor you chose. Sending a game to a smaller screen means it plays at that screen&rsquo;s size, which is a property of the monitor rather than something any setting can talk it out of.</p>
+
             <h3>Detect Genres</h3>
             <p>Control Panel &rarr; Tools &rarr; <strong>Detect Genres</strong> sorts your library by what each game actually is &mdash; ARPG, CRPG, FPS, Racing &mdash; rather than by the vague genre line stores hand out. See <a href="#man-10">Genres</a> for what it does and how to overrule it.</p>
 

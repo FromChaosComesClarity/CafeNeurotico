@@ -860,9 +860,13 @@ ipcMain.handle('set-launch-target', (_, grinderGameId, relPath, taskIndex) => {
 const customInstallers = require('../../packages/core/custom-installers.js');
 
 // ── Which screen games open on (KDE only) ────────────────────────────────────
-// See packages/core/kwin-display.js for why this is a KWin rule rather than anything
-// inside the game, and why it is one rule for all games rather than one per game.
+// See packages/core/kwin-display.js for why this is a KWin script rather than anything
+// inside the game, and why it is one script for all games rather than one per game.
 const kwinDisplay = require('../../packages/core/kwin-display.js');
+
+// A loaded KWin script is gone after a logout, so the stored choice is put back into
+// effect on every start. Nothing to do — and nothing written — if there is no choice.
+try { if (kwinDisplay.isSupported()) kwinDisplay.apply(); } catch {}
 
 ipcMain.handle('display-options', () => {
     if (!kwinDisplay.isSupported()) return { supported: false, displays: [], current: null };

@@ -1,17 +1,22 @@
 // ── Which monitor games open on (KDE / KWin) ─────────────────────────────────
-// On a nested Wayland session nothing inside the game decides where its window lands —
-// the compositor does. gamescope's --prefer-output belongs to its DRM backend, so under a
-// normal KDE session it has no say either. KWin's own window rules do, and KWin can be
-// told to re-read them over D-Bus, so this takes effect without a logout.
+// On a Wayland session nothing inside the game decides where its window lands — the
+// compositor does. gamescope's --prefer-output belongs to its DRM backend, so under a
+// normal KDE session it has no say either. That leaves KWin, which offers two ways in.
 //
-// One rule for every game rather than one per game, because umu gives every non-Steam
+// The obvious one is a window rule in kwinrulesrc, and it does not work: on KWin 6.7 a
+// rule written to that file is ignored no matter how it is spelled, UUID group name or
+// not, and even a rule matching every window with a forced size changes nothing. KWin
+// owns that file and only reads our edits back on its own terms. So this uses KWin's
+// scripting interface instead, which is a supported API, takes effect immediately, and
+// has the considerable virtue of not writing to the user's KDE configuration at all.
+//
+// One script for every game rather than one per game, because umu gives every non-Steam
 // title the same window class — steam_app_0 — deriving it from GAMEID, and GAMEID is what
-// umu looks its compatibility fixes up by, so it is not ours to fake for the sake of a
-// window rule.
+// umu looks its compatibility fixes up by, so it is not ours to fake for a window match.
 //
-// ⚠️ This is the only place Cafe Neurotico writes outside its own folder. It therefore
-// touches exactly one rule, identified by a fixed id, and leaves every other rule in the
-// file alone — including ones the user wrote by hand.
+// ⚠️ A loaded KWin script lives as long as the KWin session, not as long as this app, and
+// is gone after a logout. `apply()` at startup is what makes the setting stick across
+// reboots; the choice itself is ours, kept beside our own settings.
 'use strict';
 
 const fs = require('fs');
@@ -19,13 +24,12 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 
-const RULE_ID = 'cafeneurotico-game-display';
-const RULE_DESC = 'Cafe Neurotico — open games on a chosen screen';
-const WM_CLASS = 'steam_app_';          // every umu/Proton launch, matched as a substring
-// Every key this rule owns — written together, and removed together when it is turned off.
-const RULE_KEYS = ['Description', 'wmclass', 'wmclasscomplete', 'wmclassmatch', 'screen', 'screenrule'];
+const PLUGIN = 'cafeneurotico-game-display';
 
-const rulesFile = () => path.join(os.homedir(), '.config', 'kwinrulesrc');
+// Window classes worth moving. umu/Proton covers everything launched through a compatibility
+// layer, which is nearly every game here; the rest are the runners we launch directly.
+const GAME_CLASSES = ['steam_app_', 'dosbox', 'scummvm', 'openbor', 'gzdoom', 'uzdoom',
+    'ironwail', 'vkquake', 'quake', 'raze', 'buildgdx', 'ecwolf', 'cannonball'];
 
 function which(bin) {
     for (const dir of (process.env.PATH || '').split(path.delimiter)) {
@@ -36,14 +40,17 @@ function which(bin) {
     return '';
 }
 
+const qdbusBin = () => which('qdbus6') || which('qdbus') || which('qdbus-qt6');
+
 // KDE only, and only when the tools to do it properly are present.
 function isSupported() {
     const desktop = `${process.env.XDG_CURRENT_DESKTOP || ''} ${process.env.DESKTOP_SESSION || ''}`.toLowerCase();
-    return desktop.includes('kde') && !!which('kscreen-doctor') && !!(which('kwriteconfig6') || which('kwriteconfig5'));
+    return desktop.includes('kde') && !!which('kscreen-doctor') && !!qdbusBin();
 }
 
 // The monitors KWin can place a window on, in the order KWin numbers them — which is the
-// order kscreen reports, and what a rule's `screen` index refers to.
+// order kscreen reports. The name is what the script matches on: an index shifts when a
+// monitor is unplugged, a connector name does not.
 function listDisplays() {
     const kd = which('kscreen-doctor');
     if (!kd) return [];
@@ -74,75 +81,145 @@ function listDisplays() {
         .sort((a, b) => a.index - b.index);
 }
 
-// ── Reading and writing the rule ─────────────────────────────────────────────
+// ── Where the choice lives ───────────────────────────────────────────────────
+// Beside our own settings, not in KDE's: this is a Cafe Neurotico preference that happens
+// to be enacted through KWin.
+const configDir = () => path.join(os.homedir(), 'GameManagerConfig');
+const choiceFile = () => path.join(configDir(), 'game-display.json');
+const scriptFile = () => path.join(configDir(), 'kwin-game-display.js');
 
-function readRulesFile() {
-    try { return fs.readFileSync(rulesFile(), 'utf8'); } catch { return '[General]\nrules=\n'; }
+function readChoice() {
+    try { return JSON.parse(fs.readFileSync(choiceFile(), 'utf8')); } catch { return null; }
 }
 
+// The stored choice is a connector name; the index it maps to is whatever KWin numbers it
+// today. A monitor that has since been unplugged reports null rather than moving games to
+// whichever screen inherited its number.
 function currentDisplay() {
-    const text = readRulesFile();
-    const group = text.split(/^\[/m).find(s => s.startsWith(`${RULE_ID}]`));
-    if (!group) return null;
-    const m = group.match(/^screen=(\d+)$/m);
-    return m ? Number(m[1]) : null;
+    const choice = readChoice();
+    if (!choice || !choice.name) return null;
+    const found = listDisplays().find(d => d.name === choice.name);
+    return found ? found.index : null;
 }
 
-function kwriteconfig(args) {
-    const bin = which('kwriteconfig6') || which('kwriteconfig5');
-    if (!bin) return false;
-    return spawnSync(bin, ['--file', 'kwinrulesrc', ...args], { encoding: 'utf8' }).status === 0;
+// ── The script ───────────────────────────────────────────────────────────────
+// Written out with the target baked in, because a KWin script cannot read a file to find
+// out where it should be putting things.
+function scriptFor(outputName) {
+    return `// Generated by Cafe Neurotico. Moves game windows to a chosen monitor.
+// Reloaded whenever the setting changes or the app starts; safe to delete.
+var TARGET = ${JSON.stringify(outputName)};
+var CLASSES = ${JSON.stringify(GAME_CLASSES)};
+
+function targetOutput() {
+    var outs = workspace.screens;
+    for (var i = 0; i < outs.length; i++) if (outs[i].name === TARGET) return outs[i];
+    return null;
 }
 
-// Keep the [General] rules list in step, without disturbing anyone else's entries.
-function setRuleListed(listed) {
-    const text = readRulesFile();
-    const m = text.match(/^rules=(.*)$/m);
-    const ids = (m ? m[1] : '').split(',').map(s => s.trim()).filter(Boolean);
-    const without = ids.filter(id => id !== RULE_ID);
-    const next = listed ? [...without, RULE_ID] : without;
-    kwriteconfig(['--group', 'General', '--key', 'rules', next.join(',')]);
-    // count is what older KWin reads; harmless and correct to keep aligned.
-    kwriteconfig(['--group', 'General', '--key', 'count', String(next.length)]);
+function isGame(w) {
+    if (!w || w.desktopWindow || w.dock || w.splash || w.utility || w.popupWindow) return false;
+    var cls = String(w.resourceClass || "").toLowerCase();
+    for (var i = 0; i < CLASSES.length; i++) if (cls.indexOf(CLASSES[i]) !== -1) return true;
+    return false;
 }
 
-// Ask KWin to re-read its rules. Without this the change waits for a session restart.
-function reconfigure() {
-    const qdbus = which('qdbus6') || which('qdbus') || which('qdbus-qt6');
-    if (!qdbus) return false;
-    return spawnSync(qdbus, ['org.kde.KWin', '/KWin', 'reconfigure'], { encoding: 'utf8' }).status === 0;
+function place(w) {
+    var out = targetOutput();
+    if (!out || !isGame(w)) return;
+    if (w.output && w.output.name === TARGET) return;   // already there; don't fight it
+
+    // sendClientToScreen is the API for this and keeps a fullscreen window fullscreen —
+    // it re-fits it to the new monitor instead of stranding it at the old one's size.
+    if (typeof workspace.sendClientToScreen === "function") workspace.sendClientToScreen(w, out);
+
+    // A window that is neither fullscreen nor maximised may keep its old coordinates, so
+    // it is moved by hand as well, clamped to the monitor it is going to.
+    if (w.fullScreen) return;   // sendClientToScreen already re-fitted it to the new monitor
+    var g = out.geometry, f = w.frameGeometry;
+    w.frameGeometry = {
+        x: g.x + Math.max(0, Math.round((g.width - f.width) / 2)),
+        y: g.y + Math.max(0, Math.round((g.height - f.height) / 2)),
+        width: Math.min(f.width, g.width),
+        height: Math.min(f.height, g.height),
+    };
 }
 
-// index === null clears the rule entirely and hands placement back to KDE.
+// Games routinely open a small window and go fullscreen a moment later, and going
+// fullscreen is exactly when a game re-picks its monitor — so watch for it rather than
+// placing the window once and hoping.
+function watch(w) {
+    if (!isGame(w)) return;
+    place(w);
+    if (w.fullScreenChanged) w.fullScreenChanged.connect(function () { place(w); });
+    if (w.outputChanged) w.outputChanged.connect(function () { place(w); });
+}
+
+workspace.windowAdded.connect(watch);
+var existing = workspace.windowList ? workspace.windowList() : [];
+for (var i = 0; i < existing.length; i++) watch(existing[i]);
+`;
+}
+
+function qdbus(args) {
+    const bin = qdbusBin();
+    if (!bin) return { ok: false, out: '' };
+    const r = spawnSync(bin, ['org.kde.KWin', '/Scripting', ...args], { encoding: 'utf8' });
+    return { ok: r.status === 0, out: (r.stdout || '').trim() };
+}
+
+function unload() {
+    qdbus(['org.kde.kwin.Scripting.unloadScript', PLUGIN]);
+}
+
+function load(file) {
+    // Unload first: loading the same plugin name twice would leave two copies connected to
+    // windowAdded, each moving every window.
+    unload();
+    const loaded = qdbus(['org.kde.kwin.Scripting.loadScript', file, PLUGIN]);
+    if (!loaded.ok) return false;
+    return qdbus(['org.kde.kwin.Scripting.start']).ok;
+}
+
+// Put the stored choice into effect. Called at startup, because a loaded script does not
+// survive a logout — without this the setting would quietly stop working after a reboot.
+function apply() {
+    if (!isSupported()) return { ok: false, error: 'This needs KDE with kscreen-doctor and qdbus.' };
+    const choice = readChoice();
+    if (!choice || !choice.name) { unload(); return { ok: true, display: null }; }
+
+    const target = listDisplays().find(d => d.name === choice.name);
+    if (!target) { unload(); return { ok: false, error: `${choice.name} is not connected.` }; }
+
+    try {
+        fs.mkdirSync(configDir(), { recursive: true });
+        fs.writeFileSync(scriptFile(), scriptFor(target.name), 'utf8');
+    } catch (e) { return { ok: false, error: e.message }; }
+
+    return load(scriptFile()) ? { ok: true, display: target }
+        : { ok: false, error: 'KWin would not load the script.' };
+}
+
+// index === null clears the setting and hands placement back to KDE.
 function setGameDisplay(index) {
-    if (!isSupported()) return { ok: false, error: 'This needs KDE with kscreen-doctor and kwriteconfig.' };
+    if (!isSupported()) return { ok: false, error: 'This needs KDE with kscreen-doctor and qdbus.' };
 
     if (index === null || index === undefined || index < 0) {
-        // kwriteconfig can delete a key but not a group, so every key we wrote is removed
-        // individually. What is left is an empty section, which KWin ignores — and editing
-        // the file by hand to tidy that away would risk the rules someone else wrote.
-        for (const k of RULE_KEYS) kwriteconfig(['--group', RULE_ID, '--key', k, '--delete', '']);
-        setRuleListed(false);
-        reconfigure();
+        try { fs.rmSync(choiceFile(), { force: true }); } catch {}
+        try { fs.rmSync(scriptFile(), { force: true }); } catch {}
+        unload();
         return { ok: true, display: null };
     }
 
-    const displays = listDisplays();
-    const target = displays.find(d => d.index === index);
+    const target = listDisplays().find(d => d.index === index);
     if (!target) return { ok: false, error: 'That screen is no longer connected.' };
 
-    for (const [k, v] of [
-        ['Description', `${RULE_DESC} (${target.name})`],
-        ['wmclass', WM_CLASS],
-        ['wmclasscomplete', 'false'],
-        ['wmclassmatch', '2'],              // 2 = substring
-        ['screen', String(index)],
-        ['screenrule', '3'],                // 3 = Force
-    ]) kwriteconfig(['--group', RULE_ID, '--key', k, v]);
+    try {
+        fs.mkdirSync(configDir(), { recursive: true });
+        fs.writeFileSync(choiceFile(), JSON.stringify({ name: target.name }, null, 2), 'utf8');
+    } catch (e) { return { ok: false, error: e.message }; }
 
-    setRuleListed(true);
-    const applied = reconfigure();
-    return { ok: true, display: target, applied };
+    return apply();
 }
 
-module.exports = { isSupported, listDisplays, currentDisplay, setGameDisplay, RULE_ID };
+module.exports = { isSupported, listDisplays, currentDisplay, setGameDisplay, apply, PLUGIN };
