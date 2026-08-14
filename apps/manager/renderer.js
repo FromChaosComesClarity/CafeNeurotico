@@ -1391,7 +1391,7 @@ window.addEventListener('focus', () => {
 });
 let currentLaunchCmd = '';
 let activeFilters = new Set(); // empty = ALL GAMES
-const STORE_FILTERS     = new Set(['steam','gog','epic','flatpak','pico8','itch','physical','emulation','apps','others']);
+const STORE_FILTERS     = new Set(['steam','gog','epic','flatpak','pico8','itch','physical','emulation','apps','others','openbor']);
 const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable']);
 
 // ── Genres ───────────────────────────────────────────────────────────────────
@@ -3835,6 +3835,7 @@ const CMD_STORE_DEFS = [
     { key: 'apps',      label: 'Apps' },
     { key: 'others',    label: 'Others' },
     { key: 'pico8',     label: 'PICO-8' },
+    { key: 'openbor',   label: 'OpenBOR' },
 ];
 function _cmdStoreMatch(key, game) {
     const s = (game.Store || '').toLowerCase();
@@ -3848,6 +3849,7 @@ function _cmdStoreMatch(key, game) {
         case 'itch':      return s.includes('itch') || (game.LaunchCommand || '').startsWith('itch://');
         case 'apps':      return s.includes('apps');
         case 'others':    return s.includes('others');
+        case 'openbor':   return s.includes('openbor');
         case 'emulation': return s.includes('emulation');
     }
     return false;
@@ -4328,6 +4330,7 @@ function applyFilters() {
                 if (f === 'itch')      return storeLower.includes('itch') || (game.LaunchCommand || '').startsWith('itch://');
                 if (f === 'apps')      return storeLower.includes('apps');
                 if (f === 'others')    return storeLower.includes('others');
+                if (f === 'openbor')   return storeLower.includes('openbor');
                 if (f === 'emulation') return storeLower.includes('emulation');
                 return false;
             });
@@ -5131,6 +5134,7 @@ function getStoreLogo(store) {
     if (s.includes('physical')) return 'assets/logos/physical.png';
     if (s.includes('emulat'))   return 'assets/logos/emulation.png';
     if (s.includes('app'))      return 'assets/logos/apps.png';
+    if (s.includes('openbor'))  return 'assets/logos/openbor.png';
     if (s.includes('other'))    return 'assets/logos/others.png';
     return null;
 }
@@ -5348,7 +5352,7 @@ const _macFilterLabels = {
     all:'All Games', installed:'Installed', favs:'Favs', want:'Want',
     steam:'Steam', epic:'Epic', gog:'GOG', flatpak:'Flatpak',
     pico8:'PICO-8', itch:'itch.io', physical:'Physical',
-    others:'Others', emulation:'Emulation', apps:'Apps'
+    others:'Others', emulation:'Emulation', apps:'Apps', openbor:'OpenBOR'
 };
 
 function _applyMacFilter(src) {
@@ -5365,6 +5369,7 @@ function _applyMacFilter(src) {
         case 'itch':       return src.filter(g => s(g).includes('itch') || (g.LaunchCommand||'').startsWith('itch://'));
         case 'physical':   return src.filter(g => s(g).includes('physical'));
         case 'others':     return src.filter(g => s(g).includes('others'));
+        case 'openbor':    return src.filter(g => s(g).includes('openbor'));
         case 'emulation':  return src.filter(g => s(g).includes('emulation'));
         case 'apps':       return src.filter(g => s(g).includes('apps'));
         default:           return src;
@@ -5821,7 +5826,8 @@ let _xpIdx    = -1;
 const _xpFilterLabels = {
     all:'All Games', installed:'Installed', favs:'Favorites', want:'Want to Play',
     steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak',
-    pico8:'PICO-8', itch:'itch.io', physical:'Physical', others:'Others', emulation:'Emulation'
+    pico8:'PICO-8', itch:'itch.io', physical:'Physical', others:'Others', emulation:'Emulation',
+    openbor:'OpenBOR'
 };
 
 function _xpGetGames() {
@@ -5840,6 +5846,7 @@ function _xpGetGames() {
         case 'itch':      src = src.filter(g => s(g).includes('itch') || (g.LaunchCommand||'').startsWith('itch://')); break;
         case 'physical':  src = src.filter(g => s(g).includes('physical')); break;
         case 'others':    src = src.filter(g => s(g).includes('others')); break;
+        case 'openbor':   src = src.filter(g => s(g).includes('openbor')); break;
         case 'emulation': src = src.filter(g => s(g).includes('emulation')); break;
     }
     return src;
@@ -6155,6 +6162,7 @@ function _kdeGetGames() {
         case 'physical':  src = src.filter(g => s(g).includes('physical')); break;
         case 'emulation': src = src.filter(g => s(g).includes('emulation')); break;
         case 'others':    src = src.filter(g => s(g).includes('others')); break;
+        case 'openbor':   src = src.filter(g => s(g).includes('openbor')); break;
     }
     return src;
 }
@@ -6196,7 +6204,7 @@ function renderKDE() {
     list.innerHTML = '';
     list.appendChild(frag);
 
-    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', physical:'Physical', emulation:'Emulation', others:'Others' };
+    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', physical:'Physical', emulation:'Emulation', others:'Others', openbor:'OpenBOR' };
     document.getElementById('kde-status-count').textContent = games.length + ' item' + (games.length !== 1 ? 's' : '');
     const sel = games[_kdeIdx];
     document.getElementById('kde-status-sel').textContent = sel ? sel.Game : 'Nothing selected';
@@ -6407,6 +6415,7 @@ function _c64GetGames() {
         if (f === 'pico8')     return store.includes('pico');
         if (f === 'itch')      return store.includes('itch');
         if (f === 'others')    return store.includes('others') || store.includes('grinder');
+        if (f === 'openbor')   return store.includes('openbor');
         return true;
     });
     if (_c64PlaylistGames) return base.filter(g => _c64PlaylistGames.has(g.id));
@@ -6586,6 +6595,7 @@ function _nxGetGames() {
         if (f === 'pico8')     return store.includes('pico');
         if (f === 'itch')      return store.includes('itch');
         if (f === 'others')    return store.includes('others') || store.includes('grinder');
+        if (f === 'openbor')   return store.includes('openbor');
         return true;
     });
     if (_nxPlaylistGames) return base.filter(g => _nxPlaylistGames.has(g.id));
@@ -6791,6 +6801,7 @@ function _w95GetGames() {
         if (f === 'pico8')     return store.includes('pico');
         if (f === 'itch')      return store.includes('itch');
         if (f === 'others')    return store.includes('others') || store.includes('grinder');
+        if (f === 'openbor')   return store.includes('openbor');
         return true;
     });
     if (_w95PlaylistGames) return base.filter(g => _w95PlaylistGames.has(g.id));
@@ -6818,7 +6829,7 @@ function renderW95() {
         row.addEventListener('dblclick', () => openW95Gamepage(g));
         list.appendChild(row);
     });
-    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others' };
+    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others', openbor:'OpenBOR' };
     const sel = games[_w95Idx];
     document.getElementById('w95-status-count').textContent = `${games.length} object(s)`;
     document.getElementById('w95-status-sel').textContent   = sel ? sel.Game : '';
@@ -7007,6 +7018,7 @@ function _beosGetGames() {
         if (f === 'pico8')     return store.includes('pico');
         if (f === 'itch')      return store.includes('itch');
         if (f === 'others')    return store.includes('others') || store.includes('grinder');
+        if (f === 'openbor')   return store.includes('openbor');
         return true;
     });
     if (_beosPlaylistGames) return base.filter(g => _beosPlaylistGames.has(g.id));
@@ -7034,7 +7046,7 @@ function renderBeos() {
         row.addEventListener('dblclick', () => openBeosGamepage(g));
         list.appendChild(row);
     });
-    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others' };
+    const labels = { all:'All Games', installed:'Installed', favs:'Favourites', want:'Want to Play', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others', openbor:'OpenBOR' };
     const sel = games[_beosIdx];
     document.getElementById('beos-status-count').textContent = `${games.length} item${games.length !== 1 ? 's' : ''}`;
     document.getElementById('beos-status-sel').textContent   = sel ? sel.Game : '';
@@ -7199,6 +7211,7 @@ function _amigaGetGames() {
         if (f === 'pico8')     return store.includes('pico');
         if (f === 'itch')      return store.includes('itch');
         if (f === 'others')    return store.includes('others') || store.includes('grinder');
+        if (f === 'openbor')   return store.includes('openbor');
         return true;
     });
     if (_amigaPlaylistGames) return base.filter(g => _amigaPlaylistGames.has(g.id));
@@ -7229,7 +7242,7 @@ function renderAmiga() {
     const sel = games[_amigaIdx];
     document.getElementById('amiga-status-count').textContent = `${games.length} objects`;
     document.getElementById('amiga-status-sel').textContent   = sel ? sel.Game : '';
-    const label = { all:'All Games', installed:'Installed', favs:'Favourites', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others' };
+    const label = { all:'All Games', installed:'Installed', favs:'Favourites', steam:'Steam', gog:'GOG', epic:'Epic', flatpak:'Flatpak', pico8:'PICO-8', itch:'itch.io', others:'Others', openbor:'OpenBOR' };
     document.getElementById('amiga-wintitle').textContent = `Game Library : ${label[_amigaFilter] || _amigaFilter}`;
 }
 
@@ -10500,6 +10513,7 @@ const CP_KEYWORDS = {
     'physical': 'physical', 'others': 'others', 'custom': 'others',
     'emulation': 'emulation', 'emulated': 'emulation', 'retro': 'emulation',
     'apps': 'apps',
+    'openbor': 'openbor', 'bor': 'openbor', 'beat em up': 'openbor',
 };
 
 // ── TOP NAV BAR WIRING ────────────────────────────────────────────────────
@@ -11277,6 +11291,7 @@ function updateHeroMosaic(filtered) {
         'physical': { text: t('filter.physical'), icon: 'physical' },
         'others': { text: t('filter.others'), icon: 'others' }, 'emulation': { text: t('filter.emulation'), icon: 'emulation' },
         'apps': { text: t('filter.apps'), icon: 'apps' },
+        'openbor': { text: 'OPENBOR', icon: 'openbor' },
         'installed': { text: 'INSTALLED', icon: 'installed' }
     };
     const active = [...activeFilters];

@@ -83,10 +83,33 @@ function listDisplays() {
 
 // ── Where the choice lives ───────────────────────────────────────────────────
 // Beside our own settings, not in KDE's: this is a Cafe Neurotico preference that happens
-// to be enacted through KWin.
-const configDir = () => path.join(os.homedir(), 'GameManagerConfig');
+// to be enacted through KWin. The app's settings folder travels with the AppImage rather
+// than living in $HOME, so the host must say where it is — guessing would strand the
+// setting behind when someone moves their library to another machine.
+let _configDir = path.join(os.homedir(), 'GameManagerConfig');
+function configure(dir) { if (dir) _configDir = dir; migrateLegacyChoice(); }
+
+const configDir = () => _configDir;
 const choiceFile = () => path.join(configDir(), 'game-display.json');
 const scriptFile = () => path.join(configDir(), 'kwin-game-display.js');
+
+// The first build of this feature wrote to ~/GameManagerConfig whatever the app's real
+// settings folder was. Move that choice rather than silently reverting to Default.
+function migrateLegacyChoice() {
+    const legacyDir = path.join(os.homedir(), 'GameManagerConfig');
+    if (path.resolve(legacyDir) === path.resolve(_configDir)) return;
+    const legacy = path.join(legacyDir, 'game-display.json');
+    try {
+        if (!fs.existsSync(legacy)) return;
+        if (!fs.existsSync(choiceFile())) {
+            fs.mkdirSync(configDir(), { recursive: true });
+            fs.copyFileSync(legacy, choiceFile());
+        }
+        fs.rmSync(legacy, { force: true });
+        fs.rmSync(path.join(legacyDir, 'kwin-game-display.js'), { force: true });
+        fs.rmdirSync(legacyDir);   // only succeeds if we were the only thing in it
+    } catch {}
+}
 
 function readChoice() {
     try { return JSON.parse(fs.readFileSync(choiceFile(), 'utf8')); } catch { return null; }
@@ -222,4 +245,4 @@ function setGameDisplay(index) {
     return apply();
 }
 
-module.exports = { isSupported, listDisplays, currentDisplay, setGameDisplay, apply, PLUGIN };
+module.exports = { configure, isSupported, listDisplays, currentDisplay, setGameDisplay, apply, PLUGIN };

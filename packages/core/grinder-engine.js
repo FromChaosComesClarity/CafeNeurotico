@@ -712,7 +712,13 @@ function prefixPathForGame(game, opts = {}) {
 //
 // Deliberately a short list of *wrappers*. d3d9, dxgi and d3d11 are excluded on purpose:
 // a game shipping one of those is usually shipping something DXVK does better.
-const SHIPPED_WRAPPERS = ['opengl32.dll', 'ddraw.dll', 'dsound.dll', 'dinput.dll'];
+//
+// dinput8 earns its place for a third reason: it is what almost every modern ASI loader
+// installs itself as, so a game folder containing one is nearly always a game someone has
+// patched. OutRun2006Tweaks is the case in hand, and its own documentation tells Linux
+// players to set exactly this override by hand — which is a thing a library ought to do
+// for them.
+const SHIPPED_WRAPPERS = ['opengl32.dll', 'ddraw.dll', 'dsound.dll', 'dinput.dll', 'dinput8.dll'];
 
 function findShippedWrappers(resolvedExe, installPath) {
     const dirs = [resolvedExe && path.dirname(resolvedExe), installPath].filter(Boolean);
@@ -937,6 +943,31 @@ async function launchGame(gameId, opts = {}) {
             console.log(`[launch] using the ${add.map(a => a.split('=')[0]).join(', ')} shipped with this game rather than Wine's`);
         }
     }
+
+    // Fixes for one named game rather than a class of them. Settings are written once and
+    // then respected; the environment is applied every launch. Both are no-ops for a game
+    // with no entry, which is nearly all of them. See packages/core/game-fixes.js.
+    try {
+        const named = gameFixes.fixFor(resolvedExe);
+        if (named) {
+            const { applied } = gameFixes.applySettings(resolvedExe, installPath);
+            for (const line of applied) console.log(`[launch] ${named.title}: set ${line}`);
+            // Never over the user's own custom_env — someone who set a variable by hand
+            // has already overruled us on purpose.
+            for (const [k, v] of Object.entries(named.env || {})) {
+                if (k === 'WINEDLLOVERRIDES') {
+                    const have = `${customEnv.WINEDLLOVERRIDES || ''};${compatEnv.WINEDLLOVERRIDES || ''}`;
+                    const missing = v.split(';').filter(e => !new RegExp(`\\b${e.split('=')[0]}\\b`, 'i').test(have));
+                    if (missing.length) {
+                        const base = (compatEnv.WINEDLLOVERRIDES || '').trim().replace(/;$/, '');
+                        compatEnv.WINEDLLOVERRIDES = base ? `${base};${missing.join(';')}` : missing.join(';');
+                    }
+                } else if (!(k in customEnv)) {
+                    compatEnv[k] = v;
+                }
+            }
+        }
+    } catch (e) { console.log(`[launch] per-game fix skipped: ${e.message}`); }
 
     // Base env: system → custom user vars → compat flags → GRINDER's required vars (highest
     // priority). Every spawn below builds its environment from this.

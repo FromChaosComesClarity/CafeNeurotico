@@ -365,6 +365,10 @@ app.whenReady().then(() => {
         try { db.prepare("UPDATE games SET SteamAppID = substr(SteamAppID, 1, length(SteamAppID) - 2) WHERE SteamAppID LIKE '%.0'").run(); } catch(e) {}
         // A blank Store leaves a game uncategorizable; file it under "Others" (same bucket GRINDER games use).
         try { db.prepare("UPDATE games SET Store = 'Others' WHERE Store IS NULL OR TRIM(Store) = ''").run(); } catch(e) {}
+        // One-time migration: OpenBOR games were filed as "OpenBOR, Others" while the gallery
+        // had no filter of their own and the tag alone would have hidden them from every view.
+        // It has one now, so the crutch comes off and they stop appearing under Others too.
+        try { db.prepare("UPDATE games SET Store = 'OpenBOR' WHERE Store = 'OpenBOR, Others'").run(); } catch(e) {}
         try {
             db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_store_others
                 AFTER INSERT ON games
@@ -864,9 +868,13 @@ const customInstallers = require('../../packages/core/custom-installers.js');
 // inside the game, and why it is one script for all games rather than one per game.
 const kwinDisplay = require('../../packages/core/kwin-display.js');
 
+// The choice belongs with the rest of our settings, which travel with the AppImage.
 // A loaded KWin script is gone after a logout, so the stored choice is put back into
 // effect on every start. Nothing to do — and nothing written — if there is no choice.
-try { if (kwinDisplay.isSupported()) kwinDisplay.apply(); } catch {}
+try {
+    kwinDisplay.configure(configDir);
+    if (kwinDisplay.isSupported()) kwinDisplay.apply();
+} catch {}
 
 ipcMain.handle('display-options', () => {
     if (!kwinDisplay.isSupported()) return { supported: false, displays: [], current: null };
@@ -934,11 +942,12 @@ function _registerCustomInstall(r) {
     if (existing) db.prepare('UPDATE games SET Installed=1, LaunchCommand=? WHERE id=?').run(cmd, existing.id);
     // OpenBOR is its own category rather than a member of Others — one engine with one
     // rigid layout, the same argument that earned PICO-8 its own place in the library.
-    // 'Others' is appended so the existing store filters, which are literal substring
-    // matches, still find it until the dedicated category lands in the gallery.
+    // It stands alone now that the gallery has a filter for it: a game filed under both
+    // would be counted twice and turn up under Others, which is where it was never meant
+    // to be. Anything without a category of its own still lands in Others.
     else db.prepare(`INSERT INTO games (Game, Store, LaunchCommand, GrinderGameId, Installed, FAV, WANT_TO_PLAY)
                      VALUES (?,?,?,?,1,'NO','NO')`)
-            .run(r.title, r.category ? `${r.category}, Others` : 'Others', cmd, gid);
+            .run(r.title, r.category || 'Others', cmd, gid);
     return gid;
 }
 

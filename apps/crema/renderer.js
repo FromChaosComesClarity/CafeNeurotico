@@ -108,7 +108,7 @@ let igdbSearchResults = []; let selectedIgdbId = null;
 // game playlists + a "RECENTLY IMPORTED" auto-category are appended at runtime by
 // rebuildCategories(). It's mutated IN PLACE (never reassigned) so the many
 // closures that captured this reference keep seeing updates.
-const categories = ["ALL GAMES", "INSTALLED", "STEAM", "GOG", "EPIC", "FLATPAK", "ITCH", "PICO-8", "OTHERS", "PHYSICAL", "EMULATION", "APPS", "WANT TO PLAY", "FAVS", "BACKLOG", "PLAYED"];
+const categories = ["ALL GAMES", "INSTALLED", "STEAM", "GOG", "EPIC", "FLATPAK", "ITCH", "PICO-8", "OPENBOR", "OTHERS", "PHYSICAL", "EMULATION", "APPS", "WANT TO PLAY", "FAVS", "BACKLOG", "PLAYED"];
 const BASE_CATEGORIES = [...categories];
 const RECENTLY_IMPORTED_CAT = "RECENTLY IMPORTED";
 const RECENTLY_IMPORTED_LIMIT = 50;
@@ -318,7 +318,7 @@ function convertSafePath(rawPath) {
 let usingKeyboard = false;
 function getBtn(icon) { const iconPath = convertSafePath('assets/gamepad_icons/' + icon + '.png'); return `<span class="gp-btn-masked" style="-webkit-mask-image: url('${iconPath}');"></span>`; }
 function getKey(label) { return `<span class="kb-key">${label}</span>`; }
-const KNOWN_LOGOS = new Set(['all_games','amazon','apps','emulation','epic','favs','flatpak','gog','installed','itch','others','physical','pico8','playable','steam','want_to_play']);
+const KNOWN_LOGOS = new Set(['all_games','amazon','apps','emulation','epic','favs','flatpak','gog','installed','itch','openbor','others','physical','pico8','playable','steam','want_to_play']);
 function logoPath(name) { let safe = String(name).toLowerCase().replace(/ /g, '_'); if (safe === 'pico-8') safe = 'pico8'; const file = KNOWN_LOGOS.has(safe) ? safe : 'playable'; return convertSafePath(`assets/logos/${file}.png`); }
 
 // ── GAME PLAYLISTS ────────────────────────────────────────────────────────────
@@ -1790,7 +1790,7 @@ function applyLiveFilters(preserveIndex = false) {
 
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
-    if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
+    if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OPENBOR") matchCat = store.includes("openbor"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
     if (!matchCat) return false; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
@@ -2585,7 +2585,7 @@ function updateDownloadProgressBar(percentage) { const fillEl = document.getElem
 function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OPENBOR") return s.includes("openbor"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -3418,6 +3418,7 @@ function getGalleryStoreLogo(store) {
   if (s.includes('physical')) return 'assets/logos/physical.png';
   if (s.includes('emulat'))   return 'assets/logos/emulation.png';
   if (s.includes('app'))      return 'assets/logos/apps.png';
+  if (s.includes('openbor'))  return 'assets/logos/openbor.png';
   if (s.includes('other'))    return 'assets/logos/others.png';
   return null;
 }
@@ -3435,7 +3436,7 @@ function matchCatForGallery(g, catName) {
   if (catName === "PHYSICAL") return store.includes("physical");
   if (catName === "EMULATION") return store.includes("emulation");
   if (catName === "APPS") return store.includes("apps");
-  if (catName === "OTHERS") return store.includes("others");
+  if (catName === "OPENBOR") return store.includes("openbor"); if (catName === "OTHERS") return store.includes("others");
   if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; }
   if (catName === "FAVS") return g.FAV === 'YES';
   if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES';
