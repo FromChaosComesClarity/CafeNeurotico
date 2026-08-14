@@ -925,7 +925,12 @@ async function launchGame(gameId, opts = {}) {
         const add = wrappers
             .map(w => w.replace(/\.dll$/, ''))
             .filter(n => !new RegExp(`\\b${n}\\b`, 'i').test(already))
-            .map(n => `${n}=n`);
+            // "n,b" — native first, builtin as fallback — not bare "n". These DLLs are
+            // wrappers: Classic REbirth's ddraw forwards the calls it does not implement on
+            // to the real one, and with only "native" allowed there is nothing to forward
+            // to, so the game called through a null pointer and crashed at address zero.
+            // Verified: bare n crashes in ~5s, n,b runs.
+            .map(n => `${n}=n,b`);
         if (add.length) {
             const existing = already.trim().replace(/;$/, '');
             compatEnv.WINEDLLOVERRIDES = existing ? `${existing};${add.join(';')}` : add.join(';');
