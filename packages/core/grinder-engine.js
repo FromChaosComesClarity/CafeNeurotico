@@ -938,6 +938,10 @@ async function launchGame(gameId, opts = {}) {
         }
     }
 
+    // Base env: system → custom user vars → compat flags → GRINDER's required vars (highest
+    // priority). Every spawn below builds its environment from this.
+    const baseEnv = (extra = {}) => ({ ...process.env, ...customEnv, ...compatEnv, ...extra });
+
     // Launch Comet sidecar for GOG games (enables achievement unlocking via Galaxy SDK proxy)
     let cometProc = null;
     if (game.store === 'gog') {
