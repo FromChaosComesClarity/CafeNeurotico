@@ -152,6 +152,7 @@
 
             <div class="nav-group-label">Engine &amp; Data</div>
             <button class="manual-nav-btn" data-target="man-19">19. GRINDER</button>
+            <button class="manual-nav-btn" data-target="man-19b">19b. Fan Games &amp; Ports</button>
             <button class="manual-nav-btn" data-target="man-20">20. Save Games</button>
             <button class="manual-nav-btn" data-target="man-21">21. Your Data &amp; Backups</button>
             <button class="manual-nav-btn" data-target="man-22">22. Tips &amp; Troubleshooting</button>
@@ -523,6 +524,21 @@
             </ul>
             <div class="warn-box"><p><strong>GOG DLC is installed as a set.</strong> GOG&rsquo;s downloader cannot safely add one DLC on its own &mdash; asking it to will delete the base game. So the DLC panel always reinstalls the game together with all the DLC you own, which is slower but never destroys anything.</p></div>
             <p>GRINDER&rsquo;s data lives in <code>~/.config/grinder/</code> &mdash; logins and install records are per-machine, which is why a fresh copy of the suite still knows your GOG library on the same computer.</p>
+
+            <!-- ====== SECTION 19b ====== -->
+            <h2 id="man-19b">19b. Fan Games, Source Ports &amp; Mods</h2>
+            <p>Control Panel &rarr; <strong>Fan Games &amp; Source Ports</strong>. A catalogue of things the suite knows how to install from a file you already downloaded &mdash; source ports, custom engines, standalone fan games, mods, and OpenBOR titles. Each entry says where to get the download and what the file is called, because that is the step that actually stops people.</p>
+            <p><strong>You bring the port; the suite finds the game data.</strong> A source port without its game data is not a game, and you very likely already own the data in the library the suite is already managing. Install Ironwail and it links Quake&rsquo;s <code>pak</code> files out of your GOG copy; install GZDoom and every Doom IWAD you own turns up beside it. Nothing is copied &mdash; the data stays in one place. If you own it but have not installed it, the entry says so by name; if the files never came from a store at all (arcade ROMs, a folder off an old disc), it asks you to point at them, and copies those, because a folder of yours may be moved or tidied away.</p>
+            <h3>Games, not engines</h3>
+            <p>Nobody sets out to install GZDoom &mdash; they set out to play Brutal Doom. So mods and Build-engine games are entries in their own right: choosing one installs the engine too if you have not got it, and appears in your library under the game&rsquo;s own name. Blood, Duke Nukem 3D, Shadow Warrior, PowerSlave, Redneck Rampage and both Witchavens are separate entries, listed whether or not you own them, because the catalogue&rsquo;s job is to say what is possible.</p>
+            <h3>Choices happen when you press Play</h3>
+            <ul>
+                <li><strong>Which Doom?</strong> &mdash; a mod runs on whichever Doom you feel like tonight, so the choice is made at launch, not baked in at install. It opens on whatever you picked last.</li>
+                <li><strong>Which engine?</strong> &mdash; where two engines can both run a game, both are installed beside it and you pick as you start.</li>
+            </ul>
+            <h3>Anything not in the catalogue</h3>
+            <p><em>A game folder you already have</em> registers any folder holding a Windows game, where it sits &mdash; nothing copied or moved, so a folder on another drive stays there. It looks three levels deep, puts the likely entry point first and lets you name it. That is the right answer for anything self-contained: a fan game that ships its own engine, or a setup you assembled yourself. <em>Any Quake mod or episode</em> and <em>Any Doom mod or texture pack</em> do the same for mods, taking any archive and letting you choose what loads.</p>
+            <div class="tip-box"><p><strong>Games that ship their own patch DLL just work.</strong> Many older Windows games come with a community fix in a file like <code>ddraw.dll</code> or <code>opengl32.dll</code>. On Windows the game&rsquo;s own copy wins; Wine normally overrides it, so the patch never runs and the game stops dead or starts untranslated. The suite spots those and hands the game its own, with Wine&rsquo;s behind it as a fallback. Nothing to configure.</p></div>
 
             <!-- ====== SECTION 20 ====== -->
             <h2 id="man-20">20. Save Games &mdash; Backup &amp; Restore</h2>

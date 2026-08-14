@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.5.1-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.6.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
@@ -90,6 +90,16 @@ All three read and write the **same database**. Favourite a game on the couch, i
 **The manual, where the game keeps it.** Plenty of games — RPGs above all — still expect you to read something, and the file is usually already on your disk without anyone telling you. A book button on the gamepage finds it: GOG names its own documents, so Realms of Arkania offers you *Manual*, *Cluebook* and *Password reference card* rather than three filenames. For GOG games it can also fetch the scanned originals from the store. A game can hold as many as it needs, read in a window you can drag to a second monitor and keep open while you play.
 
 **DOS games that actually start.** GOG's DOS titles ship a Windows DOSBox and a config that only works from the right folder — get either wrong and the window opens and closes. Both are handled, including the configs GOG's installer copies and `gogdl` never did. Optionally hand the job to a native DOSBox instead: it reads the very same GOG config, so every tweak made for that game survives and only the emulator changes.
+
+**Fan games, source ports and mods — installed properly.** A catalogue of things the suite knows how to set up from a file you already downloaded: Ironwail, vkQuake, GZDoom, ECWolf, Raze, BuildGDX, CannonBall, OpenBOR titles, Mini Doom, SWOS 2020, Brutal Doom. Each entry says exactly where to get the download and what the file is called — that being the step that actually stops people. **You bring the port; the suite finds the game data.** A source port without its data is not a game, and you very likely already own the data in the library the suite is already managing: install Ironwail and Quake's paks are linked out of your GOG copy, install GZDoom and every Doom IWAD you own turns up beside it. Own it but not installed? It says so by name. Never sold in a form a library can hold — arcade ROMs, files off an old disc — and it asks you to point at them.
+
+**Games, not engines.** Nobody sets out to install GZDoom; they set out to play Brutal Doom. So mods and Build games are entries in their own right — Blood, Duke Nukem 3D, Shadow Warrior, PowerSlave, Redneck Rampage, both Witchavens — each installing its engine if needed and appearing under its own name. The choices that vary by mood happen when you press Play: *which Doom* a mod runs on, and *which engine* runs a game two of them support. Anything not in the catalogue is still one click: point at a folder and it joins your library where it sits, or hand *Any Quake mod* / *Any Doom mod* an archive and pick what loads.
+
+**Old Windows games that ship their own fix.** Plenty of nineties titles come with a community patch in a file like `ddraw.dll` or `opengl32.dll` — a translation, a renderer, a timing fix. On Windows the game's own copy wins; Wine normally overrides it, so the patch never runs and the game either dies on startup or comes up in the wrong language. The suite hands the game its own, with Wine's behind it as a fallback. Nothing to configure, and it applies to every game that does this.
+
+**Pick which version starts.** A GOG release often ships several ways to launch and the store never shows you: Quake: The Offering has seven, and only one of them plays the CD soundtrack. The gamepage lets you choose, and remembers.
+
+**Can't decide?** *Pick a Random Game* draws from whatever the gallery is currently showing — so set the filters to GOG, strategy, not-installed and it becomes "pick me something off the pile I keep meaning to start". It avoids repeating its last ten picks.
 
 **A dashboard if you want one.** An optional drag-and-drop widget board: roulette, backlog weight, throwback, achievement completion, disk footprint, and strictly opt-in online widgets (deals, Epic freebies, RSS gaming news, Steam patch notes) that make **zero network calls until you enable them**.
 
