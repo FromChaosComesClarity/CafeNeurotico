@@ -119,6 +119,50 @@ function openSteamMenu(anchorBtn, appId) {
     setTimeout(() => document.addEventListener('click', _steamMenuOutside, true), 0);
 }
 
+// ── Which screen games open on ───────────────────────────────────────────────
+// KDE only, and the card stays hidden everywhere else rather than showing a setting that
+// cannot work. Nothing inside a game decides which monitor it lands on under Wayland —
+// the compositor does — so this is a KWin rule, applied live without a logout.
+async function initDisplayPicker() {
+    const card = document.getElementById('display-card');
+    const sel = document.getElementById('display-select');
+    if (!card || !sel) return;
+
+    let opts = null;
+    try { opts = await window.api.displayOptions(); } catch (e) {}
+    if (!opts || !opts.supported || opts.displays.length < 2) return;   // one screen: no choice to make
+
+    card.style.display = '';
+    sel.innerHTML = '<option value="">Default &mdash; let KDE decide</option>';
+    for (const d of opts.displays) {
+        const o = document.createElement('option');
+        o.value = String(d.index);
+        // The connector name alone means nothing to most people; the size is what makes a
+        // monitor recognisable.
+        o.textContent = `${d.name}${d.mode ? ` — ${d.mode}${d.hz ? `@${d.hz}Hz` : ''}` : ''}${d.primary ? ' (primary)' : ''}`;
+        if (opts.current === d.index) o.selected = true;
+        sel.appendChild(o);
+    }
+
+    const status = document.getElementById('display-status');
+    sel.onchange = async () => {
+        const v = sel.value === '' ? null : Number(sel.value);
+        status.style.color = 'var(--text_dim)';
+        status.textContent = 'Applying…';
+        const res = await window.api.setGameDisplay(v);
+        if (!res || !res.ok) {
+            status.style.color = '#ef5350';
+            status.textContent = (res && res.error) || 'Could not change it.';
+            return;
+        }
+        status.style.color = '#66bb6a';
+        status.textContent = res.display
+            ? `Games will open on ${res.display.name}. Takes effect on the next game you start.`
+            : 'Back to KDE deciding.';
+    };
+}
+initDisplayPicker();
+
 // ── Fan games & source ports ─────────────────────────────────────────────────
 // The catalogue of things installable from a file the user already downloaded. Each entry
 // states where to get the download and what it is called, because "go find a source port"

@@ -859,6 +859,21 @@ ipcMain.handle('set-launch-target', (_, grinderGameId, relPath, taskIndex) => {
 // specific recipes rather than one generic folder importer.
 const customInstallers = require('../../packages/core/custom-installers.js');
 
+// ── Which screen games open on (KDE only) ────────────────────────────────────
+// See packages/core/kwin-display.js for why this is a KWin rule rather than anything
+// inside the game, and why it is one rule for all games rather than one per game.
+const kwinDisplay = require('../../packages/core/kwin-display.js');
+
+ipcMain.handle('display-options', () => {
+    if (!kwinDisplay.isSupported()) return { supported: false, displays: [], current: null };
+    return { supported: true, displays: kwinDisplay.listDisplays(), current: kwinDisplay.currentDisplay() };
+});
+
+ipcMain.handle('set-game-display', (_, index) => {
+    try { return kwinDisplay.setGameDisplay(index === null ? null : Number(index)); }
+    catch (e) { return { ok: false, error: e.message }; }
+});
+
 // Paths other games already occupy. Custom installs share a folder with GOG and Epic
 // installs and the names collide — <root>/Witchaven is where GOG puts Witchaven and where
 // a recipe called Witchaven wants to go — so a target that lands on one must be renamed,

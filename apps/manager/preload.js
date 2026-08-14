@@ -178,6 +178,8 @@ contextBridge.exposeInMainWorld('api', {
                                 customRecipeList: () => ipcRenderer.invoke('custom-recipe-list'),
                                 customInstallPick:(recipeId) => ipcRenderer.invoke('custom-install-pick', recipeId),
                                 customInstall:    (payload) => ipcRenderer.invoke('custom-install', payload),
+                                displayOptions:  () => ipcRenderer.invoke('display-options'),
+                                setGameDisplay:  (i) => ipcRenderer.invoke('set-game-display', i),
                                 customFolderPick: (title) => ipcRenderer.invoke('custom-folder-pick', title),
                                 customFolderScan: (folder) => ipcRenderer.invoke('custom-folder-scan', folder),
                                 customFolderAdd:  (payload) => ipcRenderer.invoke('custom-folder-add', payload),
