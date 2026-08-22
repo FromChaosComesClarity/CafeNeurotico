@@ -47,21 +47,46 @@ const SOURCES = {
         url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v2/cafeneurotico-binaries-v2.tar.gz',
         sha256: '876eecaeda3228ee24288c1fae0b87b8f2ed9b1775b1ce48c2d5ad47cc93b3bf',
     },
-    // Not published yet — see docs/mac-port-phase-a.md. Until it exists, `npm install` on a
-    // Mac warns rather than failing, so the repo can be set up before the tarball is built.
-    darwin: null,
+    darwin: {
+        url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-mac-v1/cafeneurotico-binaries-mac-v1.tar.gz',
+        sha256: '8262dfb4f09d2a650ed422c5724f78d09d1eca0a017bbb07052d9c69a0476e1e',
+        // Deliberately short of the full set. gogdl is our patched fork build and PyInstaller
+        // cannot cross-compile, so the macOS one has to be built on a Mac. Shipping upstream's
+        // instead is NOT a stopgap: 1.3.0 picked up our CDN rotation but still verifies the
+        // chunk checksum outside the retry loop, still blocks on the telemetry queue, and
+        // still recurses without a limit in get_secure_link while dropping `root`. That is
+        // three known download-hanging bugs. See docs/mac-port-phase-a.md.
+        provides: ['ffmpeg', 'ffprobe', 'yt-dlp', 'legendary', 'comet'],
+        missing: {
+            gogdl: 'build it from the fork at ~/Documents/DEVELOPMENT/CLAUDE/gogdl_fork on the Mac:\n' +
+                   '    python3 -m PyInstaller --onefile --name gogdl grinder_entry.py --clean --noconfirm\n' +
+                   '  then drop the result in assets/bin/darwin-arm64/ and publish binaries-mac-v2.',
+        },
+    },
 };
 
-const allPresent = () => REQUIRED.every(name => existsSync(join(BIN_DIR, name)));
+// What a given tarball is expected to deliver. A source may deliberately provide less than
+// the full set (see darwin), in which case the shortfall is reported every run rather than
+// being retried as a failed download for ever.
+const expectedOf  = source => source?.provides || REQUIRED;
+const presentIn   = names => names.every(name => existsSync(join(BIN_DIR, name)));
+const reportGaps  = source => {
+    for (const [name, how] of Object.entries(source?.missing || {})) {
+        if (existsSync(join(BIN_DIR, name))) continue;
+        console.warn(`\n⚠ ${name} is not in this tarball — ${how}\n`);
+    }
+};
 const sha256 = file => createHash('sha256').update(readFileSync(file)).digest('hex');
 
 function main() {
-    if (allPresent()) {
+    const source = SOURCES[host.id];
+
+    if (source && presentIn(expectedOf(source))) {
         console.log(`• helper binaries already present (${host.binDirName}) — skipping fetch`);
+        reportGaps(source);
         return;
     }
 
-    const source = SOURCES[host.id];
     if (!source) {
         console.warn(
             `\n⚠ No helper-binary tarball published for "${host.id}" yet.\n` +
@@ -89,14 +114,18 @@ function main() {
     }
 
     execFileSync('tar', ['-xzf', tmp, '-C', BIN_DIR], { stdio: 'inherit' });
-    execFileSync('chmod', ['+x', ...REQUIRED.map(n => join(BIN_DIR, n))]);
+    // Only what this tarball actually delivered — chmod on an absent name would abort here.
+    const landed = expectedOf(source).filter(n => existsSync(join(BIN_DIR, n)));
+    if (landed.length) execFileSync('chmod', ['+x', ...landed.map(n => join(BIN_DIR, n))]);
     rmSync(tmp, { force: true });
 
-    if (!allPresent()) {
-        console.error('\n✗ extraction completed but some binaries are still missing');
+    const shortfall = expectedOf(source).filter(n => !existsSync(join(BIN_DIR, n)));
+    if (shortfall.length) {
+        console.error(`\n✗ extraction completed but these are still missing: ${shortfall.join(', ')}`);
         process.exit(1);
     }
     console.log('• helper binaries ready');
+    reportGaps(source);
 }
 
 main();

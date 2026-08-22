@@ -427,3 +427,61 @@ be built from the Linux box. `scripts/fetch-binaries.mjs` expects a `.tar.gz` co
 `ffmpeg ffprobe yt-dlp gogdl legendary comet` — upstream's macOS builds are named
 `gogdl_macos_arm64`, `legendary_macOS_arm64`, `comet-aarch64-apple-darwin` and `yt-dlp_macos`, so
 rename on the way in. Add it to `SOURCES.darwin` with its SHA256.
+
+---
+
+## The `binaries-mac-v1` tarball
+
+Built 2026-08-22. **95,128,023 bytes**, SHA256
+`8262dfb4f09d2a650ed422c5724f78d09d1eca0a017bbb07052d9c69a0476e1e`. Reproducible — the same
+inputs and `tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=…` give byte-identical
+output.
+
+| Binary | Source | arm64 | Signed |
+|---|---|---|---|
+| `legendary` | derrod/legendary `0.21.0` → `legendary_macOS_arm64` | ✅ | ✅ |
+| `comet` | imLinguin/comet `v0.3.2` → `comet-aarch64-apple-darwin` | ✅ | ✅ |
+| `yt-dlp` | yt-dlp/yt-dlp → `yt-dlp_macos` | universal | ✅ |
+| `ffmpeg` | eugeneware/ffmpeg-static `b6.1.1` → `ffmpeg-darwin-arm64` | ✅ | ✅ |
+| `ffprobe` | eugeneware/ffmpeg-static `b6.1.1` → `ffprobe-darwin-arm64` | ✅ | ✅ |
+| `yt-dlp.conf` | copied from the Linux set (no paths in it) | — | — |
+| **`gogdl`** | **absent — see below** | | |
+
+Every Mach-O carries `LC_CODE_SIGNATURE`, which matters: Apple Silicon refuses to run an
+unsigned arm64 executable. The ffmpeg/ffprobe builds link only against `/usr/lib` and
+`/System/Library/Frameworks` — no Homebrew, no `@rpath` third-party libraries.
+
+**Rejected: osxexperts.net.** It is the usual recommendation for arm64 static ffmpeg, and its
+URLs are real, but the files it serves match *none* of the six SHA256 checksums printed on its
+own page. Downloads were stable and reproducible, so this is drift between its binaries and its
+published sums, not a transfer error — either way the integrity claim cannot be checked, so it
+is not something to pin a public release to. evermeet.cx is Intel-only by policy and says it
+will not do Apple Silicon.
+
+### Why gogdl is not in it
+
+`gogdl` is the one helper we patch, and **PyInstaller cannot cross-compile** — a macOS arm64
+build has to be made on a Mac.
+
+Shipping upstream's `gogdl_macos_arm64` instead is not an acceptable stopgap. Upstream is now
+1.3.0 against our fork's 1.2.1 base, and it has picked up exactly one of the four fixes:
+
+| Fork fix | Upstream 1.3.0 |
+|---|---|
+| CDN endpoint rotation per attempt | ✅ present |
+| Chunk checksum verified *inside* the retry loop | ❌ still after it — a chunk that transfers cleanly but corrupt still escapes and resets rotation on resubmit |
+| Telemetry via `put_nowait` | ❌ still a blocking `speed_queue.put` per 512 KiB |
+| `get_secure_link` bounded + keeps `root` | ❌ still unbounded recursion, still drops `root` on retry |
+| `api.py` default request timeout | ❌ plain `requests.Session()` |
+
+That is three known download-hanging bugs, one of which is the silent hour-long freeze in
+[[project-gogdl-fixes]]. `scripts/fetch-binaries.mjs` therefore declares darwin's `provides`
+list without `gogdl` and prints the build instructions on every run, so the gap is loud rather
+than latent — the pinning trap that memory warns about, handled by refusing to paper over it.
+
+**Without gogdl the suite still runs**: `findGogdl()` returns null and only GOG download,
+install-size, DLC listing and redist calls fail with "gogdl not found". Epic works (legendary is
+present), and so does everything that is not a GOG download.
+
+**Phase B task 1:** clone the fork on the Mac, `python3 -m PyInstaller --onefile --name gogdl
+grinder_entry.py --clean --noconfirm`, then publish `binaries-mac-v2` with all six.
