@@ -298,9 +298,9 @@ ipcMain.on('launch-game', (event, cmd) => {
         return;
     }
 
-    // 2. itch.io — delegate to itch app via xdg-open (shell.openExternal rejects custom schemes)
+    // 2. itch.io — hand the scheme to the desktop's opener (shell.openExternal rejects custom schemes)
     if (cmd.startsWith('itch://')) {
-        spawn('xdg-open', [cmd], { detached: true, stdio: 'ignore' }).unref();
+        host.desktop.openUrlScheme(cmd);
         return;
     }
 
@@ -503,16 +503,9 @@ ipcMain.on('force-focus', () => {
     win.setAlwaysOnTop(true, 'screen-saver');
     setTimeout(() => win.setAlwaysOnTop(false), 2000);
 
-    // X11 only: wmctrl sends _NET_ACTIVE_WINDOW with CurrentTime, which most
-    // X11 WMs accept even with focus-stealing prevention enabled.
-    // On Wayland this is a no-op (wmctrl not installed / XWayland may ignore it).
-    if (process.platform === 'linux') {
-        try {
-            const hwnd = win.getNativeWindowHandle().readUInt32LE(0);
-            const hexId = '0x' + hwnd.toString(16);
-            execFile('wmctrl', ['-i', '-a', hexId], () => {});
-        } catch (_) {}
-    }
+    // Then whatever else the host can do to raise a window past focus-stealing
+    // prevention. Always safe to call — a host with no such trick does nothing.
+    host.desktop.focusWindow(win);
 });
 
 ipcMain.handle('fetch-hltb', async (event, gameName) => { try { const results = await searchHltb(gameName); if (results.length > 0 && results[0].comp_main > 0) return `${Math.round(results[0].comp_main / 3600)} Hours`; return "Unknown"; } catch (e) { return "Error"; } });

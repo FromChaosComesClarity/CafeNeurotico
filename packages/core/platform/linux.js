@@ -84,6 +84,101 @@ function which(bin) {
 // GNU coreutils. `-B1` is not portable — see dirSizeCommand's callers.
 function dirSizeCommand(target) { return ['du', '-sB1', target]; }
 
+// ── Desktop integration ──────────────────────────────────────────────────────
+// Menu entries, desktop shortcuts, autostart, opening a URL scheme, focusing a window.
+// The INTENT is the same everywhere; almost none of the mechanics are. Callers describe a
+// launcher in structured fields and the backend decides what a launcher actually is — on
+// Linux a .desktop file under XDG directories, elsewhere something else entirely.
+
+function appsDir()    { return path.join(HOME, '.local', 'share', 'applications'); }
+
+// The XDG Desktop folder, honouring a localised name via user-dirs.dirs.
+function desktopDir() {
+    try {
+        const cfg = path.join(HOME, '.config', 'user-dirs.dirs');
+        if (fs.existsSync(cfg)) {
+            const m = fs.readFileSync(cfg, 'utf8').match(/XDG_DESKTOP_DIR="([^"]+)"/);
+            if (m) return m[1].replace(/^\$HOME/, HOME);
+        }
+    } catch {}
+    return path.join(HOME, 'Desktop');
+}
+
+function launcherFileName(id) { return `${id}.desktop`; }
+
+// entry: { id, name, comment, exec, args[], icon, categories[], keywords[], wmClass, extraLines[] }
+function launcherContent(entry) {
+    const args = (entry.args || []).length ? ' ' + entry.args.join(' ') : '';
+    const lines = [
+        '[Desktop Entry]', 'Version=1.0', 'Type=Application',
+        `Name=${String(entry.name || '').replace(/[\r\n]/g, ' ')}`,
+    ];
+    if (entry.comment)  lines.push(`Comment=${String(entry.comment).replace(/[\r\n]/g, ' ')}`);
+    lines.push(`Exec="${entry.exec}"${args}`);
+    if (entry.icon)     lines.push(`Icon=${entry.icon}`);
+    lines.push('Terminal=false');
+    lines.push(`Categories=${(entry.categories || ['Game']).join(';')};`);
+    if (entry.keywords?.length) lines.push(`Keywords=${entry.keywords.join(';')};`);
+    if (entry.wmClass)  lines.push(`StartupWMClass=${entry.wmClass}`);
+    for (const l of entry.extraLines || []) lines.push(l);
+    return lines.join('\n') + '\n';
+}
+
+function writeLauncher(dir, entry) {
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, launcherFileName(entry.id));
+    fs.writeFileSync(p, launcherContent(entry));
+    try { fs.chmodSync(p, '755'); } catch {}
+    return p;
+}
+
+function removeLauncher(dir, id) {
+    try { fs.unlinkSync(path.join(dir, launcherFileName(id))); return true; } catch { return false; }
+}
+
+// Tell the desktop a launcher appeared/changed.
+function refreshMenu(dir) { try { spawn('update-desktop-database', [dir], { stdio: 'ignore' }).unref(); } catch {} }
+
+// GNOME/Nautilus require a launcher be marked trusted to run without a warning.
+function markTrusted(file) { try { spawn('gio', ['set', file, 'metadata::trusted', 'true'], { stdio: 'ignore' }).unref(); } catch {} }
+
+function autostartPath(id) { return path.join(HOME, '.config', 'autostart', launcherFileName(id)); }
+function getAutostart(id)  { try { return fs.existsSync(autostartPath(id)); } catch { return false; } }
+function setAutostart(id, enabled, entry) {
+    const file = autostartPath(id);
+    if (!enabled) { try { fs.unlinkSync(file); } catch {} return { ok: true, enabled: false }; }
+    try {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, launcherContent({ ...entry, id, extraLines: ['X-GNOME-Autostart-enabled=true'] }));
+        return { ok: true, enabled: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Custom schemes (itch://, pico8-cart:) — shell.openExternal refuses these, so hand them to
+// the desktop's own opener.
+function openUrlScheme(url) { try { spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref(); } catch {} }
+
+// X11 only: wmctrl sends _NET_ACTIVE_WINDOW with CurrentTime, which most window managers
+// honour where Electron's own focus() is ignored. A no-op on Wayland and anywhere wmctrl
+// is not installed, so it is always safe to call.
+function focusWindow(win) {
+    try {
+        const hwnd = win.getNativeWindowHandle().readUInt32LE(0);
+        spawn('wmctrl', ['-i', '-a', '0x' + hwnd.toString(16)], { stdio: 'ignore' }).unref();
+    } catch {}
+}
+
+const desktop = {
+    canInstallMenuEntries: true,
+    appsDir, desktopDir, launcherFileName, writeLauncher, removeLauncher,
+    refreshMenu, markTrusted,
+    autostartPath, getAutostart, setAutostart,
+    openUrlScheme, focusWindow,
+    // The per-game display picker is a KWin script; nothing equivalent exists elsewhere.
+    // isSupported() already gates it, so a null here is handled by the existing UI path.
+    displayPicker: require('../kwin-display.js'),
+};
+
 // ── Steam ────────────────────────────────────────────────────────────────────
 // Every place Steam might keep a library on this host, including extra drives declared in
 // libraryfolders.vdf. The Manager and CREMA each carried a byte-identical copy of this.
@@ -793,7 +888,7 @@ module.exports = {
     binDirName, portableBaseDir, selfExecutable, selfSpawnArgs,
     grinderDbCandidates, findGrinderDb, grinderDbCreatePath,
     which, dirSizeCommand,
-    steamLibraryPaths, steamLaunchCommand, extraStore,
+    steamLibraryPaths, steamLaunchCommand, extraStore, desktop,
     nativeOsKey, gogdlPlatform, legendaryPlatform,
     launchNative, findNativeGameExe, findNativeInstallResult,
     dosbox,

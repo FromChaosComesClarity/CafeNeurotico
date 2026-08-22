@@ -781,7 +781,7 @@ const customInstallers = require('../../packages/core/custom-installers.js');
 // ── Which screen games open on (KDE only) ────────────────────────────────────
 // See packages/core/kwin-display.js for why this is a KWin script rather than anything
 // inside the game, and why it is one script for all games rather than one per game.
-const kwinDisplay = require('../../packages/core/kwin-display.js');
+const kwinDisplay = host.desktop.displayPicker;
 
 // The choice belongs with the rest of our settings, which travel with the AppImage.
 // A loaded KWin script is gone after a logout, so the stored choice is put back into
@@ -2633,58 +2633,60 @@ ipcMain.on('launch-emulatte', () => {
 
 ipcMain.handle('install-to-menu', () => {
     try {
-        const appsDir = path.join(os.homedir(), '.local', 'share', 'applications');
+        if (!host.desktop.canInstallMenuEntries) return { success: false, message: 'This system installs its own menu entries.' };
+        const appsDir  = host.desktop.appsDir();
         const iconsDir = path.join(baseDir, 'icons');
         if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true });
         fs.writeFileSync(path.join(iconsDir, 'CNGM.svg'),     Buffer.from(CNGM_SVG_B64,     'base64'));
         fs.writeFileSync(path.join(iconsDir, 'CREMA.svg'),    Buffer.from(CREMA_SVG_B64,    'base64'));
         fs.writeFileSync(path.join(iconsDir, 'GRINDER.svg'),  Buffer.from(GRINDER_SVG_B64,  'base64'));
         fs.writeFileSync(path.join(iconsDir, 'EmuLatte.svg'), Buffer.from(EMULATTE_SVG_B64, 'base64'));
-        if (!fs.existsSync(appsDir)) fs.mkdirSync(appsDir, { recursive: true });
         const files = fs.readdirSync(baseDir);
         const suiteFile    = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
-        const suitePath    = suiteFile ? path.join(baseDir, suiteFile) : (process.env.APPIMAGE || null);
+        const suitePath    = suiteFile ? path.join(baseDir, suiteFile) : (host.selfExecutable() || null);
         const emulatteFile = files.find(f => /^EmuLatte.*\.AppImage$/i.test(f));
 
         // Remove stale pre-merge launchers (separate CNGM/GRINDER AppImages are gone).
-        for (const stale of ['cafe-neurotico-game-manager.desktop', 'cafe-neurotico-grinder.desktop']) {
-            try { fs.unlinkSync(path.join(appsDir, stale)); } catch {}
-        }
+        for (const stale of ['cafe-neurotico-game-manager', 'cafe-neurotico-grinder'])
+            host.desktop.removeLauncher(appsDir, stale);
 
         const installed = [];
         if (suitePath) {
-            fs.chmodSync(suitePath, '755');
-            // Manager (default face)
-            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=Cafe Neurotico\nComment=Your game library — Manager, GRINDER and CREMA in one.\nExec="${suitePath}"\nIcon=${path.join(iconsDir,'CNGM.svg')}\nTerminal=false\nCategories=Game;Utility;\nStartupWMClass=cafeneurotico\n`);
-            // CREMA fullscreen face
-            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-crema.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico in fullscreen, gamepad-first mode — made for the living room / TV.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir,'CREMA.svg')}\nTerminal=false\nCategories=Game;\nKeywords=couch;tv;living room;gamepad;controller;fullscreen;big picture;bigpicture;cafe neurotico;crema;\nStartupWMClass=crema\n`);
+            try { fs.chmodSync(suitePath, '755'); } catch {}
+            host.desktop.writeLauncher(appsDir, {
+                id: 'cafe-neurotico', name: 'Cafe Neurotico',
+                comment: 'Your game library — Manager, GRINDER and CREMA in one.',
+                exec: suitePath, icon: path.join(iconsDir, 'CNGM.svg'),
+                categories: ['Game', 'Utility'], wmClass: 'cafeneurotico',
+            });
+            host.desktop.writeLauncher(appsDir, {
+                id: 'cafe-neurotico-crema', name: 'CREMA (Fullscreen)',
+                comment: 'Cafe Neurotico in fullscreen, gamepad-first mode — made for the living room / TV.',
+                exec: suitePath, args: ['--crema'], icon: path.join(iconsDir, 'CREMA.svg'),
+                categories: ['Game'], wmClass: 'crema',
+                keywords: ['couch', 'tv', 'living room', 'gamepad', 'controller', 'fullscreen',
+                           'big picture', 'bigpicture', 'cafe neurotico', 'crema'],
+            });
             installed.push('Cafe Neurotico', 'CREMA');
         }
         if (emulatteFile) {
-            const p = path.join(baseDir, emulatteFile); fs.chmodSync(p, '755');
-            fs.writeFileSync(path.join(appsDir, 'cafe-neurotico-emulatte.desktop'),
-                `[Desktop Entry]\nVersion=1.0\nType=Application\nName=EmuLatte\nComment=Cafe Neurotico EmuLatte — ROM library manager.\nExec="${p}"\nIcon=${path.join(iconsDir,'EmuLatte.svg')}\nTerminal=false\nCategories=Game;Emulator;\n`);
+            const p = path.join(baseDir, emulatteFile);
+            try { fs.chmodSync(p, '755'); } catch {}
+            host.desktop.writeLauncher(appsDir, {
+                id: 'cafe-neurotico-emulatte', name: 'EmuLatte',
+                comment: 'Cafe Neurotico EmuLatte — ROM library manager.',
+                exec: p, icon: path.join(iconsDir, 'EmuLatte.svg'),
+                categories: ['Game', 'Emulator'],
+            });
             installed.push('EmuLatte');
         }
-        execFile('update-desktop-database', [appsDir], () => {});
+        host.desktop.refreshMenu(appsDir);
         if (installed.length === 0) return { success: false, message: 'CafeNeurotico.AppImage not found in the app folder.' };
         return { success: true, message: `Installed to menu: ${installed.join(' + ')}` };
     } catch(err) { return { success: false, message: err.message }; }
 });
 
-// Resolve the XDG Desktop folder (honours a localised name via user-dirs.dirs), ~/Desktop otherwise.
-function resolveDesktopDir() {
-    try {
-        const cfg = path.join(os.homedir(), '.config', 'user-dirs.dirs');
-        if (fs.existsSync(cfg)) {
-            const m = fs.readFileSync(cfg, 'utf8').match(/XDG_DESKTOP_DIR="([^"]+)"/);
-            if (m) return m[1].replace(/^\$HOME/, os.homedir());
-        }
-    } catch {}
-    return path.join(os.homedir(), 'Desktop');
-}
+// Where a desktop shortcut goes is the host's business (see the platform backend).
 
 // Add a per-game launcher that opens the game straight through Cafe Neurotico (via the
 // --game=<id> deeplink). targets = { menu, desktop }. Works on any XDG desktop (KDE/GNOME/…).
@@ -2719,30 +2721,24 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
             } catch {}
         }
 
-        const nameEsc = String(game.Game || 'Game').replace(/[\r\n]/g, ' ');
-        const content =
-            `[Desktop Entry]\nVersion=1.0\nType=Application\n` +
-            `Name=${nameEsc}\nComment=Launch ${nameEsc} via Cafe Neurotico\n` +
-            `Exec="${suitePath}" --game=${game.id}\nIcon=${iconPath}\n` +
-            `Terminal=false\nCategories=Game;\nStartupWMClass=cafeneurotico\n`;
-        const fname = `cafe-neurotico-game-${game.id}.desktop`;
+        const entry = {
+            id: `cafe-neurotico-game-${game.id}`,
+            name: String(game.Game || 'Game'),
+            comment: `Launch ${String(game.Game || 'Game')} via Cafe Neurotico`,
+            exec: suitePath, args: [`--game=${game.id}`], icon: iconPath,
+            categories: ['Game'], wmClass: 'cafeneurotico',
+        };
 
         const wrote = [];
         if (targets.menu) {
-            const appsDir = path.join(os.homedir(), '.local', 'share', 'applications');
-            fs.mkdirSync(appsDir, { recursive: true });
-            const p = path.join(appsDir, fname);
-            fs.writeFileSync(p, content); try { fs.chmodSync(p, '755'); } catch {}
-            execFile('update-desktop-database', [appsDir], () => {});
+            const appsDir = host.desktop.appsDir();
+            host.desktop.writeLauncher(appsDir, entry);
+            host.desktop.refreshMenu(appsDir);
             wrote.push('app menu');
         }
         if (targets.desktop) {
-            const desktopDir = resolveDesktopDir();
-            fs.mkdirSync(desktopDir, { recursive: true });
-            const p = path.join(desktopDir, fname);
-            fs.writeFileSync(p, content); try { fs.chmodSync(p, '755'); } catch {}
-            // GNOME/Nautilus require a launcher be marked trusted to run without a warning.
-            execFile('gio', ['set', p, 'metadata::trusted', 'true'], () => {});
+            const p = host.desktop.writeLauncher(host.desktop.desktopDir(), entry);
+            host.desktop.markTrusted(p);
             wrote.push('desktop');
         }
         return { ok: true, message: `Shortcut added to ${wrote.join(' + ')}.` };
@@ -2751,20 +2747,21 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
 
 // Opt-in: auto-start the CREMA (fullscreen) face on login (living-room / HTPC). Off by default.
 // State = presence of the XDG autostart entry; no separate setting to drift.
-const cremaAutostartPath = () => path.join(os.homedir(), '.config', 'autostart', 'cafe-neurotico-crema.desktop');
-ipcMain.handle('get-crema-autostart', () => { try { return fs.existsSync(cremaAutostartPath()); } catch { return false; } });
+const CREMA_AUTOSTART_ID = 'cafe-neurotico-crema';
+ipcMain.handle('get-crema-autostart', () => host.desktop.getAutostart(CREMA_AUTOSTART_ID));
 ipcMain.handle('set-crema-autostart', (_, enabled) => {
     try {
-        const file = cremaAutostartPath();
-        if (!enabled) { try { fs.unlinkSync(file); } catch {} return { ok: true, enabled: false }; }
-        fs.mkdirSync(path.dirname(file), { recursive: true });
+        if (!enabled) return host.desktop.setAutostart(CREMA_AUTOSTART_ID, false);
         const sf = (() => { try { return fs.readdirSync(baseDir).find(f => /^CafeNeurotico.*\.AppImage$/i.test(f)); } catch { return null; } })();
-        const suitePath = sf ? path.join(baseDir, sf) : (process.env.APPIMAGE || process.execPath);
+        const suitePath = sf ? path.join(baseDir, sf) : host.selfExecutable();
         const iconsDir = path.join(baseDir, 'icons');
         try { fs.mkdirSync(iconsDir, { recursive: true }); fs.writeFileSync(path.join(iconsDir, 'CREMA.svg'), Buffer.from(CREMA_SVG_B64, 'base64')); } catch {}
-        fs.writeFileSync(file,
-            `[Desktop Entry]\nVersion=1.0\nType=Application\nName=CREMA (Fullscreen)\nComment=Cafe Neurotico — auto-start in fullscreen / gamepad mode on login.\nExec="${suitePath}" --crema\nIcon=${path.join(iconsDir, 'CREMA.svg')}\nTerminal=false\nCategories=Game;\nStartupWMClass=crema\nX-GNOME-Autostart-enabled=true\n`);
-        return { ok: true, enabled: true };
+        return host.desktop.setAutostart(CREMA_AUTOSTART_ID, true, {
+            name: 'CREMA (Fullscreen)',
+            comment: 'Cafe Neurotico — auto-start in fullscreen / gamepad mode on login.',
+            exec: suitePath, args: ['--crema'], icon: path.join(iconsDir, 'CREMA.svg'),
+            categories: ['Game'], wmClass: 'crema',
+        });
     } catch (e) { return { ok: false, error: e.message }; }
 });
 
@@ -3240,9 +3237,9 @@ ipcMain.on('launch-game', (event, cmd, launchArgs, executable) => {
         }
     }
 
-    // itch.io — delegate to itch app via xdg-open (shell.openExternal rejects custom schemes)
+    // itch.io — hand the scheme to the desktop's opener (shell.openExternal rejects custom schemes)
     if (cmd.startsWith('itch://')) {
-        spawn('xdg-open', [cmd], { detached: true, stdio: 'ignore' }).unref();
+        host.desktop.openUrlScheme(cmd);
         return;
     }
 
