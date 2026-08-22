@@ -1,7 +1,7 @@
 # Mac port — Phase A: the platform boundary
 
-**Status:** A1 + A2 done (backend + engine). A3–A8 outstanding.
-**Branch:** to be cut as `mac` off `experimental` — the A1/A2 work is currently uncommitted on `main`.
+**Status:** ✅ **Phase A complete.** A1–A10 done, committed on `mac`, Linux build verified.
+**Branch:** `mac`, cut off `experimental` at `6220ead`. Seven commits, `935cb2d`…`fa81254`.
 **Line numbers are as of `6220ead` (v1.7.0).**
 
 Phase A is done entirely on the Linux box and ships **zero Mac code**. Its only job is to
@@ -343,3 +343,87 @@ signpost pointing at the backend, one describes DOSBox's own drive-letter behavi
 **Not yet done:** the manual six-game smoke test from *Acceptance criteria* item 4. The
 oracle tests prove the spawn specs are identical, but nothing has actually launched a game
 end to end.
+
+---
+
+## Phase A: done
+
+Seven commits on `mac`, off `experimental` at `6220ead`.
+
+| | Item | Commit |
+|---|---|---|
+| A1 | Backend scaffold (`platform/index.js`, `platform/linux.js`) | `935cb2d` |
+| A2 | grinder-engine.js — runtime, launch, DOSBox, native detection | `935cb2d` |
+| A9 | Compatibility-runtime management (unified from two drifted copies) | `6b29785` |
+| A3 | Paths: binDirName, portableBaseDir, self-spawn, grinder.db lookup | `b86a516` |
+| A5 | Steam library scan + launch command, Flatpak discovery | `b8aa35c` |
+| A4 | Desktop integration: launchers, shortcuts, autostart, URL schemes, focus, display picker | `1218f87` |
+| A6/A7/A8/A10 | fetch-binaries, packaging, recipe hosts, legendary dir | `c4d959e` |
+| — | Three spots the work items had missed | `fa81254` |
+
+### What the spec got wrong
+
+Worth recording, because the pattern repeated: **the work items were drawn up by reading
+`grinder-engine.js` and grepping for a few known strings, and that under-counted every time.**
+
+- **A3** was scoped at 4 binDir sites and 8 grinder.db lists. Actually 8 and **16**.
+- **A5** listed one `getSteamLibraryPaths`. There were **two** — byte-identical copies in the
+  Manager and CREMA.
+- **A8** said 18 recipes. There are **25**: seven are generated from `BUILD_GAMES` rather than
+  declared literally, so a grep for `id:` never saw them. The new `selfCheck()` assertion found
+  them immediately.
+- **A9 and A10 were missing from the spec entirely** — six Proton-management IPC handlers living
+  in the two faces, and legendary's config directory.
+- Three more spots surfaced only when the acceptance greps were finally run: a **third and fourth**
+  copy of the runner selection in `run-exe-on-prefix` / `run-exe-in-game-folder`, the
+  umu-launcher installer, and a stray `process.env.APPIMAGE`.
+
+The lesson for Phase B: **run the greps first, then write the work items.**
+
+### Bugs found and fixed on the way
+
+- **GRINDER's Proton downloader was installing an ARM64 build on an x86-64 machine.** It took the
+  first `.tar.gz` in a GE-Proton release; GE now ships an `aarch64` tarball that sorts ahead of the
+  x86-64 one. The Manager's copy had an `!/aarch64/` filter and was fine. Unifying them fixed it.
+- **`du -sB1` is GNU-only** and would have failed silently on macOS.
+- The "no native DOSBox" error hardcoded `sudo dnf install dosbox-staging` while
+  `dosboxInstallHint()` already knew the right answer per distribution.
+- GE-Proton downloads staged through `os.tmpdir()`, which is tmpfs on most current
+  distributions — 533 MB compressed, 1.5 GB unpacked, in RAM. Now staged in the install directory.
+
+### Verification
+
+- `buildLaunch` + the availability gate against an oracle transcribing the original branches:
+  **288 assertions, 0 failures**, all four spawn paths including the ones unreachable on this
+  machine (`which` stubbed).
+- `findGogInstallResult` over 32 real Windows installs and 4 native ones.
+- Flatpak discovery identical to the original — same 10 entries.
+- Every installed `.desktop` launcher regenerated through the new code path and diffed:
+  byte-identical.
+- Delete-safety base set unchanged plus umu's store; refusals hold for `/etc`, `/home`, `/`,
+  `/usr/lib` and a game directory.
+- `customInstallers.selfCheck()` clean across all 25 recipes.
+- Six-path launch smoke test on the packaged AppImage: DOS → `dosbox-native`, native Linux →
+  `native`, GOG Windows → `umu-run`, `.bat` → `umu-run-bat` with the exact `Z:\…` path,
+  source port → `umu-run`, and a full GOG install → launch → uninstall cycle.
+- All three faces start with zero errors.
+
+### Deliberately not done
+
+- **`apps/grinder/renderer.js`'s External Tools panel** hardcodes the four tool names and their
+  descriptions. `check-tools` now also returns a `runtimeTools` array for it to move onto, but
+  rewriting the panel means guessing at a macOS tool list that does not exist yet.
+- **A `.icns` for the Mac build.** The project only has SVG icons; electron-builder cannot use
+  those on macOS. Phase B.
+- **`games.platform` per-host derivation** (see *Data-model decisions*) — decided, implemented in D.
+- **A Steam game launch** was not re-tested end to end. `steamLaunchCommand()` produces a
+  byte-identical string and the launch itself goes through untouched code
+  (`spawn(cmd, [], { shell: true })`).
+
+## Phase B prerequisite
+
+The **`binaries-mac-v1` tarball** is the only thing standing between here and Phase B, and it can
+be built from the Linux box. `scripts/fetch-binaries.mjs` expects a `.tar.gz` containing exactly
+`ffmpeg ffprobe yt-dlp gogdl legendary comet` — upstream's macOS builds are named
+`gogdl_macos_arm64`, `legendary_macOS_arm64`, `comet-aarch64-apple-darwin` and `yt-dlp_macos`, so
+rename on the way in. Add it to `SOURCES.darwin` with its SHA256.
