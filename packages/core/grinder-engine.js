@@ -24,8 +24,9 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const { spawn, execSync, spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 const Database = require('better-sqlite3');
+const host = require('./platform/index.js');
 
 // ── Injected context (set by init) ────────────────────────────────────────────
 let configDir, prefixesDir, logDir, binDir, appImageDir, HOME, db, _onProgress, _onLaunchIssue, _onLaunchProgress;
@@ -43,13 +44,17 @@ function init(ctx = {}) {
     // Called when a launched game dies on the spot (see spawnGame's watchdog), so the face
     // can tell the user instead of leaving them staring at a library that did nothing.
     _onLaunchIssue = ctx.onLaunchIssue || _onLaunchIssue || (() => {});
-    // Called while a game is still setting itself up — umu's one-time runtime download and the
-    // per-game Wine prefix build both take minutes with nothing on screen otherwise.
+    // Called while a game is still setting itself up — the compatibility runtime's one-time
+    // download and the per-game prefix build both take minutes with nothing on screen otherwise.
     _onLaunchProgress = ctx.onLaunchProgress || _onLaunchProgress || (() => {});
 
     BUNDLED_LEGENDARY = path.join(binDir, 'legendary');
     BUNDLED_GOGDL     = path.join(binDir, 'gogdl');
     BUNDLED_COMET     = path.join(binDir, 'comet');
+
+    // The backend shares this context rather than re-deriving it, so a face that re-inits
+    // (or re-attaches its database through setDb) moves both in step.
+    host.init({ homeDir: HOME, configDir, getDb: () => db, expandTilde });
 }
 
 // Allow the DB handle to be (re)attached after init (grinder opens it in initDb).
@@ -154,13 +159,12 @@ function resolvePathCaseInsensitive(filePath) {
 }
 
 // ── External tool helpers ─────────────────────────────────────────────────────
-function which(bin) {
-    try { return execSync(`which ${bin}`, { stdio: ['ignore','pipe','ignore'] }).toString().trim(); }
-    catch { return null; }
-}
+// Host-specific: a macOS .app launched from Finder inherits a minimal PATH with no
+// Homebrew in it, so "is this installed" is not the same question on every platform.
+const which = (bin) => host.which(bin);
 
-// Tool paths resolved once — avoids repeated execSync('which ...') on every launch/IPC call
-let _legendary = null, _gogdl = null, _comet = null, _umu = null, _wine = null;
+// Tool paths resolved once — avoids re-running a PATH lookup on every launch/IPC call
+let _legendary = null, _gogdl = null, _comet = null;
 let _activeInstallProc = null;   // the gogdl/legendary child currently downloading (for cancel)
 let _activeKillTimer   = null;
 let _installCancelled  = false;  // set by cancel → makes the failure message read "cancelled"
@@ -198,168 +202,29 @@ function findComet() {
     _comet = fs.existsSync(BUNDLED_COMET) ? BUNDLED_COMET : (which('comet') || '');
     return _comet || null;
 }
-function findUmu() {
-    if (_umu !== null) return _umu;
-    _umu = which('umu-run') || '';
-    return _umu || null;
-}
-function findWineCached() {
-    if (_wine !== null) return _wine;
-    _wine = which('wine') || '';
-    return _wine || null;
-}
+// Still exported: the GRINDER face destructures both. The caching moved to the backend.
+const findUmu        = () => host.runtime.findUmu();
+const findWineCached = () => host.runtime.findWine();
 
-// ── Proton runtime discovery ─────────────────────────────────────────────────
-// Every face resolves Proton through here, and we ALWAYS hand umu-run an explicit
-// PROTONPATH rather than letting it find its own. Two reasons, both of which showed up as a
-// game that "launched" and then did absolutely nothing:
-//   1. umu's own discovery (umu_proton.py `_get_from_compat`) keeps only folders whose name
-//      `startswith("GE-Proton")` or `("UMU-Proton")`. A perfectly good build installed under
-//      any other name — e.g. "Proton-GE Latest", which is what ProtonUp-Qt writes — is
-//      invisible to it, so PROTONPATH stays empty and umu exits 1 immediately with
-//      `FileNotFoundError: Environment variable not set or is empty: PROTONPATH`.
-//   2. With nothing installed at all, umu tries to *download* GE-Proton — hundreds of MB with
-//      no progress anywhere in our UI, and a hard failure when the machine is offline.
-// Resolving it ourselves also means we can tell the user what's wrong (NO_PROTON below).
-const PROTON_SEARCH_DIRS = () => [
-    // Steam's own Proton builds
-    path.join(HOME, '.steam', 'root', 'steamapps', 'common'),
-    path.join(HOME, '.steam', 'steam', 'steamapps', 'common'),
-    path.join(HOME, '.local', 'share', 'Steam', 'steamapps', 'common'),
-    // GE-Proton and other custom compatibility tools
-    path.join(HOME, '.steam', 'root', 'compatibilitytools.d'),
-    path.join(HOME, '.steam', 'steam', 'compatibilitytools.d'),
-    path.join(HOME, '.local', 'share', 'Steam', 'compatibilitytools.d'),
-    // umu's own store, used when no Steam install exists
-    path.join(HOME, '.local', 'share', 'umu', 'compatibilitytools'),
-    // Flatpak Steam
-    path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'steamapps', 'common'),
-    path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
-];
-
-// Is this directory an actual Proton build we can hand to umu? The `proton` launcher script is
-// the test that matters: `toolmanifest.vdf` alone also matches Steam's runtime containers
-// (SteamLinuxRuntime_*), which are not Proton and would poison the "best available" pick.
-function isProtonDir(dir) {
-    try { return fs.existsSync(path.join(dir, 'proton')); }
-    catch { return false; }
-}
-
-// All Proton builds on the machine, best first: GE-Proton, then Steam's, then anything else;
-// newest within each group. Named folders are matched loosely on purpose — the *contents*
-// decide what counts, not the folder name (that is exactly what umu gets wrong).
-function scanProtonVersions() {
-    const found = [];
-    const seen  = new Set();
-    for (const dir of PROTON_SEARCH_DIRS()) {
-        if (!fs.existsSync(dir)) continue;
-        let entries;
-        try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
-        catch { continue; }
-        for (const entry of entries) {
-            if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
-            const fullPath = path.join(dir, entry.name);
-            // Resolve symlinks so ~/.steam/root, ~/.steam/steam and ~/.local/share/Steam
-            // (all the same place) don't yield duplicates.
-            const realPath = (() => { try { return fs.realpathSync(fullPath); } catch { return fullPath; } })();
-            if (seen.has(realPath) || !isProtonDir(realPath)) continue;
-            seen.add(realPath);
-            const name = entry.name;
-            let type = 'other';
-            if (/GE-Proton|Proton-GE|UMU-Proton/i.test(name)) type = 'ge';
-            else if (/^Proton/i.test(name))                   type = 'steam';
-            // A folder called "Proton-GE Latest" says nothing about which build it holds;
-            // GE ships the real version in `version` ("<epoch> GE-Proton11-3"), so prefer that
-            // for ordering and for anything we show the user.
-            let version = '';
-            try { version = (fs.readFileSync(path.join(realPath, 'version'), 'utf8').trim().split(/\s+/).pop() || ''); } catch {}
-            found.push({ name, path: realPath, type, version, label: version || name });
-        }
-    }
-    const order = { ge: 0, steam: 1, other: 2 };
-    return found.sort((a, b) => {
-        const to = (order[a.type] ?? 2) - (order[b.type] ?? 2);
-        if (to !== 0) return to;
-        return b.label.localeCompare(a.label, undefined, { numeric: true, sensitivity: 'base' });
-    });
-}
-
-// The Proton a given game should run with: its own override, then the configured default,
-// then the best one found on disk. Configured paths are existence-checked — a `proton_path`
-// left over from a build the user has since deleted is another way to end up launching
-// nothing at all.
-function resolveProton(game) {
-    const usable = p => { const e = expandTilde(p || ''); return e && isProtonDir(e) ? e : ''; };
-    const own = usable(game?.proton_path);
-    if (own) return own;
-    let configured = '';
-    try { configured = db?.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || ''; } catch {}
-    const def = usable(configured);
-    if (def) return def;
-    return scanProtonVersions()[0]?.path || '';
-}
-
-// Turn a dead game's output into something a person can act on. Anything we don't recognise
-// stays UNKNOWN — the face shows the log tail rather than inventing a cause.
-function diagnoseLaunchFailure(log, protonPath) {
-    const t = String(log || '');
-    if (/PROTONPATH/i.test(t) && /not set or is empty|FileNotFoundError/i.test(t))
-        return { code: 'NO_PROTON', message: 'No Proton build was available to run this Windows game.' };
-    if (/umu-run|umu_run\.py/i.test(t) && /Traceback/i.test(t))
-        return { code: 'UMU_FAILED', message: 'umu-run could not start the game.' };
-    if (/command not found|No such file or directory/i.test(t) && !protonPath)
-        return { code: 'MISSING_RUNTIME', message: 'The compatibility runtime is missing.' };
-    if (/wine: cannot find|is not a valid Win32|Bad EXE format/i.test(t))
-        return { code: 'BAD_EXE', message: 'The game executable could not be run by Proton/Wine.' };
-    return { code: 'UNKNOWN', message: 'The game closed immediately after starting.' };
-}
+// ── Compatibility runtime ────────────────────────────────────────────────────
+// Discovering the runtime, choosing one for a given game, and reading a failure out of a
+// dead game's log are all host business — on Linux that is Proton driven by umu-run, and
+// packages/core/platform/linux.js records why we always hand umu an explicit PROTONPATH.
+// These wrappers stay because the GRINDER face and the Manager both destructure them.
+const scanProtonVersions    = () => host.runtime.scan();
+const resolveProton         = (game) => host.runtime.resolve(game);
+const isProtonDir           = (dir) => host.runtime.isRuntimeDir(dir);
+const diagnoseLaunchFailure = (log, runtimePath) => host.runtime.diagnose(log, runtimePath);
 
 // ── First-launch progress ────────────────────────────────────────────────────
-// The first Windows game on a machine doesn't start for minutes: umu downloads the steamrt
-// runtime (several hundred MB) and Proton then builds the game's Wine prefix. Every new game
-// pays the prefix cost again. None of that reaches the UI on its own, so the app looks hung.
-// We already send the launch output to a log file (see spawnGame) — tailing that file is a
-// safe way to follow along, with no pipe that could EPIPE a detached game later.
+// The first Windows game on a machine doesn't start for minutes while the compatibility
+// runtime downloads itself and the game's prefix is built. None of that reaches the UI on
+// its own, so the app looks hung. We already send the launch output to a log file (see
+// spawnGame) — tailing that file is a safe way to follow along, with no pipe that could
+// EPIPE a detached game later.
 //
-// Phases are matched against umu's real output. Percentages are step markers, not byte counts:
-// umu prints no percentage, so the honest live signal during the big download is the growing
-// `.parts` file, reported as MB in the message.
-const STARTUP_STEPS = [
-    { re: /Setting up Unified Launcher/i,                    phase: 'setup',    percent: 5,   message: 'Preparing the compatibility layer…' },
-    { re: /Downloading steamrt|Downloading SteamLinuxRuntime/i, phase: 'runtime', percent: 15, message: 'Downloading the compatibility runtime — one-time setup, this takes a few minutes.' },
-    { re: /SHA256 is OK/i,                                   phase: 'verify',   percent: 45,  message: 'Checking the download…' },
-    { re: /Verifying integrity of/i,                         phase: 'verify',   percent: 50,  message: 'Verifying the runtime…' },
-    { re: /mtree is OK|Using steamrt/i,                      phase: 'ready',    percent: 60,  message: 'Compatibility runtime ready.' },
-    // protonfixes runs on every launch and lands BEFORE the prefix build in umu's output, so it
-    // sits below `prefix` here — percentages are clamped monotonic and must not walk backwards.
-    { re: /Running protonfixes|Running checks/i,             phase: 'fixes',    percent: 70,  message: 'Applying compatibility fixes…' },
-    // "Upgrading prefix" is printed only when the prefix is new or the Proton build changed —
-    // deliberately NOT matching generic wine startup chatter, which would show the panel on
-    // every ordinary launch.
-    { re: /Upgrading prefix from|Creating prefix/i,          phase: 'prefix',   percent: 80,  message: "Setting up this game's Windows environment…" },
-    { re: /Downloading upscaler file|Downloading .* dll/i,   phase: 'extras',   percent: 88,  message: 'Downloading graphics components…' },
-    { re: /Executable is a unix path|^Proton: \//im,         phase: 'starting', percent: 95,  message: 'Starting the game…' },
-    { re: /ntsync: up and running|wineserver: created/i,     phase: 'running',  percent: 100, message: 'Running.' },
-];
-
-// Bytes fetched so far by umu's resumable download (`<archive>.<buildid>.parts`, written under
-// a temp dir in XDG_CACHE_HOME/umu). Best-effort: no file → no counter, just the phase text.
-function umuDownloadBytes() {
-    const cacheRoot = path.join(process.env.XDG_CACHE_HOME || path.join(HOME, '.cache'), 'umu');
-    let total = 0;
-    const walk = (dir, depth) => {
-        if (depth > 2) return;
-        let entries;
-        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        for (const en of entries) {
-            const p = path.join(dir, en.name);
-            if (en.isDirectory()) walk(p, depth + 1);
-            else if (en.name.endsWith('.parts')) { try { total += fs.statSync(p).size; } catch {} }
-        }
-    };
-    walk(cacheRoot, 0);
-    return total;
-}
+// What the phases ARE is the host's business (they match one particular runtime's output);
+// the tailing below is not.
 
 // Follow a launching game's log until it is actually running (or gives up). Emits only while
 // setup is genuinely happening; a game whose runtime and prefix already exist blows past every
@@ -369,6 +234,7 @@ function watchStartup({ proc, gameId, title, logPath }) {
     const MAX_MS = 15 * 60000;          // generous: a slow link downloading the runtime
     const started = Date.now();
     let offset = 0, percent = 0, phase = '', finished = false, bytesAtPhase = 0;
+    const steps = host.runtime.startupSteps();
 
     const emit = (extra = {}) => _onLaunchProgress({ gameId, title, phase, percent, ...extra });
 
@@ -397,16 +263,16 @@ function watchStartup({ proc, gameId, title, logPath }) {
 
         for (const line of chunk.split('\n')) {
             if (!line.trim()) continue;
-            const step = STARTUP_STEPS.find(s => s.re.test(line));
+            const step = steps.find(s => s.re.test(line));
             if (!step || step.percent < percent) continue;   // never walk backwards
             percent = step.percent; phase = step.phase; bytesAtPhase = 0;
             if (phase === 'running') { finish('running'); return; }
             emit({ message: step.message });
         }
 
-        // Keep the big download visibly alive between log lines (umu prints none while fetching).
-        if (phase === 'runtime') {
-            const bytes = umuDownloadBytes();
+        // Keep the big download visibly alive between log lines (the runtime prints none while fetching).
+        if (phase === host.runtime.setupPhase) {
+            const bytes = host.runtime.setupBytes();
             if (bytes > bytesAtPhase) {
                 bytesAtPhase = bytes;
                 emit({ message: `Downloading the compatibility runtime — ${(bytes / 1e6).toFixed(0)} MB so far. One-time setup.` });
@@ -419,26 +285,8 @@ function watchStartup({ proc, gameId, title, logPath }) {
     proc.once('exit', () => setTimeout(() => finish('exited'), 600));   // let the last lines land
 }
 
-// Thrown before we spawn anything, so the faces can offer to install Proton instead of
-// letting umu fail invisibly.
-function noProtonError() {
-    const err = new Error(
-        'No Proton build found. Windows games need Proton (GE-Proton is recommended) — ' +
-        'install one from the Control Panel, or point Cafe Neurotico at an existing build.');
-    err.code = 'NO_PROTON';
-    return err;
-}
-
-// Locate BattlEye or EAC runtime: GRINDER's own copy first, then common Steam locations
-function findRuntime(name) {
-    const steamName = name === 'battleye_runtime' ? 'Battleye AntiCheat' : 'EasyAntiCheat';
-    return [
-        path.join(configDir, 'runtimes', name),
-        path.join(HOME, '.steam', 'root', 'steamapps', 'common', steamName),
-        path.join(HOME, '.local', 'share', 'Steam', 'steamapps', 'common', steamName),
-        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam', 'steamapps', 'common', steamName),
-    ].find(p => fs.existsSync(p)) || null;
-}
+// Locate the BattlEye / EasyAntiCheat runtime a game asks for.
+const findRuntime = (name) => host.runtime.findAntiCheatRuntime(name);
 
 // ── Moved from grinder/main.js (slice 2): GOG creds + install/launch/auth engine ──
 const GOG_CLIENT_ID     = '46899977096215655';
@@ -897,22 +745,11 @@ async function launchGame(gameId, opts = {}) {
     })();
     let allArgs = [...gogTaskArgs, ...userArgs];
 
-    const umu = findUmu();
-    const usingProton = !!(proton || umu);
-
-    // Compat env vars — mirrors Heroic's launcher.ts logic exactly
-    const compatEnv = {};
-    if (usingProton) {
-        if (!game.use_esync)     compatEnv.PROTON_NO_ESYNC = '1';
-        if (!game.use_fsync)     compatEnv.PROTON_NO_FSYNC = '1';
-        if (game.use_dxvk_nvapi) { compatEnv.PROTON_ENABLE_NVAPI = '1'; compatEnv.DXVK_NVAPI_ALLOW_OTHER_DRIVERS = '1'; }
-    } else {
-        if (game.use_esync !== 0) compatEnv.WINEESYNC = '1';
-        if (game.use_fsync !== 0) compatEnv.WINEFSYNC = '1';
-        if (game.use_dxvk_nvapi) { compatEnv.DXVK_ENABLE_NVAPI = '1'; compatEnv.DXVK_NVAPI_ALLOW_OTHER_DRIVERS = '1'; }
-    }
-    if (game.use_battleye) { const p = findRuntime('battleye_runtime'); if (p) compatEnv.PROTON_BATTLEYE_RUNTIME = p; }
-    if (game.use_eac)      { const p = findRuntime('eac_runtime');       if (p) compatEnv.PROTON_EAC_RUNTIME      = p; }
+    // Whether a translation layer is involved at all decides both the compat environment
+    // and, below, whether a game's own shipped wrapper DLLs would be shadowed by the
+    // runtime's builtins.
+    const usingProton = host.runtime.inUse(proton);
+    const compatEnv   = host.runtime.compatEnv(game, proton);
 
     // A game that ships its own opengl32.dll beside the executable gets that file on Windows,
     // where the application directory is searched first. Wine reverses this for DLLs it
@@ -1083,7 +920,7 @@ async function launchGame(gameId, opts = {}) {
                 }
                 return { ok: true, method: 'legendary' };
             }
-            throw new Error('Cannot launch: exe not found, umu-run not available, and legendary not found.');
+            throw new Error('Cannot launch: exe not found, no compatibility runtime available, and legendary not found.');
         }
         throw new Error(`Executable not found: ${resolvedExe || '(not set)'}`);
     }
@@ -1091,7 +928,7 @@ async function launchGame(gameId, opts = {}) {
     // .bat files must be launched via Wine's Z: drive Windows path — Proton/wine
     // can't run .bat from a raw Linux path. Z: maps to the filesystem root.
     const isBat = resolvedExe.toLowerCase().endsWith('.bat');
-    const launchExe = isBat ? ('Z:' + resolvedExe.replace(/\//g, '\\')) : resolvedExe;
+    const launchExe = isBat ? host.runtime.toWindowsPath(resolvedExe) : resolvedExe;
 
     // A DOS game can skip Proton entirely when a native DOSBox is installed: it reads the
     // very same GOG config, so the game's own tweaks are kept and only the emulator changes.
@@ -1120,29 +957,26 @@ async function launchGame(gameId, opts = {}) {
             return { ok: true, method: `dosbox-native (${nativeDosbox.label})` };
         }
         if (dosboxMode === 'native') {
+            const hint = dosboxInstallHint();
             throw new Error(
-                'No native DOSBox found. Install one (on Fedora/Nobara: `sudo dnf install dosbox-staging`), ' +
+                'No native DOSBox found. Install one' + (hint.native ? ` (\`${hint.native}\`)` : '') + ', ' +
                 'or set DOSBox mode back to Automatic to use the copy GOG ships.'
             );
         }
         // 'auto' with nothing installed → fall through to GOG's bundled DOSBox via Proton.
     }
 
-    // Native Linux builds need no compatibility layer at all — check this BEFORE any Proton
-    // gate, or a Linux-native title would be blocked on a Proton it never uses.
-    if (game.platform === 'linux') {
-        try { fs.chmodSync(resolvedExe, '755'); } catch {}
-        spawnGame(resolvedExe, [...userArgs], { cwd: launchCwd, env: baseEnv(), detached: true, stdio: 'ignore' });
+    // A build native to THIS host needs no compatibility layer at all — checked BEFORE the
+    // runtime gate, or a native title would be blocked on a Proton it never uses.
+    if (game.platform === host.nativeOsKey) {
+        const native = host.launchNative({ exe: resolvedExe, args: userArgs });
+        spawnGame(native.cmd, native.args, { cwd: launchCwd, env: baseEnv(native.env), detached: true, stdio: 'ignore' });
         return { ok: true, method: 'native' };
     }
 
-    // Everything below runs a Windows build, and all of it needs Proton. umu-run with an empty
-    // PROTONPATH exits 1 on the spot (see PROTON_SEARCH_DIRS), so refuse the launch here and let
-    // the face offer to install Proton rather than spawning something guaranteed to die in
-    // silence. Bare wine stays reachable only where it is genuinely the sole option — with
-    // umu-run installed, Proton is the supported path and quietly dropping to wine (no DXVK, no
-    // Proton patches) just trades a visible failure for a mysterious one.
-    if (!proton && (umu || !findWineCached())) throw noProtonError();
+    // Everything below runs a Windows build. A runtime that would fail invisibly is refused
+    // here rather than spawned, so the face can offer to install one instead.
+    host.runtime.assertAvailable(proton);
 
     // Per-game fix (see applyFalloutNewCaliforniaFix). Runs before the spawn so the game
     // finds its config and registry on this launch rather than the next one, and is
@@ -1153,28 +987,11 @@ async function launchGame(gameId, opts = {}) {
         catch (e) { console.error('[launch] New California fix failed:', e.message); }
     }
 
-    if (game.store === 'epic' && umu && proton) {
-        spawnGame(umu, [launchExe, ...userArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
-        return { ok: true, method: 'umu-run' };
-    }
-
-    if (umu && proton) {
-        spawnGame(umu, [launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, PROTONPATH: proton, GAMEID: game.app_id || `grinder-${gameId}` }), detached: true, stdio: 'ignore' });
-        return { ok: true, method: isBat ? 'umu-run-bat' : 'umu-run' };
-    }
-
-    if (proton) {
-        const steamRoot = which('steam') ? path.dirname(which('steam')) : path.join(HOME, '.steam', 'root');
-        const protonBin = path.join(proton, 'proton');
-        if (!fs.existsSync(protonBin)) throw new Error(`proton script not found in ${proton}`);
-        spawnGame(protonBin, ['run', launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix, STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot }), detached: true, stdio: 'ignore' });
-        return { ok: true, method: isBat ? 'proton-bat' : 'proton-direct' };
-    }
-
-    const wine = findWineCached();
-    if (!wine) throw new Error('No launch method: umu-run not found, no Proton path set, wine not installed.');
-    spawnGame(wine, [launchExe, ...allArgs], { cwd: launchCwd, env: baseEnv({ WINEPREFIX: prefix }), detached: true, stdio: 'ignore' });
-    return { ok: true, method: 'wine' };
+    const spec = host.runtime.buildLaunch({
+        game, gameId, launchExe, isBat, userArgs, allArgs, runtimePath: proton, prefix,
+    });
+    spawnGame(spec.cmd, spec.args, { cwd: launchCwd, env: baseEnv(spec.env), detached: true, stdio: 'ignore' });
+    return { ok: true, method: spec.method };
 }
 
 function runLegendary(args) {
@@ -1267,12 +1084,10 @@ async function runRedist(sender, channel, appId, platform, prefixPath, protonPat
     // Same resolution as launching, so redists install on a machine where Proton was never
     // configured by hand but a build is present on disk.
     const resolvedProton = resolveProton({ proton_path: protonPath });
-    const umu = findUmu();
     const prefix = expandTilde(prefixPath);
-    const steamRoot = path.join(HOME, '.steam', 'root');
 
-    if (!resolvedProton && !findWineCached()) {
-        sendDone(false, 'No Proton version configured and Wine not found. Set a default Proton in Settings.');
+    if (!host.runtime.canRun(resolvedProton)) {
+        sendDone(false, host.runtime.redistUnavailableMessage);
         return { ok: false };
     }
 
@@ -1283,13 +1098,9 @@ async function runRedist(sender, channel, appId, platform, prefixPath, protonPat
         const exeArgs = (depot.executable.arguments || '').trim().split(/\s+/).filter(Boolean);
         if (!fs.existsSync(exePath)) { send(`⚠ Missing installer: ${exeRel}\n`); continue; }
         send(`Installing ${path.basename(exePath)} (${depot.dependencyId})...\n`);
-        const runEnv = { ...process.env, WINEPREFIX: prefix, STEAM_COMPAT_DATA_PATH: prefix,
-                         STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot, GAMEID: 'umu-0', PROTON_VERB: 'run' };
-        if (resolvedProton) runEnv.PROTONPATH = resolvedProton;
-        let cmd, args;
-        if (umu && resolvedProton)      { cmd = umu;                               args = [exePath, ...exeArgs]; }
-        else if (resolvedProton)        { cmd = path.join(resolvedProton, 'proton'); args = ['run', exePath, ...exeArgs]; }
-        else                            { cmd = findWineCached();                      args = [exePath, ...exeArgs]; delete runEnv.PROTONPATH; }
+        const { cmd, args, env: runEnv } = host.runtime.buildRedistLaunch({
+            exePath, exeArgs, prefix, runtimePath: resolvedProton,
+        });
         await new Promise(res => {
             const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: runEnv, cwd: redistDir });
             p.stdout.on('data', send);
@@ -1309,7 +1120,7 @@ async function injectGogRegistry(game, prefix, proton) {
     if (!(game.store || '').toLowerCase().includes('gog')) return;
 
     const appId   = String(game.app_id);
-    const winPath = ('Z:' + installPath).replace(/\//g, '\\');
+    const winPath = host.runtime.toWindowsPath(installPath);
     const escaped = winPath.replace(/\\/g, '\\\\');
 
     const regContent =
@@ -1326,23 +1137,10 @@ async function injectGogRegistry(game, prefix, proton) {
     const regFile = path.join(os.tmpdir(), `gog_reg_${appId}.reg`);
     fs.writeFileSync(regFile, regContent, 'utf8');
 
-    // Find Wine binary: prefer Proton's bundled wine, fall back to system wine
-    let wineBin = 'wine';
-    if (proton) {
-        const candidates = [
-            path.join(proton, 'files', 'bin', 'wine64'),
-            path.join(proton, 'files', 'bin', 'wine'),
-        ];
-        for (const c of candidates) {
-            if (fs.existsSync(c)) { wineBin = c; break; }
-        }
-    }
+    const reg = host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
 
     await new Promise(resolve => {
-        const proc = spawn(wineBin, ['regedit', '/S', regFile], {
-            env: { ...process.env, WINEPREFIX: prefix, WINEDEBUG: '-all' },
-            stdio: 'ignore',
-        });
+        const proc = spawn(reg.cmd, reg.args, { env: reg.env, stdio: 'ignore' });
         proc.on('close', () => { try { fs.unlinkSync(regFile); } catch {} resolve(); });
         proc.on('error', () => { try { fs.unlinkSync(regFile); } catch {} resolve(); });
     });
@@ -1475,9 +1273,8 @@ async function gogDownloadManual(appId, bonusId, destDir, onProgress) {
 // that actually starts it) is preserved exactly. We change what runs the config, not the
 // config. Nothing is rewritten on disk.
 //
-// dosbox-staging is preferred: it is the actively maintained fork and the one distributions
-// package today. Plain dosbox and dosbox-x are accepted too.
-const DOSBOX_BINARIES = ['dosbox-staging', 'dosbox', 'dosbox-x'];
+// WHICH native DOSBox, and how a person installs one, is the host's business — see the
+// platform backend. Everything above is about GOG's own files and is true everywhere.
 
 // GRINDER's own settings table, read the same way the GOG credentials are.
 function engineSetting(key, fallback = null) {
@@ -1485,50 +1282,9 @@ function engineSetting(key, fallback = null) {
     catch { return fallback; }
 }
 
-// Flatpak is the one way to get DOSBox that works on every distribution, so it is worth
-// finding too — otherwise someone who installed it that way is told they have none.
-const DOSBOX_FLATPAKS = ['io.github.dosbox-staging', 'com.dosbox_x.DOSBox-X'];
-
-// { cmd, args, label } or null. args is non-empty only for the flatpak form.
-let _dosboxCache;
-function findNativeDosbox() {
-    if (_dosboxCache !== undefined) return _dosboxCache;
-    _dosboxCache = null;
-    for (const b of DOSBOX_BINARIES) {
-        const p = which(b);
-        if (p) { _dosboxCache = { cmd: p, args: [], label: path.basename(p) }; return _dosboxCache; }
-    }
-    const flatpak = which('flatpak');
-    if (flatpak) {
-        for (const id of DOSBOX_FLATPAKS) {
-            try {
-                const r = spawnSync(flatpak, ['info', id], { encoding: 'utf8', timeout: 4000 });
-                if (r.status === 0) { _dosboxCache = { cmd: flatpak, args: ['run', id], label: id }; return _dosboxCache; }
-            } catch {}
-        }
-    }
-    return _dosboxCache;
-}
-
-// How to get one, in the words of the user's own distribution. Flatpak is always offered
-// alongside, because it is the single instruction that works everywhere.
-function dosboxInstallHint() {
-    let id = '', like = '';
-    try {
-        const osr = fs.readFileSync('/etc/os-release', 'utf8');
-        id   = (osr.match(/^ID=(.*)$/m)      || [, ''])[1].replace(/"/g, '').trim().toLowerCase();
-        like = (osr.match(/^ID_LIKE=(.*)$/m) || [, ''])[1].replace(/"/g, '').trim().toLowerCase();
-    } catch {}
-    const is = (...names) => names.some(n => id === n || like.split(/\s+/).includes(n));
-    const native =
-        is('fedora', 'rhel', 'centos')  ? 'sudo dnf install dosbox-staging'
-      : is('debian', 'ubuntu')          ? 'sudo apt install dosbox-staging'
-      : is('arch')                      ? 'sudo pacman -S dosbox-staging'
-      : is('opensuse', 'suse')          ? 'sudo zypper install dosbox-staging'
-      : is('alpine')                    ? 'sudo apk add dosbox-staging'
-      : '';
-    return { native, flatpak: 'flatpak install flathub io.github.dosbox-staging' };
-}
+// { cmd, args, label } or null — args is non-empty only for a sandboxed form (Flatpak).
+const findNativeDosbox  = () => host.dosbox.find();
+const dosboxInstallHint = () => host.dosbox.installHint();
 
 // A GOG DOS game is one whose launch target is the bundled DOSBox.
 function isGogDosGame(game, resolvedExe) {
@@ -1538,24 +1294,8 @@ function isGogDosGame(game, resolvedExe) {
     return /(^|\/)dosbox\.exe$/i.test(String(resolvedExe || '').replace(/\\/g, '/'));
 }
 
-// Translate GOG's Windows DOSBox invocation for a native binary. Run from the same working
-// directory, so the relative -conf paths and the config's own `mount C ".."` still resolve.
-//   • backslashes → forward slashes, so ..\game.conf finds the file on Linux
-//   • -noconsole is dropped: it exists only to hide a Windows console window, and a native
-//     build rejects the unknown option outright
-function nativeDosboxArgs(gogArgs) {
-    const out = [];
-    for (let i = 0; i < gogArgs.length; i++) {
-        const a = gogArgs[i];
-        if (a === '-noconsole') continue;
-        if (a === '-conf' && gogArgs[i + 1] !== undefined) {
-            out.push('-conf', gogArgs[++i].replace(/\\/g, '/'));
-            continue;
-        }
-        out.push(a);
-    }
-    return out;
-}
+// GOG's Windows DOSBox invocation, translated for whatever native build this host has.
+const nativeDosboxArgs = (gogArgs) => host.dosbox.translateArgs(gogArgs);
 
 // ── CD audio for GOG's DOS games ─────────────────────────────────────────────
 // A lot of GOG's classic releases ship the original disc as a CD image beside the game —
@@ -1810,7 +1550,7 @@ async function applyFalloutNewCaliforniaFix(installPath, prefix, proton) {
     // Trailing backslash matches the {app}\ GOG writes. FalloutNV.exe and its launcher are
     // both 32-bit, so on a win64 prefix they read HKLM\Software through the WoW64 view —
     // the Wow6432Node copy is the one they actually see.
-    const winPath = ('Z:' + installPath).replace(/\//g, '\\') + '\\';
+    const winPath = host.runtime.toWindowsPath(installPath) + '\\';
     const escaped = winPath.replace(/\\/g, '\\\\');
 
     const regContent =
@@ -1823,22 +1563,13 @@ async function applyFalloutNewCaliforniaFix(installPath, prefix, proton) {
     const regFile = path.join(os.tmpdir(), `fnc_reg_${FNC_APP_ID}.reg`);
     try { fs.writeFileSync(regFile, regContent, 'utf8'); } catch { return; }
 
-    // Proton's own wine, same as injectGogRegistry. It runs outside umu's container, which
-    // is what lets regedit read a file from the host's /tmp at all.
-    let wineBin = 'wine';
-    if (proton) {
-        for (const c of [path.join(proton, 'files', 'bin', 'wine64'),
-                         path.join(proton, 'files', 'bin', 'wine')]) {
-            if (fs.existsSync(c)) { wineBin = c; break; }
-        }
-    }
+    // The runtime's own wine, same as injectGogRegistry. It runs outside umu's container,
+    // which is what lets regedit read a file from the host's /tmp at all.
+    const reg = host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
 
     await new Promise(resolve => {
         const finish = () => { try { fs.unlinkSync(regFile); } catch {} resolve(); };
-        const proc = spawn(wineBin, ['regedit', '/S', regFile], {
-            env: { ...process.env, WINEPREFIX: prefix, WINEDEBUG: '-all' },
-            stdio: 'ignore',
-        });
+        const proc = spawn(reg.cmd, reg.args, { env: reg.env, stdio: 'ignore' });
         // A wedged wine must never hold the game hostage — give up and launch anyway. Merging
         // into a built prefix takes seconds; building one from scratch is a wineboot, so don't
         // pull the plug on that half way through.
@@ -2061,10 +1792,14 @@ async function syncOwnedLibrary() {
                 for (const item of items) {
                     if (!item?.id) continue;
                     const oses      = [...new Set((item.downloads?.installers || []).map(x => x.os).filter(Boolean))];
-                    const platform  = oses.includes('linux') ? 'linux' : 'windows';
-                    const platforms = oses.filter(o => o === 'linux' || o === 'windows').join(',') || platform;
+                    // `platform` is what we would run here; `platforms` is everything GOG
+                    // offers that this host could ever use. Keyed off the backend so a
+                    // library synced on one OS is not mislabelled for the other.
+                    const nativeOs  = host.nativeOsKey;
+                    const runsAs    = oses.includes(nativeOs) ? nativeOs : 'windows';
+                    const platforms = oses.filter(o => o === nativeOs || o === 'windows').join(',') || runsAs;
                     const is_dlc    = item.game_type && item.game_type !== 'game' ? 1 : 0;
-                    games.push({ id: String(item.id), title: item.title || 'Unknown', platform, platforms, is_dlc });
+                    games.push({ id: String(item.id), title: item.title || 'Unknown', platform: runsAs, platforms, is_dlc });
                 }
             }
             const stmtInsert = db.prepare(
@@ -2115,56 +1850,18 @@ function findGogInstallResult(baseDir, appId, preExistingDirs = null) {
                 } catch { return { install_path: gameDir, executable: null }; }
             }
 
-            // ── Linux native path ─────────────────────────────────────────────
-            // gogdl writes .gogdl-linux-manifest after a successful Linux install.
-            // No .info file is created; find the main launcher instead.
-            // Guard: verify this directory belongs to the right game so that a
-            // previously-installed Linux game in the same parent folder is never
-            // mistaken for the newly-installed one.
-            const linuxManifest = path.join(gameDir, '.gogdl-linux-manifest');
-            if (fs.existsSync(linuxManifest)) {
-                // Primary check: gogdl writes a plain-text "gameinfo" file whose
-                // lines include the numeric appId — fast and reliable.
-                try {
-                    const lines = fs.readFileSync(path.join(gameDir, 'gameinfo'), 'utf8')
-                        .split('\n').map(l => l.trim());
-                    if (!lines.includes(String(appId))) continue;
-                } catch {
-                    // gameinfo absent — fall back to the pre-install snapshot:
-                    // skip any directory that already existed before this install.
-                    if (preExistingDirs?.has(entry.name)) continue;
-                }
-                const exe = findLinuxGameExe(gameDir);
-                return { install_path: gameDir, executable: exe };
-            }
+            // ── Native path ───────────────────────────────────────────────────
+            // How a build native to THIS host announces itself is the backend's business
+            // (on Linux, gogdl's .gogdl-linux-manifest). null → not this game, keep looking.
+            const native = host.findNativeInstallResult(gameDir, appId, preExistingDirs);
+            if (native) return native;
         }
     } catch {}
     return null;
 }
 
-function findLinuxGameExe(gameDir) {
-    const folderName = path.basename(gameDir).toLowerCase();
-    try {
-        const entries = fs.readdirSync(gameDir);
-        // 1. .sh launcher at root
-        const sh = entries.find(e => e.toLowerCase().endsWith('.sh') && !e.toLowerCase().startsWith('uninstall'));
-        if (sh) return sh;
-        // 2. Executable binary matching the folder name
-        for (const e of entries) {
-            if (e.toLowerCase() === folderName || e.toLowerCase() === folderName.replace(/ /g, '_')) {
-                const full = path.join(gameDir, e);
-                try { if (fs.statSync(full).mode & 0o111) return e; } catch {}
-            }
-        }
-        // 3. Any executable binary (no extension) at root
-        for (const e of entries) {
-            if (e.includes('.')) continue;
-            const full = path.join(gameDir, e);
-            try { if (fs.statSync(full).isFile() && (fs.statSync(full).mode & 0o111)) return e; } catch {}
-        }
-    } catch {}
-    return null;
-}
+// Still exported under its old name: the GRINDER face destructures it.
+const findLinuxGameExe = (gameDir) => host.findNativeGameExe(gameDir);
 
 // ── Pre-install size info + free disk space (shared by Manager & CREMA) ──────
 // Available bytes at a path (walks up to the first existing parent).
