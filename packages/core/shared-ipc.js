@@ -24,6 +24,7 @@ const genres = require('./genres.js');
 const genreStore = require('./genre-store.js');
 const smartPlaylists = require('./smart-playlists.js');
 const manuals = require('./manuals.js');
+const host = require('./platform/index.js');
 
 function registerSharedHandlers(ctx) {
     const { db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath,
@@ -201,73 +202,38 @@ function registerSharedHandlers(ctx) {
         return result;
     });
 
-    ipcMain.handle('find-flatpak-icon', (e, iconName) => {
-        const bases = [
-            path.join(os.homedir(), '.local/share/flatpak/exports/share/icons/hicolor'),
-            '/var/lib/flatpak/exports/share/icons/hicolor'
-        ];
-        const sizes = ['512x512', '256x256', '192x192', '128x128'];
-        for (const base of bases) {
-            for (const size of sizes) {
-                const p = path.join(base, size, 'apps', iconName + '.png');
-                if (fs.existsSync(p)) return p;
-            }
-            const svg = path.join(base, 'scalable', 'apps', iconName + '.svg');
-            if (fs.existsSync(svg)) return svg;
-        }
-        return null;
-    });
+    // Games installed outside the known stores that still announce themselves to the
+    // desktop (Flatpak on Linux). FINDING them is the host's business; reconciling what it
+    // finds against the library is the same work everywhere, so that half stays here.
+    ipcMain.handle('find-flatpak-icon', (e, iconName) => host.extraStore.findIcon(iconName));
 
     ipcMain.handle('scan-flatpak', () => {
-        const GAME_CATS = new Set(['Game','ActionGame','ArcadeGame','BoardGame','CardGame',
-            'KidsGame','LogicGame','RolePlaying','Shooter','Simulation','SportsGame','StrategyGame']);
-        const dirs = [
-            '/var/lib/flatpak/exports/share/applications',
-            path.join(os.homedir(), '.local/share/flatpak/exports/share/applications')
-        ];
+        const store = host.extraStore;
+        if (!store.supported) return { count: 0, iconMap: {} };
 
-        const found = new Set();
-        const iconMap = {}; // gameId → iconName (= appId for Flatpak)
+        const entries = store.scan();
+        const found   = new Set(entries.map(x => x.launchCmd));
+        const iconMap = {};   // gameId → icon name
 
-        for (const dir of dirs) {
-            let files;
-            try { files = fs.readdirSync(dir).filter(f => f.endsWith('.desktop')); }
-            catch { continue; }
-            for (const file of files) {
-                let content;
-                try { content = fs.readFileSync(path.join(dir, file), 'utf8'); }
-                catch { continue; }
-                let name = '', cats = '', icon = '';
-                for (const line of content.split('\n')) {
-                    if (line.startsWith('Name=')       && !name) name = line.slice(5).trim();
-                    if (line.startsWith('Categories=') && !cats) cats = line.slice(11).trim();
-                    if (line.startsWith('Icon=')       && !icon) icon = line.slice(5).trim();
-                }
-                if (!cats.split(';').map(c => c.trim()).some(c => GAME_CATS.has(c))) continue;
-                const appId = file.slice(0, -8);
-                if (!name) name = appId;
-                if (!icon) icon = appId;
-                const launchCmd = `flatpak run ${appId}`;
-                found.add(launchCmd);
-                const row = db.prepare('SELECT id, Store, CoverArt FROM games WHERE LaunchCommand = ?').get(launchCmd);
-                if (row) {
-                    const stores = (row.Store || '').split(',').map(s => s.trim());
-                    if (!stores.some(s => s.toLowerCase() === 'flatpak'))
-                        db.prepare('UPDATE games SET Store=?, Installed=1 WHERE id=?').run([...stores, 'Flatpak'].join(', '), row.id);
-                    else
-                        db.prepare('UPDATE games SET Installed=1 WHERE id=?').run(row.id);
-                    if (!row.CoverArt) iconMap[row.id] = icon;
-                } else {
-                    const info = db.prepare('INSERT INTO games (Game,Store,LaunchCommand,Installed) VALUES (?,?,?,1)').run(name, 'Flatpak', launchCmd);
-                    iconMap[info.lastInsertRowid] = icon;
-                }
+        for (const entry of entries) {
+            const row = db.prepare('SELECT id, Store, CoverArt FROM games WHERE LaunchCommand = ?').get(entry.launchCmd);
+            if (row) {
+                const stores = (row.Store || '').split(',').map(x => x.trim());
+                if (!stores.some(x => x.toLowerCase() === store.label.toLowerCase()))
+                    db.prepare('UPDATE games SET Store=?, Installed=1 WHERE id=?').run([...stores, store.label].join(', '), row.id);
+                else
+                    db.prepare('UPDATE games SET Installed=1 WHERE id=?').run(row.id);
+                if (!row.CoverArt) iconMap[row.id] = entry.icon;
+            } else {
+                const info = db.prepare('INSERT INTO games (Game,Store,LaunchCommand,Installed) VALUES (?,?,?,1)')
+                               .run(entry.name, store.label, entry.launchCmd);
+                iconMap[info.lastInsertRowid] = entry.icon;
             }
         }
 
-        const existing = db.prepare("SELECT id, LaunchCommand FROM games WHERE Store = 'Flatpak'").all();
-        for (const row of existing) {
-            if (!found.has(row.LaunchCommand))
-                db.prepare('DELETE FROM games WHERE id=?').run(row.id);
+        // Anything of this store's that is no longer on disk drops out of the library.
+        for (const row of db.prepare('SELECT id, LaunchCommand FROM games WHERE Store = ?').all(store.label)) {
+            if (!found.has(row.LaunchCommand)) db.prepare('DELETE FROM games WHERE id=?').run(row.id);
         }
 
         return { count: found.size, iconMap };

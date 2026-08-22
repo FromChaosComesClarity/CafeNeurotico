@@ -319,31 +319,8 @@ ipcMain.on('launch-game', (event, cmd) => {
 ipcMain.on('quit-app', () => app.quit());
 const SAVE_DB_ALLOWED_FIELDS = new Set(['FAV', 'WANT_TO_PLAY', 'LaunchCommand', 'Game', 'CoverArt', 'Screenshot', 'DEV', 'PUB', 'RELEASED', 'GENRE', 'METACRITIC', 'Description', 'Description_i18n', 'ProtonTier', 'SteamAppID', 'HLTB_Main', 'Installed', 'kb_played', 'Hidden']);
 
-function getSteamLibraryPaths() {
-    const home = os.homedir();
-    const roots = [
-        path.join(home, '.local', 'share', 'Steam'),
-        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'steam'),
-        path.join(home, '.steam', 'steam'),
-    ];
-    const dirs = new Set();
-    for (const root of roots) {
-        const sa = path.join(root, 'steamapps');
-        if (!fs.existsSync(sa)) continue;
-        dirs.add(sa);
-        try {
-            const vdf = path.join(sa, 'libraryfolders.vdf');
-            if (fs.existsSync(vdf)) {
-                const content = fs.readFileSync(vdf, 'utf8');
-                for (const m of content.matchAll(/"path"\s+"([^"]+)"/g)) {
-                    const extra = path.join(m[1], 'steamapps');
-                    if (fs.existsSync(extra)) dirs.add(extra);
-                }
-            }
-        } catch(e) {}
-    }
-    return [...dirs];
-}
+// Kept as a local name so the call sites below read unchanged.
+const getSteamLibraryPaths = () => host.steamLibraryPaths();
 function isSteamGameInstalled(appId) {
     if (!appId || appId === 'None' || appId === '') return false;
     const id = String(appId).replace(/\.0+$/, '');
@@ -394,7 +371,7 @@ function expandLaunchers(game) {
     // SteamAppID alone proves nothing — it doubles as the metadata key on GOG/itch rows.
     const appId = String(game.SteamAppID || '').replace(/\.0+$/, '').trim();
     if (stores.includes('steam') && appId && appId !== 'None' && !has('steam')) {
-        add('Steam', `steam steam://rungameid/${appId} -silent`);
+        add('Steam', host.steamLaunchCommand(appId));
     }
     const gg = String(game.GrinderGameId || '').match(/^(gog|epic)_(.+)$/i);
     if (gg) {

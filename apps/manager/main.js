@@ -1179,31 +1179,8 @@ function findEmuLattePath() {
 ipcMain.handle('check-emulatte', () => !!findEmuLattePath());
 
 // ── INSTALL STATUS HELPERS ────────────────────────────────────────────────
-function getSteamLibraryPaths() {
-    const home = os.homedir();
-    const roots = [
-        path.join(home, '.local', 'share', 'Steam'),
-        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'steam'),
-        path.join(home, '.steam', 'steam'),
-    ];
-    const dirs = new Set();
-    for (const root of roots) {
-        const sa = path.join(root, 'steamapps');
-        if (!fs.existsSync(sa)) continue;
-        dirs.add(sa);
-        try {
-            const vdf = path.join(sa, 'libraryfolders.vdf');
-            if (fs.existsSync(vdf)) {
-                const content = fs.readFileSync(vdf, 'utf8');
-                for (const m of content.matchAll(/"path"\s+"([^"]+)"/g)) {
-                    const extra = path.join(m[1], 'steamapps');
-                    if (fs.existsSync(extra)) dirs.add(extra);
-                }
-            }
-        } catch(e) {}
-    }
-    return [...dirs];
-}
+// Kept as a local name so the call sites below read unchanged.
+const getSteamLibraryPaths = () => host.steamLibraryPaths();
 function guessLauncherLabel(cmd) {
     if (!cmd) return 'Custom';
     if (/steam:\/\/rungameid/i.test(cmd))         return 'Steam';
@@ -1760,7 +1737,7 @@ function upsertSteamGame(appid, rawName) {
     const name = rawName ? rawName.trim() : 'Unknown Game';
     if (!name) return null;
 
-    const launchCommand = `steam steam://rungameid/${appid} -silent`;
+    const launchCommand = host.steamLaunchCommand(appid);
     const isInstalled = isSteamGameInstalled(appid) ? 1 : 0;
 
     // Match only by exact LaunchCommand or SteamAppID — never by game name,
@@ -1962,7 +1939,7 @@ function expandLaunchers(game) {
     // itch rows — so a Steam launcher is only inferred when the row is tagged Steam too.
     const appId = String(game.SteamAppID || '').replace(/\.0+$/, '').trim();
     if (stores.includes('steam') && appId && appId !== 'None' && !has('steam')) {
-        add('Steam', `steam steam://rungameid/${appId} -silent`);
+        add('Steam', host.steamLaunchCommand(appId));
     }
     const gg = String(game.GrinderGameId || '').match(/^(gog|epic)_(.+)$/i);
     if (gg) {

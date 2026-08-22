@@ -84,6 +84,96 @@ function which(bin) {
 // GNU coreutils. `-B1` is not portable — see dirSizeCommand's callers.
 function dirSizeCommand(target) { return ['du', '-sB1', target]; }
 
+// ── Steam ────────────────────────────────────────────────────────────────────
+// Every place Steam might keep a library on this host, including extra drives declared in
+// libraryfolders.vdf. The Manager and CREMA each carried a byte-identical copy of this.
+function steamLibraryPaths() {
+    const roots = [
+        path.join(HOME, '.local', 'share', 'Steam'),
+        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'steam'),
+        path.join(HOME, '.steam', 'steam'),
+    ];
+    const dirs = new Set();
+    for (const root of roots) {
+        const sa = path.join(root, 'steamapps');
+        if (!fs.existsSync(sa)) continue;
+        dirs.add(sa);
+        try {
+            const vdf = path.join(sa, 'libraryfolders.vdf');
+            if (fs.existsSync(vdf)) {
+                const content = fs.readFileSync(vdf, 'utf8');
+                for (const m of content.matchAll(/"path"\s+"([^"]+)"/g)) {
+                    const extra = path.join(m[1], 'steamapps');
+                    if (fs.existsSync(extra)) dirs.add(extra);
+                }
+            }
+        } catch (e) {}
+    }
+    return [...dirs];
+}
+
+// How a Steam game is started here. Stored in the library as a launch command, so changing
+// it changes existing rows too — see the LIKE '%steam://rungameid%' queries in the Manager.
+function steamLaunchCommand(appId) { return `steam steam://rungameid/${appId} -silent`; }
+
+// ── Other stores this host knows about ───────────────────────────────────────
+// Flatpak: games installed outside GOG/Epic/Steam that still announce themselves through a
+// desktop entry. Discovery only — reconciling the results against the library is the same
+// work on every host, so it stays in shared-ipc.
+const FLATPAK_GAME_CATS = new Set(['Game','ActionGame','ArcadeGame','BoardGame','CardGame',
+    'KidsGame','LogicGame','RolePlaying','Shooter','Simulation','SportsGame','StrategyGame']);
+
+function scanExtraStore() {
+    const dirs = [
+        '/var/lib/flatpak/exports/share/applications',
+        path.join(HOME, '.local/share/flatpak/exports/share/applications'),
+    ];
+    const out = [];
+    const seen = new Set();
+    for (const dir of dirs) {
+        let files;
+        try { files = fs.readdirSync(dir).filter(f => f.endsWith('.desktop')); }
+        catch { continue; }
+        for (const file of files) {
+            let content;
+            try { content = fs.readFileSync(path.join(dir, file), 'utf8'); }
+            catch { continue; }
+            let name = '', cats = '', icon = '';
+            for (const line of content.split('\n')) {
+                if (line.startsWith('Name=')       && !name) name = line.slice(5).trim();
+                if (line.startsWith('Categories=') && !cats) cats = line.slice(11).trim();
+                if (line.startsWith('Icon=')       && !icon) icon = line.slice(5).trim();
+            }
+            if (!cats.split(';').map(c => c.trim()).some(c => FLATPAK_GAME_CATS.has(c))) continue;
+            const appId = file.slice(0, -8);
+            const launchCmd = `flatpak run ${appId}`;
+            if (seen.has(launchCmd)) continue;
+            seen.add(launchCmd);
+            out.push({ name: name || appId, launchCmd, icon: icon || appId });
+        }
+    }
+    return out;
+}
+
+function findExtraStoreIcon(iconName) {
+    const bases = [
+        path.join(HOME, '.local/share/flatpak/exports/share/icons/hicolor'),
+        '/var/lib/flatpak/exports/share/icons/hicolor',
+    ];
+    const sizes = ['512x512', '256x256', '192x192', '128x128'];
+    for (const base of bases) {
+        for (const size of sizes) {
+            const p = path.join(base, size, 'apps', iconName + '.png');
+            if (fs.existsSync(p)) return p;
+        }
+        const svg = path.join(base, 'scalable', 'apps', iconName + '.svg');
+        if (fs.existsSync(svg)) return svg;
+    }
+    return null;
+}
+
+const extraStore = { supported: true, label: 'Flatpak', scan: scanExtraStore, findIcon: findExtraStoreIcon };
+
 // ── Store platform identifiers ───────────────────────────────────────────────
 // What this host calls itself in the places a platform name is data rather than code:
 // the `games.platform` column, GOG's `os` field, and the two downloaders' CLI flags.
@@ -703,6 +793,7 @@ module.exports = {
     binDirName, portableBaseDir, selfExecutable, selfSpawnArgs,
     grinderDbCandidates, findGrinderDb, grinderDbCreatePath,
     which, dirSizeCommand,
+    steamLibraryPaths, steamLaunchCommand, extraStore,
     nativeOsKey, gogdlPlatform, legendaryPlatform,
     launchNative, findNativeGameExe, findNativeInstallResult,
     dosbox,
