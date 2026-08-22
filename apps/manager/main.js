@@ -2701,7 +2701,7 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
         // The suite AppImage (or the exec path in dev).
         const files = (() => { try { return fs.readdirSync(baseDir); } catch { return []; } })();
         const suiteFile = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
-        const suitePath = suiteFile ? path.join(baseDir, suiteFile) : (process.env.APPIMAGE || process.execPath);
+        const suitePath = suiteFile ? path.join(baseDir, suiteFile) : host.selfExecutable();
         try { if (/\.AppImage$/i.test(suitePath)) fs.chmodSync(suitePath, '755'); } catch {}
 
         // Icon: prefer a squarish Icon/Logo, fall back to the cover, then the CN app icon.

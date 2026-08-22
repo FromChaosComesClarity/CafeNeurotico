@@ -417,13 +417,19 @@ ipcMain.handle('get-ui-font', () => {
 ipcMain.handle('check-tools', () => {
     const leg   = findLegendary();
     const gogdl = findGogdl();
+    // legendary and gogdl ship with the suite and are the same everywhere. The rest are the
+    // host's runner stack; `runtimeTools` is the shape the panel should move to, while the
+    // flat keys keep today's UI working untouched.
+    const tools = host.runtime.tools();
+    const byKey = Object.fromEntries(tools.map(t => [t.key, t.path]));
     return {
         legendary:         leg,
         legendary_bundled: leg === path.join(binDir, 'legendary'),
         gogdl:             gogdl,
         gogdl_bundled:     gogdl === path.join(binDir, 'gogdl'),
-        umu:               findUmu(),
-        wine:              findWineCached(),
+        runtimeTools:      tools,
+        canInstallRunner:  host.runtime.canInstallRunner,
+        ...byKey,
     };
 });
 
@@ -957,96 +963,50 @@ ipcMain.handle('get-play-tasks', (_, gameId) => grinderEngine.gogPlayTasks(gameI
 // can detect the base game (they check HKLM\SOFTWARE\GOG.com\Games\<ID>\path).
 // Wine maps Z:\ to the filesystem root, so Linux paths are reachable via Z:\.
 
-ipcMain.handle('run-exe-on-prefix', async (_, gameId) => {
-    const result = await dialog.showOpenDialog(win, {
-        title: 'Select executable to run in game prefix',
-        filters: [{ name: 'Windows Executables', extensions: ['exe', 'msi', 'bat'] }],
-        properties: ['openFile'],
-    });
-    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
-
+// "Run something else in this game's prefix" — a config tool, a patcher, a mod installer.
+// Both entry points differ only in which folder the file picker opens at; the spawn spec is
+// the same one redistributable installers use, so it comes from the platform backend.
+async function runExeForGame(gameId, dialogOpts) {
     const game = db.prepare('SELECT * FROM games WHERE id=?').get(gameId);
     if (!game) return { ok: false, error: 'Game not found' };
 
-    const exe = result.filePaths[0];
+    const result = await dialog.showOpenDialog(win, {
+        filters: [{ name: 'Windows Executables', extensions: ['exe', 'msi', 'bat'] }],
+        properties: ['openFile'],
+        ...dialogOpts,
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+
+    const exe    = result.filePaths[0];
     const prefix = grinderEngine.prefixPathForGame(game);
     const proton = expandTilde(game.proton_path)
         || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || '';
     fs.mkdirSync(prefix, { recursive: true });
     await injectGogRegistry(game, prefix, proton);
-    const umu = findUmu();
-    const steamRoot = path.join(HOME, '.steam', 'root');
 
+    if (!host.runtime.canRun(proton)) return { ok: false, error: host.runtime.redistUnavailableMessage };
+
+    // Per-game custom variables sit over the runtime's own, same as a normal launch.
     const customEnv = {};
     for (const line of (game.custom_env || '').split('\n')) {
         const eq = line.indexOf('=');
         if (eq > 0) customEnv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
     }
-    const env = { ...process.env, ...customEnv, WINEPREFIX: prefix,
-                  STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot,
-                  GAMEID: 'umu-0', PROTON_VERB: 'run' };
-    if (proton) env.PROTONPATH = proton;
 
-    if (umu && proton) {
-        spawn(umu, [exe], { env, detached: true, stdio: 'ignore' }).unref();
-        return { ok: true, method: 'umu-run' };
-    }
-    if (proton) {
-        const protonBin = path.join(proton, 'proton');
-        spawn(protonBin, ['run', exe], { env, detached: true, stdio: 'ignore' }).unref();
-        return { ok: true, method: 'proton-direct' };
-    }
-    const wine = findWineCached();
-    if (!wine) return { ok: false, error: 'No runner: umu-run not found, no Proton set, wine not installed.' };
-    spawn(wine, [exe], { env, detached: true, stdio: 'ignore' }).unref();
-    return { ok: true, method: 'wine' };
-});
+    const spec = host.runtime.buildRedistLaunch({ exePath: exe, exeArgs: [], prefix, runtimePath: proton });
+    spawn(spec.cmd, spec.args, { env: { ...spec.env, ...customEnv }, detached: true, stdio: 'ignore' }).unref();
+    return { ok: true, method: spec.method };
+}
 
-ipcMain.handle('run-exe-in-game-folder', async (_, gameId) => {
-    const game = db.prepare('SELECT * FROM games WHERE id=?').get(gameId);
-    if (!game) return { ok: false, error: 'Game not found' };
+ipcMain.handle('run-exe-on-prefix', (_, gameId) =>
+    runExeForGame(gameId, { title: 'Select executable to run in game prefix' }));
 
-    const installDir = expandTilde(game.install_path) || undefined;
-    const result = await dialog.showOpenDialog(win, {
+ipcMain.handle('run-exe-in-game-folder', (_, gameId) => {
+    const game = db.prepare('SELECT install_path FROM games WHERE id=?').get(gameId);
+    return runExeForGame(gameId, {
         title: 'Select executable in game folder',
-        defaultPath: installDir,
-        filters: [{ name: 'Windows Executables', extensions: ['exe', 'msi', 'bat'] }],
-        properties: ['openFile'],
+        defaultPath: expandTilde(game?.install_path) || undefined,
     });
-    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
-
-    const exe = result.filePaths[0];
-    const prefix = grinderEngine.prefixPathForGame(game);
-    const proton = expandTilde(game.proton_path)
-        || db.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value || '';
-    fs.mkdirSync(prefix, { recursive: true });
-    await injectGogRegistry(game, prefix, proton);
-    const umu = findUmu();
-    const steamRoot = path.join(HOME, '.steam', 'root');
-
-    const customEnv = {};
-    for (const line of (game.custom_env || '').split('\n')) {
-        const eq = line.indexOf('=');
-        if (eq > 0) customEnv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-    }
-    const env = { ...process.env, ...customEnv, WINEPREFIX: prefix,
-                  STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot,
-                  GAMEID: 'umu-0', PROTON_VERB: 'run' };
-    if (proton) env.PROTONPATH = proton;
-
-    if (umu && proton) {
-        spawn(umu, [exe], { env, detached: true, stdio: 'ignore' }).unref();
-        return { ok: true, method: 'umu-run' };
-    }
-    if (proton) {
-        const protonBin = path.join(proton, 'proton');
-        spawn(protonBin, ['run', exe], { env, detached: true, stdio: 'ignore' }).unref();
-        return { ok: true, method: 'proton-direct' };
-    }
-    const wine = findWineCached();
-    if (!wine) return { ok: false, error: 'No runner: umu-run not found, no Proton set, wine not installed.' };
-    spawn(wine, [exe], { env, detached: true, stdio: 'ignore' }).unref();
-    return { ok: true, method: 'wine' };
 });
 
 // ── GOG / gogdl ───────────────────────────────────────────────────────────────
@@ -1443,28 +1403,10 @@ ipcMain.handle('legendary-repair', (event, gameId) => {
     });
 });
 
-// umu-run installer — tries pipx first, falls back to pip --user
+// Install the host's recommended compatibility runner.
 ipcMain.handle('install-umu', (event) => {
-    const pipx = which('pipx');
-    const pip  = which('pip3') || which('pip');
-
-    if (!pipx && !pip) {
-        return { ok: false, error: 'Neither pipx nor pip found. Install pipx first:\n  Fedora: sudo dnf install pipx\n  Debian/Ubuntu: sudo apt install pipx\n  Arch: sudo pacman -S python-pipx' };
-    }
-
-    const cmd  = pipx || pip;
-    const args = pipx ? ['install', 'umu-launcher'] : ['install', '--user', 'umu-launcher'];
-
-    return new Promise(resolve => {
-        const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-
-        const send = (data) => {
-            try { event.sender.send('umu-install-progress', String(data)); } catch {}
-        };
-
-        proc.stdout.on('data', send);
-        proc.stderr.on('data', send);
-        proc.on('close', code => resolve({ ok: code === 0, exitCode: code, method: pipx ? 'pipx' : 'pip --user' }));
-        proc.on('error', err => resolve({ ok: false, error: err.message }));
+    if (!host.runtime.canInstallRunner) return { ok: false, error: 'This system has no installable compatibility runner.' };
+    return host.runtime.installRunner({
+        onProgress: line => { try { event.sender.send('umu-install-progress', line); } catch {} },
     });
 });

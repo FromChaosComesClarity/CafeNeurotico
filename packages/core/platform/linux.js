@@ -688,10 +688,10 @@ function buildRedistLaunch({ exePath, exeArgs, prefix, runtimePath }) {
                   STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot, GAMEID: 'umu-0', PROTON_VERB: 'run' };
     if (runtimePath) env.PROTONPATH = runtimePath;
 
-    if (umu && runtimePath) return { cmd: umu, args: [exePath, ...exeArgs], env };
-    if (runtimePath)        return { cmd: path.join(runtimePath, 'proton'), args: ['run', exePath, ...exeArgs], env };
+    if (umu && runtimePath) return { cmd: umu, args: [exePath, ...exeArgs], env, method: 'umu-run' };
+    if (runtimePath)        return { cmd: path.join(runtimePath, 'proton'), args: ['run', exePath, ...exeArgs], env, method: 'proton-direct' };
     delete env.PROTONPATH;
-    return { cmd: findWineCached(), args: [exePath, ...exeArgs], env };
+    return { cmd: findWineCached(), args: [exePath, ...exeArgs], env, method: 'wine' };
 }
 
 const REDIST_UNAVAILABLE_MESSAGE =
@@ -878,9 +878,46 @@ const management = {
     cancel: cancelInstall, remove: removeRuntime,
 };
 
+// The host tools a user might have to install themselves, for the External Tools panel.
+// `key` is what the existing UI keys its dots off; a host with a different runner stack
+// returns a different list and the panel follows it.
+function runnerTools() {
+    return [
+        { key: 'umu',  label: 'umu-run', path: findUmu() || null, installable: true, optional: false,
+          hint: 'not found — install via package manager for best compatibility. Direct Proton invocation is used as a fallback.' },
+        { key: 'wine', label: 'wine',    path: findWineCached() || null, installable: false, optional: true,
+          hint: 'not found (optional — only needed as last resort)' },
+    ];
+}
+
+// Install the recommended runner. umu-launcher is a Python package, so pipx is preferred and
+// pip --user is the fallback; neither existing is a dead end we can only explain.
+function installRunner({ onProgress } = {}) {
+    const send = typeof onProgress === 'function' ? onProgress : () => {};
+    const pipx = which('pipx');
+    const pip  = which('pip3') || which('pip');
+    if (!pipx && !pip) {
+        return Promise.resolve({ ok: false, error:
+            'Neither pipx nor pip found. Install pipx first:\n  Fedora: sudo dnf install pipx\n' +
+            '  Debian/Ubuntu: sudo apt install pipx\n  Arch: sudo pacman -S python-pipx' });
+    }
+    const cmd  = pipx || pip;
+    const args = pipx ? ['install', 'umu-launcher'] : ['install', '--user', 'umu-launcher'];
+    return new Promise(resolve => {
+        const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        proc.stdout.on('data', d => send(String(d)));
+        proc.stderr.on('data', d => send(String(d)));
+        proc.on('close', code => resolve({ ok: code === 0, exitCode: code, method: pipx ? 'pipx' : 'pip --user' }));
+        proc.on('error', err => resolve({ ok: false, error: err.message }));
+    });
+}
+
 const runtime = {
     id: 'proton',
     management,
+    tools: runnerTools,
+    canInstallRunner: true,
+    installRunner,
     prefixesDirName: 'prefixes',
     setupPhase: 'runtime',          // the STARTUP_STEPS phase whose byte counter is live
     scan: scanRuntimes,
