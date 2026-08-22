@@ -1376,7 +1376,7 @@ function scriptSavePaths(installDir) {
 
 // ── Epic (legendary) authoritative source: CloudSaveFolder from the game metadata ──
 // legendary uses the standard ~/.config/legendary (confirmed against GRINDER).
-const legendaryDir = () => path.join(os.homedir(), '.config', 'legendary');
+const legendaryDir = () => host.legendaryConfigDir();
 function epicAccountId() {
     try { const u = JSON.parse(fs.readFileSync(path.join(legendaryDir(), 'user.json'), 'utf8')); return u.account_id || u.accountId || ''; } catch { return ''; }
 }

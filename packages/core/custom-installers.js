@@ -28,6 +28,7 @@ const { spawnSync } = require('child_process');
 const RECIPES = [
     {
         id: 'ironwail',
+        hosts: ['linux'],
         title: 'Ironwail',
         kind: 'Source port',
         game: 'Quake',
@@ -45,6 +46,7 @@ const RECIPES = [
     },
     {
         id: 'vkquake',
+        hosts: ['linux'],
         title: 'vkQuake',
         kind: 'Source port',
         game: 'Quake',
@@ -62,6 +64,7 @@ const RECIPES = [
     },
     {
         id: 'quake-rt',
+        hosts: ['linux'],
         title: 'Quake: Ray Traced',
         kind: 'Source port',
         game: 'Quake',
@@ -79,6 +82,7 @@ const RECIPES = [
     },
     {
         id: 'gzdoom',
+        hosts: ['linux'],
         title: 'GZDoom',
         kind: 'Source port',
         game: 'Doom',
@@ -96,6 +100,7 @@ const RECIPES = [
     },
     {
         id: 'uzdoom',
+        hosts: ['linux'],
         title: 'UZDoom',
         kind: 'Source port',
         game: 'Doom',
@@ -113,6 +118,7 @@ const RECIPES = [
     },
     {
         id: 'minidoom2',
+        hosts: ['linux'],
         title: 'Mini Doom 2',
         kind: 'Fan game',
         game: '',
@@ -130,6 +136,7 @@ const RECIPES = [
     },
     {
         id: 'minidoom1',
+        hosts: ['linux'],
         title: 'Mini Doom',
         kind: 'Fan game',
         game: '',
@@ -150,6 +157,7 @@ const RECIPES = [
     },
     {
         id: 'ecwolf',
+        hosts: ['linux'],
         title: 'ECWolf',
         kind: 'Source port',
         game: 'Wolfenstein 3D',
@@ -167,6 +175,7 @@ const RECIPES = [
     },
     {
         id: 'raze',
+        hosts: ['linux'],
         title: 'Raze',
         kind: 'Source port',
         game: 'Build engine games',
@@ -189,6 +198,7 @@ const RECIPES = [
     },
     {
         id: 'buildgdx',
+        hosts: ['linux'],
         title: 'BuildGDX',
         kind: 'Source port',
         game: 'Build engine games',
@@ -209,6 +219,7 @@ const RECIPES = [
     },
     {
         id: 'cannonball',
+        hosts: ['linux'],
         title: 'CannonBall',
         kind: 'Custom engine',
         game: 'OutRun',
@@ -229,6 +240,7 @@ const RECIPES = [
     },
     {
         id: 'swos2020',
+        hosts: ['linux'],
         title: 'SWOS 2020',
         kind: 'Fan game',
         game: '',
@@ -253,6 +265,7 @@ const RECIPES = [
     // chosen deliberately and never claims someone else's download.
     {
         id: 'quake-mod',
+        hosts: ['linux'],
         title: 'Any Quake mod or episode',
         kind: 'Mod',
         game: 'Quake',
@@ -275,6 +288,7 @@ const RECIPES = [
     // folders with their own engine, and no recipe can improve on simply registering them.
     {
         id: 'folder',
+        hosts: ['linux'],
         title: 'A game folder you already have',
         kind: 'Folder',
         game: '',
@@ -300,6 +314,7 @@ const RECIPES = [
     // than copied per mod, because that is how GZDoom is designed to work.
     {
         id: 'brutaldoom',
+        hosts: ['linux'],
         title: 'Brutal Doom',
         kind: 'Mod',
         game: 'Doom',
@@ -321,6 +336,7 @@ const RECIPES = [
     },
     {
         id: 'brutaldoom-black',
+        hosts: ['linux'],
         title: 'Brutal Doom: Black Edition',
         kind: 'Mod',
         game: 'Doom',
@@ -347,6 +363,7 @@ const RECIPES = [
     // claim every archive; it only ever runs when the user picks it deliberately.
     {
         id: 'doom-mod',
+        hosts: ['linux'],
         title: 'Any Doom mod or texture pack',
         kind: 'Mod',
         game: 'Doom',
@@ -370,6 +387,7 @@ const RECIPES = [
     // one rigid layout, nothing to curate per game.
     {
         id: 'openbor',
+        hosts: ['linux'],
         title: 'OpenBOR game',
         kind: 'OpenBOR',
         game: '',
@@ -570,6 +588,7 @@ const BUILD_BLURB = {
 for (const [id, g] of Object.entries(BUILD_GAMES)) {
     RECIPES.push({
         id: `build-game-${id}`,
+        hosts: ['linux'],
         title: g.label.replace(/ \(.*\)$/, ''),
         kind: 'Game',
         game: 'Build engine games',
@@ -618,6 +637,11 @@ for (const [id, g] of Object.entries(BUILD_GAMES)) {
 function selfCheck() {
     const problems = [];
     for (const r of RECIPES) {
+        // Every recipe declares the hosts it is valid on. The catalogue is a Linux one today
+        // — each entry points at a Windows download run through a compatibility layer — and a
+        // macOS catalogue built from native source-port releases will live alongside it here
+        // rather than in a fork. An untagged recipe would silently be offered on both.
+        if (!Array.isArray(r.hosts) || !r.hosts.length) { problems.push(`${r.id}: no hosts declared`); continue; }
         if (r.contains || r.generic || r.onEngine || r.folder) continue;   // no archive of their own
         if (!r.samples || !r.samples.length) { problems.push(`${r.id}: no samples to check`); continue; }
         for (const s of r.samples) {

@@ -81,8 +81,22 @@ function which(bin) {
     catch { return null; }
 }
 
-// GNU coreutils. `-B1` is not portable — see dirSizeCommand's callers.
-function dirSizeCommand(target) { return ['du', '-sB1', target]; }
+// Directory size. Both the flag and the unit differ between coreutils and BSD userland
+// (`du -sB1` is GNU-only; BSD has no -B and reports 512-byte or 1K blocks), so the command
+// and the parser have to travel together.
+function dirSizeBytesCommand(target) {
+    return {
+        cmd: `du -sB1 "${target}" 2>/dev/null`,
+        parse: out => { const n = parseInt((String(out).split('\t')[0] || '').trim(), 10); return Number.isFinite(n) ? n : null; },
+    };
+}
+function dirSizeHumanCommand(target) {
+    return { cmd: `du -sh "${target}" 2>/dev/null`, parse: out => String(out).split('\t')[0].trim() };
+}
+
+// legendary keeps its credentials and per-game metadata here. Not the same place on every
+// host: macOS puts it under ~/Library/Application Support.
+function legendaryConfigDir() { return path.join(HOME, '.config', 'legendary'); }
 
 // ── Desktop integration ──────────────────────────────────────────────────────
 // Menu entries, desktop shortcuts, autostart, opening a URL scheme, focusing a window.
@@ -887,7 +901,7 @@ module.exports = {
     init,
     binDirName, portableBaseDir, selfExecutable, selfSpawnArgs,
     grinderDbCandidates, findGrinderDb, grinderDbCreatePath,
-    which, dirSizeCommand,
+    which, dirSizeBytesCommand, dirSizeHumanCommand, legendaryConfigDir,
     steamLibraryPaths, steamLaunchCommand, extraStore, desktop,
     nativeOsKey, gogdlPlatform, legendaryPlatform,
     launchNative, findNativeGameExe, findNativeInstallResult,

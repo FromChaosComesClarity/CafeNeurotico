@@ -544,8 +544,9 @@ ipcMain.handle('get-disk-size', (_, dirPath) => {
     if (!resolved || !fs.existsSync(resolved)) return null;
     return new Promise(resolve => {
         const { exec } = require('child_process');
-        exec(`du -sh "${resolved}" 2>/dev/null`, { timeout: 15000 }, (err, stdout) => {
-            resolve(err ? null : stdout.split('\t')[0].trim());
+        const size = host.dirSizeHumanCommand(resolved);
+        exec(size.cmd, { timeout: 15000 }, (err, stdout) => {
+            resolve(err ? null : size.parse(stdout));
         });
     });
 });
@@ -562,9 +563,9 @@ ipcMain.handle('get-all-disk-sizes', () => {
         if (!p || !fs.existsSync(p)) return Promise.resolve({ id: g.id, bytes: null });
         return new Promise(resolve => {
             // -sB1 = summarised disk usage (allocated blocks) in bytes → numeric, sortable.
-            exec(`du -sB1 "${p}" 2>/dev/null`, { timeout: 15000 }, (err, stdout) => {
-                const bytes = err ? null : parseInt((stdout.split('\t')[0] || '').trim(), 10);
-                resolve({ id: g.id, bytes: Number.isFinite(bytes) ? bytes : null });
+            const size = host.dirSizeBytesCommand(p);
+            exec(size.cmd, { timeout: 15000 }, (err, stdout) => {
+                resolve({ id: g.id, bytes: err ? null : size.parse(stdout) });
             });
         });
     }));
@@ -747,7 +748,7 @@ ipcMain.handle('legendary-login', event => {
                     if (exitCode !== 0) {
                         // Show legendary's log file so the user can see what went wrong
                         try {
-                            const logPath = path.join(HOME, '.config', 'legendary', 'logs', 'legendary.log');
+                            const logPath = path.join(host.legendaryConfigDir(), 'logs', 'legendary.log');
                             const log = fs.readFileSync(logPath, 'utf8');
                             const tail = log.split('\n').slice(-25).join('\n');
                             send(`\n--- legendary log (last 25 lines) ---\n${tail}\n`);
