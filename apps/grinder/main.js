@@ -35,7 +35,7 @@ const logDir      = path.join(configDir, 'game_logs');
 const dbPath      = path.join(configDir, 'grinder.db');
 
 // Directory containing the AppImage (same folder as CNGM.AppImage)
-const appImageDir  = process.env.APPIMAGE ? path.dirname(process.env.APPIMAGE) : configDir;
+const appImageDir  = host.portableBaseDir({ devDir: configDir });
 const progressFile = path.join(appImageDir, 'GameManagerConfig', 'grinder-progress.json');
 
 
@@ -134,11 +134,9 @@ const HOME = os.homedir();
 
 // Expand ~ to HOME so spawn() (which doesn't use a shell) gets real paths
 // ── Bundled binary paths ──────────────────────────────────────────────────────
-// In packaged AppImage, extraResources land in process.resourcesPath/assets/bin/linux.
-// In dev, they live in __dirname/assets/bin/linux.
-const binDir = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets', 'bin', 'linux')
-    : path.join(__dirname, 'assets', 'bin', 'linux');
+// In a packaged build, extraResources land in process.resourcesPath/assets/bin/<host>.
+// In dev, they live in __dirname/assets/bin/<host>.
+const binDir = path.join(app.isPackaged ? process.resourcesPath : __dirname, 'assets', 'bin', host.binDirName);
 
 // expandTilde, resolvePathCaseInsensitive, which, find* and findRuntime now live
 // in packages/core/grinder-engine.js (re-bound at the top of this file).

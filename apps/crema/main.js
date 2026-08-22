@@ -6,6 +6,7 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const { registerSharedHandlers } = require('../../packages/core/shared-ipc.js');
 const _smart = require('../../packages/core/smart-playlists.js');
+const host = require('../../packages/core/platform/index.js');
 const { spawn, exec, execFile } = require('child_process');
 const https = require('https');
 const mm = require('music-metadata');
@@ -57,19 +58,14 @@ async function searchHltb(gameName) {
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
-// --- APPIMAGE PORTABILITY LOGIC ---
-let baseDir;
-if (process.env.APPIMAGE) {
-    baseDir = path.dirname(process.env.APPIMAGE); // External: Where the user placed the AppImage
-} else if (app.isPackaged) {
-    baseDir = path.dirname(process.execPath);
-} else {
-    baseDir = __dirname;
-}
+// --- PORTABILITY LOGIC ---
+// Where user data lives is the host's call: portable beside the AppImage on Linux, an
+// absolute Library path on systems where an app bundle cannot hold its own data.
+const baseDir = host.portableBaseDir({ isPackaged: app.isPackaged, execPath: process.execPath, devDir: __dirname });
 
 const isPackaged = app.isPackaged;
 const baseAssetPath = isPackaged ? process.resourcesPath : __dirname;
-const binDir = path.join(baseAssetPath, 'assets', 'bin', 'linux');
+const binDir = path.join(baseAssetPath, 'assets', 'bin', host.binDirName);
 const ytDlpPath = path.join(binDir, 'yt-dlp');
 const ffmpegPath = path.join(binDir, 'ffmpeg');
 const ytDlpConfigPath = path.join(binDir, 'yt-dlp.conf');
@@ -167,19 +163,13 @@ async function fetchDescI18n(appId, enDesc) {
 // ── GRINDER integration ───────────────────────────────────────────────────────
 // GRINDER is a face of this same binary now: re-invoke self with a leading 'grinder' arg.
 function spawnGrinderFace(subArgs, opts) {
-    const bin  = process.env.APPIMAGE || process.execPath;
-    const args = process.env.APPIMAGE ? ['grinder', ...subArgs] : [path.join(__dirname, '..', '..'), 'grinder', ...subArgs];
+    const bin  = host.selfExecutable();
+    const args = host.selfSpawnArgs(['grinder', ...subArgs], path.join(__dirname, '..', '..'));
     return spawn(bin, args, opts);
 }
 
 function readGrinderDb() {
-    const home = os.homedir();
-    const candidates = [
-        path.join(home, '.config', 'grinder', 'grinder.db'),
-        path.join(home, '.config', 'GRINDER', 'grinder.db'),
-        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
-    ];
-    const dbPath = candidates.find(p => fs.existsSync(p));
+    const dbPath = host.findGrinderDb(baseDir);
     if (!dbPath) return null;
     try {
         const gdb = new Database(dbPath, { readonly: true });
@@ -211,14 +201,10 @@ let _grinderEngineDb = null;
 function ensureGrinderEngine() {
     if (_grinderEngineDb) return true;
     const home = os.homedir();
-    const gdbPath = [
-        path.join(home, '.config', 'grinder', 'grinder.db'),
-        path.join(home, '.config', 'GRINDER', 'grinder.db'),
-        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
-    ].find(p => fs.existsSync(p));
+    const gdbPath = host.findGrinderDb(baseDir);
     if (!gdbPath) return false;
     const gConfigDir   = path.dirname(gdbPath);
-    const engineBinDir = isPackaged ? path.join(process.resourcesPath, 'assets', 'bin', 'linux') : path.join(__dirname, 'assets', 'bin', 'linux');
+    const engineBinDir = path.join(isPackaged ? process.resourcesPath : __dirname, 'assets', 'bin', host.binDirName);
     try { _grinderEngineDb = new Database(gdbPath, { timeout: 5000 }); }
     catch (e) { console.error('[grinder-engine] DB open failed:', e); _grinderEngineDb = null; return false; }
     grinderEngine.init({
@@ -267,13 +253,7 @@ function reportLaunchFailure(info) {
 // Same logic as CNGM's grinder-status + sync-all-grinder-games
 function syncInstalledFromGrinder() {
     if (!db) return;
-    const home = os.homedir();
-    const candidates = [
-        path.join(home, '.config', 'grinder', 'grinder.db'),
-        path.join(home, '.config', 'GRINDER', 'grinder.db'),
-        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
-    ];
-    const gDbPath = candidates.find(p => fs.existsSync(p));
+    const gDbPath = host.findGrinderDb(baseDir);
     if (!gDbPath) return;
     try {
         const gdb = new Database(gDbPath, { readonly: true });
@@ -374,12 +354,7 @@ function isSteamGameInstalled(appId) {
 // LaunchCommands. Install state is the OR across those stores; keying off only the
 // primary LaunchCommand hid an installed Steam copy whenever the primary was GOG/Epic.
 function grinderDbPath() {
-    const home = os.homedir();
-    return [
-        path.join(home, '.config', 'grinder', 'grinder.db'),
-        path.join(home, '.config', 'GRINDER', 'grinder.db'),
-        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
-    ].find(p => fs.existsSync(p)) || null;
+    return host.findGrinderDb(baseDir);
 }
 function guessLauncherLabel(cmd) {
     if (!cmd) return 'Custom';
@@ -672,13 +647,7 @@ const GOG_CLIENT_ID     = '46899977096215655';
 const GOG_CLIENT_SECRET = '9d85c43b1482497dbbce61f6e4aa173a433796eeae2ca8c5f6129f2dc4de46d9';
 
 ipcMain.handle('fetch-achievements-now', async (_, appId) => {
-    const home = os.homedir();
-    const candidates = [
-        path.join(home, '.config', 'grinder', 'grinder.db'),
-        path.join(home, '.config', 'GRINDER', 'grinder.db'),
-        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
-    ];
-    const gdbPath = candidates.find(p => fs.existsSync(p));
+    const gdbPath = host.findGrinderDb(baseDir);
     if (!gdbPath) return { ok: false, error: 'grinder_not_found' };
 
     let token, userId;
@@ -1044,8 +1013,7 @@ const grinderProgressFile = path.join(configDir, 'grinder-progress.json');
 let _headlessProc = null;
 
 function getGrinderDbPath() {
-    const home = os.homedir();
-    return [path.join(home, '.config', 'grinder', 'grinder.db'), path.join(home, '.config', 'GRINDER', 'grinder.db'), path.join(baseDir, 'GRINDERConfig', 'grinder.db')].find(p => fs.existsSync(p)) || null;
+    return host.findGrinderDb(baseDir);
 }
 
 ipcMain.handle('grinder-get-default-install-dir', () => {

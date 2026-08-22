@@ -31,6 +31,50 @@ function init(ctx = {}) {
     if (typeof ctx.expandTilde === 'function') expandTilde = ctx.expandTilde;
 }
 
+// ── Paths ────────────────────────────────────────────────────────────────────
+// The subdirectory of assets/bin/ holding this host's helper binaries.
+const binDirName = 'linux';
+
+// Where the suite keeps user data. The AppImage is portable by design: the library sits
+// beside the file the user placed, so moving the AppImage moves the data with it. Falls
+// back to the packaged executable's directory, then to whatever the caller uses in dev.
+//
+// There is no equivalent on macOS — an .app in /Applications cannot keep user data inside
+// itself — so a darwin backend returns an absolute Library path and ignores devDir.
+function portableBaseDir({ isPackaged = false, execPath = '', devDir = '' } = {}) {
+    if (process.env.APPIMAGE) return path.dirname(process.env.APPIMAGE);
+    if (isPackaged && execPath) return path.dirname(execPath);
+    return devDir;
+}
+
+// The binary to re-spawn when one face opens another, and the argv that selects the face.
+// Packaged, the AppImage takes the face arguments directly; in dev, Electron needs the repo
+// root ahead of them.
+function selfExecutable() { return process.env.APPIMAGE || process.execPath; }
+function selfSpawnArgs(faceArgs, repoRoot) {
+    return process.env.APPIMAGE ? [...faceArgs] : [repoRoot, ...faceArgs];
+}
+
+// grinder.db, in the order it should be looked for. This list was duplicated at fourteen
+// call sites across two faces before it lived here.
+function grinderDbCandidates(baseDir) {
+    return [
+        path.join(HOME, '.config', 'grinder', 'grinder.db'),
+        path.join(HOME, '.config', 'GRINDER', 'grinder.db'),
+        path.join(baseDir, 'GRINDERConfig', 'grinder.db'),
+    ];
+}
+function findGrinderDb(baseDir) {
+    return grinderDbCandidates(baseDir).find(p => fs.existsSync(p)) || null;
+}
+
+// Where a grinder.db should be CREATED when none exists yet (headless first-run sign-in).
+function grinderDbCreatePath(baseDir, isPackaged) {
+    return isPackaged
+        ? path.join(HOME, '.config', 'grinder', 'grinder.db')
+        : path.join(baseDir, 'GRINDERConfig', 'grinder.db');
+}
+
 // ── System inventory ─────────────────────────────────────────────────────────
 function which(bin) {
     try { return execSync(`which ${bin}`, { stdio: ['ignore','pipe','ignore'] }).toString().trim(); }
@@ -656,6 +700,8 @@ const runtime = {
 module.exports = {
     id: 'linux',
     init,
+    binDirName, portableBaseDir, selfExecutable, selfSpawnArgs,
+    grinderDbCandidates, findGrinderDb, grinderDbCreatePath,
     which, dirSizeCommand,
     nativeOsKey, gogdlPlatform, legendaryPlatform,
     launchNative, findNativeGameExe, findNativeInstallResult,
