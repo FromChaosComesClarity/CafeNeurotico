@@ -2120,7 +2120,7 @@ function renderProtonList(versions) {
     }
     const defaultPath = document.getElementById('s-proton').value;
     container.innerHTML = versions.map(v => {
-        const canDelete = v.path.includes('compatibilitytools.d');
+        const canDelete = !!v.managed;   // decided by the platform backend, not by path-sniffing here
         const delBtn = canDelete
             ? `<button onclick="deleteProton('${v.path.replace(/'/g, "\\'")}')" style="font-size:10px;font-weight:900;padding:3px 8px;border:1px solid #c62828;background:rgba(198,40,40,0.10);color:#ef5350;border-radius:3px;cursor:pointer;font-family:var(--ui-font,Raleway),sans-serif;" title="Uninstall this Proton version">Delete</button>`
             : '';

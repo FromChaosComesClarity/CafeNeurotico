@@ -9,6 +9,7 @@ const Database = require('better-sqlite3');
 // Shared window-free GRINDER engine. Leaf helpers are re-bound here so existing
 // call sites in this file keep working unchanged; engine.init() runs in initDb().
 const grinderEngine = require('../../packages/core/grinder-engine.js');
+const host = require('../../packages/core/platform/index.js');
 const {
     sanitizeLogName, expandTilde, resolvePathCaseInsensitive,
     which, findLegendary, findGogdl, findComet, findUmu, findWineCached, findRuntime,
@@ -665,119 +666,22 @@ ipcMain.handle('scan-game-folder', (_, folderPath) => {
 // Proton
 ipcMain.handle('scan-proton', () => scanProtonVersions());
 
-ipcMain.handle('delete-proton', (_, dirPath) => {
-    const resolved = (() => { try { return fs.realpathSync(expandTilde(dirPath)); } catch { return expandTilde(dirPath); } })();
-    // Safety: only delete from compatibilitytools.d — resolve symlinks on base dirs too
-    const safeBases = [
-        path.join(HOME, '.steam', 'root', 'compatibilitytools.d'),
-        path.join(HOME, '.steam', 'steam', 'compatibilitytools.d'),
-        path.join(HOME, '.local', 'share', 'Steam', 'compatibilitytools.d'),
-        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
-    ].map(b => { try { return fs.realpathSync(b); } catch { return b; } });
-    const isSafe = safeBases.some(base => resolved.startsWith(base + path.sep));
-    if (!isSafe) return { ok: false, error: 'Refusing to delete — path is not inside compatibilitytools.d.' };
-    try {
-        fs.rmSync(resolved, { recursive: true, force: true });
-        return { ok: true };
-    } catch (e) { return { ok: false, error: e.message }; }
-});
+// Only ever removes something inside a directory the backend installs into.
+ipcMain.handle('delete-proton', (_, dirPath) => host.runtime.management.remove(dirPath));
 
-// ── GE-Proton downloader ───────────────────────────────────────────────────────
-let _protonDlReq = null;
-
-ipcMain.handle('get-proton-releases', async () => {
-    try {
-        const releases = await new Promise((resolve, reject) => {
-            require('https').get(
-                'https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases?per_page=15',
-                { headers: { 'User-Agent': 'GRINDER/1.0' } },
-                res => {
-                    let data = '';
-                    res.on('data', d => data += d);
-                    res.on('end', () => {
-                        try { resolve(JSON.parse(data)); }
-                        catch (e) { reject(new Error('Invalid JSON from GitHub API')); }
-                    });
-                }
-            ).on('error', reject);
-        });
-        return {
-            ok: true,
-            releases: releases
-                .map(r => {
-                    const asset = r.assets.find(a => a.name.endsWith('.tar.gz'));
-                    if (!asset) return null;
-                    return {
-                        tag:  r.tag_name,
-                        name: r.name || r.tag_name,
-                        date: r.published_at.split('T')[0],
-                        size: asset.size,
-                        url:  asset.browser_download_url,
-                    };
-                })
-                .filter(Boolean),
-        };
-    } catch (e) { return { ok: false, error: e.message }; }
-});
+// ── Compatibility-runtime downloader ──────────────────────────────────────────
+// The catalogue, the install location and the unpacking all live in the platform backend,
+// so this face and the Manager can no longer drift apart on them. They had: this copy took
+// the first .tar.gz in a release, and GE-Proton now ships an aarch64 tarball that sorts
+// ahead of the x86-64 one — so it was downloading an ARM build onto an x86-64 machine.
+ipcMain.handle('get-proton-releases', () => host.runtime.management.listReleases(15));
 
 ipcMain.handle('download-proton', async (event, url, tag) => {
     const send = d => { try { event.sender.send('proton-dl-progress', d); } catch {} };
-
-    // Install to first available compatibilitytools.d that exists (or create it)
-    const ctDirs = [
-        path.join(HOME, '.steam', 'root', 'compatibilitytools.d'),
-        path.join(HOME, '.local', 'share', 'Steam', 'compatibilitytools.d'),
-        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
-    ];
-    const installBase = ctDirs.find(d => fs.existsSync(d)) || ctDirs[0];
-    try { fs.mkdirSync(installBase, { recursive: true }); } catch {}
-
-    const tmpFile = path.join(configDir, `${tag}.tar.gz`);
-    send({ phase: 'downloading', percent: 0, message: `Downloading ${tag}...` });
-
-    const dlOk = await new Promise(resolve => {
-        function get(dlUrl, redirectCount = 0) {
-            if (redirectCount > 5) { resolve(false); return; }
-            const protocol = dlUrl.startsWith('https') ? require('https') : require('http');
-            _protonDlReq = protocol.get(dlUrl, { headers: { 'User-Agent': 'GRINDER/1.0' } }, res => {
-                if (res.statusCode === 301 || res.statusCode === 302) { get(res.headers.location, redirectCount + 1); return; }
-                if (res.statusCode !== 200) { resolve(false); return; }
-                const total = parseInt(res.headers['content-length'] || '0', 10);
-                let downloaded = 0;
-                const out = fs.createWriteStream(tmpFile);
-                res.on('data', chunk => {
-                    downloaded += chunk.length;
-                    if (total) send({ phase: 'downloading', percent: Math.round(downloaded / total * 100), message: `${(downloaded/1e6).toFixed(0)} MB / ${(total/1e6).toFixed(0)} MB` });
-                });
-                res.pipe(out);
-                out.on('finish', () => resolve(true));
-                out.on('error', () => resolve(false));
-            });
-            _protonDlReq.on('error', () => resolve(false));
-        }
-        get(url);
-    });
-
-    _protonDlReq = null;
-    if (!dlOk) { try { fs.unlinkSync(tmpFile); } catch {} return { ok: false, error: 'Download failed or cancelled.' }; }
-
-    send({ phase: 'extracting', percent: 100, message: `Extracting ${tag}...` });
-    const extractOk = await new Promise(resolve => {
-        const proc = spawn('tar', ['-xzf', tmpFile, '-C', installBase], { stdio: 'ignore' });
-        proc.on('close', code => resolve(code === 0));
-        proc.on('error', () => resolve(false));
-    });
-    try { fs.unlinkSync(tmpFile); } catch {}
-    if (!extractOk) return { ok: false, error: 'Extraction failed.' };
-
-    send({ phase: 'done', percent: 100, message: `${tag} installed to ${installBase}` });
-    return { ok: true, installBase };
+    return host.runtime.management.install({ release: { url, tag }, onProgress: send });
 });
 
-ipcMain.handle('cancel-proton-download', () => {
-    if (_protonDlReq) { try { _protonDlReq.destroy(); } catch {} _protonDlReq = null; }
-    return { ok: true };
-});
+ipcMain.handle('cancel-proton-download', () => { host.runtime.management.cancel(); return { ok: true }; });
 
 // ── Legendary / Epic ──────────────────────────────────────────────────────────
 

@@ -429,6 +429,7 @@ function getGrinderMap() {
 // Points at GRINDER's own data dir (~/.config/grinder) so it reads the same DB,
 // prefixes and Proton settings the grinder face uses.
 const grinderEngine = require('../../packages/core/grinder-engine.js');
+const host = require('../../packages/core/platform/index.js');
 let _grinderEngineDb = null;
 let _grinderProgressCb = null;   // set per install/uninstall to route progress to the renderer
 let _grinderBusy = false;        // serialize install/uninstall (one at a time)
@@ -538,89 +539,30 @@ ipcMain.handle('proton-set-default', (_, protonPath) => {
     } catch (e) { return { ok: false, error: e.message }; }
 });
 
-// Download + install the latest GE-Proton. Mirrors the GRINDER face's downloader so a user who
-// never opens GRINDER can still get a working Proton from the Manager.
-let _protonDlReq = null;
+// Download + install the newest runtime the host knows how to fetch. What that IS, where it
+// goes and how it unpacks all belong to the platform backend; this handler only relays
+// progress and then confirms the engine can see the result.
 ipcMain.handle('proton-install-latest', async (event) => {
     const send = d => { try { event.sender.send('proton-install-progress', d); } catch {} };
-    const home = os.homedir();
+    const mgmt = host.runtime.management;
+    if (!mgmt.supported) return { ok: false, error: 'This system has no downloadable compatibility runtime.' };
 
-    const ghJson = (url) => new Promise((resolve, reject) => {
-        https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
-            if (res.statusCode !== 200) { res.resume(); reject(new Error(`GitHub returned ${res.statusCode}`)); return; }
-            let data = ''; res.on('data', d => data += d);
-            res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON from GitHub')); } });
-        }).on('error', reject);
-    });
+    send({ phase: 'looking', percent: 0, message: `Looking up the latest ${mgmt.label}…` });
+    const latest = await mgmt.latestRelease();
+    if (!latest.ok) return { ok: false, error: latest.error };
 
-    let release, asset;
-    try {
-        send({ phase: 'looking', percent: 0, message: 'Looking up the latest GE-Proton…' });
-        release = await ghJson('https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest');
-        asset = (release.assets || []).find(a => /\.tar\.(gz|xz)$/.test(a.name) && !/aarch64/i.test(a.name));
-        if (!asset) throw new Error('No release archive found.');
-    } catch (e) { return { ok: false, error: `Could not reach GitHub: ${e.message}` }; }
-
-    // Install into the first compatibilitytools.d that exists, else umu's own store — both are
-    // scanned by the engine, so either location works for launching.
-    const ctDirs = [
-        path.join(home, '.steam', 'root', 'compatibilitytools.d'),
-        path.join(home, '.local', 'share', 'Steam', 'compatibilitytools.d'),
-        path.join(home, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
-        path.join(home, '.local', 'share', 'umu', 'compatibilitytools'),
-    ];
-    const installBase = ctDirs.find(d => fs.existsSync(d)) || ctDirs[1];
-    try { fs.mkdirSync(installBase, { recursive: true }); }
-    catch (e) { return { ok: false, error: `Cannot create ${installBase}: ${e.message}` }; }
-
-    const tmpFile = path.join(os.tmpdir(), asset.name);
-    const dl = await new Promise(resolve => {
-        function get(url, redirects = 0) {
-            if (redirects > 5) { resolve({ ok: false, error: 'Too many redirects.' }); return; }
-            _protonDlReq = https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
-                if (res.statusCode === 301 || res.statusCode === 302) { res.resume(); get(res.headers.location, redirects + 1); return; }
-                if (res.statusCode !== 200) { res.resume(); resolve({ ok: false, error: `Download failed (HTTP ${res.statusCode}).` }); return; }
-                const total = parseInt(res.headers['content-length'] || '0', 10);
-                let got = 0;
-                const out = fs.createWriteStream(tmpFile);
-                res.on('data', c => {
-                    got += c.length;
-                    send({ phase: 'downloading', percent: total ? Math.round(got / total * 100) : 0,
-                           message: `${(got / 1e6).toFixed(0)} MB${total ? ` / ${(total / 1e6).toFixed(0)} MB` : ''}` });
-                });
-                res.pipe(out);
-                out.on('finish', () => resolve({ ok: true }));
-                out.on('error', e => resolve({ ok: false, error: e.message }));
-            });
-            _protonDlReq.on('error', e => resolve({ ok: false, error: e.message }));
-        }
-        get(asset.browser_download_url);
-    });
-    _protonDlReq = null;
-    if (!dl.ok) { try { fs.unlinkSync(tmpFile); } catch {} return { ok: false, error: dl.error || 'Download failed.' }; }
-
-    send({ phase: 'extracting', percent: 100, message: `Extracting ${release.tag_name}…` });
-    const flag = asset.name.endsWith('.xz') ? '-xJf' : '-xzf';
-    const extracted = await new Promise(resolve => {
-        const p = spawn('tar', [flag, tmpFile, '-C', installBase], { stdio: 'ignore' });
-        p.on('close', code => resolve(code === 0));
-        p.on('error', () => resolve(false));
-    });
-    try { fs.unlinkSync(tmpFile); } catch {}
-    if (!extracted) return { ok: false, error: 'Could not extract the archive (is `tar` installed?).' };
+    const r = await mgmt.install({ release: latest.release, onProgress: send });
+    if (!r.ok) return r;
 
     // Confirm the engine can now actually see it — the whole point of the exercise.
     ensureGrinderEngine();
     const found = grinderEngine.scanProtonVersions()[0];
-    if (!found) return { ok: false, error: 'Installed, but no Proton build was found afterwards.' };
+    if (!found) return { ok: false, error: 'Installed, but no compatibility runtime was found afterwards.' };
     send({ phase: 'done', percent: 100, message: `${found.label} ready.` });
-    return { ok: true, proton: found, installBase };
+    return { ok: true, proton: found, installBase: r.installBase };
 });
 
-ipcMain.handle('proton-install-cancel', () => {
-    if (_protonDlReq) { try { _protonDlReq.destroy(); } catch {} _protonDlReq = null; }
-    return { ok: true };
-});
+ipcMain.handle('proton-install-cancel', () => { host.runtime.management.cancel(); return { ok: true }; });
 
 // Split a GrinderGameId like "gog_2049187585" / "epic_<hex>" into { store, appId }.
 function parseGrinderId(gid) {

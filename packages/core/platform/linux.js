@@ -13,7 +13,8 @@
 const path  = require('path');
 const fs    = require('fs');
 const os    = require('os');
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawnSync, spawn } = require('child_process');
+const https = require('https');
 
 // ── Injected context ─────────────────────────────────────────────────────────
 // Mirrors grinder-engine's own init() idiom. `getDb` is a getter rather than a handle
@@ -21,7 +22,7 @@ const { execSync, spawnSync } = require('child_process');
 let HOME       = os.homedir();
 let configDir  = '';
 let getDb      = () => null;
-let expandTilde = p => p;
+let expandTilde = p => (p && p.startsWith('~') ? path.join(HOME, p.slice(1)) : p);
 
 function init(ctx = {}) {
     HOME        = ctx.homeDir  || HOME;
@@ -258,7 +259,7 @@ function scanRuntimes() {
             // for ordering and for anything we show the user.
             let version = '';
             try { version = (fs.readFileSync(path.join(realPath, 'version'), 'utf8').trim().split(/\s+/).pop() || ''); } catch {}
-            found.push({ name, path: realPath, type, version, label: version || name });
+            found.push({ name, path: realPath, type, version, label: version || name, managed: isManagedDir(realPath) });
         }
     }
     const order = { ge: 0, steam: 1, other: 2 };
@@ -473,8 +474,170 @@ function regeditCommand({ prefix, runtimePath, regFile }) {
     };
 }
 
+// ── Installing and removing runtimes ─────────────────────────────────────────
+// GE-Proton, fetched from its GitHub releases. Both faces used to carry their own copy of
+// this; they had drifted (one handled .tar.xz and knew about umu's store, the other did
+// not), which is exactly the kind of divergence a host boundary is supposed to end.
+const GE_REPO = 'GloriousEggroll/proton-ge-custom';
+
+// Where a downloaded build goes. First existing wins; umu's own store is last because it
+// only matters on a machine with no Steam at all. All of them are scanned by scanRuntimes,
+// so any of them works for launching.
+function installDirs() {
+    return [
+        path.join(HOME, '.steam', 'root', 'compatibilitytools.d'),
+        path.join(HOME, '.local', 'share', 'Steam', 'compatibilitytools.d'),
+        path.join(HOME, '.var', 'app', 'com.valvesoftware.Steam', 'data', 'Steam', 'compatibilitytools.d'),
+        path.join(HOME, '.local', 'share', 'umu', 'compatibilitytools'),
+    ];
+}
+
+function resolveInstallDir() {
+    const dirs = installDirs();
+    const base = dirs.find(d => fs.existsSync(d)) || dirs[1];
+    fs.mkdirSync(base, { recursive: true });
+    return base;
+}
+
+// Everywhere a build may legitimately be removed from. Deliberately a superset of
+// installDirs(): the two faces used to keep their own lists and they disagreed — one allowed
+// ~/.steam/steam/compatibilitytools.d but not umu's store, the other the reverse. Taking the
+// union means nothing that used to be removable stopped being removable, and the one location
+// we install into that was previously un-removable no longer strands a build there.
+function managedDirs() {
+    return [...installDirs(), path.join(HOME, '.steam', 'steam', 'compatibilitytools.d')];
+}
+
+// Delete safety. Symlinks are resolved on both sides — ~/.steam/root and ~/.local/share/Steam
+// are usually the same place, and a path that arrived by one name must still match a base
+// named the other.
+function isManagedDir(dirPath) {
+    const resolved = (() => { try { return fs.realpathSync(expandTilde(dirPath)); } catch { return expandTilde(dirPath); } })();
+    const bases = managedDirs().map(b => { try { return fs.realpathSync(b); } catch { return b; } });
+    return bases.some(base => resolved.startsWith(base + path.sep));
+}
+
+function removeRuntime(dirPath) {
+    if (!isManagedDir(dirPath)) return { ok: false, error: 'Refusing to delete — path is not inside compatibilitytools.d.' };
+    const resolved = (() => { try { return fs.realpathSync(expandTilde(dirPath)); } catch { return expandTilde(dirPath); } })();
+    try { fs.rmSync(resolved, { recursive: true, force: true }); return { ok: true }; }
+    catch (e) { return { ok: false, error: e.message }; }
+}
+
+function ghJson(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
+            if (res.statusCode !== 200) { res.resume(); reject(new Error(`GitHub returned ${res.statusCode}`)); return; }
+            let data = ''; res.on('data', d => data += d);
+            res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Invalid JSON from GitHub')); } });
+        }).on('error', reject);
+    });
+}
+
+// The archive to actually fetch out of a release. aarch64 builds are excluded: this is the
+// x86-64 host backend, and handing umu an ARM Proton is a silent failure later.
+function pickAsset(release) {
+    return (release.assets || []).find(a => /\.tar\.(gz|xz)$/.test(a.name) && !/aarch64/i.test(a.name)) || null;
+}
+
+async function listReleases(limit = 15) {
+    try {
+        const raw = await ghJson(`https://api.github.com/repos/${GE_REPO}/releases?per_page=${limit}`);
+        return { ok: true, releases: raw.map(r => {
+            const asset = pickAsset(r);
+            if (!asset) return null;
+            return { tag: r.tag_name, name: r.name || r.tag_name, date: (r.published_at || '').split('T')[0],
+                     size: asset.size, url: asset.browser_download_url, assetName: asset.name };
+        }).filter(Boolean) };
+    } catch (e) { return { ok: false, error: e.message, releases: [] }; }
+}
+
+async function latestRelease() {
+    try {
+        const r = await ghJson(`https://api.github.com/repos/${GE_REPO}/releases/latest`);
+        const asset = pickAsset(r);
+        if (!asset) return { ok: false, error: 'No release archive found.' };
+        return { ok: true, release: { tag: r.tag_name, name: r.name || r.tag_name, size: asset.size,
+                                      url: asset.browser_download_url, assetName: asset.name } };
+    } catch (e) { return { ok: false, error: `Could not reach GitHub: ${e.message}` }; }
+}
+
+let _dlReq = null;
+function cancelInstall() {
+    if (_dlReq) { try { _dlReq.destroy(); } catch {} _dlReq = null; return true; }
+    return false;
+}
+
+// Download + unpack one release. onProgress({ phase, percent, message }).
+//
+// The archive lands in the install directory, not os.tmpdir(): /tmp is tmpfs on most
+// modern distributions, and these builds unpack to well over a gigabyte — staging that in
+// RAM is a bad trade when the destination filesystem is right there. It also means the
+// extraction never crosses a filesystem boundary.
+async function installRelease({ release, onProgress } = {}) {
+    const send = typeof onProgress === 'function' ? onProgress : () => {};
+    if (!release || !release.url) return { ok: false, error: 'No release to install.' };
+
+    let installBase;
+    try { installBase = resolveInstallDir(); }
+    catch (e) { return { ok: false, error: `Cannot create the install directory: ${e.message}` }; }
+
+    const name = release.assetName
+        || (() => { try { return path.basename(new URL(release.url).pathname); } catch { return ''; } })()
+        || `${release.tag || 'proton'}.tar.gz`;
+    const tmpFile = path.join(installBase, '.' + name + '.part');
+
+    send({ phase: 'downloading', percent: 0, message: `Downloading ${release.tag || 'the runtime'}…` });
+    const dl = await new Promise(resolve => {
+        function get(url, redirects = 0) {
+            if (redirects > 5) { resolve({ ok: false, error: 'Too many redirects.' }); return; }
+            _dlReq = https.get(url, { headers: { 'User-Agent': 'CafeNeurotico' } }, res => {
+                if (res.statusCode === 301 || res.statusCode === 302) { res.resume(); get(res.headers.location, redirects + 1); return; }
+                if (res.statusCode !== 200) { res.resume(); resolve({ ok: false, error: `Download failed (HTTP ${res.statusCode}).` }); return; }
+                const total = parseInt(res.headers['content-length'] || '0', 10);
+                let got = 0;
+                const out = fs.createWriteStream(tmpFile);
+                res.on('data', c => {
+                    got += c.length;
+                    send({ phase: 'downloading', percent: total ? Math.round(got / total * 100) : 0,
+                           message: `${(got / 1e6).toFixed(0)} MB${total ? ` / ${(total / 1e6).toFixed(0)} MB` : ''}` });
+                });
+                res.pipe(out);
+                out.on('finish', () => resolve({ ok: true }));
+                out.on('error', e => resolve({ ok: false, error: e.message }));
+            });
+            _dlReq.on('error', e => resolve({ ok: false, error: e.message }));
+        }
+        get(release.url);
+    });
+    _dlReq = null;
+    if (!dl.ok) { try { fs.unlinkSync(tmpFile); } catch {} return { ok: false, error: dl.error || 'Download failed or cancelled.' }; }
+
+    send({ phase: 'extracting', percent: 100, message: `Extracting ${release.tag || 'the runtime'}…` });
+    const flag = name.endsWith('.xz') ? '-xJf' : '-xzf';
+    const extracted = await new Promise(resolve => {
+        const p = spawn('tar', [flag, tmpFile, '-C', installBase], { stdio: 'ignore' });
+        p.on('close', code => resolve(code === 0));
+        p.on('error', () => resolve(false));
+    });
+    try { fs.unlinkSync(tmpFile); } catch {}
+    if (!extracted) return { ok: false, error: 'Could not extract the archive (is `tar` installed?).' };
+
+    send({ phase: 'done', percent: 100, message: `${release.tag || 'The runtime'} installed to ${installBase}` });
+    return { ok: true, installBase };
+}
+
+const management = {
+    supported: true,
+    label: 'GE-Proton',
+    installDirs, managedDirs, resolveInstallDir, isManagedDir,
+    listReleases, latestRelease, install: installRelease,
+    cancel: cancelInstall, remove: removeRuntime,
+};
+
 const runtime = {
     id: 'proton',
+    management,
     prefixesDirName: 'prefixes',
     setupPhase: 'runtime',          // the STARTUP_STEPS phase whose byte counter is live
     scan: scanRuntimes,
