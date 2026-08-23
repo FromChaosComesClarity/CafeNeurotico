@@ -1,7 +1,13 @@
 # Cafe Neurotico on macOS — handoff
 
-Development moves to the Mac from here. Everything below assumes an **M2 MacBook Air, 16 GB,
-macOS Tahoe (26)**, and the `mac` branch.
+**Linux stays the primary platform.** It is the main gaming machine, it is what ships, and it
+is not being replaced or wound down. macOS is a *second host in the same codebase* — an
+Experimental build alongside the AppImage, not a successor to it. Both are maintained from here
+on.
+
+What moves to the Mac is the *macOS work*, because none of it can be written or tested from
+Nobara. Everything below assumes an **M2 MacBook Air, 16 GB, macOS Tahoe (26)**, and the `mac`
+branch.
 
 Phase A is done and pushed: the host boundary exists, the Linux build still works, and
 `binaries-mac-v1` is published. What's left is writing the macOS side of that boundary.
@@ -293,13 +299,28 @@ to change one, that's a sign the boundary is in the wrong place — fix `darwin.
 
 ---
 
-## Working across two machines
+## Rules for a two-host repo
 
-One repo, one branch, both push and pull. **Don't fork.**
+One repo, one branch, both machines push and pull. **Don't fork.** Long-term, `mac` merges back
+into `experimental` and both hosts live in one codebase — the boundary exists precisely so they
+can.
 
-The Linux box stays the reference implementation: when something on the Mac looks wrong, diff
-against what `linux.js` does. And if a change belongs to *both* hosts, make it on Linux, verify
-the AppImage still builds, and pull it over.
+**Linux is the shipping platform and outranks macOS in every conflict.**
+
+1. **A Linux regression blocks the merge. A macOS gap does not.** The AppImage is the product;
+   the Mac build is labelled Experimental and is allowed to be incomplete.
+2. **Never reshape `linux.js` to suit `darwin.js`.** If the macOS backend wants a different
+   contract, widen the contract — add a member, give it a sensible Linux value — rather than
+   changing what Linux already does. Phase A deliberately deferred one such change (line ~582
+   of `grinder-engine.js`) for exactly this reason.
+3. **Anything shared gets verified on Linux before it merges** — the engine, `shared-ipc.js`,
+   the renderers, `custom-installers.js`. That means `npm run dist` on the Linux box plus the
+   six-path launch smoke test in `docs/mac-port-phase-a.md`, not just "it built".
+4. **If a fix belongs to both hosts, make it on Linux first**, confirm the AppImage, then pull
+   it over. The Linux box is the reference implementation: when something on the Mac looks
+   wrong, diff against what `linux.js` does.
+5. **`apps/*/main.js` should stay host-agnostic.** Phase A got them there. If macOS work needs
+   to touch one, that is a signal the boundary is in the wrong place — fix `darwin.js` instead.
 
 Copy the memory directory across too. The Mac's project key will be `-Users-jose-…`, so it's a
 copy into the Mac's own memory dir, not a symlink.

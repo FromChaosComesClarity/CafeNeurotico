@@ -9,6 +9,14 @@ put a seam in the codebase so that Phase B onward is *additive* — a second bac
 rather than a fork. Its only acceptance criterion is that the Linux build behaves exactly
 as 1.7.0 does.
 
+## Standing constraint
+
+**Linux is the primary platform and stays that way.** It is the main gaming machine and it is
+what ships; macOS is a second host in the same codebase, built Experimental alongside the
+AppImage. In any conflict Linux wins: a Linux regression blocks a merge, a macOS gap does not,
+and the contract gets widened rather than `linux.js` reshaped. See *Rules for a two-host repo*
+in `docs/mac-port-handoff.md`.
+
 ## Goal
 
 One repo, one branch, two hosts. After Phase A:
