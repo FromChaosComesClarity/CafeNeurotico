@@ -41,6 +41,10 @@
     .titlebar-controls { display: flex; height: 100%; -webkit-app-region: no-drag; }
     .win-btn { border: none; border-radius: 0; background: transparent; width: 45px; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background-color 0.1s; cursor: pointer; color: var(--text_main); }
     .win-btn:hover { background-color: rgba(255,255,255,0.1); color: var(--text_main); transform: none; box-shadow: none; }
+    /* macOS: the window itself draws real traffic lights (titleBarStyle:'hidden' in main.js) —
+       hide the custom row and leave room at the left instead of drawing our own. */
+    body.platform-darwin .titlebar-controls { display: none; }
+    body.platform-darwin .titlebar-brand { padding-left: 78px; }
     .win-close:hover { background-color: #d32f2f; color: white; }
 
     #app-container { display: flex; flex-direction: column; flex: 1; width: 100%; height: 100%; overflow: hidden; position: relative; }

@@ -146,10 +146,14 @@ const binDir = path.join(app.isPackaged ? process.resourcesPath : __dirname, 'as
 
 // ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
+    // macOS: real traffic lights instead of the custom win-btn row — see manager/main.js.
+    const chrome = process.platform === 'darwin'
+        ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 10 } }
+        : { frame: false };
     win = new BrowserWindow({
         width: 1100, height: 700,
         minWidth: 800, minHeight: 500,
-        frame: false,
+        ...chrome,
         show: false,
         backgroundColor: '#1a0f0a',
         webPreferences: {

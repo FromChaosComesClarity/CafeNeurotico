@@ -145,6 +145,9 @@ document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
 });
 
 // ── Window controls ───────────────────────────────────────────────────────────
+// macOS gets the real traffic lights (see main.js's titleBarStyle:'hidden'); the custom row
+// stays hidden there via body.platform-darwin in CSS.
+if (window.api.platform === 'darwin') document.body.classList.add('platform-darwin');
 document.getElementById('btn-min').addEventListener('click',   () => window.api.minimize());
 document.getElementById('btn-max').addEventListener('click',   () => window.api.maximize());
 document.getElementById('btn-close').addEventListener('click', () => window.api.close());

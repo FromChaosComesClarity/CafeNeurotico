@@ -1757,6 +1757,10 @@ function getSafePath(rawPath) {
 }
 
 // --- WINDOW CONTROLS ---
+// macOS gets the real traffic lights (see main.js's titleBarStyle:'hidden'); the custom row
+// stays hidden there via body.platform-darwin in CSS rather than removed, so nothing else that
+// queries #btn-min/#btn-max/#btn-close has to know the host differs.
+if (window.api.platform === 'darwin') document.body.classList.add('platform-darwin');
 document.getElementById('btn-min').addEventListener('click', () => window.api.minimizeApp());
 document.getElementById('btn-max').addEventListener('click', () => window.api.maximizeApp());
 document.getElementById('btn-close').addEventListener('click', () => window.api.closeApp());

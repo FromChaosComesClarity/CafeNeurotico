@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+    platform: process.platform,
     getBaseDir: () => ipcRenderer.invoke('get-basedir'),
                                 getGames: () => ipcRenderer.invoke('get-games'),
                                 genreList: () => ipcRenderer.invoke('genre-list'),

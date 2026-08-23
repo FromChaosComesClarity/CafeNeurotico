@@ -188,9 +188,15 @@ function createWindow () {
         x = fits ? Math.round(wa.x + (wa.width  - width)  / 2) : undefined;
         y = fits ? Math.round(wa.y + (wa.height - height) / 2) : undefined;
     }
+    // macOS: keep the real traffic lights instead of the custom-drawn win-btn row — inset to
+    // sit inside our own #titlebar rather than Electron's default top-left corner. Every other
+    // host stays frame:false with the custom row, unchanged.
+    const chrome = process.platform === 'darwin'
+        ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 10 } }
+        : { frame: false };
     const win = new BrowserWindow({
         width, height, x, y,
-        frame: false,
+        ...chrome,
         show: false,
         backgroundColor: '#1a1210',
         webPreferences: {
