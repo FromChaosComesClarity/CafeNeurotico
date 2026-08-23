@@ -1872,6 +1872,44 @@ document.getElementById('modal-free-games')?.addEventListener('click', (e) => {
     if (e.target.id === 'modal-free-games') e.currentTarget.classList.remove('active');
 });
 
+// ── MAC-NATIVE FILTER (macOS only) ──────────────────────────────────────────
+// Which games have a real macOS build vs. Windows-only. GOG/Epic are tagged from grinder.db
+// (free, local); Steam needs a live per-game lookup, so it's a user-triggered scan rather than
+// something that runs on every sync — see scan-mac-native in main.js.
+let _onlyMacNative = false;
+function isMacNative(game) { return game && (game.MacNative == 1); }
+function applyMacNativeVisibility(only) {
+    _onlyMacNative = only;
+    window.api.setSetting('only_mac_native', only ? '1' : '');
+    document.querySelectorAll('.macnative-vis-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.val === (only ? 'only' : 'all')));
+    applyFilters();
+}
+document.querySelectorAll('.macnative-vis-btn').forEach(btn =>
+    btn.addEventListener('click', () => applyMacNativeVisibility(btn.dataset.val === 'only')));
+(async () => {
+    if (window.api.platform !== 'darwin') return;
+    document.getElementById('mac-native-tool-card')?.style.setProperty('display', '');
+    const saved = await window.api.getSetting('only_mac_native');
+    if (saved === '1') applyMacNativeVisibility(true);
+})();
+document.getElementById('btn-scan-mac-native')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-scan-mac-native');
+    const status = document.getElementById('mac-native-scan-status');
+    btn.disabled = true;
+    window.api.onMacNativeScanProgress?.(p => {
+        if (status && p.total) status.textContent = `${p.label || ''} (${p.scanned}/${p.total})`;
+    });
+    if (status) status.textContent = 'Scanning…';
+    const r = await window.api.scanMacNative({ force: false });
+    btn.disabled = false;
+    if (!r.ok) { if (status) status.textContent = r.error === 'already_running' ? 'Already scanning…' : `Failed: ${r.error}`; return; }
+    if (status) status.textContent = `Done — ${r.macNative} Mac-native games found.`;
+    const res = await window.api.getGames();
+    allGames = (res.games || []).filter(g => g.Game && g.Game !== 'null');
+    applyFilters();
+});
+
 // ── HIDDEN GAMES (per-game hide; managed from the Control Panel) ────────────
 // Any game can be hidden from every library view; hidden games live in the
 // Hidden Games manager where they can be unhidden individually.
@@ -4321,6 +4359,9 @@ function applyFilters() {
 
         // Free-to-play visibility: hide tagged games everywhere when the toggle is off
         if (_hideFreeGames && isFreeToPlay(game)) return false;
+
+        // Mac-native only (macOS build): opt-in, off by default
+        if (_onlyMacNative && !isMacNative(game)) return false;
 
         // Stores: OR — game must match at least one selected store (open if none selected)
         if (storeActive.length > 0) {
@@ -8715,7 +8756,8 @@ function renderGallery(recent, regular) {
         const imgSrc = game.CoverArt ? getSafePath(game.CoverArt) : '';
         const imgHtml = imgSrc ? `<img src="${imgSrc}" class="gallery-cover" loading="lazy">` : `<div class="gallery-cover" style="display:flex; align-items:center; justify-content:center; color:#555; font-size:12px;">${t('game.no_cover')}</div>`;
         const _badges = (game.Store ? String(game.Store).split(',') : []).map(s => s.trim()).filter(Boolean).map(s => { const l = getStoreLogo(s); return l ? `<div class="gallery-store-badge" style="-webkit-mask-image:url('${l}');"></div>` : ''; }).join('');
-        const badgeHtml = _badges ? `<div class="gallery-store-badges">${_badges}</div>` : '';
+        const _macBadge = isMacNative(game) ? `<div class="gallery-store-badge gallery-mac-badge" style="-webkit-mask-image:url('assets/logos/apple.png');" title="Runs natively on macOS"></div>` : '';
+        const badgeHtml = (_badges || _macBadge) ? `<div class="gallery-store-badges">${_badges}${_macBadge}</div>` : '';
         const f2pHtml = isFreeToPlay(game) ? `<div class="f2p-pill gallery-f2p-pill" data-f2p-pill="1" title="Free-to-play — click to show/hide these">FREE</div>` : '';
         const installCmdG = getInstallCommand(game);
         const isInstalled = !!game.LaunchCommand && (game.Installed == null || game.Installed == 1);

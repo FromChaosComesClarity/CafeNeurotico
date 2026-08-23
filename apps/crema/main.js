@@ -123,6 +123,8 @@ app.whenReady().then(() => {
         // opens first creates the tables; the other is a no-op.
         try { db.prepare("ALTER TABLE games ADD COLUMN date_added INTEGER DEFAULT 0").run(); } catch(e) {}
         try { db.prepare("ALTER TABLE games ADD COLUMN kb_played INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN MacNative INTEGER DEFAULT 0").run(); } catch(e) {}
+        try { db.prepare("ALTER TABLE games ADD COLUMN MacNativeChecked INTEGER DEFAULT 0").run(); } catch(e) {}
         try {
             db.prepare(`CREATE TRIGGER IF NOT EXISTS auto_date_added
                 AFTER INSERT ON games

@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('api', {
                                 cancelGenreScan: () => ipcRenderer.invoke('cancel-genre-scan'),
                                 quickGenrePass: () => ipcRenderer.invoke('quick-genre-pass'),
                                 onGenreScanProgress: (cb) => ipcRenderer.on('genre-scan-progress', (_e, d) => cb(d)),
+                                scanMacNative: (opts) => ipcRenderer.invoke('scan-mac-native', opts),
+                                onMacNativeScanProgress: (cb) => ipcRenderer.on('mac-native-scan-progress', (_e, d) => cb(d)),
                                 addGameShortcut: (id, targets) => ipcRenderer.invoke('add-game-shortcut', id, targets),
                                 resolveGameFolder: (id) => ipcRenderer.invoke('resolve-game-folder', id),
                                 openGameFolder: (id) => ipcRenderer.invoke('open-game-folder', id),

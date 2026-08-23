@@ -3558,7 +3558,8 @@ function renderGalleryGrid() {
         : `<button class="gcell-play-btn gcell-install-btn">⬇ ${t('status.install')}</button>`;
     }
     const _gcellBadges = (game.Store ? String(game.Store).split(',') : []).map(s => s.trim()).filter(Boolean).map(s => { const l = getGalleryStoreLogo(s); return l ? `<div class="gcell-store-badge" style="-webkit-mask-image:url('${l}');"></div>` : ''; }).join('');
-    const storeBadgeGroup = _gcellBadges ? `<div style="display:flex;gap:3px;flex-shrink:0;">${_gcellBadges}</div>` : '';
+    const _gcellMacBadge = game.MacNative == 1 ? `<div class="gcell-store-badge" style="-webkit-mask-image:url('assets/logos/apple.png');" title="Runs natively on macOS"></div>` : '';
+    const storeBadgeGroup = (_gcellBadges || _gcellMacBadge) ? `<div style="display:flex;gap:3px;flex-shrink:0;">${_gcellBadges}${_gcellMacBadge}</div>` : '';
     const coverArea = imgSrc
       ? `<div class="gcell-cover-area"><img src="${imgSrc}" alt="" loading="lazy" decoding="async"></div>`
       : `<div class="gcell-cover-area"><div class="gcell-noart">${game.Game}</div></div>`;

@@ -345,6 +345,8 @@ app.whenReady().then(() => {
         try { db.prepare("ALTER TABLE games ADD COLUMN FreeToPlay INTEGER DEFAULT 0").run(); } catch(e) {} // 1 = Steam free-to-play (played-free-games)
         try { db.prepare("ALTER TABLE games ADD COLUMN Hidden INTEGER DEFAULT 0").run(); } catch(e) {}      // 1 = user-hidden from all library views
         try { db.prepare("ALTER TABLE games ADD COLUMN SaveDirOverride TEXT").run(); } catch(e) {}          // GOG save-game manager: user-picked save folder ("Locate saves…")
+        try { db.prepare("ALTER TABLE games ADD COLUMN MacNative INTEGER DEFAULT 0").run(); } catch(e) {}    // 1 = has a native macOS build (Steam platforms.mac, or GOG/Epic via grinder.db)
+        try { db.prepare("ALTER TABLE games ADD COLUMN MacNativeChecked INTEGER DEFAULT 0").run(); } catch(e) {} // 1 = already checked (Steam lookup is a live API call — never re-ask once answered)
         try { db.prepare(`CREATE TABLE IF NOT EXISTS save_backups (
             id INTEGER PRIMARY KEY AUTOINCREMENT, game_id INTEGER, path TEXT, created INTEGER, bytes INTEGER, source TEXT
         )`).run(); } catch(e) {}                                                                            // log of GOG save-zip backups (incl. pre-restore snapshots)
@@ -1854,6 +1856,79 @@ function _diskStoreBucket(s) {
     if (s.includes('emulation')) return 'Emulation'; if (s.includes('physical')) return 'Physical'; if (s.includes('apps')) return 'Apps';
     if (s.includes('others')) return 'Others'; return 'Other';
 }
+// Which games have a native macOS build — Steam via its public store API (platforms.mac),
+// GOG/Epic via grinder.db's platform/platforms (already correctly tagged 'osx' there — see
+// darwin.js and the GOG_CATALOG_OS_ALIAS fix in grinder-engine.js). Only meaningful on macOS;
+// gated by host.id so a Linux run of this same shared file never touches it.
+//
+// Steam's endpoint needs a live call per game with no bulk form, so results are cached in
+// MacNativeChecked and only re-asked with force. GOG/Epic reads are free (local grinder.db),
+// so those always refresh.
+let _macNativeScanRunning = false;
+ipcMain.handle('scan-mac-native', async (evt, opts) => {
+    if (host.id !== 'darwin') return { ok: false, error: 'macOS only.' };
+    if (!db) return { ok: false, error: 'Library not ready.' };
+    if (_macNativeScanRunning) return { ok: false, error: 'already_running' };
+    _macNativeScanRunning = true;
+    const force = !!(opts && opts.force);
+    const send = (scanned, total, label) => { try { evt.sender.send('mac-native-scan-progress', { scanned, total, label }); } catch {} };
+    try {
+        // GOG/Epic — free, local, always refreshed.
+        const gpath = host.findGrinderDb(baseDir);
+        const grinderPlatforms = new Map();
+        if (gpath) {
+            try {
+                const gdb = new Database(gpath, { readonly: true, timeout: 5000 });
+                for (const r of gdb.prepare("SELECT id, platform, platforms FROM games").all())
+                    grinderPlatforms.set(String(r.id), `${r.platform || ''},${r.platforms || ''}`);
+                gdb.close();
+            } catch {}
+        }
+        const grinderRows = db.prepare("SELECT id, GrinderGameId FROM games WHERE GrinderGameId IS NOT NULL AND GrinderGameId != ''").all();
+        let updated = 0;
+        for (const g of grinderRows) {
+            // grinder.db's own `id` column already carries the store_appid form ("gog_123…"),
+            // same as GrinderGameId itself — key on that directly, not the split appId (see
+            // disk-scan's grinderPaths for the same lookup done right).
+            const blob = grinderPlatforms.get(String(g.GrinderGameId)) || '';
+            const isMac = blob.split(',').map(s => s.trim()).includes('osx');
+            db.prepare("UPDATE games SET MacNative=?, MacNativeChecked=1 WHERE id=?").run(isMac ? 1 : 0, g.id);
+            updated++;
+        }
+
+        // Steam — one live lookup per game, only for what hasn't been asked yet (or `force`).
+        let steamRows = db.prepare(
+            `SELECT id, SteamAppID FROM games WHERE SteamAppID IS NOT NULL AND SteamAppID != '' AND SteamAppID != 'None'` +
+            (force ? '' : ' AND MacNativeChecked=0')
+        ).all();
+        const total = steamRows.length;
+        let scanned = 0;
+        for (const r of steamRows) {
+            scanned++;
+            const appId = String(r.SteamAppID).replace(/\.0+$/, '').trim();
+            send(scanned, total, `Checking Steam #${appId}…`);
+            let isMac = false;
+            try {
+                const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=platforms`);
+                const j = await res.json();
+                isMac = !!j?.[appId]?.data?.platforms?.mac;
+            } catch {}
+            db.prepare("UPDATE games SET MacNative=?, MacNativeChecked=1 WHERE id=?").run(isMac ? 1 : 0, r.id);
+            updated++;
+            // Steam's public store API has no documented rate limit but is known to soft-throttle
+            // bursts — a small gap per call is cheap insurance against a scan of hundreds of games
+            // silently degrading into a wall of failed lookups partway through.
+            await new Promise(res => setTimeout(res, 150));
+        }
+        send(total, total, '');
+        return { ok: true, updated, macNative: db.prepare("SELECT COUNT(*) c FROM games WHERE MacNative=1").get().c };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    } finally {
+        _macNativeScanRunning = false;
+    }
+});
+
 ipcMain.handle('disk-get', () => { try { const raw = db.prepare("SELECT value FROM settings WHERE key='disk_usage'").get()?.value; return raw ? JSON.parse(raw) : null; } catch { return null; } });
 ipcMain.handle('disk-scan', async () => {
     if (!db) return null;
