@@ -33,11 +33,17 @@ const REQUIRED = ['ffmpeg', 'ffprobe', 'yt-dlp', 'gogdl', 'legendary', 'comet'];
 // Pinned release asset + its SHA256, per host. Bump the tag and hash together when a
 // binary set changes.
 //
-// gogdl in the Linux tarball is OUR BUILD, from the fork — it carries fixes that are not in
+// gogdl in both tarballs is OUR BUILD, from the fork — it carries fixes that are not in
 // upstream 1.2.1 (CDN failover on a corrupt chunk, bounded secure-link retries, non-blocking
 // telemetry, API timeouts). These binaries are gitignored, so the tarball is the only place
 // they live: point this at the upstream build and a clean checkout would quietly lose all of
-// it. Rebuild from the fork and publish a new binaries-vN before bumping.
+// it. Rebuild from the fork and publish a new binaries-vN before bumping. On macOS, PyInstaller
+// cannot cross-compile, so that half has to be built on a Mac:
+//   python3 -m PyInstaller --onefile --name gogdl grinder_entry.py --clean --noconfirm
+// (see docs/mac-port-handoff.md, Phase B.6). Shipping upstream's darwin build instead is NOT a
+// stopgap: 1.3.0 picked up our CDN rotation but still verifies the chunk checksum outside the
+// retry loop, still blocks on the telemetry queue, and still recurses without a limit in
+// get_secure_link while dropping `root`. That is three known download-hanging bugs.
 //
 // The archive is expected to contain the six names in REQUIRED exactly. Upstream calls its
 // macOS builds gogdl_macos_arm64 / legendary_macOS_arm64 / comet-aarch64-apple-darwin /
@@ -48,20 +54,8 @@ const SOURCES = {
         sha256: '876eecaeda3228ee24288c1fae0b87b8f2ed9b1775b1ce48c2d5ad47cc93b3bf',
     },
     darwin: {
-        url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-mac-v1/cafeneurotico-binaries-mac-v1.tar.gz',
-        sha256: '8262dfb4f09d2a650ed422c5724f78d09d1eca0a017bbb07052d9c69a0476e1e',
-        // Deliberately short of the full set. gogdl is our patched fork build and PyInstaller
-        // cannot cross-compile, so the macOS one has to be built on a Mac. Shipping upstream's
-        // instead is NOT a stopgap: 1.3.0 picked up our CDN rotation but still verifies the
-        // chunk checksum outside the retry loop, still blocks on the telemetry queue, and
-        // still recurses without a limit in get_secure_link while dropping `root`. That is
-        // three known download-hanging bugs. See docs/mac-port-phase-a.md.
-        provides: ['ffmpeg', 'ffprobe', 'yt-dlp', 'legendary', 'comet'],
-        missing: {
-            gogdl: 'build it from the fork at ~/Documents/DEVELOPMENT/CLAUDE/gogdl_fork on the Mac:\n' +
-                   '    python3 -m PyInstaller --onefile --name gogdl grinder_entry.py --clean --noconfirm\n' +
-                   '  then drop the result in assets/bin/darwin-arm64/ and publish binaries-mac-v2.',
-        },
+        url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-mac-v2/cafeneurotico-binaries-mac-v2.tar.gz',
+        sha256: '892a251259ba6474cfee8860c26068430bbb27b24aba28d82e6447b5e06559c3',
     },
 };
 

@@ -89,6 +89,7 @@
         }
       ],
       "category": "public.app-category.games",
+      "icon": "apps/manager/assets/icons/CNGM.icns",
       "artifactName": "CafeNeurotico-${arch}.${ext}",
       "identity": null,
       "extraResources": [
