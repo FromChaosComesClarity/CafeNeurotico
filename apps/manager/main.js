@@ -792,11 +792,12 @@ try {
 } catch {}
 
 ipcMain.handle('display-options', () => {
-    if (!kwinDisplay.isSupported()) return { supported: false, displays: [], current: null };
+    if (!kwinDisplay?.isSupported()) return { supported: false, displays: [], current: null };
     return { supported: true, displays: kwinDisplay.listDisplays(), current: kwinDisplay.currentDisplay() };
 });
 
 ipcMain.handle('set-game-display', (_, index) => {
+    if (!kwinDisplay) return { ok: false, error: 'Not supported on this system.' };
     try { return kwinDisplay.setGameDisplay(index === null ? null : Number(index)); }
     catch (e) { return { ok: false, error: e.message }; }
 });
