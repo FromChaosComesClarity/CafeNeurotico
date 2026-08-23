@@ -94,7 +94,13 @@ function dirSizeHumanCommand(target) {
     return { cmd: `du -sh "${target}" 2>/dev/null`, parse: out => String(out).split('\t')[0].trim() };
 }
 
-function legendaryConfigDir() { return path.join(HOME, 'Library', 'Application Support', 'legendary'); }
+// Not ~/Library/Application Support — legendary is a cross-platform Python CLI that never
+// adopted macOS's config conventions on its own; `legendary status` on this host reports its
+// real config directory as ~/.config/legendary, same as Linux. runLegendary() never passes
+// --config-folder, so this has to match what legendary actually uses, not what a well-behaved
+// macOS app would use. (grinder.db is a different case: that's Electron's own userData for
+// our own app.setName('grinder') process, which does resolve correctly per-host on its own.)
+function legendaryConfigDir() { return path.join(HOME, '.config', 'legendary'); }
 
 // ── Desktop integration ──────────────────────────────────────────────────────
 // canInstallMenuEntries is false — the .app bundle IS the menu entry, there is no separate
