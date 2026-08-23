@@ -1392,7 +1392,7 @@ window.addEventListener('focus', () => {
 let currentLaunchCmd = '';
 let activeFilters = new Set(); // empty = ALL GAMES
 const STORE_FILTERS     = new Set(['steam','gog','epic','flatpak','pico8','itch','physical','emulation','apps','others','openbor']);
-const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable']);
+const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable','mac-native']);
 
 // ── Genres ───────────────────────────────────────────────────────────────────
 // The vocabulary lives in packages/core/genres.js and arrives via the genre-list IPC,
@@ -1875,24 +1875,18 @@ document.getElementById('modal-free-games')?.addEventListener('click', (e) => {
 // ── MAC-NATIVE FILTER (macOS only) ──────────────────────────────────────────
 // Which games have a real macOS build vs. Windows-only. GOG/Epic are tagged from grinder.db
 // (free, local); Steam needs a live per-game lookup, so it's a user-triggered scan rather than
-// something that runs on every sync — see scan-mac-native in main.js.
-let _onlyMacNative = false;
+// something that runs on every sync — see scan-mac-native in main.js. The filter itself is just
+// another qualifier in activeFilters (see QUALIFIER_FILTERS/applyFilters), reachable from the
+// same "ALL GAMES ▾" dropdown Favourites/Want/Installed already live in — not a bespoke toggle,
+// so it's exactly as easy to find as those.
 function isMacNative(game) { return game && (game.MacNative == 1); }
-function applyMacNativeVisibility(only) {
-    _onlyMacNative = only;
-    window.api.setSetting('only_mac_native', only ? '1' : '');
-    document.querySelectorAll('.macnative-vis-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.val === (only ? 'only' : 'all')));
-    applyFilters();
-}
-document.querySelectorAll('.macnative-vis-btn').forEach(btn =>
-    btn.addEventListener('click', () => applyMacNativeVisibility(btn.dataset.val === 'only')));
-(async () => {
-    if (window.api.platform !== 'darwin') return;
+if (window.api.platform === 'darwin') {
     document.getElementById('mac-native-tool-card')?.style.setProperty('display', '');
-    const saved = await window.api.getSetting('only_mac_native');
-    if (saved === '1') applyMacNativeVisibility(true);
-})();
+} else {
+    // Not meaningful data on any other host — remove the option rather than hide it, so it's
+    // gone from enhanceSelect()'s popup too (it reads sel.options directly, not CSS visibility).
+    document.getElementById('gallery-category-mac-native')?.remove();
+}
 document.getElementById('btn-scan-mac-native')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-scan-mac-native');
     const status = document.getElementById('mac-native-scan-status');
@@ -4360,9 +4354,6 @@ function applyFilters() {
         // Free-to-play visibility: hide tagged games everywhere when the toggle is off
         if (_hideFreeGames && isFreeToPlay(game)) return false;
 
-        // Mac-native only (macOS build): opt-in, off by default
-        if (_onlyMacNative && !isMacNative(game)) return false;
-
         // Stores: OR — game must match at least one selected store (open if none selected)
         if (storeActive.length > 0) {
             const storeMatch = storeActive.some(f => {
@@ -4392,9 +4383,10 @@ function applyFilters() {
 
         // Qualifiers: AND — game must satisfy every selected qualifier
         for (const f of qualifierActive) {
-            if (f === 'playable' && !game.LaunchCommand) return false;
-            if (f === 'favs'     && game.FAV !== 'YES') return false;
-            if (f === 'want'     && game.WANT_TO_PLAY !== 'YES') return false;
+            if (f === 'playable'   && !game.LaunchCommand) return false;
+            if (f === 'favs'       && game.FAV !== 'YES') return false;
+            if (f === 'want'       && game.WANT_TO_PLAY !== 'YES') return false;
+            if (f === 'mac-native' && !isMacNative(game)) return false;
             if (f === 'installed') {
                 const cat = storeLower;
                 const isManual = !game.GrinderGameId && (cat.includes('others') || cat.includes('emulation') || cat.includes('physical') || cat.includes('apps'));

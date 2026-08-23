@@ -3691,6 +3691,7 @@
               <option value="installed">Installed</option>
               <option value="favs">Favourites</option>
               <option value="want">Want to Play</option>
+              <option value="mac-native" id="gallery-category-mac-native">Mac-Native</option>
               <option value="steam">Steam</option>
               <option value="gog">GOG</option>
               <option value="epic">Epic</option>
@@ -6211,12 +6212,8 @@ LOADING...READY.</div>
 
         <div class="tool-card tools-section" id="mac-native-tool-card" style="display:none;" data-search="mac native macos apple filter games run compatibility badge steam gog epic">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a1 1 0 0 1 1 1v2"/><path d="M12 8c-4 0-7 3-7 8 0 4 2 6 4 6 1 0 1.5-1 3-1s2 1 3 1c2 0 4-2 4-6 0-2.5-1-4.5-2.5-6 1-1 1.5-2.5 1.5-4-2 0-3.5.8-4.5 2-.6-.1-1.3 0-1.5 0z"/></svg>Mac-Native Games</div>
-          <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Which games have a real macOS build, not just Windows through a compatibility layer — GOG/Epic checked locally, Steam checked live per game. Marked with a small apple on the cover.</p>
-          <div class="segmented-control" id="macnative-vis-control">
-            <button class="segmented-btn macnative-vis-btn active" data-val="all">All Games</button>
-            <button class="segmented-btn macnative-vis-btn" data-val="only">Mac-Native Only</button>
-          </div>
-          <button id="btn-scan-mac-native" style="width:100%; font-size:12px; padding:10px; letter-spacing:1px; margin-top:8px;" class="primary"><span>Scan for Mac Compatibility</span></button>
+          <p style="font-size:10px; color:var(--text_dim); margin:0 0 8px; line-height:1.5;">Which games have a real macOS build, not just Windows through a compatibility layer — GOG/Epic checked locally, Steam checked live per game. Marked with a small apple on the cover, and filterable from the category dropdown above the gallery ("Mac-Native").</p>
+          <button id="btn-scan-mac-native" style="width:100%; font-size:12px; padding:10px; letter-spacing:1px;" class="primary"><span>Scan for Mac Compatibility</span></button>
           <p id="mac-native-scan-status" style="font-size:10px; color:var(--text_dim); margin:8px 0 0; line-height:1.5;"></p>
         </div>
 
