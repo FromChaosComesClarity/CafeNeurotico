@@ -1205,7 +1205,12 @@ async function showLaunchFailure(info) {
     $('pr-progress').style.display = 'none';
     $('pr-bar').style.width = '0%';
     $('pr-step').textContent = ''; $('pr-progress-msg').textContent = '';
-    $('pr-install').style.display = ''; $('pr-install').disabled = false;
+    // Only offer to install a Windows runtime when the failure is actually about one missing —
+    // this used to show unconditionally, so a completely unrelated failure (a stale grinder.db
+    // lookup, a bad path) still offered "Install GE-Proton" as if that would fix it. Confusing
+    // on Linux; actively wrong on macOS, where GE-Proton isn't a concept that exists at all.
+    $('pr-install').style.display = isProtonIssue ? '' : 'none';
+    $('pr-install').disabled = false;
     $('pr-install').textContent = 'Install GE-Proton';
     $('pr-close').textContent = 'Close';
 
@@ -1216,10 +1221,11 @@ async function showLaunchFailure(info) {
 
     // If Proton builds DO exist, the problem is something else (or a bad selection) — let the
     // user pick which one to use as the default rather than pushing another download at them.
+    // None of this applies when the failure isn't Proton-related in the first place.
     let list = { protons: [], current: '' };
-    try { list = await window.api.protonList(); } catch {}
+    if (isProtonIssue) { try { list = await window.api.protonList(); } catch {} }
     const sel = $('pr-select');
-    if (list.protons && list.protons.length) {
+    if (isProtonIssue && list.protons && list.protons.length) {
         $('pr-found').style.display = '';
         sel.innerHTML = list.protons
             .map(p => `<option value="${p.path.replace(/"/g, '&quot;')}">${(p.label || p.name)} — ${p.name}</option>`)
