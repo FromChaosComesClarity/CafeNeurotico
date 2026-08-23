@@ -116,7 +116,7 @@ doubles as the specification.
 | `which(bin)` | ⚠ A `.app` launched from Finder inherits a minimal PATH with **no Homebrew**. Search `/opt/homebrew/bin`, `/usr/local/bin` explicitly as well as PATH. |
 | `dirSizeBytesCommand(p)` | `du -sk "p"` and multiply the parsed number by 1024 — BSD `du` has no `-B1` |
 | `dirSizeHumanCommand(p)` | `du -sh "p"` works as-is |
-| `legendaryConfigDir()` | `~/Library/Application Support/legendary` |
+| `legendaryConfigDir()` | ⚠ **not** `~/Library/Application Support/legendary` — that was the Phase B guess, and it's wrong. legendary never adopted macOS's conventions on its own; `legendary status` on a real Mac reports its actual config directory as `~/.config/legendary`, same as Linux, and nothing in `runLegendary()` overrides that with `--config-folder`. Match the tool, not the platform. |
 | `steamLibraryPaths()` | `~/Library/Application Support/Steam/steamapps`, plus extra roots from `libraryfolders.vdf` — the vdf parsing is identical, lift it |
 | `steamLaunchCommand(appId)` | `open steam://rungameid/<id>` |
 | `extraStore` | `{ supported: false, label: '', scan: () => [], findIcon: () => null }` — no Flatpak. `scan-flatpak` becomes a no-op on its own. |
