@@ -9,8 +9,13 @@ What moves to the Mac is the *macOS work*, because none of it can be written or 
 Nobara. Everything below assumes an **M2 MacBook Air, 16 GB, macOS Tahoe (26)**, and the `mac`
 branch.
 
-Phase A is done and pushed: the host boundary exists, the Linux build still works, and
-`binaries-mac-v1` is published. What's left is writing the macOS side of that boundary.
+**Phases A through D are done and pushed.** The host boundary exists, `darwin.js` is written and
+contract-verified, a real unsigned `.app`/dmg builds, `gogdl` is built from the fork and
+published as `binaries-mac-v2`, and a real GOG macOS-native game has been installed, launched,
+and uninstalled end-to-end against Jose's actual GOG account. What's left is Phase E (Windows
+games via CrossOver) and the parts of Phase C that need hardware not yet on this machine
+(external-volume awareness — no SSD formatted here yet). See *Status* below each phase for the
+real, verified-against-reality version of what this file originally guessed at.
 
 Background: **`docs/mac-port-phase-a.md`** (what was moved, what was verified, what was
 deliberately left). This file is the do-this-next companion to it.
@@ -100,7 +105,7 @@ doubles as the specification.
 
 | Member | macOS |
 |---|---|
-| `nativeOsKey` | `'osx'` — GOG's own name for it, and what lands in `games.platform` |
+| `nativeOsKey` | `'osx'` — ⚠ **this was wrong as originally written.** `'osx'` is what lands in `games.platform` and what gogdl's own `--platform` flag wants — but GOG's *public catalog API* (`api.gog.com/products?expand=downloads`) calls the same OS `"mac"` in its installer `os` field, not `"osx"`. Comparing that field directly against `nativeOsKey` (as `syncOwnedLibrary` originally did) means **every Mac-native game in the library silently looks Windows-only** — happened to all 298 of Jose's owned GOG games until caught in Phase D. Fixed in `grinder-engine.js` with a small `GOG_CATALOG_OS_ALIAS = { mac: 'osx' }` translation before matching, not in `darwin.js` — `nativeOsKey` itself is correct. |
 | `gogdlPlatform` | `'osx'` |
 | `legendaryPlatform` | `'Mac'` |
 
@@ -120,9 +125,9 @@ doubles as the specification.
 
 | Member | macOS |
 |---|---|
-| `launchNative({exe, args})` | If `exe` is a `.app` bundle → `{ cmd: 'open', args: ['-a', exe, '--args', ...args] }`. If it's a plain binary → chmod +x and spawn directly, like Linux. |
+| `launchNative({exe, args})` | If `exe` is a `.app` bundle → `{ cmd: 'open', args: ['-n', exe, '--args', ...args] }` (`-n` — always a new instance, not `-a`). If it's a plain binary → chmod +x and spawn directly, like Linux. |
 | `findNativeGameExe(dir)` | Look for `*.app` first, then a plain executable |
-| `findNativeInstallResult(dir, appId, preExisting)` | **Unknown until you look.** Run one GOG macOS install and see what gogdl actually leaves behind — a `.app`, a `.pkg`, a plain tree. Don't guess. |
+| `findNativeInstallResult(dir, appId)` | **Verified against a real `gogdl --platform osx download` in Phase D** — see below. gogdl writes *no manifest file at all* on macOS (the Phase B guess of `.gogdl-osx-manifest` doesn't exist). The game IS the `.app` bundle, dropped directly under the install root with no extra per-game wrapper folder the way Linux/Windows get one. It self-identifies via `<bundle>.app/Contents/Resources/goggame-<appId>.info` — same `playTasks` JSON shape GOG already uses on Windows, just nested one level in. `install_path` has to be the bundle itself (`headlessUninstall` does an unguarded `rm -rf` on it — pointing it at the shared library root instead would delete every installed game), so `executable` is stored as the self-reference `'.'` rather than a real relative path, and `resolvedExe`'s `path.join(install_path, executable)` still lands on the bundle. |
 | `dosbox` | `find()` → look for `dosbox-staging` / `dosbox-x` via the widened `which`; `installHint()` → `brew install dosbox-staging`; `translateArgs` → lift verbatim from Linux |
 
 **Desktop.**
@@ -187,8 +192,27 @@ node -e "const h=require('./packages/core/platform/index.js');
 
 ## Phases, with an acceptance test each
 
-### Phase B — it launches
-Write `darwin.js` (paths + stubs above). Then:
+### Phase B — it launches — ✅ DONE
+`darwin.js` is written (paths, store IDs, system inventory, desktop/autostart via a
+`~/Library/LaunchAgents` plist, `runtime.*` stubbed through Phase E) and passes the contract
+check below with no missing members or type mismatches. `npm start`, `npm run start:crema`, and
+`npx electron . grinder` all launch clean — verified by screenshot, not just an empty terminal
+(the fresh-install onboarding wizard rendering correctly in each face is what "the library
+renders" actually looked like on a brand-new profile).
+
+One real, host-agnostic bug caught along the way: `apps/manager/main.js`'s `display-options`
+IPC handler called `host.desktop.displayPicker.isSupported()` with no null guard — fine on
+Linux (never null there), but an immediate crash on macOS where `displayPicker` is legitimately
+`null` per this very table. Fixed with a null check; Linux behaviour is unchanged since a real
+object still passes through untouched.
+
+Also found and fixed: `scripts/fetch-binaries.mjs` requires `platform/index.js` to resolve
+`host.binDirName` — which means on a **fresh clone before `darwin.js` exists**, `postinstall`
+(`fetch-binaries.mjs && electron-builder install-app-deps`) dies on the darwin platform error
+and the `&&` never lets `electron-builder install-app-deps` run. `better-sqlite3` ends up built
+for plain Node, not Electron's bundled Node, and the app fails with an ABI mismatch that looks
+unrelated. This resolves itself for anyone cloning *after* `darwin.js` is committed (which it
+now is) — if you ever hit the ABI error anyway, `npx electron-builder install-app-deps` fixes it.
 
 ```bash
 npm start                 # Manager
@@ -196,52 +220,86 @@ npm run start:crema       # CREMA
 npx electron . grinder    # GRINDER GUI
 ```
 
-**Done when:** all three windows open, the library renders, and nothing throws.
 **Read the terminal, not the window** — an Electron main-process error dialog keeps the process
 alive, so "it stayed open" proves nothing. That mistake cost two bugs in Phase A.
 
-### Phase B.5 — build a real app
+### Phase B.5 — build a real app — ✅ DONE
 ```bash
 npm run dist:mac          # dmg + zip, arm64, unsigned
 ```
-Needs an **`.icns`** — the project only has SVGs. Generate one from
-`apps/manager/assets/icons/CNGM.svg` (`sips`/`iconutil`, or any converter) and point
-`build.mac.icon` at it.
+`build.mac.icon` points at `apps/manager/assets/icons/CNGM.icns`. **`sips` cannot rasterize
+SVG** (`Error: Can't write format: public.svg-image`) and no other converter (`rsvg-convert`,
+`imagemagick`, `inkscape`, `cairosvg`) was installed — the icon was rendered by loading the SVG
+into a hidden, offscreen `BrowserWindow` at 1024px via Electron itself and downscaling with
+`nativeImage.resize()` for the other 9 sizes, then `iconutil -c icns`. No new dependency needed.
 
-Because you build locally, the `.app` never gets a quarantine bit and **Gatekeeper won't
-bother you at all**. That friction only exists for people who *download* the dmg — for them,
-`xattr -dr com.apple.quarantine /Applications/Cafe\ Neurotico.app`.
+Verified by actually launching the packaged `.app` (not just checking the build log) — the menu
+bar correctly reads "Cafe Neurotico", not "Electron", confirming the icon and identity are both
+wired. Because it's built locally, the `.app` never gets a quarantine bit and **Gatekeeper
+doesn't appear at all**. That friction only exists for someone who *downloads* the dmg — for
+them, `xattr -dr com.apple.quarantine /Applications/Cafe\ Neurotico.app`.
 
-### Phase B.6 — gogdl, and close the tarball gap
+### Phase B.6 — gogdl, and close the tarball gap — ✅ DONE
 ```bash
-git clone <the fork> gogdl_fork && cd gogdl_fork
-python3 -m pip install pyinstaller
+git clone https://github.com/shampoo-is-a-lie/gogdl.git gogdl_fork && cd gogdl_fork
+git submodule update --init --recursive     # xdelta3 — needed for the gogdl_xdelta3 C extension
+python3 -m venv .venv && source .venv/bin/activate
+pip install . pyinstaller
 python3 -m PyInstaller --onefile --name gogdl grinder_entry.py --clean --noconfirm
 ```
-Copy `dist/gogdl` into `assets/bin/darwin-arm64/`, then rebuild the tarball with all six and
-publish `binaries-mac-v2`, bumping `SOURCES.darwin` (url + sha256) and dropping the `missing`
-block in `scripts/fetch-binaries.mjs`.
+The fork wasn't already cloned on the Mac (contrary to what `fetch-binaries.mjs`'s error message
+implies) — that clone command above is the real one. `binaries-mac-v2` is published with the
+full six-binary set; `SOURCES.darwin` in `scripts/fetch-binaries.mjs` no longer has a `missing`
+block. Verified two ways: the built `gogdl --version`/`--help` run correctly (arm64 Mach-O,
+ad-hoc re-signed by PyInstaller), and a full `npm run fetch-bin` end-to-end — wiped the local
+binaries, re-downloaded from the actual published release, and let the script's own SHA256
+check verify the hash before it was committed.
 
 **Do not shortcut this with upstream's `gogdl_macos_arm64`.** It still has three of the four
 bugs the fork exists for — see the table in `docs/mac-port-phase-a.md`.
 
-### Phase C — scan and launch what's already installed
-Steam library scan, `open steam://…`, GOG `.app` bundles, and external-volume awareness for
-`/Volumes/`.
-**Done when:** the library populates from a real Mac Steam install and a native game launches.
+### Phase C — scan and launch what's already installed — Steam ✅, GOG .app ✅ (via Phase D), external volumes ⏳
+Steam library scan and `open steam://…` verified against a real installed Mac Steam library (7
+native games) — picked a small one (Wizorb), launched it via
+`host.steamLaunchCommand()`, and confirmed the actual game process running full-screen.
+GOG `.app` bundle detection turned out to be inseparable from Phase D (you cannot verify install
+detection without doing a real install), so it's covered there instead.
 
-### Phase D — the actual goal: download and install
-gogdl `--platform osx`, legendary `--platform Mac`, comet for achievements, installing to the
-external SSD.
+**Not done: external-volume awareness for `/Volumes/`.** Zero references to `/Volumes` exist
+anywhere in the codebase — this is unimplemented, not just untested. No external SSD has been
+formatted on this machine yet (Day 0's step), so there's no real mount point to design or test
+against. Do Day 0's SSD step before picking this up.
 
-Two things to settle here:
-- **`games.platform` per-host derivation.** `platforms` (plural) holds everything GOG offers;
-  stop trusting the singular `platform` at launch time and pick per host. See *Data-model
-  decisions* in the Phase A doc.
-- **Line 582 of `grinder-engine.js`** (`activePlat = platform || 'windows'`) — deferred from
-  Phase A because changing it there would have altered Linux behaviour. It belongs here.
+### Phase D — the actual goal: download and install — ✅ DONE (GOG native; Epic blocked on auth)
+Verified end-to-end against Jose's real GOG account: synced the owned library (298 games, GOG
+Web API `os` values translated via the `GOG_CATALOG_OS_ALIAS` fix above — 66 turned out to be
+genuinely Mac-native), installed a real title (`gogdl --platform osx download`), launched it
+(confirmed the actual game process, not just an `{ok:true}` return), and uninstalled it cleanly
+(bundle removed from disk, DB row reset to `installed:0, install_path:null`).
 
-**Done when:** a GOG macOS-native game installs to the SSD, launches, and uninstalls cleanly.
+**The two "two things to settle" this file originally flagged turned out to be red herrings.**
+Neither `activePlat = platform || 'windows'` (now at grinder-engine.js:430, not line 582 — line
+numbers drifted after Phase A) nor "stop trusting the singular `platform` column" needed to
+change. The singular column is fine to trust at launch time *once it's computed correctly* — the
+real bug was purely in how it got computed (the catalog `os`-field mismatch above). Leaving the
+per-row `platform` column as user-overridable (only `platforms`, plural, refreshes on every
+re-sync — see `apps/manager/main.js`'s "Linux-native vs Windows" toggle, which explicitly
+persists a user's choice) turned out to be a deliberate, correct design, not an oversight.
+
+One more real bug, found while reading the surrounding code rather than by a failure: GOG's
+`goggame-<appId>.info` file (used by `gogPlayTaskList` in `grinder-engine.js` for the
+DLC/alternate-executable task picker) is looked up at `install_path`'s root — correct for
+Windows/Linux, wrong on macOS where `install_path` **is** the `.app` bundle and GOG nests that
+file in `Contents/Resources/` instead. Fixed by branching on whether `install_path` ends in
+`.app`; no-op on every other host.
+
+**Epic/legendary is not verified.** Signing in through the app's browser-based OAuth window
+did not actually persist legendary auth — `~/Library/Application Support/legendary` doesn't
+exist on this machine. `syncOwnedLibrary`'s Epic half fails with `ValueError: No saved
+credentials` from legendary itself. The headless Epic sign-in flow (`apps/manager/main.js`
+`epic-login`, mirroring `gog-login`) needs to actually complete before Epic installs can be
+tested the same way GOG was here — this is a real, un-investigated gap, not a platform-backend
+issue.
 
 ### Phase E — Windows games
 Runner detection and management. Deliberately last: CrossOver's ARM64/FEX transition is still
@@ -278,24 +336,33 @@ release first — **the native ARM64 CrossOver build needs macOS 26.5+**.
 | `packages/core/platform/index.js` | 31 lines. How a backend is selected. |
 | `docs/mac-port-phase-a.md` | What moved, what was verified, what was left. |
 
-**Write this:**
+**Written (Phases B–D, done):**
 
 | File | |
 |---|---|
-| `packages/core/platform/darwin.js` | The whole of Phase B. |
+| `packages/core/platform/darwin.js` | Phase B's platform backend, plus the Phase D fixes to `findNativeInstallResult`. |
+| `packages/core/grinder-engine.js` | The `GOG_CATALOG_OS_ALIAS` fix in `syncOwnedLibrary` (~line 1794) and the `.app`-aware path in `gogPlayTaskList` (~line 605) — both Phase D. |
+| `scripts/fetch-binaries.mjs` | `SOURCES.darwin` bumped to `binaries-mac-v2`, `missing`/`provides` dropped — Phase B.6. |
+| `package.json` → `build.mac.icon` | Points at `apps/manager/assets/icons/CNGM.icns` — Phase B.5. |
+| `apps/manager/main.js`, `apps/grinder/main.js`/`preload.js`/`renderer.js`, `apps/manager/preload.js`/`renderer.js`, both `index.html`s | Native traffic lights on macOS (`titleBarStyle:'hidden'`) instead of the custom win-btn row — not part of the original phase plan, added on request. Gated on `process.platform`/`window.api.platform`; Linux/other hosts unaffected. |
 
-**Touch these, but only later:**
+**Still to touch:**
 
 | File | When |
 |---|---|
-| `scripts/fetch-binaries.mjs` | Phase B.6 — `SOURCES.darwin` after gogdl |
-| `package.json` → `build.mac.icon` | Phase B.5 — the `.icns` |
-| `packages/core/grinder-engine.js` (line ~582) | Phase D |
-| `packages/core/custom-installers.js` | Phase D — Mac recipes, tagged `hosts: ['darwin']`, from macsourceports.com (192 notarized Universal 2 ports) |
+| `packages/core/custom-installers.js` | Phase D follow-up — Mac recipes, tagged `hosts: ['darwin']`, from macsourceports.com (192 notarized Universal 2 ports) |
 | `apps/grinder/renderer.js` | Whenever — the External Tools panel hardcodes the Linux tool names; `check-tools` already returns a `runtimeTools` array for it to move onto |
+| `apps/manager/main.js` `epic-login` | Epic/legendary auth genuinely isn't verified yet — see Phase D's status above |
 
-**Don't touch:** the three `apps/*/main.js`. Phase A left them host-agnostic; if Phase B needs
-to change one, that's a sign the boundary is in the wrong place — fix `darwin.js` instead.
+**Don't touch:** the three `apps/*/main.js` — for macOS-*specific* business logic. That line got
+crossed twice, deliberately, for things that weren't actually macOS-specific: the
+`display-options` null-guard (a latent bug any second backend would have hit, not something
+about macOS) and the traffic-light window chrome (a real `process.platform` branch, but the fix
+lives in the shared window-creation code because that's where `frame`/`titleBarStyle` already
+was — there's no `darwin.js` equivalent for "how a BrowserWindow gets constructed"). If you find
+yourself writing `if (macOS-specific thing) { ... }` inside `apps/*/main.js`, that's still the
+signal the boundary is wrong; a platform-agnostic bug that only *manifests* on a second host, or
+a genuinely shared file with no platform-backend home, isn't the same thing.
 
 ---
 
@@ -311,8 +378,10 @@ can.
    the Mac build is labelled Experimental and is allowed to be incomplete.
 2. **Never reshape `linux.js` to suit `darwin.js`.** If the macOS backend wants a different
    contract, widen the contract — add a member, give it a sensible Linux value — rather than
-   changing what Linux already does. Phase A deliberately deferred one such change (line ~582
-   of `grinder-engine.js`) for exactly this reason.
+   changing what Linux already does. In practice the Phase D fixes turned out not to need this:
+   both `syncOwnedLibrary`'s `GOG_CATALOG_OS_ALIAS` and `gogPlayTaskList`'s `.app`-aware path
+   are additive branches that are no-ops on every host but macOS, not reshapes of existing
+   Linux behaviour.
 3. **Anything shared gets verified on Linux before it merges** — the engine, `shared-ipc.js`,
    the renderers, `custom-installers.js`. That means `npm run dist` on the Linux box plus the
    six-path launch smoke test in `docs/mac-port-phase-a.md`, not just "it built".
