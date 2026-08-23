@@ -32,11 +32,22 @@ const configDir = app.isPackaged
 
 const prefixesDir = path.join(configDir, 'prefixes');
 const logDir      = path.join(configDir, 'game_logs');
-const dbPath      = path.join(configDir, 'grinder.db');
 
 // Directory containing the AppImage (same folder as CNGM.AppImage)
 const appImageDir  = host.portableBaseDir({ devDir: configDir });
 const progressFile = path.join(appImageDir, 'GameManagerConfig', 'grinder-progress.json');
+
+// GRINDER's own db normally lives at configDir/grinder.db — its dedicated identity (see the
+// comment above), and findGrinderDb's own candidate list already includes that exact path
+// first. But if a grinder.db with real data already exists at one of the OTHER candidates
+// (most likely the shared suite's own baseDir/GRINDERConfig, from an install or sync that ran
+// against it before this dedicated path ever got created — e.g. dev-mode testing, or the
+// Manager face running before GRINDER's own packaged path existed), use that instead of
+// silently creating another, empty grinder.db right next to it. Two live, disagreeing
+// databases for the same suite is exactly the split that made "Play" fail with a real, correct
+// GrinderGameId that simply wasn't in *this* file. Falls back to the original dedicated path
+// when nothing exists anywhere yet (the normal fresh-install case — unchanged from before).
+const dbPath = host.findGrinderDb(appImageDir) || path.join(configDir, 'grinder.db');
 
 
 let db;
