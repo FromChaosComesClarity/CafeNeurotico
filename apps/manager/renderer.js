@@ -1113,23 +1113,36 @@ async function openGrinderInstall(game) {
     $('gi-cancel').textContent = 'Cancel';
     modal.classList.add('active');
 
-    // Platform choice — only for GOG games that ship BOTH a native Linux and a Windows build.
+    // Platform choice — only for GOG games that ship BOTH a native build for this host and a
+    // Windows build. The native key varies by host (gogdl calls it 'linux' on Linux, 'osx' on
+    // macOS) — hardcoding 'linux' here meant a Mac-native GOG game never got offered its own
+    // native build at all: hasChoice stayed false, so the platform silently fell through to
+    // whatever grinder.db already had (usually fine) rather than ever being a real choice.
+    const nativeKey   = window.api.platform === 'darwin' ? 'osx' : 'linux';
+    const nativeLabel = window.api.platform === 'darwin' ? 'Mac Native' : 'Linux Native';
     let selectedPlatform;
     let hasChoice = false;
     const platRow = $('gi-platform-row');
     try {
         const pinfo = await window.api.grinderPlatforms(gid);
         const avail = pinfo.platforms || [];
-        hasChoice = /^gog_/i.test(gid) && avail.includes('linux') && avail.includes('windows');
-        selectedPlatform = pinfo.platform === 'linux' ? 'linux' : 'windows';
+        hasChoice = /^gog_/i.test(gid) && avail.includes(nativeKey) && avail.includes('windows');
+        selectedPlatform = pinfo.platform === nativeKey ? nativeKey : 'windows';
     } catch { hasChoice = false; }
     if (platRow) platRow.style.display = hasChoice ? 'flex' : 'none';
+    const nativeBtn = $('gi-plat-linux');
+    if (nativeBtn) { nativeBtn.textContent = nativeLabel; nativeBtn.title = `Install the native ${nativeLabel} build`; }
 
     const fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1) + ' GB' : (b/1024**2).toFixed(0) + ' MB');
     const refreshSizeInfo = async () => {
         const el = $('gi-sizeinfo'); el.textContent = 'Checking size & free space…';
+        // Always the resolved platform, even without a choice to make — it's already set
+        // correctly above from grinder.db's own value, and passing undefined here used to
+        // silently default the size lookup to Windows (gogInstallInfo's own `platform ||
+        // 'windows'` fallback), showing the wrong download size for a game with no Windows
+        // build at all.
         const [info, free] = await Promise.all([
-            window.api.getInstallSize(gid, hasChoice ? selectedPlatform : undefined).catch(() => null),
+            window.api.getInstallSize(gid, selectedPlatform).catch(() => null),
             window.api.getDiskSpace($('gi-dir').value).catch(() => null),
         ]);
         const val = v => `<b style="color:var(--text_main)">${fmtB(v)}</b>`;
@@ -1147,11 +1160,11 @@ async function openGrinderInstall(game) {
     if (hasChoice) {
         const setPlat = p => {
             selectedPlatform = p;
-            $('gi-plat-linux').classList.toggle('active', p === 'linux');
+            $('gi-plat-linux').classList.toggle('active', p === nativeKey);
             $('gi-plat-windows').classList.toggle('active', p === 'windows');
             refreshSizeInfo();
         };
-        $('gi-plat-linux').onclick   = () => setPlat('linux');
+        $('gi-plat-linux').onclick   = () => setPlat(nativeKey);
         $('gi-plat-windows').onclick = () => setPlat('windows');
         setPlat(selectedPlatform);
     } else {
