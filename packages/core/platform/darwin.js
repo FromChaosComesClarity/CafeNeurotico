@@ -242,22 +242,27 @@ function findNativeGameExe(gameDir) {
     return null;
 }
 
-// Is `gameDir` a native macOS install of `appId`? Mirrors linux.js's manifest check, on the
-// assumption gogdl names its per-platform manifest the same way on every host
-// (.gogdl-{platform}-manifest). UNVERIFIED — gogdl for macOS doesn't exist yet (Phase B.6);
-// confirm this against a real `gogdl --platform osx` install in Phase D and fix the filename
-// here if it differs.
-function findNativeInstallResult(gameDir, appId, preExistingDirs = null) {
-    const manifest = path.join(gameDir, '.gogdl-osx-manifest');
-    if (!fs.existsSync(manifest)) return null;
-    try {
-        const lines = fs.readFileSync(path.join(gameDir, 'gameinfo'), 'utf8')
-            .split('\n').map(l => l.trim());
-        if (!lines.includes(String(appId))) return null;
-    } catch {
-        if (preExistingDirs?.has(path.basename(gameDir))) return null;
-    }
-    return { install_path: gameDir, executable: findNativeGameExe(gameDir) };
+// Is `gameDir` a native macOS install of `appId`? Verified against a real
+// `gogdl --platform osx download` (Phase D): unlike Linux, gogdl writes no manifest file at
+// all here — the game IS the .app bundle, dropped directly under the shared install root with
+// no extra per-game wrapper folder. findGogInstallResult's caller peels one level off that
+// root before calling us, so `gameDir` here typically already IS the bundle; a plain folder
+// containing one (a source-port style install) is handled too. It carries its own
+// goggame-<appId>.info inside Contents/Resources (same playTasks shape as the Windows .info
+// file) — the filename already encodes the appId, so there's no ambiguity to guess at.
+//
+// install_path must be safe to `rm -rf` alone on uninstall (see headlessUninstall), so it has
+// to be the bundle itself, never the shared root above it — which makes `executable` a
+// self-reference ('.') rather than a name, so resolvedExe's path.join(install_path, executable)
+// still lands on the bundle. launchNative's `open -n` then resolves the real binary through
+// the bundle's own Info.plist (CFBundleExecutable), exactly as GOG's own installer would.
+function findNativeInstallResult(gameDir, appId) {
+    const isApp = /\.app$/i.test(gameDir);
+    const bundle = isApp ? gameDir : (() => { const a = findNativeGameExe(gameDir); return a ? path.join(gameDir, a) : null; })();
+    if (!bundle) return null;
+    const infoFile = path.join(bundle, 'Contents', 'Resources', `goggame-${appId}.info`);
+    if (!fs.existsSync(infoFile)) return null;
+    return { install_path: bundle, executable: '.' };
 }
 
 // ── DOSBox for GOG's DOS games ───────────────────────────────────────────────

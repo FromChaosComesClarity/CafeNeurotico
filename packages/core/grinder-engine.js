@@ -605,7 +605,12 @@ function findShippedWrappers(resolvedExe, installPath) {
 function gogPlayTaskList(game) {
     if (!game || game.store !== 'gog' || !game.install_path || !game.app_id) return [];
     const installPath = expandTilde(game.install_path);
-    const infoFile = resolvePathCaseInsensitive(path.join(installPath, `goggame-${game.app_id}.info`));
+    // On macOS install_path IS the .app bundle (see platform/darwin.js), and GOG nests the
+    // .info file inside it rather than at the install root the way Windows/Linux get it.
+    const infoRel = /\.app$/i.test(installPath)
+        ? path.join('Contents', 'Resources', `goggame-${game.app_id}.info`)
+        : `goggame-${game.app_id}.info`;
+    const infoFile = resolvePathCaseInsensitive(path.join(installPath, infoRel));
     let info;
     try { info = JSON.parse(fs.readFileSync(infoFile, 'utf8')); } catch { return []; }
 
@@ -1791,7 +1796,14 @@ async function syncOwnedLibrary() {
                 const items = Array.isArray(data) ? data : [data];
                 for (const item of items) {
                     if (!item?.id) continue;
-                    const oses      = [...new Set((item.downloads?.installers || []).map(x => x.os).filter(Boolean))];
+                    // GOG's public catalog API calls a macOS installer's os "mac"; gogdl's own
+                    // --platform flag (and therefore host.nativeOsKey / games.platform / every
+                    // launch-time comparison against it) calls the same host "osx". Two GOG
+                    // APIs, two vocabularies for the same OS — translate before matching, or
+                    // every Mac-native game in the library silently looks Windows-only.
+                    const GOG_CATALOG_OS_ALIAS = { mac: 'osx' };
+                    const oses      = [...new Set((item.downloads?.installers || [])
+                        .map(x => GOG_CATALOG_OS_ALIAS[x.os] || x.os).filter(Boolean))];
                     // `platform` is what we would run here; `platforms` is everything GOG
                     // offers that this host could ever use. Keyed off the backend so a
                     // library synced on one OS is not mislabelled for the other.
