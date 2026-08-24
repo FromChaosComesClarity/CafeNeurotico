@@ -2,7 +2,7 @@
 
 **Linux is the primary platform.** It's what's tested first, what ships fastest, and what the
 rest of this README is written for. The macOS build is a second host in the same codebase —
-real, working, and actively used, but younger, unsigned, and without Linux's years of mileage.
+real, working, and actively used, but younger, unsigned, and with less mileage behind it than Linux.
 "Experimental" means exactly that: expect it to work for the things listed below as working, and
 expect rough edges anywhere this guide doesn't mention.
 
