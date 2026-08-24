@@ -13,8 +13,8 @@ macOS reports are genuinely useful right now, this build needs them.
 
 - **The full library**: Steam, GOG and Epic sign-in, sync, and browsing — all three faces (the
   Manager, CREMA, and GRINDER)
-- **Installing and launching Mac-native GOG and Epic games** — real downloads through the suite's
-  own `gogdl`/`legendary`, not a browser hand-off
+- **Installing and launching Mac-native GOG and Epic games** — real downloads through `gogdl` and
+  `legendary` directly, not a browser hand-off
 - **A filter for which of your games are actually Mac-native** — the "Mac-Native" option in the
   library's category dropdown, plus a small apple badge on the cover art of anything it applies
   to. GOG/Epic are checked instantly from what you already own; Steam needs one "Scan for Mac
