@@ -4,12 +4,14 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.6.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.8.0-D4A373?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
+![platform-mac](https://img.shields.io/badge/platform-macOS%20(Experimental)-e58a70?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
 
 **[Download the AppImage](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/latest)** ·
+[macOS build (Experimental)](docs/macos-guide.md) ·
 [Website](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/) ·
 [Support](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/support.html)
 
@@ -113,6 +115,16 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 **Local-only, portable, backupable.** Everything lives in a `GameManagerConfig` folder next to the AppImage. Put it on a thumb drive, take your library to another machine. No account, no telemetry, no cloud.
 
+## macOS — Experimental
+
+Cafe Neurotico also runs on Apple Silicon Macs, built from the exact same codebase behind a host
+boundary rather than a fork. **Linux stays primary** — it's what ships fastest and gets tested
+first — but the Mac build is real: Steam/GOG/Epic sign-in, the full library, and installing and
+launching Mac-native GOG/Epic games all work today, including a filter and cover badge for which
+of your owned games actually have a native macOS build. Windows games need a compatibility layer
+that isn't wired in yet, so that's the one major gap. **[Full install instructions, what works,
+and what doesn't →](docs/macos-guide.md)**
+
 ## The rest of the ecosystem
 
 **[EmuLatte](https://github.com/shampoo-is-a-lie/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up and adds it to the app menu and the icon rail.
@@ -145,7 +157,7 @@ cafeneurotico/
 > Helper binaries (ffmpeg / yt-dlp / gogdl / legendary / comet) are fetched from this repo's
 > GitHub Releases — keeping the repo and the AppImage lean.
 
-**Requirements:** a 64-bit Linux desktop, and FUSE for the AppImage. The Steam import needs a free Steam API key; SteamGridDB and IGDB scraping need their own free keys. Everything else works out of the box.
+**Requirements:** a 64-bit Linux desktop, and FUSE for the AppImage — or an Apple Silicon Mac for the [Experimental macOS build](docs/macos-guide.md). The Steam import needs a free Steam API key; SteamGridDB and IGDB scraping need their own free keys. Everything else works out of the box.
 
 ## Documentation
 

@@ -3304,6 +3304,12 @@ window.api.getAppVersion?.().then(v => {
     const cp = document.getElementById('cp-app-version-num');
     if (cp) cp.textContent = `VERSION ${v}`;
 }).catch(() => {});
+// The macOS build is unsigned and doesn't get the same Linux-first testing yet — make that
+// visible in the two places anyone would look for the version, not just the docs.
+if (window.api.platform === 'darwin') {
+    document.getElementById('about-platform-badge')?.style.setProperty('display', '');
+    document.getElementById('cp-platform-badge')?.style.setProperty('display', '');
+}
 
 // Control Panel splash → releases page. There is no in-app updater by design:
 // the user reads the release notes on GitHub and grabs the AppImage themselves.
