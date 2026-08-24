@@ -68,6 +68,11 @@
     /* macOS: real traffic lights (titleBarStyle:'hidden' in main.js) — hide the custom row. */
     body.platform-darwin .titlebar-controls { display: none; }
     body.platform-darwin .titlebar-brand { padding-left: 78px; }
+    /* umu/wine and the GE-Proton downloader are Linux-only concepts; CrossOver replaces both
+       in the mini-strip and the External Tools panel (see checkTools() in renderer.js). */
+    body.platform-darwin #status-umu,
+    body.platform-darwin #status-wine,
+    body.platform-darwin #settings-ge-proton { display: none; }
 
     /* ── Layout ── */
     #app { display: flex; flex: 1; overflow: hidden; }
@@ -609,6 +614,7 @@
         <div class="tool-status" id="status-gogdl"><div class="dot"></div>gogdl</div>
         <div class="tool-status" id="status-umu"><div class="dot"></div>umu-run</div>
         <div class="tool-status" id="status-wine"><div class="dot"></div>wine</div>
+        <div class="tool-status" id="status-crossover" style="display:none"><div class="dot"></div>CrossOver</div>
       </div>
     </div>
 
@@ -658,14 +664,14 @@
         </div>
 
         <div class="settings-section">
-          <h3>Proton Versions</h3>
+          <h3 id="settings-runtime-heading">Proton Versions</h3>
           <div id="proton-list" style="margin-bottom:12px; display:flex; flex-direction:column; gap:6px; font-size:15px; color:var(--text_sec);">Not scanned yet.</div>
           <button class="btn-save-settings" id="btn-scan-proton" style="background:rgba(255,255,255,0.05); border:1px solid var(--border_solid); color:var(--text_sec); margin-bottom:4px;">Scan Proton Versions</button>
-          <p style="font-size:14px; color:var(--text_dim); margin-top:4px; line-height:1.6;">
+          <p id="settings-runtime-desc" style="font-size:14px; color:var(--text_dim); margin-top:4px; line-height:1.6;">
             Scans Steam, Flatpak Steam, and <code style="font-size:14px;background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">compatibilitytools.d</code> for installed Proton versions (including GE-Proton). Install new versions with <strong style="color:var(--text_sec)">ProtonUp-Qt</strong>.
           </p>
         </div>
-        <div class="settings-section">
+        <div class="settings-section" id="settings-ge-proton">
           <h3>Install GE-Proton</h3>
           <p style="font-size:14px; color:var(--text_dim); margin-bottom:12px; line-height:1.6;">Download and install GE-Proton directly from the <strong style="color:var(--text_sec)">GloriousEggroll</strong> GitHub releases. Installs to <code style="font-size:13px;background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">compatibilitytools.d</code> and is immediately available in the Proton scanner above.</p>
           <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">

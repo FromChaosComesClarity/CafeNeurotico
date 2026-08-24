@@ -9,13 +9,14 @@ What moves to the Mac is the *macOS work*, because none of it can be written or 
 Nobara. Everything below assumes an **M2 MacBook Air, 16 GB, macOS Tahoe (26)**, and the `mac`
 branch.
 
-**Phases A through D are done and pushed.** The host boundary exists, `darwin.js` is written and
+**Phases A through E are done and pushed.** The host boundary exists, `darwin.js` is written and
 contract-verified, a real unsigned `.app`/dmg builds, `gogdl` is built from the fork and
 published as `binaries-mac-v2`, and a real GOG macOS-native game has been installed, launched,
-and uninstalled end-to-end against Jose's actual GOG account. What's left is Phase E (Windows
-games via CrossOver) and the parts of Phase C that need hardware not yet on this machine
-(external-volume awareness — no SSD formatted here yet). See *Status* below each phase for the
-real, verified-against-reality version of what this file originally guessed at.
+and uninstalled end-to-end against Jose's actual GOG account. Windows games now run too, through
+CrossOver — see *Phase E* below for what that turned out to actually require. What's left is the
+part of Phase C that needs hardware not yet on this machine (external-volume awareness — no SSD
+formatted here yet). See *Status* below each phase for the real, verified-against-reality version
+of what this file originally guessed at.
 
 Background: **`docs/mac-port-phase-a.md`** (what was moved, what was verified, what was
 deliberately left). This file is the do-this-next companion to it.
@@ -301,10 +302,43 @@ credentials` from legendary itself. The headless Epic sign-in flow (`apps/manage
 tested the same way GOG was here — this is a real, un-investigated gap, not a platform-backend
 issue.
 
-### Phase E — Windows games
-Runner detection and management. Deliberately last: CrossOver's ARM64/FEX transition is still
-landing, so anything written now against Rosetta-era assumptions rots. Check your exact point
-release first — **the native ARM64 CrossOver build needs macOS 26.5+**.
+### Phase E — Windows games — ✅ DONE, 2026-08-24
+**CrossOver, not Sikarugir.** Sikarugir was tried first (Jose's ask, since he'd already installed
+it) and dropped: its app is "Sikarugir Creator.app", a GUI-only Wineskin-lineage wrapper generator
+with no CLI to drive headlessly — a fundamentally worse fit than everything else this codebase
+talks to. CrossOver has a real one, confirmed by hand on this machine (26.3, native ARM64 —
+clears the 26.5+ threshold this file used to warn about) before any code was written:
+
+- The sanctioned entry point is `wine --bottle NAME [--no-gui] EXE args…`, at
+  `Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/wine` inside the app bundle
+  (**not** `Contents/SharedSupport/CrossOver/bin/`, an earlier guess that was wrong). It sets up
+  CX_ROOT, the GPTK/D3DMetal library paths, WINEDLLPATH etc. itself — calling the engine binary
+  underneath (`wineloader`) directly skips all of that.
+- `CX_BOTTLE_PATH` (an env var) relocates where a *named* bottle is looked up/created, which is
+  what let grinder-engine.js's existing per-game prefix scheme (`configDir/prefixes/<safe-name>`,
+  unchanged from Linux) work with zero changes: the directory becomes the bottle's parent, its
+  own name becomes the bottle name.
+- Bottles do **not** self-initialize the way umu/Proton prefixes do — `wine --bottle` against a
+  name with no bottle yet is a fatal error, and `cxbottle --create` refuses to create one at a
+  path that already exists (even empty, which is exactly what grinder-engine.js's own
+  `fs.mkdirSync(prefix, {recursive:true})` leaves behind before `host.runtime` is ever consulted).
+  `darwin.js`'s `ensureBottle()` treats "no `system.reg`" as "not a real bottle yet" and is safe
+  to wipe-and-recreate from — verified against exactly that pre-created-empty-directory shape.
+- `z:` still maps to `/`, same as vanilla Wine/Linux (CrossOver additionally maps `y:` to
+  `$HOME`, unused here).
+
+Because bottle creation (~15-20s, one-time per game) has to happen before a launch can be spawned
+at all, `buildLaunch`/`buildRedistLaunch`/`regeditCommand` are `async` on darwin — and
+grinder-engine.js's three call sites (plus one in `apps/grinder/main.js`) now `await` them, a
+harmless no-op for Linux's plain-sync versions. Verified end-to-end with real spawns, not just
+unit-style calls: a fresh, never-touched prefix directory → `buildLaunch` → bottle created →
+`cmd.exe` actually ran inside it and printed real output; a second launch against the same prefix
+skipped creation entirely (0.2ms vs ~10s). Not yet tested against a real Windows *game* — every
+verification so far used `cmd.exe`, which proves the plumbing but not any one title's actual
+compatibility. Not wired up: BattlEye/EAC (`findAntiCheatRuntime` returns `null` — CrossOver 26
+advertises its own support built into the engine, unverified against a real anti-cheat title),
+and there's no structured first-run progress panel the way Linux's `STARTUP_STEPS` regex-matches
+umu's output (`startupSteps()` returns `[]` — the bottle-creation delay is real but silent).
 
 ---
 

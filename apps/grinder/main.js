@@ -1008,7 +1008,7 @@ async function runExeForGame(gameId, dialogOpts) {
         if (eq > 0) customEnv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
     }
 
-    const spec = host.runtime.buildRedistLaunch({ exePath: exe, exeArgs: [], prefix, runtimePath: proton });
+    const spec = await host.runtime.buildRedistLaunch({ exePath: exe, exeArgs: [], prefix, runtimePath: proton });
     spawn(spec.cmd, spec.args, { env: { ...spec.env, ...customEnv }, detached: true, stdio: 'ignore' }).unref();
     return { ok: true, method: spec.method };
 }

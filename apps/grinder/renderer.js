@@ -155,6 +155,7 @@ document.getElementById('btn-close').addEventListener('click', () => window.api.
 // ── Tool status indicators ────────────────────────────────────────────────────
 async function checkTools() {
     const tools = await window.api.checkTools();
+    const isMac = window.api.platform === 'darwin';
     function setDot(id, value) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -163,8 +164,49 @@ async function checkTools() {
     }
     setDot('status-legendary', tools.legendary);
     setDot('status-gogdl',     tools.gogdl);
-    setDot('status-umu',       tools.umu);
-    setDot('status-wine',      tools.wine);
+
+    if (isMac) {
+        // umu/wine are Linux runner-stack concepts; CrossOver is this host's one runtime.
+        // runtimeTools carries it under key 'crossover' (see darwin.js's runnerTools()).
+        const cx = tools.runtimeTools?.find(t => t.key === 'crossover');
+        const crossoverEl = document.getElementById('status-crossover');
+        if (crossoverEl) crossoverEl.style.display = 'flex';
+        setDot('status-crossover', cx?.path);
+
+        const heading = document.getElementById('settings-runtime-heading');
+        const desc    = document.getElementById('settings-runtime-desc');
+        if (heading) heading.textContent = 'CrossOver';
+        if (desc) desc.innerHTML = cx?.path
+            ? `Found at <code style="font-size:14px;background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">${cx.path}</code>. Windows games run through it directly — nothing to configure here.`
+            : 'Not found. Windows games need <strong style="color:var(--text_sec)">CrossOver</strong> — install it from <strong style="color:var(--text_sec)">codeweavers.com</strong>, then relaunch Cafe Neurotico.';
+
+        const info = document.getElementById('tools-info');
+        if (info) info.innerHTML = [
+            `<strong style="color:var(--text_main)">legendary</strong>: ${
+                tools.legendary
+                    ? (tools.legendary_bundled
+                        ? `<span style="color:#66bb6a">✓ bundled (${tools.legendary})</span>`
+                        : `<span style="color:#ffb74d">⚠ system install (${tools.legendary})</span>`)
+                    : '<span style="color:#ef5350">not found</span>'
+            }`,
+            `<strong style="color:var(--text_main)">gogdl</strong>: ${
+                tools.gogdl
+                    ? (tools.gogdl_bundled
+                        ? `<span style="color:#66bb6a">✓ bundled (${tools.gogdl})</span>`
+                        : `<span style="color:#ffb74d">⚠ system install (${tools.gogdl})</span>`)
+                    : '<span style="color:var(--text_dim)">not found — required for GOG installation.</span>'
+            }`,
+            `<strong style="color:var(--text_main)">CrossOver</strong>: ${
+                cx?.path
+                    ? `<span style="color:#66bb6a">✓ ${cx.path}</span>`
+                    : '<span style="color:#ffb74d">not found — install it from codeweavers.com to run Windows games.</span>'
+            }`,
+        ].join('<br><br>');
+        return;
+    }
+
+    setDot('status-umu',  tools.umu);
+    setDot('status-wine', tools.wine);
 
     // Show install button only when umu is missing
     const umuWrap = document.getElementById('umu-install-wrap');
@@ -216,12 +258,19 @@ async function showWelcome() {
                     ? `<span style="color:#66bb6a;">✓ found</span>`
                     : `<span style="color:var(--text_dim);">${note}</span>`}
             </div>`;
-        wlcInfo.innerHTML = [
+        const isMac = window.api.platform === 'darwin';
+        const rows = [
             row('legendary', tools.legendary, '✗ not found — required for Epic Games. Bundled with GRINDER or install via package manager.'),
             row('gogdl',     tools.gogdl,     '✗ not found — required for GOG games. Place gogdl binary next to GRINDER.AppImage.'),
-            row('umu-run',   tools.umu,       '⚠ not found — recommended for best compatibility. Install via Settings → External Tools.'),
-            row('wine',      tools.wine,      '— not found (optional — only needed as last resort if no Proton is set)'),
-        ].join('');
+        ];
+        if (isMac) {
+            const cx = tools.runtimeTools?.find(t => t.key === 'crossover');
+            rows.push(row('CrossOver', cx?.path, '✗ not found — required for Windows games. Install it from codeweavers.com.'));
+        } else {
+            rows.push(row('umu-run', tools.umu, '⚠ not found — recommended for best compatibility. Install via Settings → External Tools.'));
+            rows.push(row('wine',    tools.wine, '— not found (optional — only needed as last resort if no Proton is set)'));
+        }
+        wlcInfo.innerHTML = rows.join('');
     }
     _welcomeModal.classList.add('active');
 }

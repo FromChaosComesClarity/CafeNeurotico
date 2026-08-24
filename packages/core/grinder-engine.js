@@ -992,7 +992,10 @@ async function launchGame(gameId, opts = {}) {
         catch (e) { console.error('[launch] New California fix failed:', e.message); }
     }
 
-    const spec = host.runtime.buildLaunch({
+    // Awaited so a host whose runtime needs a real async step before it can launch anything
+    // (CrossOver: creating the game's bottle, first time only) isn't forced into blocking the
+    // whole process synchronously to do it. A no-op for Linux, whose buildLaunch is plain sync.
+    const spec = await host.runtime.buildLaunch({
         game, gameId, launchExe, isBat, userArgs, allArgs, runtimePath: proton, prefix,
     });
     spawnGame(spec.cmd, spec.args, { cwd: launchCwd, env: baseEnv(spec.env), detached: true, stdio: 'ignore' });
@@ -1103,7 +1106,7 @@ async function runRedist(sender, channel, appId, platform, prefixPath, protonPat
         const exeArgs = (depot.executable.arguments || '').trim().split(/\s+/).filter(Boolean);
         if (!fs.existsSync(exePath)) { send(`⚠ Missing installer: ${exeRel}\n`); continue; }
         send(`Installing ${path.basename(exePath)} (${depot.dependencyId})...\n`);
-        const { cmd, args, env: runEnv } = host.runtime.buildRedistLaunch({
+        const { cmd, args, env: runEnv } = await host.runtime.buildRedistLaunch({
             exePath, exeArgs, prefix, runtimePath: resolvedProton,
         });
         await new Promise(res => {
@@ -1142,7 +1145,7 @@ async function injectGogRegistry(game, prefix, proton) {
     const regFile = path.join(os.tmpdir(), `gog_reg_${appId}.reg`);
     fs.writeFileSync(regFile, regContent, 'utf8');
 
-    const reg = host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
+    const reg = await host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
 
     await new Promise(resolve => {
         const proc = spawn(reg.cmd, reg.args, { env: reg.env, stdio: 'ignore' });
@@ -1570,7 +1573,7 @@ async function applyFalloutNewCaliforniaFix(installPath, prefix, proton) {
 
     // The runtime's own wine, same as injectGogRegistry. It runs outside umu's container,
     // which is what lets regedit read a file from the host's /tmp at all.
-    const reg = host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
+    const reg = await host.runtime.regeditCommand({ prefix, runtimePath: proton, regFile });
 
     await new Promise(resolve => {
         const finish = () => { try { fs.unlinkSync(regFile); } catch {} resolve(); };
