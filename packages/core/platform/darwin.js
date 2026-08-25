@@ -389,6 +389,40 @@ function isRuntimeDir(dir) {
     try { return fs.existsSync(path.join(dir, 'system.reg')); } catch { return false; }
 }
 
+// Everything a bottle legitimately contains at rest. Used to tell "a half-built or
+// broken bottle of ours" (safe to throw away and rebuild) apart from "a directory
+// with somebody's actual files in it" (never touch) — see clearForCreate below.
+const BOTTLE_ARTIFACTS = new Set([
+    'cxbottle.conf', 'system.reg', 'user.reg', 'userdef.reg',
+    'dosdevices', 'drive_c', '.update-timestamp', '.DS_Store',
+]);
+
+// cxbottle refuses to --create over a path that already exists — even an empty
+// directory, which is exactly what grinder-engine.js's own unconditional
+// `fs.mkdirSync(prefix, {recursive:true})` leaves behind before host.runtime is ever
+// consulted. So something has to clear the way. What must NOT happen is clearing it
+// blindly: prefixPathForGame honours a user-set `game.prefix_path`, and the settings
+// UI actively invites pointing that at a folder of their choosing, so a blind
+// recursive delete here is a data-loss bug waiting for the first person who does.
+// Only an empty directory, or one holding nothing but the bottle files above, is
+// ours to remove; anything else is somebody's data and stops the launch instead.
+function clearForCreate(prefix) {
+    let entries;
+    try { entries = fs.readdirSync(prefix); }
+    catch { return; }                                  // doesn't exist — nothing to clear
+    const foreign = entries.filter(e => !BOTTLE_ARTIFACTS.has(e));
+    if (foreign.length) {
+        const err = new Error(
+            `Refusing to build a CrossOver bottle at ${prefix} — it already contains files ` +
+            `that are not part of a bottle (${foreign.slice(0, 3).join(', ')}` +
+            `${foreign.length > 3 ? `, +${foreign.length - 3} more` : ''}). ` +
+            `Point this game at an empty prefix folder, or move those files aside first.`);
+        err.code = 'PREFIX_NOT_EMPTY';
+        throw err;
+    }
+    fs.rmSync(prefix, { recursive: true, force: true });
+}
+
 function ensureBottle(prefix, runtimePath) {
     const bottleDir  = path.dirname(prefix);
     const bottleName = path.basename(prefix);
@@ -397,21 +431,26 @@ function ensureBottle(prefix, runtimePath) {
     const toolsDir = runtimePath ? path.dirname(runtimePath) : findCrossOver()?.toolsDir;
     if (!toolsDir) return Promise.reject(unavailableError());
 
-    // Not a real bottle yet — could be nothing, or the empty stub grinder-engine.js
-    // pre-creates via fs.mkdirSync before host.runtime is ever consulted. Either way
-    // cxbottle refuses to --create over an existing path, so clear it first.
-    try { if (fs.existsSync(prefix)) fs.rmSync(prefix, { recursive: true, force: true }); } catch {}
+    try { clearForCreate(prefix); }
+    catch (e) { return Promise.reject(e); }
     fs.mkdirSync(bottleDir, { recursive: true });
 
     const cxbottle = path.join(toolsDir, 'cxbottle');
     return new Promise((resolve, reject) => {
+        // stderr is kept rather than discarded: when this fails it is the only thing
+        // that says why, and "cxbottle exit 1" on its own is not a diagnosis.
         const proc = spawn(cxbottle, ['--bottle', bottleName, '--create', '--template', 'win10'], {
             env: { ...process.env, CX_BOTTLE_PATH: bottleDir },
-            stdio: 'ignore',
+            stdio: ['ignore', 'ignore', 'pipe'],
         });
+        let err = '';
+        proc.stderr.on('data', d => { if (err.length < 4000) err += d; });
         proc.on('close', code => {
-            if (code === 0 && isRuntimeDir(prefix)) resolve({ bottleDir, bottleName });
-            else reject(new Error(`Could not create a CrossOver bottle for this game (cxbottle exit ${code}).`));
+            if (code === 0 && isRuntimeDir(prefix)) { resolve({ bottleDir, bottleName }); return; }
+            const tail = err.trim().split('\n').filter(Boolean).slice(-3).join('; ');
+            reject(new Error(
+                `Could not create a CrossOver bottle for this game (cxbottle exit ${code})` +
+                `${tail ? `: ${tail}` : '.'}`));
         });
         proc.on('error', reject);
     });
@@ -469,10 +508,13 @@ function scanRuntimes() {
 
 function resolveRuntime() { return findCrossOver()?.wine || ''; }
 
-// Reached only for Windows-platform games — grinder-engine.js's native-build gate
-// (game.platform === host.nativeOsKey) already routes anything native around this
-// entire runtime before inUse()/compatEnv() are ever consulted.
-function inUse() { return true; }
+// Note both of these ARE reached for native macOS games too: grinder-engine.js calls
+// inUse()/compatEnv() well before its native-build gate (game.platform ===
+// host.nativeOsKey), not after. That's harmless — compatEnv adds nothing, and the
+// shipped-wrapper-DLL scan those answers feed finds no Windows DLLs beside a .app
+// bundle — but it does mean neither may assume it is only ever asked about a Windows
+// title. Same shape as Linux's: "is a translation layer going to be involved at all".
+function inUse(runtimePath) { return !!(runtimePath || findWineCached()); }
 function canRun(runtimePath) { return !!(runtimePath || findWineCached()); }
 
 // Nothing CrossOver-specific to add here: esync/fsync are Linux kernel futex

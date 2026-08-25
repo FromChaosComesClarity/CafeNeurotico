@@ -7749,10 +7749,14 @@ function _flatFilter(query, bypassPicoHide = false) {
     return base.filter(g => {
         if (_hidePico8 && !picoSearch && !bypassPicoHide && _isPico8Only(g.Store)) return false;
         for (const f of qualifierActive) {
-            if (f === 'favs'      && g.FAV !== 'YES') return false;
-            if (f === 'want'      && g.WANT_TO_PLAY !== 'YES') return false;
-            if (f === 'playable'  && !g.LaunchCommand) return false;
-            if (f === 'installed' && g.Installed != 1) return false;
+            if (f === 'favs'       && g.FAV !== 'YES') return false;
+            if (f === 'want'       && g.WANT_TO_PLAY !== 'YES') return false;
+            if (f === 'playable'   && !g.LaunchCommand) return false;
+            if (f === 'installed'  && g.Installed != 1) return false;
+            // Same qualifier the gallery honours — without this branch the flat view silently
+            // ignored a Mac-Native selection made from the very same dropdown and showed
+            // everything, because 'mac-native' IS in QUALIFIER_FILTERS and so reaches this loop.
+            if (f === 'mac-native' && !isMacNative(g)) return false;
         }
         if (!q) return true;
         return (g.Game||'').toLowerCase().includes(q) ||
