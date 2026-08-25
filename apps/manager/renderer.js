@@ -12070,6 +12070,17 @@ async function renderOmarchyCard(s) {
         };
     }
 
+    // Games floating. Applied by the main process at startup, because Hyprland rules cannot be
+    // withdrawn once set for a session — so this stores the choice and the label says when it
+    // takes effect rather than implying it is live.
+    const floatBox = document.getElementById('omarchy-float-games');
+    if (floatBox) {
+        const saved = await window.api.getSetting('omarchy_float_games').catch(() => null);
+        floatBox.checked = saved === null || saved === undefined ? true : saved === '1';
+        floatBox.onchange = () =>
+            window.api.setSetting('omarchy_float_games', floatBox.checked ? '1' : '0');
+    }
+
     const themeBtn = document.getElementById('btn-omarchy-theme');
     const label = document.getElementById('omarchy-theme-name');
     if (label) label.textContent = _omarchyThemeName || 'none found';

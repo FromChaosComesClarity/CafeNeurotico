@@ -281,6 +281,7 @@ app.whenReady().then(() => {
         db.pragma('journal_mode = WAL');
     // Shared IPC handlers live in packages/core/shared-ipc.js (single source of truth).
     registerSharedHandlers({ db, baseDir, trailersDir, ytDlpPath, ytDlpConfigPath, ffmpegPath, getBeautifulName, getOldCrushedName });
+    applyHyprlandRules();   // needs `db` — see the note on the function
         db.prepare(`
         CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT, Store TEXT, FAV TEXT, WANT_TO_PLAY TEXT,
@@ -850,10 +851,24 @@ try {
 // Hyprland window rules, for the same reason the KWin script is re-applied above: they are
 // session-scoped and nothing is written to the user's config, so they have to be set again on
 // every start. A no-op off Hyprland.
-try {
-    const r = host.desktop?.omarchy?.applyWindowRules?.();
-    if (r?.applied) console.log(`[hyprland] ${r.applied}/${r.total} window rules applied`);
-} catch {}
+// ⚠️ Called after the database is open, NOT at module load. The float-games choice is a
+// setting, and at module-evaluation time `db` is still undefined — reading it there silently
+// returned nothing and the toggle appeared to do nothing at all.
+//
+// ⚠️ Hyprland rules also cannot be un-set once applied for a session, so this is read once at
+// startup rather than toggled live; the Control Panel says "takes effect next start" instead
+// of pretending otherwise.
+function applyHyprlandRules() {
+    try {
+        let floatGames = true;
+        try {
+            const row = db?.prepare("SELECT value FROM settings WHERE key='omarchy_float_games'").get();
+            if (row && row.value === '0') floatGames = false;
+        } catch {}
+        const r = host.desktop?.omarchy?.applyWindowRules?.({ floatGames });
+        if (r?.applied) console.log(`[hyprland] ${r.applied}/${r.total} window rules applied` + (floatGames ? ' (games float)' : ' (games tile)'));
+    } catch {}
+}
 
 ipcMain.handle('display-options', () => {
     if (!kwinDisplay?.isSupported()) return { supported: false, displays: [], current: null };

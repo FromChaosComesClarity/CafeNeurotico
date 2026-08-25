@@ -190,6 +190,13 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
   numbers, which is why this is not a CSS media query.
 - **GRINDER and sign-in windows float** instead of tiling. They are transient tools opened over
   the library, and tiling one halves what you were looking at.
+- **Games open floating too.** Tiled, a game gets shoved into whatever slot the layout has free
+  and resized to fit it — a moment before it goes fullscreen anyway, so the first thing you see
+  of a game is it being squashed. Floating lets it open at the size it asked for, centred, and
+  the only change you see is the one that was meant to happen. Toggleable in the Omarchy card.
+
+  > ⚠️ Hyprland rules cannot be withdrawn once set for a session, so that toggle takes effect on
+  > the next start — and the label says so rather than pretending it is live.
 - **The app takes the desktop's corner radius**, not just its colours, whenever you are wearing
   your Omarchy palette. Omarchy defaults to square corners, and rounded cards on a square desktop
   read as foreign.

@@ -135,6 +135,10 @@ function monitors() {
 //
 // A plain Arch box running Hyprland with a .conf config still has the legacy parser, so the
 // keyword form is kept as a fallback. Both are checked for a literal "ok".
+// Every window class a game can arrive under, as one Lua/Hyprland regex. Kept in step with
+// kwin-display.js's GAME_CLASSES — the same problem on a different compositor.
+const GAME_CLASS_RE = '^(steam_app_.*|dosbox.*|scummvm|openbor|gzdoom|uzdoom|ironwail|vkquake|quake.*|raze|buildgdx|ecwolf|cannonball)$';
+
 const WINDOW_RULES = [
     // GRINDER floats above the Manager rather than splitting the screen with it — it is a tool
     // opened over the library, and tiling it halves the thing you were just looking at.
@@ -157,15 +161,29 @@ const WINDOW_RULES = [
     // idle off while one is focused is belt-and-braces alongside the app's own inhibitor, and
     // it is what Steam's own Omarchy rule does.
     {
-        lua: 'o.window({ class = "^(steam_app_.*)$" }, { idle_inhibit = "focus" })',
-        keyword: ['idleinhibit focus', 'class:^(steam_app_.*)$'],
+        lua: `o.window({ class = "${GAME_CLASS_RE}" }, { idle_inhibit = "focus" })`,
+        keyword: ['idleinhibit focus', `class:${GAME_CLASS_RE}`],
     },
 ];
 
-function applyWindowRules() {
-    if (!isHyprland() || !hyprctlBin()) return { ok: false, applied: 0, total: WINDOW_RULES.length };
+// ── Games float rather than tile ─────────────────────────────────────────────
+// A game that opens tiled gets shoved into whatever slot the layout has free, resized to it,
+// and then goes fullscreen a moment later — so the first thing you see of a game is it being
+// squashed into half a screen. Floating means it opens at the size it asked for, centred,
+// and the transition to fullscreen is the only change you see.
+//
+// Same class list the KWin picker uses: everything through umu/Proton arrives as steam_app_*,
+// and the rest are the runners the suite launches directly.
+const FLOAT_GAMES_RULE = {
+    lua: `o.window({ class = "${GAME_CLASS_RE}" }, { float = true, center = true })`,
+    keyword: ['float', `class:${GAME_CLASS_RE}`],
+};
+
+function applyWindowRules({ floatGames = true } = {}) {
+    if (!isHyprland() || !hyprctlBin()) return { ok: false, applied: 0, total: 0 };
+    const rules = floatGames ? [...WINDOW_RULES, FLOAT_GAMES_RULE] : WINDOW_RULES;
     let applied = 0;
-    for (const r of WINDOW_RULES) {
+    for (const r of rules) {
         let out = hyprctl(['eval', r.lua]);
         // No Lua helper (a plain Hyprland with the legacy parser) — try the classic form.
         if (!out || !/^ok\b/i.test(out.trim())) {
@@ -174,7 +192,7 @@ function applyWindowRules() {
         }
         if (out && /^ok\b/i.test(out.trim())) applied++;
     }
-    return { ok: applied > 0, applied, total: WINDOW_RULES.length };
+    return { ok: applied > 0, applied, total: rules.length };
 }
 
 // ── The desktop's geometry ───────────────────────────────────────────────────
@@ -524,7 +542,7 @@ module.exports = {
     hyprctl, hyprctlJson, monitors,
     TOOLS, toolStatus, missingTools, gapSummary,
     INSTALLERS, installerStatus, missingInstallers, runInstaller,
-    WINDOW_RULES, applyWindowRules, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
+    WINDOW_RULES, FLOAT_GAMES_RULE, GAME_CLASS_RE, applyWindowRules, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
     installCommand, openInstallTerminal, openTerminalWith, terminalLauncher,
     isSupported, describe, which,
 };
