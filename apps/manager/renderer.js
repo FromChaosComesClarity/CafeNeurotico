@@ -1694,36 +1694,70 @@ window.api.getBaseDir().then(dir => {
     // Load SEE filter visibility preferences at startup
     applySeeFilterVisibility();
 
-    // Load the UI Scale preference at startup
-    window.api.getSetting('cngm_ui_scale').then(val => {
-        if (val) {
+    // ── UI scale ─────────────────────────────────────────────────────────────
+    // ⚠️ 100% is the wrong default on a small or scaled screen, and the failure is not
+    // cosmetic: on a 1440x900 laptop at 1.25x compositor scale — 1152x720 of actual room —
+    // the icon rail ran past the bottom of the window and the Control Panel button could not
+    // be clicked at all. So a first run picks a scale that fits.
+    //
+    // ⚠️ And a saved scale is only trustworthy on the screen it was chosen for. A library
+    // restored from another machine brings that machine's setting with it: a 1.0 chosen on a
+    // desktop arrives on a laptop panel where it does not fit, and because a value IS saved
+    // the first-run path never runs. So the screen it was chosen on is stamped alongside it,
+    // and a mismatch re-derives the scale for the screen actually in front of the user.
+    //
+    // Stamped either way, so this re-derives once per screen and never fights a choice the
+    // user makes afterwards.
+    const _screenId = () => `${window.screen?.width || 0}x${window.screen?.height || 0}`;
+
+    function _autoScale() {
+        const h = window.screen?.availHeight || window.innerHeight || 1080;
+        const w = window.screen?.availWidth  || window.innerWidth  || 1920;
+        // ⚠️ Only values that exist as buttons — the picker offers 0.5/0.75/1.0/1.25/1.5, and
+        // anything else would apply a zoom no button is highlighted for, leaving the panel
+        // disagreeing with the actual scale.
+        return (h <= 900 || w <= 1400) ? '0.75' : '1.0';
+    }
+
+    function _markScaleButton(val) {
+        document.querySelectorAll('.ui-scale-btn').forEach(btn =>
+            btn.classList.toggle('active', btn.getAttribute('data-val') === val));
+    }
+
+    Promise.all([
+        window.api.getSetting('cngm_ui_scale'),
+        window.api.getSetting('cngm_ui_scale_screen'),
+    ]).then(([val, stamp]) => {
+        const here = _screenId();
+        const auto = _autoScale();
+
+        if (val && stamp === here) {                 // chosen on this screen — respect it
             window.api.setZoomLevel(parseFloat(val));
             _zoomNow = parseFloat(val);
-            document.querySelectorAll('.ui-scale-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.getAttribute('data-val') === val);
-            });
-        } else {
-            // ⚠️ 100% is the wrong default on a small or scaled screen. A 1440x900 laptop at
-            // 1.25x compositor scale is 1152x720 of actual room, and at 100% the Control Panel
-            // ran past the bottom of the window — the settings button could not be clicked at
-            // all. So the FIRST run picks a scale that fits and the user can still override it,
-            // at which point their choice is stored and this never runs again.
-            //
-            // Deliberately not saved: nothing is written until the user picks a value
-            // themselves, so plugging into a bigger monitor re-evaluates instead of carrying a
-            // guess made on a laptop panel around forever.
-            const h = window.screen?.availHeight || window.innerHeight || 1080;
-            const w = window.screen?.availWidth  || window.innerWidth  || 1920;
-            // ⚠️ Only values that exist as buttons — the picker offers 0.5/0.75/1.0/1.25/1.5,
-            // and choosing anything else would apply a zoom no button is highlighted for,
-            // leaving the panel disagreeing with the actual scale.
-            const auto = (h <= 900 || w <= 1400) ? '0.75' : '1.0';
-            if (auto !== '1.0') window.api.setZoomLevel(parseFloat(auto));
-            _zoomNow = parseFloat(auto);
-            const defaultBtn = document.querySelector(`.ui-scale-btn[data-val="${auto}"]`)
-                            || document.querySelector('.ui-scale-btn[data-val="1.0"]');
-            if(defaultBtn) defaultBtn.classList.add('active');
+            _markScaleButton(val);
+            return;
         }
+
+        if (val && stamp !== here) {                 // came from elsewhere, or predates the stamp
+            const applied = auto;
+            window.api.setZoomLevel(parseFloat(applied));
+            _zoomNow = parseFloat(applied);
+            _markScaleButton(applied);
+            window.api.setSetting('cngm_ui_scale', applied);
+            window.api.setSetting('cngm_ui_scale_screen', here);
+            if (applied !== val && typeof opToast === 'function') {
+                opToast(`Interface scale set to ${Math.round(parseFloat(applied) * 100)}% for this screen`);
+                setTimeout(opToastHide, 3200);
+            }
+            return;
+        }
+
+        // Nothing saved at all — a genuine first run.
+        window.api.setZoomLevel(parseFloat(auto));
+        _zoomNow = parseFloat(auto);
+        _markScaleButton(auto);
+        window.api.setSetting('cngm_ui_scale', auto);
+        window.api.setSetting('cngm_ui_scale_screen', here);
     });
 
     // Load the recently-imported playlist setting at startup
@@ -1783,7 +1817,12 @@ document.querySelectorAll('.ui-scale-btn').forEach(btn => {
         e.target.classList.add('active');
         const val = e.target.getAttribute('data-val');
         window.api.setZoomLevel(parseFloat(val));
+        _zoomNow = parseFloat(val);
         await window.api.setSetting('cngm_ui_scale', val);
+        // ⚠️ Stamp the screen here too. This handler is separate from setZoom(), and without
+        // the stamp a scale picked in the Control Panel would look foreign on the next start
+        // and be re-derived out from under the user — the app arguing with itself.
+        await window.api.setSetting('cngm_ui_scale_screen', `${window.screen?.width || 0}x${window.screen?.height || 0}`);
     });
 });
 
@@ -3897,6 +3936,8 @@ function _animateOverlayClose(done) {
 
 function switchView(viewId) {
     _closeSteamMenu();
+    // Re-home the hero pills after the view actually changes (the class swap happens below).
+    setTimeout(() => { try { placeHeroPills(); } catch {} }, 0);
     // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
     //    centered panel over the (blurred) current view instead of swapping in full-page.
     //    Split-pane (layout-split) keeps its split-edit behavior; flat/themed layouts use
@@ -11765,6 +11806,9 @@ function setZoom(v) {
     _zoomNow = v;
     window.api.setZoomLevel(v);
     window.api.setSetting('cngm_ui_scale', String(v));
+    // ⚠️ Stamp the screen as well. Without this the user's own choice looks foreign on the
+    // next start and gets re-derived out from under them.
+    window.api.setSetting('cngm_ui_scale_screen', `${window.screen?.width || 0}x${window.screen?.height || 0}`);
     document.querySelectorAll('.ui-scale-btn').forEach(btn =>
         btn.classList.toggle('active', parseFloat(btn.getAttribute('data-val')) === v));
     if (typeof opToast === 'function') { opToast(`Interface scale: ${Math.round(v * 100)}%`); setTimeout(opToastHide, 1400); }
@@ -11814,6 +11858,24 @@ function applyCompactChrome(on) {
     };
     move(RAIL_IDS,  on ? rail  : controls);
     move(PILL_IDS,  on ? pills : controls);
+    if (on) placeHeroPills();
+}
+
+// ⚠️ The pills belong IN the hero, not floating over the window at a fixed offset. Fixed
+// looked right until the gallery was scrolled: the hero moved away and the pills stayed,
+// hovering over the game grid. Re-parenting them into the hero means they scroll with it and
+// sit in its corner properly.
+//
+// Not every view has a hero — the list view and the split layout do not — so the container
+// falls back to <body>, where the CSS switches it to a fixed corner. One node either way,
+// which keeps the listeners intact.
+function placeHeroPills() {
+    const pills = document.getElementById('hero-pills');
+    if (!pills || !document.body.classList.contains('compact-chrome')) return;
+    const activeView = document.querySelector('#main-content .view.active');
+    const hero = activeView?.querySelector('.hero-display');
+    const target = hero || document.body;
+    if (pills.parentElement !== target) target.appendChild(pills);
 }
 
 // ── Responsive shell ─────────────────────────────────────────────────────────

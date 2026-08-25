@@ -185,20 +185,53 @@
        and its listeners intact, so nothing needs rebinding and there is no second copy to
        keep in sync. See applyCompactChrome() in the renderer. */
     body.compact-chrome #titlebar { display: none; }
-    #hero-pills { display: none; position: fixed; top: 10px; right: 16px; z-index: 500; gap: 8px; align-items: center; -webkit-app-region: no-drag; }
+    /* ── The hero pills ─────────────────────────────────────────────────────────
+       ⚠️ In the title bar these two carry CREMA's own brand colours, hardcoded — a tan
+       gradient with an amber border, owing nothing to the theme. That is fine on a bar that
+       is itself chrome, and wrong the moment they sit on the hero of a themed app: on the
+       green Omarchy palette they read as something pasted on from another program.
+       Over the hero they are restyled from theme variables only, so they belong to whatever
+       palette is loaded, and they recede into the art instead of shouting over it. */
+    #hero-pills { display: none; position: absolute; top: 14px; right: 16px; z-index: 12; gap: 7px; align-items: center; -webkit-app-region: no-drag; }
     body.compact-chrome #hero-pills { display: flex; }
-    /* The hero art behind these can be anything, so they carry their own ground rather than
-       trusting the image to be dark enough. */
-    #hero-pills > * { backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
-    body.narrow #hero-pills { top: 8px; right: 10px; gap: 6px; }
+    /* Parked on <body> when the active view has no hero to sit in — see placeHeroPills(). */
+    body > #hero-pills { position: fixed; top: 32px; right: 34px; z-index: 500; }
+
+    body.compact-chrome #hero-pills #support-cta,
+    body.compact-chrome #hero-pills #crema-cta {
+        height: 24px; margin: 0; padding: 0 10px; gap: 6px; border-radius: 6px;
+        background: color-mix(in srgb, var(--bg_menu) 78%, transparent);
+        border: 1px solid var(--border_solid);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        backdrop-filter: blur(8px);
+        transition: border-color 0.16s ease, background 0.16s ease; }
+    body.compact-chrome #hero-pills #support-cta:hover,
+    body.compact-chrome #hero-pills #crema-cta:hover {
+        border-color: var(--accent);
+        background: color-mix(in srgb, var(--bg_menu) 92%, var(--accent)); }
+    body.compact-chrome #hero-pills .crema-cta-text,
+    body.compact-chrome #hero-pills .support-cta-text {
+        display: inline; font-size: 9px; font-weight: 900; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--text_sec); }
+    body.compact-chrome #hero-pills #support-cta:hover .support-cta-text,
+    body.compact-chrome #hero-pills #crema-cta:hover .crema-cta-text { color: var(--text_main); }
+    /* The icons are artwork in their own right; muted so they sit with the text rather than
+       leading it, and brought back to full strength on hover. */
+    body.compact-chrome #hero-pills .crema-cta-icon { width: 14px; height: 14px; opacity: 0.75; }
+    body.compact-chrome #hero-pills .support-cta-heart { width: 11px; height: 10px; opacity: 0.8; filter: none; }
+    body.compact-chrome #hero-pills #crema-cta:hover .crema-cta-icon,
+    body.compact-chrome #hero-pills #support-cta:hover .support-cta-heart { opacity: 1; }
+    /* Narrow tiles: the words go, the icons stay. */
+    body.narrow.compact-chrome #hero-pills .crema-cta-text,
+    body.narrow.compact-chrome #hero-pills .support-cta-text { display: none; }
+    body.narrow.compact-chrome #hero-pills #support-cta,
+    body.narrow.compact-chrome #hero-pills #crema-cta { padding: 0 8px; }
 
     #rail-chrome { display: none; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; border-bottom: 1px solid var(--border_solid); }
     body.compact-chrome #rail-chrome { display: flex; }
     body.compact-chrome #rail-chrome button { width: 34px; height: 30px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text_dim); cursor: pointer; border-radius: 5px; padding: 0; position: relative; }
     body.compact-chrome #rail-chrome button:hover { color: var(--text_main); background: var(--bg_panel); }
     /* The pills are horizontal by nature; in the rail they keep the icon and drop the words. */
-    body.compact-chrome #rail-chrome .crema-cta-text, body.compact-chrome #rail-chrome .support-cta-text { display: none; }
-    body.compact-chrome #rail-chrome #crema-cta, body.compact-chrome #rail-chrome #support-cta { width: 34px; height: 30px; min-width: 0; padding: 0; border-radius: 5px; }
 
     /* ── Matching the desktop's geometry ────────────────────────────────────────
        Omarchy defaults to square corners. An app full of rounded cards on a square desktop

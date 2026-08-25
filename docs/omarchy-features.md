@@ -172,9 +172,10 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
   which fixes an oversized interface unreachable *because* the interface was oversized.
 - **Ctrl +/− /0 changes the interface scale** from anywhere, for the same reason: an escape hatch
   must not live behind the thing it rescues you from.
-- **A first run picks a scale that fits the screen** rather than assuming 100%. A saved choice
-  always wins, and nothing is written until you pick one yourself — so moving to a bigger monitor
-  re-evaluates instead of carrying a laptop-sized guess around forever.
+- **The interface scale fits the screen it is actually on.** A first run derives one instead of
+  assuming 100%, and the screen it was chosen for is stamped alongside it — so a setting that
+  arrived in a restored library from another machine is re-derived for the panel in front of you
+  rather than inherited. Your own choice is stamped too, so it is never overridden afterwards.
 - **The layout follows the tile.** Half of a 1440px screen is 720px and a third is 480px, so a
   narrow window is the normal case here rather than an exception. The filter row wraps, the game
   list narrows, and below 680px the split view drops its list and gives the width to the game.
