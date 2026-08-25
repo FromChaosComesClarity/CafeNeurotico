@@ -104,6 +104,24 @@ function legendaryConfigDir() { return path.join(HOME, '.config', 'legendary'); 
 // launcher in structured fields and the backend decides what a launcher actually is — on
 // Linux a .desktop file under XDG directories, elsewhere something else entirely.
 
+// Fire-and-forget spawn of an OPTIONAL desktop-integration tool.
+//
+// ⚠️ `spawn` reports a missing binary through an ASYNCHRONOUS 'error' event, not a throw, so
+// a surrounding try/catch does not catch it — and an unhandled 'error' on a ChildProcess is
+// fatal to the process. Every tool below is genuinely optional: a minimal, non-freedesktop or
+// Wayland-only session may ship none of them. That made `try { spawn(...) } catch {}` a crash
+// waiting for a host without the tool, which is exactly what a tiling-WM Arch install is.
+// Each one needs a real listener instead. Swallowing the error is right here — all callers are
+// best-effort niceties whose failure the user should never be shown.
+function spawnOptional(bin, args, opts = {}) {
+    try {
+        const p = spawn(bin, args, { stdio: 'ignore', ...opts });
+        p.on('error', () => {});
+        p.unref();
+        return true;
+    } catch { return false; }
+}
+
 function appsDir()    { return path.join(HOME, '.local', 'share', 'applications'); }
 
 // The XDG Desktop folder, honouring a localised name via user-dirs.dirs.
@@ -151,10 +169,10 @@ function removeLauncher(dir, id) {
 }
 
 // Tell the desktop a launcher appeared/changed.
-function refreshMenu(dir) { try { spawn('update-desktop-database', [dir], { stdio: 'ignore' }).unref(); } catch {} }
+function refreshMenu(dir) { spawnOptional('update-desktop-database', [dir]); }
 
 // GNOME/Nautilus require a launcher be marked trusted to run without a warning.
-function markTrusted(file) { try { spawn('gio', ['set', file, 'metadata::trusted', 'true'], { stdio: 'ignore' }).unref(); } catch {} }
+function markTrusted(file) { spawnOptional('gio', ['set', file, 'metadata::trusted', 'true']); }
 
 function autostartPath(id) { return path.join(HOME, '.config', 'autostart', launcherFileName(id)); }
 function getAutostart(id)  { try { return fs.existsSync(autostartPath(id)); } catch { return false; } }
@@ -170,15 +188,19 @@ function setAutostart(id, enabled, entry) {
 
 // Custom schemes (itch://, pico8-cart:) — shell.openExternal refuses these, so hand them to
 // the desktop's own opener.
-function openUrlScheme(url) { try { spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref(); } catch {} }
+function openUrlScheme(url) { spawnOptional('xdg-open', [url], { detached: true }); }
 
 // X11 only: wmctrl sends _NET_ACTIVE_WINDOW with CurrentTime, which most window managers
-// honour where Electron's own focus() is ignored. A no-op on Wayland and anywhere wmctrl
-// is not installed, so it is always safe to call.
+// honour where Electron's own focus() is ignored. A no-op on Wayland and anywhere wmctrl is
+// not installed — enforced below, not merely hoped for, which is what it used to be.
 function focusWindow(win) {
+    // The claim above is only true if we actually check. With no X server there is no X11
+    // window id to send and nothing to send it to, so skip entirely rather than spawn an X11
+    // tool into the void; under XWayland DISPLAY is set and this still works as it always has.
+    if (!process.env.DISPLAY) return;
     try {
         const hwnd = win.getNativeWindowHandle().readUInt32LE(0);
-        spawn('wmctrl', ['-i', '-a', '0x' + hwnd.toString(16)], { stdio: 'ignore' }).unref();
+        spawnOptional('wmctrl', ['-i', '-a', '0x' + hwnd.toString(16)]);
     } catch {}
 }
 
