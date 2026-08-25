@@ -185,6 +185,13 @@
        and its listeners intact, so nothing needs rebinding and there is no second copy to
        keep in sync. See applyCompactChrome() in the renderer. */
     body.compact-chrome #titlebar { display: none; }
+    #hero-pills { display: none; position: fixed; top: 10px; right: 16px; z-index: 500; gap: 8px; align-items: center; -webkit-app-region: no-drag; }
+    body.compact-chrome #hero-pills { display: flex; }
+    /* The hero art behind these can be anything, so they carry their own ground rather than
+       trusting the image to be dark enough. */
+    #hero-pills > * { backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+    body.narrow #hero-pills { top: 8px; right: 10px; gap: 6px; }
+
     #rail-chrome { display: none; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; border-bottom: 1px solid var(--border_solid); }
     body.compact-chrome #rail-chrome { display: flex; }
     body.compact-chrome #rail-chrome button { width: 34px; height: 30px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text_dim); cursor: pointer; border-radius: 5px; padding: 0; position: relative; }
@@ -205,6 +212,22 @@
     body.omarchy-geometry #modal-welcome > div,
     body.omarchy-geometry #modal-connect > div { border-radius: var(--omarchy-radius, 10px) !important; }
 
+    /* Short windows: the hero is a fixed 350px, which on a 680px-tall tile is half the
+       window before a single cover is drawn. */
+    body.short .hero-display { height: 190px !important; margin-bottom: 12px !important; }
+    body.short #gallery-category-text { font-size: 24px !important; }
+    body.short #gallery-category-icon { width: 32px !important; height: 32px !important; }
+    body.short #hero-game-name { font-size: 18px !important; }
+    /* The empty-hero placeholder is 48px and centred, which collides with the category title
+       once the hero is short. It is a placeholder — it should recede, not compete. */
+    body.short #hero-icon { font-size: 22px !important; letter-spacing: 3px !important; opacity: 0.5; }
+    body.narrow.short #hero-icon { font-size: 16px !important; letter-spacing: 2px !important; }
+    body.narrow.short .hero-display { height: 150px !important; }
+    /* Modals have to fit the window they open in, or their buttons end up off-screen — which
+       is exactly how the Control Panel's own settings button became unclickable. */
+    body.short .modal-box, body.short #modal-tools > div, body.short #modal-welcome > div,
+    body.short #modal-themes > div, body.short #modal-connect > div { max-height: 92vh !important; }
+
     /* ── Responsive shell ───────────────────────────────────────────────────────
        A tiling WM makes a narrow window the normal case rather than the exception: half a
        1440px screen is 720px, and a third is 480px. These breakpoints are driven by a
@@ -222,7 +245,16 @@
     body.very-narrow #split-left { display: none; }
     body.very-narrow #split-detail { flex: 1 1 100% !important; }
 
-    #icon-rail { width: 48px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; background: var(--bg_menu); border-right: 1px solid var(--border_solid); overflow: hidden; }
+    /* ⚠️ overflow-y:auto, NOT hidden. With hidden, a window shorter than the rail's own
+       contents clipped the bottom buttons and there was no way to reach them — which is
+       exactly how the Control Panel button became unclickable on a 720px-tall laptop screen.
+       The scrollbar is hidden visually because the rail is a strip of icons, but the content
+       must always be reachable. */
+    #icon-rail { width: 48px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; background: var(--bg_menu); border-right: 1px solid var(--border_solid); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+    #icon-rail::-webkit-scrollbar { width: 0; height: 0; }
+    /* On a short window, tighten the rail before anything has to scroll at all. */
+    body.short #rail-top, body.short #rail-bottom, body.short #rail-chrome { padding: 2px 0; gap: 0; }
+    body.short .rail-btn { height: 34px !important; }
     #rail-top, #rail-bottom { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
     .rail-btn { width: 48px; height: 44px; border: none; background: transparent; color: var(--text_dim); cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; transition: color 0.15s; padding: 0; text-transform: none; letter-spacing: 0; border-radius: 0; }
     .rail-btn:hover { color: var(--accent); background: transparent; box-shadow: none; transform: none; }
@@ -3099,6 +3131,12 @@
     </div>
   </div>
 
+  <!-- ⚠️ Deliberately NOT inside the hero, and not inside #main-content either. The hero only
+       exists in the gallery view, and #main-content is display:none in the split layout — the
+       pills would vanish in both cases. Fixed to the viewport puts them over the hero's top
+       right corner where they were asked for, and keeps them there in every layout. Only
+       visible in compact chrome; otherwise they live in the title bar as before. -->
+  <div id="hero-pills"></div>
   <div id="app-container">
 
     <!-- ── TOP NAV BAR (layout-topnav only) ─────────────────────────────────── -->

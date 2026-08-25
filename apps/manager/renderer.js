@@ -1698,11 +1698,30 @@ window.api.getBaseDir().then(dir => {
     window.api.getSetting('cngm_ui_scale').then(val => {
         if (val) {
             window.api.setZoomLevel(parseFloat(val));
+            _zoomNow = parseFloat(val);
             document.querySelectorAll('.ui-scale-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-val') === val);
             });
         } else {
-            const defaultBtn = document.querySelector('.ui-scale-btn[data-val="1.0"]');
+            // ⚠️ 100% is the wrong default on a small or scaled screen. A 1440x900 laptop at
+            // 1.25x compositor scale is 1152x720 of actual room, and at 100% the Control Panel
+            // ran past the bottom of the window — the settings button could not be clicked at
+            // all. So the FIRST run picks a scale that fits and the user can still override it,
+            // at which point their choice is stored and this never runs again.
+            //
+            // Deliberately not saved: nothing is written until the user picks a value
+            // themselves, so plugging into a bigger monitor re-evaluates instead of carrying a
+            // guess made on a laptop panel around forever.
+            const h = window.screen?.availHeight || window.innerHeight || 1080;
+            const w = window.screen?.availWidth  || window.innerWidth  || 1920;
+            // ⚠️ Only values that exist as buttons — the picker offers 0.5/0.75/1.0/1.25/1.5,
+            // and choosing anything else would apply a zoom no button is highlighted for,
+            // leaving the panel disagreeing with the actual scale.
+            const auto = (h <= 900 || w <= 1400) ? '0.75' : '1.0';
+            if (auto !== '1.0') window.api.setZoomLevel(parseFloat(auto));
+            _zoomNow = parseFloat(auto);
+            const defaultBtn = document.querySelector(`.ui-scale-btn[data-val="${auto}"]`)
+                            || document.querySelector('.ui-scale-btn[data-val="1.0"]');
             if(defaultBtn) defaultBtn.classList.add('active');
         }
     });
@@ -11731,6 +11750,38 @@ window.api.getSetting('ui_font').then(f => {   // re-resolve --ui-font regardles
     _uiFont = f || ''; applyUiFont();
     const sel = document.getElementById('ui-font-select'); if (sel) sel.value = _uiFont || 'Poppins';
 });
+// ── Zoom shortcuts ───────────────────────────────────────────────────────────
+// ⚠️ The escape hatch for a UI that is too big to operate. The scale lives in the Control
+// Panel, which is opened from the icon rail — so when the interface is too large for the
+// window, the control that fixes it is exactly the one you cannot reach. That actually
+// happened on a 1152x720 laptop screen.
+//
+// Ctrl +/-/0 works regardless of what is on screen or reachable, which is the whole point.
+// Saved like any other choice, so it survives a restart.
+const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5];
+let _zoomNow = 1.0;
+
+function setZoom(v) {
+    _zoomNow = v;
+    window.api.setZoomLevel(v);
+    window.api.setSetting('cngm_ui_scale', String(v));
+    document.querySelectorAll('.ui-scale-btn').forEach(btn =>
+        btn.classList.toggle('active', parseFloat(btn.getAttribute('data-val')) === v));
+    if (typeof opToast === 'function') { opToast(`Interface scale: ${Math.round(v * 100)}%`); setTimeout(opToastHide, 1400); }
+}
+
+window.addEventListener('keydown', e => {
+    if (!e.ctrlKey || e.altKey) return;
+    const i = ZOOM_STEPS.indexOf(_zoomNow);
+    if (e.key === '-' || e.key === '_') {
+        e.preventDefault(); setZoom(ZOOM_STEPS[Math.max(0, (i < 0 ? 2 : i) - 1)]);
+    } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault(); setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, (i < 0 ? 2 : i) + 1)]);
+    } else if (e.key === '0') {
+        e.preventDefault(); setZoom(1.0);
+    }
+});
+
 // ── Compact chrome ───────────────────────────────────────────────────────────
 // Under a tiling WM the titlebar is dead weight: you cannot drag a tiled window, and the
 // compositor owns close/minimise/maximise. So the bar goes and what was useful in it moves
@@ -11739,23 +11790,30 @@ window.api.getSetting('ui_font').then(f => {   // re-resolve --ui-font regardles
 // ⚠️ The controls are MOVED, not recreated. appendChild relocates a live node together with
 // its event listeners, so nothing needs rebinding and there is never a second copy to keep in
 // sync — which is what a "build a duplicate rail button" approach would have cost.
-const CHROME_IDS = ['btn-titlebar-home', 'btn-titlebar-library', 'btn-titlebar-downloads',
-                    'support-cta', 'crema-cta'];
+// Navigation belongs in the rail — it is a column of navigation already. The two pills are a
+// different kind of thing: they are wide, branded and horizontal, and squeezed into a 48px
+// column they looked like an afterthought. They go over the hero's top-right corner instead.
+const RAIL_IDS = ['btn-titlebar-home', 'btn-titlebar-library', 'btn-titlebar-downloads'];
+const PILL_IDS = ['support-cta', 'crema-cta'];
 
 function applyCompactChrome(on) {
     const rail = document.getElementById('rail-chrome');
+    const pills = document.getElementById('hero-pills');
     const bar  = document.getElementById('titlebar');
     const controls = bar?.querySelector('.titlebar-controls');
-    if (!rail || !bar || !controls) return;
+    if (!rail || !pills || !bar || !controls) return;
 
     document.body.classList.toggle('compact-chrome', !!on);
-    const target = on ? rail : controls;
-    for (const id of CHROME_IDS) {
-        const el = document.getElementById(id);
-        // The window controls themselves are NOT in this list and stay in the hidden bar:
-        // they are the one thing a tiling compositor genuinely replaces.
-        if (el && el.parentElement !== target) target.appendChild(el);
-    }
+    const move = (ids, target) => {
+        for (const id of ids) {
+            const el = document.getElementById(id);
+            // The window controls themselves are in neither list and stay in the hidden bar:
+            // they are the one thing a tiling compositor genuinely replaces.
+            if (el && el.parentElement !== target) target.appendChild(el);
+        }
+    };
+    move(RAIL_IDS,  on ? rail  : controls);
+    move(PILL_IDS,  on ? pills : controls);
 }
 
 // ── Responsive shell ─────────────────────────────────────────────────────────
@@ -11766,22 +11824,27 @@ function applyCompactChrome(on) {
 const NARROW_AT = 900;      // the filter row starts wrapping and the split list narrows
 const VERY_NARROW_AT = 680; // the split list is no longer worth the space it costs
 
-function applyWidthClasses(w) {
+// Height matters as much as width here and for a different reason: the hero is a fixed 350px,
+// which on a 680px-tall tile is half the window before a single cover is drawn.
+const SHORT_AT = 820;
+
+function applyWidthClasses(w, h) {
     document.body.classList.toggle('narrow', w < NARROW_AT);
     document.body.classList.toggle('very-narrow', w < VERY_NARROW_AT);
+    if (typeof h === 'number') document.body.classList.toggle('short', h < SHORT_AT);
 }
 
 try {
     // Observing documentElement rather than window.resize: it fires for the element actually
     // being laid out, which is what a compositor changes when it retiles around a new window.
     const ro = new ResizeObserver(entries => {
-        for (const e of entries) applyWidthClasses(e.contentRect.width);
+        for (const e of entries) applyWidthClasses(e.contentRect.width, e.contentRect.height);
     });
     ro.observe(document.documentElement);
-    applyWidthClasses(document.documentElement.clientWidth);
+    applyWidthClasses(document.documentElement.clientWidth, document.documentElement.clientHeight);
 } catch {
-    window.addEventListener('resize', () => applyWidthClasses(window.innerWidth));
-    applyWidthClasses(window.innerWidth);
+    window.addEventListener('resize', () => applyWidthClasses(window.innerWidth, window.innerHeight));
+    applyWidthClasses(window.innerWidth, window.innerHeight);
 }
 
 // ── The Omarchy card ─────────────────────────────────────────────────────────

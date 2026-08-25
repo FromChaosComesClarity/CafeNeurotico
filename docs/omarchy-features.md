@@ -166,6 +166,15 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
   tiling WM you cannot drag a window and the compositor owns close/minimise/maximise, so that bar
   was 35px of nothing — which on a tiled window is a whole extra row of covers. Toggleable in the
   Omarchy card; on by default when Omarchy is detected.
+- **Nothing in the rail can be out of reach.** The icon rail was `overflow: hidden`, so on a
+  window shorter than its own contents the bottom buttons were clipped with no way to scroll to
+  them — including the Control Panel button. On a 1152×720 laptop panel that made the setting
+  which fixes an oversized interface unreachable *because* the interface was oversized.
+- **Ctrl +/− /0 changes the interface scale** from anywhere, for the same reason: an escape hatch
+  must not live behind the thing it rescues you from.
+- **A first run picks a scale that fits the screen** rather than assuming 100%. A saved choice
+  always wins, and nothing is written until you pick one yourself — so moving to a bigger monitor
+  re-evaluates instead of carrying a laptop-sized guess around forever.
 - **The layout follows the tile.** Half of a 1440px screen is 720px and a third is 480px, so a
   narrow window is the normal case here rather than an exception. The filter row wraps, the game
   list narrows, and below 680px the split view drops its list and gives the width to the game.
