@@ -1,0 +1,183 @@
+# Cafe Neurotico on Omarchy Linux — handoff
+
+**This is a third development machine, not a third platform.** Omarchy is Arch with Hyprland;
+`host.id` is `linux` and it runs the exact same `packages/core/platform/linux.js` the Nobara
+desktop does. Nothing like the macOS port is needed, and there is no `omarchy.js` to write.
+
+What is genuinely new here is the **desktop environment**: a Wayland tiling compositor instead of
+KDE/KWin. That is a layer the codebase already has a place for — see *Where Hyprland features go*.
+
+Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
+`docs/mac-port-phase-a.md` (what the host boundary is and why).
+
+---
+
+## The rules that matter before you write anything
+
+1. **Nobara is the only release host.** Develop here freely; never cut a release from this
+   laptop. The AppImage links `better-sqlite3` and Electron against the *build host's* glibc
+   (2.43 on Nobara). Building a release on rolling Arch silently raises the glibc floor for
+   everyone who downloads it, and they find out as `GLIBC_2.xx not found`.
+2. **Linux outranks macOS; Nobara outranks this laptop.** A regression on the Nobara desktop
+   blocks a merge. A KDE-only feature not existing under Hyprland is not a regression, and
+   neither is the reverse.
+3. **Three machines push to one repo. `git fetch` first, always.** This cost three rejected
+   pushes on 2026-08-24. And a rejected push is **not** all-or-nothing — git pushes refs
+   independently, so a tag can land while the branches fail. Use `--atomic` when it matters.
+4. **`apps/*/main.js` stays host-agnostic.** If Hyprland work needs to touch one, the boundary
+   is in the wrong place. Same rule the macOS port lives under.
+
+---
+
+## Day 0 — the toolchain
+
+```bash
+sudo pacman -S --needed git base-devel nodejs npm fuse2 github-cli
+node -v                       # want v22.x — Nobara runs 22.22.2
+```
+
+- **`fuse2` is not optional.** AppImages will not run without it, so you cannot test your own
+  build otherwise.
+- **`base-devel`** is what rebuilds `better-sqlite3` against Electron's ABI.
+- `gh auth login` if you want to touch releases (you shouldn't from here — see rule 1 — but
+  `gh` is also the git credential helper on the other machines).
+
+---
+
+## Day 1 — clone and run
+
+```bash
+git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
+cd CafeNeurotico
+npm install
+npm start
+```
+
+`npm install` runs `postinstall`, which:
+
+- downloads the pinned helper binaries (`binaries-v2`) into `assets/bin/linux/` — **six
+  binaries, gitignored, and the tarball is the only place our patched `gogdl` lives.** Never
+  point that pin at an upstream build; see `docs/` and the gogdl fork's history.
+- rebuilds `better-sqlite3` for Electron via `electron-builder install-app-deps`.
+
+Three faces, three commands:
+
+```bash
+npm start                 # The Manager
+npm run start:crema       # CREMA
+npx electron . grinder    # GRINDER
+```
+
+**Read the terminal, not the window.** An Electron main-process error dialog keeps the process
+alive, so "it stayed open" proves nothing. That mistake has cost real bugs twice on this project.
+
+`npm run dist` builds the AppImage and `postdist` copies it to `~/Games/CNGM/` — that path is
+hardcoded in `package.json` and will simply fail harmlessly if you have no such folder.
+
+---
+
+## What to check on this machine, first hour
+
+**1. `/etc/os-release`.** `linux.js:394-397` picks the package-manager hint for DOSBox from `ID`
+and `ID_LIKE`, and `:901` does the same for pipx. Arch is already handled:
+
+```bash
+grep -E '^(ID|ID_LIKE)=' /etc/os-release
+```
+
+If Omarchy sets `ID=omarchy` **without** `arch` in `ID_LIKE`, those hints fall through to a
+generic message. One-line fix in the `is(...)` chain — worth doing, since a wrong hint tells the
+user to run a command their distro doesn't have.
+
+**2. Which optional tools exist.**
+
+```bash
+for t in wmctrl update-desktop-database gio xdg-open flatpak dosbox dosbox-staging umu-run; do
+  printf '%-24s %s\n' "$t" "$(command -v $t || echo MISSING)"
+done
+```
+
+Nothing here *breaks* if they are missing — that was made true in `0f80ab3`, see below — but it
+tells you which features will silently do nothing.
+
+**3. That the app starts all three faces without an error dialog.**
+
+---
+
+## Things that already handle a tiling Wayland WM correctly
+
+Verified by reading the code on 2026-08-24, not assumed:
+
+| Thing | Behaviour here |
+|---|---|
+| **KWin display picker** (`packages/core/kwin-display.js`) | `isSupported()` requires `kde` in `XDG_CURRENT_DESKTOP`/`DESKTOP_SESSION` **and** `kscreen-doctor` **and** `qdbus`. Under Hyprland it is false and the whole feature disappears. `apps/manager/main.js` guards on it. |
+| **`focusWindow`** (`linux.js`) | Returns early with no `DISPLAY`, so a pure-Wayland session skips it. Under XWayland (`DISPLAY` set, real X11 handle) it works as it always did. |
+| **Optional desktop tools** | `spawnOptional()` attaches a real `'error'` listener — a missing `wmctrl` / `gio` / `xdg-open` / `update-desktop-database` is now a no-op instead of a fatal error. |
+| **Desktop entries** | Plain XDG: `~/.local/share/applications` + `update-desktop-database`. Whatever launcher Omarchy ships reads those. |
+| **Package hints** | `sudo pacman -S dosbox-staging` and `sudo pacman -S python-pipx` already exist. |
+| **Helper binaries** | Plain x86-64, distro-independent. |
+
+### ⚠️ The bug this machine surfaced before it even existed
+
+`try { spawn(tool, args).unref() } catch {}` **is not a guard.** `spawn` reports a missing binary
+through an *asynchronous* `'error'` event, so the `try/catch` never sees it, and an unhandled
+`'error'` on a ChildProcess is fatal. Four sites had that shape, each spawning a tool a minimal
+Wayland-only Arch box plausibly lacks — `wmctrl` most of all, being an X11 tool. `focusWindow` is
+reached from CREMA, so **CREMA is the face that would have died on startup.**
+
+Fixed in `0f80ab3` with `spawnOptional()`. If you add another optional-tool spawn, use it.
+**`spawnSync`/`execSync` are unaffected — they really do throw.**
+
+⚠️ **The published 1.9.0 AppImage does not contain this fix** (built before it). Build from
+source on this machine, or wait for the next tag.
+
+---
+
+## Where Hyprland features go
+
+**Copy the `kwin-display.js` pattern.** That module is the existing precedent for a
+desktop-environment-specific feature:
+
+- a self-contained module under `packages/core/`,
+- exposing an **`isSupported()`** that checks for the environment *and* the tools it needs,
+- wired into `linux.js`'s `desktop` object (`desktop.displayPicker`),
+- with every caller guarding on `isSupported()` — and tolerating `null`.
+
+⚠️ That last point is not theoretical: `apps/manager/main.js`'s `display-options` handler called
+`displayPicker.isSupported()` with no null guard, which was fine on KDE and an instant crash on
+macOS where the picker is legitimately `null`. A second *desktop environment* can expose the
+same class of bug a second *platform* did.
+
+So a Hyprland equivalent — a display/workspace picker, say — is a new module beside
+`kwin-display.js`, selected at runtime, **not** a branch inside `linux.js` and definitely not
+inside `apps/*/main.js`.
+
+What Hyprland plausibly offers that KWin's picker does: `hyprctl` is a clean IPC surface
+(`hyprctl monitors -j`, `hyprctl dispatch`, and window rules via `hyprctl keyword windowrulev2`)
+and is far less hostile than KWin turned out to be — KWin 6.7 **ignores** rules written into
+`kwinrulesrc` by anyone but itself, which is why that module drives the Scripting D-Bus API
+instead. Do not assume the same constraint applies here; check before designing around it.
+
+---
+
+## Branches and the release cycle
+
+```
+main == experimental == mac        # kept level; all three push to origin
+```
+
+New work goes on `experimental`, ff-merges into `main` when Jose says so, then both are pushed
+and `mac` is brought level. Releases: bump `package.json` + `package-lock.json`, write
+`RELEASE_NOTES_vX.Y.Z.md`, tag, push, build **on Nobara**, `gh release create`.
+
+Do not delete the `mac` branch — the Air pushes to it, and macOS work continues there.
+
+---
+
+## Where the project's real memory is
+
+Everything about the app's history, decisions and traps lives in Claude Code's memory directory,
+not in this repo. Restore it with **ClaudeMemKeeper** — see `MEMORY_RESTORE.md` beside this file.
+Start the first session on this machine with:
+
+> "Resume the Cafe Neurotico project. Read your memory files for context."
