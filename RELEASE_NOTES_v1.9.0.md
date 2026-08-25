@@ -21,6 +21,6 @@ This needs CrossOver installed separately; it is commercial software and is not 
 2. `chmod +x CafeNeurotico.AppImage`
 3. Run it
 
-**macOS (Experimental):** download the `.dmg` below — see the [full guide](docs/macos-guide.md) for the one-time Gatekeeper step an unsigned build needs, and for what does and doesn't work yet.
+**macOS (Experimental):** the 1.9.0 `.dmg` is built separately on a Mac and will be added to this release shortly — until it appears here, the [1.8.0 dmg](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/tag/v1.8.0) is the current Mac build (it does not include CrossOver support). See the [full guide](docs/macos-guide.md) for the one-time Gatekeeper step an unsigned build needs, and for what does and doesn't work yet.
 
 Upgrading from any 1.x? Just replace the AppImage (or the `.app`, on macOS). Your library, artwork, playlists and settings are untouched.
