@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu, Notification, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, net, session, shell, Menu, Notification, nativeImage, screen, powerSaveBlocker } = require('electron');
 app.setName('cafeneurotico');
 const path = require('path');
 const os = require('os');
@@ -457,9 +457,34 @@ function ensureGrinderEngine(createIfMissing = false) {
         onProgress:  (data) => { try { _grinderProgressCb && _grinderProgressCb(data); } catch {} },
         onLaunchIssue: (info) => reportLaunchFailure(info),
         onLaunchProgress: (info) => broadcast('game-launch-progress', info),
+        onGameSession: (active) => onGameSession(active),
     });
     if (created) grinderEngine.ensureSchema(_grinderEngineDb);   // fresh db → create tables (no-op otherwise)
     return true;
+}
+
+// ── While a game is running ──────────────────────────────────────────────────
+// Two things are worth doing for the duration of a game and undoing afterwards.
+//
+// The screen lock is the important one. A gamepad-only CREMA session, a long cutscene or a
+// turn spent staring at a map produces no keyboard or mouse input at all, so the desktop's
+// idea of idle and the player's are completely different — and on Omarchy the lock screen
+// wins. Electron's powerSaveBlocker speaks the Wayland idle-inhibit protocol, which hypridle
+// honours.
+//
+// ⚠️ An inhibitor, deliberately, rather than flipping the user's idle setting: an inhibitor
+// dies with the process holding it, whereas a toggle left flipped by a crash would disable
+// someone's lock screen indefinitely. A game launcher must not leave that behind.
+//
+// ⚠️ Counted, not boolean. Two games at once and a single flag would release everything when
+// the first one exits.
+let _gamesRunning = 0;
+function onGameSession(active) {
+    const omarchy = host.desktop?.omarchy;
+    _gamesRunning = Math.max(0, _gamesRunning + (active ? 1 : -1));
+    const busy = _gamesRunning > 0;
+    try { omarchy?.inhibitIdle?.(busy, powerSaveBlocker); } catch {}
+    try { omarchy?.setGamingPower?.(busy); } catch {}
 }
 
 // ── Launch failures ───────────────────────────────────────────────────────────
@@ -476,6 +501,9 @@ function broadcast(channel, payload) {
 function reportLaunchFailure(info) {
     try {
         broadcast('game-launch-failed', {
+            // Needed so the dialog can offer to FIX the failure rather than only describe it —
+            // a per-game environment variable has to know which game.
+            grinderGameId: info?.gameId ?? null,
             title:  info?.title || '',
             code:   info?.reason?.code || 'UNKNOWN',
             message: info?.reason?.message || 'The game could not be started.',
@@ -490,6 +518,26 @@ function reportLaunchFailure(info) {
 // launchGame refused before spawning anything (e.g. no Proton for a Windows title). The engine
 // tags those errors with a `code`; anything untagged is still worth showing rather than hiding
 // in the console, which is where these used to die.
+// Set (or replace) a single variable in a game's own environment block. Used by the launch
+// dialog to apply a fix it just suggested, instead of reading the variable out to the user and
+// leaving them to type it into the right box.
+//
+// ⚠️ Merges rather than overwrites: custom_env is the user's, and a game may already carry
+// variables that matter. Only the named one is touched.
+ipcMain.handle('grinder-set-env-var', (_, { grinderGameId, name, value } = {}) => {
+    if (!_grinderEngineDb || !grinderGameId || !name) return { ok: false, error: 'Nothing to set.' };
+    try {
+        const row = _grinderEngineDb.prepare('SELECT custom_env FROM games WHERE id=?').get(grinderGameId);
+        if (!row) return { ok: false, error: 'Game not found.' };
+        const lines = String(row.custom_env || '').split('\n').map(l => l.trim()).filter(Boolean)
+            .filter(l => l.split('=')[0].trim() !== name);
+        lines.push(`${name}=${value}`);
+        const merged = lines.join('\n');
+        _grinderEngineDb.prepare('UPDATE games SET custom_env=? WHERE id=?').run(merged, grinderGameId);
+        return { ok: true, env: merged };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
 function reportLaunchThrow(grinderGameId, err) {
     let title = '';
     try { title = _grinderEngineDb?.prepare('SELECT title FROM games WHERE id=?').get(grinderGameId)?.title || ''; } catch {}
@@ -799,6 +847,14 @@ try {
     if (kwinDisplay.isSupported()) kwinDisplay.apply();
 } catch {}
 
+// Hyprland window rules, for the same reason the KWin script is re-applied above: they are
+// session-scoped and nothing is written to the user's config, so they have to be set again on
+// every start. A no-op off Hyprland.
+try {
+    const r = host.desktop?.omarchy?.applyWindowRules?.();
+    if (r?.applied) console.log(`[hyprland] ${r.applied}/${r.total} window rules applied`);
+} catch {}
+
 ipcMain.handle('display-options', () => {
     if (!kwinDisplay?.isSupported()) return { supported: false, displays: [], current: null };
     return { supported: true, displays: kwinDisplay.listDisplays(), current: kwinDisplay.currentDisplay() };
@@ -824,6 +880,7 @@ ipcMain.handle('omarchy-status', () => {
         version: omarchy.version(),
         hyprland: omarchy.isHyprland(),
         gap: omarchy.gapSummary(),
+        geometry: omarchy.hyprGeometry?.() || null,
         tools: omarchy.toolStatus(),
         // Emulation belongs to EmuLatte; this app never offers RetroArch.
         installers: omarchy.installerStatus().filter(i => !i.emulation),

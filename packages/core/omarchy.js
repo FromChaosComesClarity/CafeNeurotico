@@ -111,6 +111,161 @@ function monitors() {
     })).filter(m => m.name);
 }
 
+// ── Window behaviour under Hyprland ──────────────────────────────────────────
+// A tiling compositor tiles everything, including windows that are obviously transient. The
+// GRINDER window is the clear case: it is a tool the Manager opens over itself, and tiling it
+// side-by-side halves the library you were just looking at. Sign-in windows are the same
+// shape — they are dialogs, and a dialog that steals half the screen is a dialog done wrong.
+//
+// ⚠️ Every face ships as the same Electron app, so they all share one app id
+// (`cafeneurotico`). Class alone cannot tell them apart; the rules below match on TITLE, which
+// is the only thing that distinguishes GRINDER from the Manager from CREMA.
+//
+// Applied with `hyprctl keyword`, which is session-scoped and writes NOTHING to the user's
+// Hyprland config — the same restraint kwin-display.js exercises on KDE, and for the same
+// reason: a game launcher has no business editing someone's window manager configuration.
+// Re-applied at every start, since the rules die with the session.
+// ⚠️ Hyprland 0.56 with Omarchy's Lua config runs a NON-LEGACY parser, and `hyprctl keyword`
+// simply does not work there — it answers "keyword can't work with non-legacy parsers. Use
+// eval." and changes nothing. Worse, it answers that on stdout with exit status 0, so a naive
+// success check counts the refusal as a success and reports rules applied that were not. The
+// runtime API is `hyprctl eval` with Omarchy's own Lua helper:
+//
+//     o.window({ class = "...", title = "..." }, { float = true, center = true })
+//
+// A plain Arch box running Hyprland with a .conf config still has the legacy parser, so the
+// keyword form is kept as a fallback. Both are checked for a literal "ok".
+const WINDOW_RULES = [
+    // GRINDER floats above the Manager rather than splitting the screen with it — it is a tool
+    // opened over the library, and tiling it halves the thing you were just looking at.
+    {
+        lua: 'o.window({ class = "^(cafeneurotico)$", title = "^(GRINDER)$" }, { float = true, center = true, size = { 1100, 700 } })',
+        keyword: ['float', 'class:^(cafeneurotico)$,title:^(GRINDER)$'],
+    },
+    // Store sign-in windows are dialogs, and the one place a user types a password.
+    {
+        lua: 'o.window({ class = "^(cafeneurotico)$", title = "^(.*(Login to|Sign in to).*)$" }, { float = true, center = true })',
+        keyword: ['float', 'class:^(cafeneurotico)$,title:^(.*(Login to|Sign in to).*)$'],
+    },
+    // The manual viewer is a reader opened beside a game.
+    {
+        lua: 'o.window({ class = "^(cafeneurotico)$", title = "^(.*Manual.*)$" }, { float = true, center = true })',
+        keyword: ['float', 'class:^(cafeneurotico)$,title:^(.*Manual.*)$'],
+    },
+    // Games launched through umu/Proton all arrive as steam_app_* (umu gives every non-Steam
+    // title the same class — see kwin-display.js for why that is not ours to change). Holding
+    // idle off while one is focused is belt-and-braces alongside the app's own inhibitor, and
+    // it is what Steam's own Omarchy rule does.
+    {
+        lua: 'o.window({ class = "^(steam_app_.*)$" }, { idle_inhibit = "focus" })',
+        keyword: ['idleinhibit focus', 'class:^(steam_app_.*)$'],
+    },
+];
+
+function applyWindowRules() {
+    if (!isHyprland() || !hyprctlBin()) return { ok: false, applied: 0, total: WINDOW_RULES.length };
+    let applied = 0;
+    for (const r of WINDOW_RULES) {
+        let out = hyprctl(['eval', r.lua]);
+        // No Lua helper (a plain Hyprland with the legacy parser) — try the classic form.
+        if (!out || !/^ok\b/i.test(out.trim())) {
+            const alt = hyprctl(['keyword', 'windowrulev2', `${r.keyword[0]}, ${r.keyword[1]}`]);
+            out = alt;
+        }
+        if (out && /^ok\b/i.test(out.trim())) applied++;
+    }
+    return { ok: applied > 0, applied, total: WINDOW_RULES.length };
+}
+
+// ── The desktop's geometry ───────────────────────────────────────────────────
+// Matching the palette makes the app look like the desktop; matching the geometry makes it
+// sit in it. Omarchy's default is square corners (rounding = 0), and an app full of rounded
+// cards on that desktop reads as foreign in a way that is hard to name until you see them
+// side by side.
+//
+// ⚠️ Read from the compositor, not from ~/.config/hypr/looknfeel.lua. The config is Lua in
+// Omarchy 4 and parsing it would mean writing a Lua reader for one integer — and it would
+// still be wrong the moment the value is changed at runtime. `hyprctl getoption` reports what
+// Hyprland is ACTUALLY using.
+function hyprGeometry() {
+    if (!isHyprland()) return null;
+    const num = key => {
+        const out = hyprctl(['getoption', key]);
+        if (!out) return null;
+        const m = out.match(/int:\s*(-?\d+)/i);
+        return m ? parseInt(m[1], 10) : null;
+    };
+    const rounding = num('decoration:rounding');
+    if (rounding === null) return null;
+    return {
+        rounding,
+        borderSize: num('general:border_size'),
+        gapsIn: num('general:gaps_in'),
+    };
+}
+
+// ── Keeping the screen awake while a game runs ───────────────────────────────
+// Omarchy locks on idle. A gamepad-only CREMA session, a long cutscene or a turn spent
+// reading a map produces no keyboard or mouse input at all, so the desktop's idea of "idle"
+// and the player's are completely different — and the lock screen wins.
+//
+// Electron's powerSaveBlocker speaks the Wayland idle-inhibit protocol, which hypridle honours,
+// so the app can hold the inhibitor for exactly as long as a game is running. That is better
+// than toggling Omarchy's idle setting: a toggle left flipped by a crash would disable the
+// user's lock screen indefinitely, whereas an inhibitor dies with the process that holds it.
+//
+// ⚠️ Deliberately NOT `omarchy toggle idle`. Persistent state that outlives a crash is exactly
+// what a game launcher should not be leaving behind on someone's desktop.
+let _idleBlockerId = null;
+function inhibitIdle(on, powerSaveBlocker) {
+    if (!powerSaveBlocker) return false;
+    try {
+        if (on) {
+            if (_idleBlockerId !== null && powerSaveBlocker.isStarted(_idleBlockerId)) return true;
+            _idleBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+            return true;
+        }
+        if (_idleBlockerId !== null) {
+            if (powerSaveBlocker.isStarted(_idleBlockerId)) powerSaveBlocker.stop(_idleBlockerId);
+            _idleBlockerId = null;
+        }
+        return true;
+    } catch { return false; }
+}
+
+// ── Power profile ────────────────────────────────────────────────────────────
+// Omarchy manages power profiles, and on a laptop the difference between `balanced` and
+// `performance` is real. Switch for the duration of a game and put it back afterwards.
+//
+// ⚠️ The previous profile is captured at switch time and restored on the way out, so this
+// cannot strand a machine in `performance` and eat someone's battery. If the profile cannot
+// be read, nothing is changed at all — guessing what to restore to would be worse than not
+// helping.
+let _savedProfile = '';
+function powerProfile(name) {
+    const bin = which('powerprofilesctl');
+    if (!bin) return '';
+    try {
+        const r = spawnSync(bin, name ? ['set', name] : ['get'], { encoding: 'utf8', timeout: 4000 });
+        return r.status === 0 ? String(r.stdout || '').trim() : '';
+    } catch { return ''; }
+}
+
+function setGamingPower(on) {
+    if (!isOmarchy()) return false;
+    if (on) {
+        if (_savedProfile) return true;                 // already switched for another game
+        const cur = powerProfile('');
+        if (!cur || cur === 'performance') return false; // nothing to do, or nothing to restore to
+        _savedProfile = cur;
+        return !!powerProfile('performance') || true;
+    }
+    if (!_savedProfile) return false;
+    powerProfile(_savedProfile);
+    _savedProfile = '';
+    return true;
+}
+
 // ── The gaming stack ─────────────────────────────────────────────────────────
 // What a fresh Omarchy lacks, measured against what the Nobara reference host has. Nobara
 // is a gaming distribution and ships this whole list preinstalled, which is exactly why the
@@ -369,6 +524,7 @@ module.exports = {
     hyprctl, hyprctlJson, monitors,
     TOOLS, toolStatus, missingTools, gapSummary,
     INSTALLERS, installerStatus, missingInstallers, runInstaller,
+    WINDOW_RULES, applyWindowRules, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
     installCommand, openInstallTerminal, openTerminalWith, terminalLauncher,
     isSupported, describe, which,
 };

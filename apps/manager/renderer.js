@@ -1253,6 +1253,40 @@ async function showLaunchFailure(info) {
     $('pr-install').textContent = 'Install GE-Proton';
     $('pr-close').textContent = 'Close';
 
+    // ── A failure we can actually fix, offered as a button ────────────────────
+    // NO_VULKAN means the GPU predates Vulkan and DXVK cannot start, which is not something
+    // the app can repair — but Proton has an OpenGL path, and switching to it is a single
+    // per-game environment variable. Telling someone the variable's name and leaving them to
+    // find the right box is a worse answer than offering to set it, so this does.
+    //
+    // ⚠️ Only offered when the game is known: the variable is per-game, and the engine's
+    // launch-issue payload is the only thing that knows which one just failed.
+    const fixBtn = $('pr-fix');
+    const canFixVulkan = info.code === 'NO_VULKAN' && info.grinderGameId != null;
+    fixBtn.style.display = canFixVulkan ? '' : 'none';
+    fixBtn.disabled = false;
+    fixBtn.textContent = 'Use OpenGL for this game';
+    if (canFixVulkan) {
+        fixBtn.onclick = async () => {
+            fixBtn.disabled = true;
+            fixBtn.textContent = 'Applying…';
+            const r = await window.api.grinderSetEnvVar({
+                grinderGameId: info.grinderGameId, name: 'PROTON_USE_WINED3D', value: '1',
+            });
+            if (r && r.ok) {
+                $('pr-message').textContent =
+                    'Done — this game will now render through OpenGL instead of Vulkan. Press Play to try again. ' +
+                    'You can undo it any time by removing PROTON_USE_WINED3D from the game\'s environment variables.';
+                fixBtn.textContent = '✓ Applied';
+                $('pr-close').textContent = 'Close';
+            } else {
+                fixBtn.disabled = false;
+                fixBtn.textContent = 'Use OpenGL for this game';
+                $('pr-message').textContent = (r && r.error) || 'Could not apply it.';
+            }
+        };
+    }
+
     const log = (info.log || '').trim();
     $('pr-details').style.display = log ? '' : 'none';
     $('pr-details').open = false;
@@ -11609,6 +11643,7 @@ function applyTheme(themeName) {
     const root = document.documentElement;
     Object.keys(tConfig).forEach(key => { if (key !== 'font') root.style.setProperty(`--${key}`, tConfig[key]); });
     activeTheme = themeName;
+    try { applyOmarchyGeometry(themeName === OMARCHY_THEME_KEY); } catch {}
     document.body.classList.toggle('sys-xp', themeName === 'WINDOWS XP');   // light chrome text on the Luna-blue titlebar+rail
     document.body.classList.toggle('theme-light', _isLightBg(tConfig.bg));  // accent hover instead of near-black invert
     applyUiFont();                         // theme's era font wins; otherwise the picker's ui_font
@@ -11696,6 +11731,59 @@ window.api.getSetting('ui_font').then(f => {   // re-resolve --ui-font regardles
     _uiFont = f || ''; applyUiFont();
     const sel = document.getElementById('ui-font-select'); if (sel) sel.value = _uiFont || 'Poppins';
 });
+// ── Compact chrome ───────────────────────────────────────────────────────────
+// Under a tiling WM the titlebar is dead weight: you cannot drag a tiled window, and the
+// compositor owns close/minimise/maximise. So the bar goes and what was useful in it moves
+// into the icon rail.
+//
+// ⚠️ The controls are MOVED, not recreated. appendChild relocates a live node together with
+// its event listeners, so nothing needs rebinding and there is never a second copy to keep in
+// sync — which is what a "build a duplicate rail button" approach would have cost.
+const CHROME_IDS = ['btn-titlebar-home', 'btn-titlebar-library', 'btn-titlebar-downloads',
+                    'support-cta', 'crema-cta'];
+
+function applyCompactChrome(on) {
+    const rail = document.getElementById('rail-chrome');
+    const bar  = document.getElementById('titlebar');
+    const controls = bar?.querySelector('.titlebar-controls');
+    if (!rail || !bar || !controls) return;
+
+    document.body.classList.toggle('compact-chrome', !!on);
+    const target = on ? rail : controls;
+    for (const id of CHROME_IDS) {
+        const el = document.getElementById(id);
+        // The window controls themselves are NOT in this list and stay in the hidden bar:
+        // they are the one thing a tiling compositor genuinely replaces.
+        if (el && el.parentElement !== target) target.appendChild(el);
+    }
+}
+
+// ── Responsive shell ─────────────────────────────────────────────────────────
+// A tiling WM makes a narrow window ordinary rather than exceptional — half of a 1440px
+// screen is 720px. Driven by the WINDOW's width via ResizeObserver rather than CSS media
+// queries, because a media query reads the screen, and on a tiled desktop the two numbers
+// have nothing to do with each other.
+const NARROW_AT = 900;      // the filter row starts wrapping and the split list narrows
+const VERY_NARROW_AT = 680; // the split list is no longer worth the space it costs
+
+function applyWidthClasses(w) {
+    document.body.classList.toggle('narrow', w < NARROW_AT);
+    document.body.classList.toggle('very-narrow', w < VERY_NARROW_AT);
+}
+
+try {
+    // Observing documentElement rather than window.resize: it fires for the element actually
+    // being laid out, which is what a compositor changes when it retiles around a new window.
+    const ro = new ResizeObserver(entries => {
+        for (const e of entries) applyWidthClasses(e.contentRect.width);
+    });
+    ro.observe(document.documentElement);
+    applyWidthClasses(document.documentElement.clientWidth);
+} catch {
+    window.addEventListener('resize', () => applyWidthClasses(window.innerWidth));
+    applyWidthClasses(window.innerWidth);
+}
+
 // ── The Omarchy card ─────────────────────────────────────────────────────────
 // Everything Omarchy-specific in one Control Panel card. On any other host the card is
 // REMOVED, not hidden — the Control Panel resets `display` on every .tools-section in three
@@ -11816,6 +11904,20 @@ async function renderOmarchyCard(s) {
         };
     }
 
+    // Compact chrome. Default ON when Omarchy is detected — it is the right default for a
+    // tiling desktop — but stored the moment it is toggled, so a deliberate choice sticks.
+    const chromeBox = document.getElementById('omarchy-compact-chrome');
+    if (chromeBox) {
+        const saved = await window.api.getSetting('omarchy_compact_chrome').catch(() => null);
+        const on = saved === null || saved === undefined ? true : saved === '1';
+        chromeBox.checked = on;
+        applyCompactChrome(on);
+        chromeBox.onchange = () => {
+            applyCompactChrome(chromeBox.checked);
+            window.api.setSetting('omarchy_compact_chrome', chromeBox.checked ? '1' : '0');
+        };
+    }
+
     const themeBtn = document.getElementById('btn-omarchy-theme');
     const label = document.getElementById('omarchy-theme-name');
     if (label) label.textContent = _omarchyThemeName || 'none found';
@@ -11853,6 +11955,17 @@ async function renderOmarchyCard(s) {
 const OMARCHY_THEME_KEY = 'OMARCHY';
 let _omarchyThemeName = '';
 
+// Applied alongside the palette rather than on its own: "match my desktop" means both, and
+// tying it to the theme choice means it needs no toggle of its own. Cleared when the user
+// picks any other theme, so a CN theme keeps CN's shape.
+let _omarchyRadius = null;
+function applyOmarchyGeometry(active) {
+    const on = !!active && _omarchyRadius !== null;
+    document.body.classList.toggle('omarchy-geometry', on);
+    if (on) document.documentElement.style.setProperty('--omarchy-radius', _omarchyRadius + 'px');
+    else document.documentElement.style.removeProperty('--omarchy-radius');
+}
+
 function _registerOmarchyTheme(d) {
     if (!d || !d.available || !d.theme) return false;
     THEMES[OMARCHY_THEME_KEY] = d.theme;
@@ -11885,6 +11998,22 @@ window.api.onOmarchyThemeChanged?.(d => {
 });
 
 _omarchyThemeReady.then(initOmarchyCard).catch(() => {});
+
+// ⚠️ Applied at startup as well as in the card, or the layout would only correct itself once
+// the user happened to open the Control Panel — a first run would show the titlebar it is
+// meant to be hiding.
+(async () => {
+    try {
+        const s = await window.api.omarchyStatus();
+        if (!s || !s.detected) return;
+        if (s.geometry && typeof s.geometry.rounding === 'number') {
+            _omarchyRadius = s.geometry.rounding;
+            applyOmarchyGeometry(activeTheme === OMARCHY_THEME_KEY);
+        }
+        const saved = await window.api.getSetting('omarchy_compact_chrome').catch(() => null);
+        applyCompactChrome(saved === null || saved === undefined ? true : saved === '1');
+    } catch {}
+})();
 
 _omarchyThemeReady.then(ok => window.api.getSetting('cngm_theme').then(saved => ({ ok, saved })))
     .then(({ ok, saved }) => {

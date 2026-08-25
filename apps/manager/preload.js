@@ -183,6 +183,7 @@ contextBridge.exposeInMainWorld('api', {
                                 customInstall:    (payload) => ipcRenderer.invoke('custom-install', payload),
                                 displayOptions:  () => ipcRenderer.invoke('display-options'),
                                 setGameDisplay:  (i) => ipcRenderer.invoke('set-game-display', i),
+                                grinderSetEnvVar: (payload) => ipcRenderer.invoke('grinder-set-env-var', payload),
                                 omarchyStatus:   () => ipcRenderer.invoke('omarchy-status'),
                                 omarchyInstallTools: (keys) => ipcRenderer.invoke('omarchy-install-tools', keys),
                                 omarchyRunInstaller: (key) => ipcRenderer.invoke('omarchy-run-installer', key),

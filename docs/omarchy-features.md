@@ -84,15 +84,15 @@ and the IPC lives in `packages/core/shared-ipc.js` rather than the Manager's `ma
 
 ### 3. It tells you what a fresh Omarchy is missing for gaming
 
-Omarchy is aimed at developers, so a clean install has almost none of the gaming stack. Nobara —
-the reference host this project develops against — ships all of it. The suite compares the two and
-reports the gap, in three honest tiers:
+Omarchy is aimed at developers, so a clean install has almost none of the gaming stack. The suite
+knows what it needs and what a gaming setup normally has, and reports the gap in three honest
+tiers:
 
 | Tier | Meaning |
 |---|---|
 | **Required** | Something in the app degrades without it, and the entry says exactly what. `umu-launcher`, a DOSBox. |
 | **Optional** | Useful, not load-bearing. `wine`, `pipx`, `flatpak`, `wmctrl`. |
-| **Extra** | Nobara ships it and a gamer wants it, but the suite never calls it: `gamemode`, `mangohud`, `gamescope`, `winetricks`, `protontricks`. |
+| **Extra** | Worth having for gaming, but the suite never calls it itself: `gamemode`, `mangohud`, `gamescope`, `winetricks`, `protontricks`. |
 
 Every entry names the binary actually probed for, so nobody is told they need something the app
 does not use. Alternates count — plain `dosbox` satisfies the DOSBox requirement, not just
@@ -136,7 +136,7 @@ and the flag exists so the EmuLatte port shows it while this app does not.
 > in the error pointed at the cause.**
 
 `gogdl` is a frozen PyInstaller binary, and the `requests` inside it resolves its CA bundle from
-the path baked in at *build* time. The suite's binaries are built on Fedora/Nobara, so that path is
+the path baked in at *build* time. The suite's binaries are built on Fedora, so that path is
 `/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem` — which does not exist on Arch, Debian,
 openSUSE or Alpine. Every HTTPS call died before it was made:
 
@@ -160,7 +160,38 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
 > ⚠️ This is **not Omarchy-specific** — it affects Arch, Debian, Ubuntu, openSUSE and Alpine users
 > of every release so far. It is listed here because Omarchy is where it was found.
 
-### 7. Hyprland-friendly
+### 7. It behaves like a tiling-desktop app
+
+- **Compact window chrome.** The title bar is gone and its buttons live in the side rail. Under a
+  tiling WM you cannot drag a window and the compositor owns close/minimise/maximise, so that bar
+  was 35px of nothing — which on a tiled window is a whole extra row of covers. Toggleable in the
+  Omarchy card; on by default when Omarchy is detected.
+- **The layout follows the tile.** Half of a 1440px screen is 720px and a third is 480px, so a
+  narrow window is the normal case here rather than an exception. The filter row wraps, the game
+  list narrows, and below 680px the split view drops its list and gives the width to the game.
+  Driven by the window's own size, not the screen's — on a tiled desktop those are different
+  numbers, which is why this is not a CSS media query.
+- **GRINDER and sign-in windows float** instead of tiling. They are transient tools opened over
+  the library, and tiling one halves what you were looking at.
+- **The app takes the desktop's corner radius**, not just its colours, whenever you are wearing
+  your Omarchy palette. Omarchy defaults to square corners, and rounded cards on a square desktop
+  read as foreign.
+
+### 8. It gets out of the way while you play
+
+- **The screen will not lock mid-game.** A gamepad-only CREMA session, a long cutscene or a turn
+  spent reading a map produces no keyboard or mouse input at all, so the desktop's idea of idle
+  and the player's are completely different — and the lock screen wins that argument. Cafe
+  Neurotico holds an idle inhibitor for exactly as long as a game is running.
+
+  > ⚠️ An inhibitor, deliberately, rather than flipping your idle setting: an inhibitor dies with
+  > the process holding it, whereas a toggle left flipped by a crash would leave your lock screen
+  > disabled indefinitely.
+
+- **The power profile switches to performance while a game runs** and is put back afterwards. The
+  previous profile is captured before switching, so this cannot strand a laptop on performance.
+
+### 9. Hyprland-friendly
 
 - **The KDE-only "Which Screen Games Open On" card is removed on Hyprland**, not hidden. It is a
   KWin script and KWin is not running, so a card offering to "let KDE decide" has no business on
@@ -195,8 +226,9 @@ drivers). The workaround that works there is **`PROTON_USE_WINED3D=1`**, which r
 OpenGL instead; set it under the game's own environment variables. It launched a title that had
 been failing instantly.
 
-Cafe Neurotico now recognises this signature and says so, rather than reporting "the game closed
-immediately" and leaving you to guess.
+Cafe Neurotico now recognises this signature and says so — and offers to fix it: the dialog has a
+**Use OpenGL for this game** button that sets the variable on that game for you, rather than
+naming a variable and leaving you to find the right box.
 
 > ⚠️ Proton Experimental also throws a `Xalia … No displays available` stack trace on such a
 > machine. It is a **red herring** — disabling Xalia removes the trace and the game still dies.

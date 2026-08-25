@@ -29,7 +29,7 @@ const Database = require('better-sqlite3');
 const host = require('./platform/index.js');
 
 // ── Injected context (set by init) ────────────────────────────────────────────
-let configDir, prefixesDir, logDir, binDir, appImageDir, HOME, db, _onProgress, _onLaunchIssue, _onLaunchProgress;
+let configDir, prefixesDir, logDir, binDir, appImageDir, HOME, db, _onProgress, _onLaunchIssue, _onLaunchProgress, _onGameSession;
 let BUNDLED_LEGENDARY, BUNDLED_GOGDL, BUNDLED_COMET;
 
 function init(ctx = {}) {
@@ -44,6 +44,10 @@ function init(ctx = {}) {
     // Called when a launched game dies on the spot (see spawnGame's watchdog), so the face
     // can tell the user instead of leaving them staring at a library that did nothing.
     _onLaunchIssue = ctx.onLaunchIssue || _onLaunchIssue || (() => {});
+    // Called with true when a game process starts and false when it exits. The engine has no
+    // business knowing what a face does with that — holding off the screen lock, switching a
+    // power profile — so it just reports the fact.
+    _onGameSession = ctx.onGameSession || _onGameSession || (() => {});
     // Called while a game is still setting itself up — the compatibility runtime's one-time
     // download and the per-game prefix build both take minutes with nothing on screen otherwise.
     _onLaunchProgress = ctx.onLaunchProgress || _onLaunchProgress || (() => {});
@@ -884,6 +888,14 @@ async function launchGame(gameId, opts = {}) {
             : (logFd !== null ? { ...o, stdio: ['ignore', logFd, logFd] } : o);
         const proc = spawn(cmd, args, spawnOpts);
         if (logFd !== null) { try { fs.closeSync(logFd); } catch {} }   // the child holds its own copy
+
+        // ⚠️ Every launch funnels through here, which is why the session signal lives here and
+        // not at the call sites — there are several of those and they drift. Both edges are
+        // reported, and 'exit' fires for a crash as well as a clean quit, so nothing the face
+        // holds on the strength of it can be left held forever.
+        try { _onGameSession(true, { gameId, title: game.title || '' }); } catch {}
+        proc.once('exit', () => { try { _onGameSession(false, { gameId, title: game.title || '' }); } catch {} });
+        proc.once('error', () => { try { _onGameSession(false, { gameId, title: game.title || '' }); } catch {} });
         if (onOutput) streamOutput(proc, `$ ${cmd} ${args.join(' ')}\n`);
         if (cometProc) proc.once('exit', () => { try { cometProc.kill('SIGTERM'); } catch {} });
 
