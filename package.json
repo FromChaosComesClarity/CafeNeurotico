@@ -17,7 +17,7 @@
     "pack": "electron-builder --dir",
     "predist": "node scripts/fetch-binaries.mjs",
     "dist": "electron-builder --linux AppImage",
-    "postdist": "D=/home/jose/Games/CNGM; F=CafeNeurotico.AppImage; [ -f $D/$F ] && mv $D/$F $D/CafeNeurotico_old.AppImage; cp dist/$F $D/$F && echo \"Deployed $F to $D\"",
+    "postdist": "node scripts/deploy-appimage.mjs",
     "dist:mac": "electron-builder --mac"
   },
   "author": "Shampoo is a Lie",
