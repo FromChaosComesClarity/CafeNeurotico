@@ -6181,8 +6181,12 @@ LOADING...READY.</div>
 
           <div id="omarchy-tools-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;"></div>
 
-          <button id="btn-omarchy-install" style="width:100%; font-size:12px; padding:9px; letter-spacing:1px; display:none;">Install What's Missing</button>
-          <div id="omarchy-status" style="font-size:11px; text-align:center; font-weight:bold; min-height:14px; margin-top:6px;"></div>
+          <div style="display:flex; gap:6px;">
+            <button id="btn-omarchy-install" style="flex:1; font-size:12px; padding:9px; letter-spacing:1px; display:none;">Install What's Missing</button>
+            <button id="btn-omarchy-recheck" style="flex:0 0 auto; font-size:12px; padding:9px 12px; letter-spacing:1px;" title="Re-read what is installed">Re-check</button>
+          </div>
+          <div id="omarchy-status" style="font-size:11px; text-align:center; min-height:14px; margin-top:6px; line-height:1.4;"></div>
+          <div style="font-size:10px; color:var(--text_dim); text-align:center; margin-top:3px;">Installs run in their own terminal, so press <b>Re-check</b> when one finishes &mdash; no restart needed.</div>
 
           <div style="margin-top:10px; padding-top:9px; border-top:1px solid var(--border);">
             <div style="font-size:11px; color:var(--text_dim); line-height:1.5;">Cafe Neurotico can wear your actual Omarchy palette &mdash; not a lookalike, the same colours your desktop is using. Change it with <code style="color:var(--accent);">omarchy theme set</code> and this follows along. It is in the theme picker under <b>Your Desktop</b> too.</div>

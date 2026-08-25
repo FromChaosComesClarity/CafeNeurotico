@@ -130,7 +130,37 @@ or not at all.
 RetroArch is carried in the module but hidden in Cafe Neurotico — emulation is EmuLatte's pillar,
 and the flag exists so the EmuLatte port shows it while this app does not.
 
-### 6. Hyprland-friendly
+### 6. GOG downloads work on Arch at all
+
+> ⚠️ **This was a total failure of GOG installs on every non-Fedora distribution, and nothing
+> in the error pointed at the cause.**
+
+`gogdl` is a frozen PyInstaller binary, and the `requests` inside it resolves its CA bundle from
+the path baked in at *build* time. The suite's binaries are built on Fedora/Nobara, so that path is
+`/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem` — which does not exist on Arch, Debian,
+openSUSE or Alpine. Every HTTPS call died before it was made:
+
+```
+OSError: Could not find a suitable TLS CA certificate bundle, invalid path:
+         /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+```
+
+What the user saw was "the install failed" on **every GOG title**, with no mention of TLS anywhere —
+and every obvious suspect (the account, the token, the network, the store, GRINDER itself) checking
+out fine.
+
+The host's real CA bundle is now located at startup and exported as `REQUESTS_CA_BUNDLE` and
+`SSL_CERT_FILE` before any helper is spawned. Fedora is checked first, because on the host the
+binaries were built for the baked-in path is already correct and there is nothing to override; a
+value the user exported themselves is left alone.
+
+Diagnosed and fixed on Omarchy 4 on 2026-08-25, and verified with a real download: B.I.O.T.A.
+reached 100% (211.73 MiB) where it had previously failed instantly.
+
+> ⚠️ This is **not Omarchy-specific** — it affects Arch, Debian, Ubuntu, openSUSE and Alpine users
+> of every release so far. It is listed here because Omarchy is where it was found.
+
+### 7. Hyprland-friendly
 
 - **The KDE-only "Which Screen Games Open On" card is removed on Hyprland**, not hidden. It is a
   KWin script and KWin is not running, so a card offering to "let KDE decide" has no business on

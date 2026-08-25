@@ -11683,27 +11683,42 @@ async function initOmarchyCard() {
     if (!s || !s.detected) { card.remove(); return; }
 
     card.style.display = '';
+    await renderOmarchyCard(s);
+}
 
+// Split out from init so the Re-check button can redraw from fresh data. Re-reading is the
+// whole point: an install happens in a terminal the app does not own, so the app cannot know
+// it finished — and telling someone to restart when a button could just look again is a poor
+// trade. Everything here is derived from status, so a redraw is the only state update needed.
+async function renderOmarchyCard(s) {
     const listEl   = document.getElementById('omarchy-tools-list');
     const btnAll   = document.getElementById('btn-omarchy-install');
     const statusEl = document.getElementById('omarchy-status');
     const steamBlk = document.getElementById('omarchy-steam-block');
+    const recheck  = document.getElementById('btn-omarchy-recheck');
+    if (!listEl) return;
 
-    // Steam gets its own block above the list: the library is built from it, and Omarchy's
-    // installer is better than ours because it brings the right graphics drivers with it.
+    const runAndPrompt = async (fn, label) => {
+        const r = await fn();
+        statusEl.style.color = r?.ok ? 'var(--text_sec)' : '#ef5350';
+        statusEl.textContent = r?.ok
+            ? `${label} is running in a terminal — finish it there, then press Re-check.`
+            : (r?.error || 'Could not open a terminal.');
+        return r;
+    };
+
+    // Steam gets its own block: the library is built from it, and Omarchy's installer brings
+    // the right graphics drivers with it, which ours would not.
     const steam = (s.installers || []).find(i => i.key === 'steam');
     if (steam && !steam.present) {
         steamBlk.style.display = '';
-        document.getElementById('btn-omarchy-steam').onclick = async () => {
-            const r = await window.api.omarchyRunInstaller('steam');
-            statusEl.style.color = r?.ok ? '#66bb6a' : '#ef5350';
-            statusEl.textContent = r?.ok
-                ? 'Omarchy\'s installer is running in a terminal — finish it there, then reopen this panel.'
-                : (r?.error || 'Could not open a terminal.');
-        };
+        document.getElementById('btn-omarchy-steam').onclick = () =>
+            runAndPrompt(() => window.api.omarchyRunInstaller('steam'), 'Omarchy\'s Steam installer');
+    } else if (steamBlk) {
+        steamBlk.style.display = 'none';
     }
 
-    // The gap, in the order that matters: what breaks first, then what is merely nice.
+    // Required first, then what is merely missing, then what is already there.
     const rank = { true: 0, false: 1 };
     const rows = [
         ...(s.tools || []).map(t => ({ ...t, kind: 'tool' })),
@@ -11715,40 +11730,65 @@ async function initOmarchyCard() {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex; align-items:flex-start; gap:7px; font-size:11px; line-height:1.45;';
         const tier = r.required ? 'needed' : (r.extra ? 'extra' : 'optional');
-        row.innerHTML = `
-            <span style="color:${r.present ? '#66bb6a' : (r.required ? '#ef5350' : 'var(--text_dim)')}; font-weight:900; flex-shrink:0;">${r.present ? '✓' : '✗'}</span>
-            <span style="flex:1; min-width:0;">
-                <b style="color:var(--text_main);">${r.label}</b>
-                <span style="color:var(--text_dim);"> · ${r.present ? 'installed' : tier}</span>
-                ${r.present ? '' : `<div style="color:var(--text_dim); margin-top:1px;">${r.why || ''}</div>`}
-            </span>`;
+        const info = document.createElement('span');
+        info.style.cssText = 'flex:1; min-width:0;';
+        info.innerHTML = `
+            <b style="color:var(--text_main);">${r.label}</b>
+            <span style="color:var(--text_dim);"> · ${r.present ? 'installed' : tier}</span>
+            ${r.present ? '' : `<div style="color:var(--text_dim); margin-top:1px;">${r.why || ''}</div>`}`;
+
+        const mark = document.createElement('span');
+        mark.style.cssText = `color:${r.present ? '#66bb6a' : (r.required ? '#ef5350' : 'var(--text_dim)')}; font-weight:900; flex-shrink:0;`;
+        mark.textContent = r.present ? '✓' : '✗';
+
+        row.appendChild(mark);
+        row.appendChild(info);
+
+        // One button per missing item, so the optionals and extras are installable
+        // individually rather than only as part of "everything the app needs".
+        if (!r.present) {
+            const b = document.createElement('button');
+            b.textContent = 'Install';
+            b.style.cssText = 'flex-shrink:0; font-size:10px; padding:3px 9px; letter-spacing:.5px;';
+            b.onclick = () => runAndPrompt(
+                () => r.kind === 'installer' ? window.api.omarchyRunInstaller(r.key)
+                                             : window.api.omarchyInstallTools([r.key]),
+                r.label);
+            row.appendChild(b);
+        }
         listEl.appendChild(row);
     }
 
-    // One button for everything the app itself needs. Extras are listed but not bundled in —
-    // installing things the suite never calls, without being asked, is not ours to decide.
+    // The bulk button covers only what the app itself needs. Extras are listed and
+    // individually installable, but installing things the suite never calls without being
+    // asked is not ours to decide.
     const wanted = (s.tools || []).filter(t => !t.present && !t.extra).map(t => t.key);
     if (wanted.length) {
         btnAll.style.display = '';
         btnAll.textContent = `Install What's Missing (${wanted.length})`;
-        btnAll.onclick = async () => {
-            const r = await window.api.omarchyInstallTools(wanted);
-            statusEl.style.color = r?.ok ? '#66bb6a' : '#ef5350';
-            statusEl.textContent = r?.ok
-                ? 'Running in a terminal — type your password there, then reopen this panel.'
-                : (r?.error || 'Could not open a terminal.');
-        };
-    } else if (!steam || steam.present) {
-        statusEl.style.color = '#66bb6a';
-        statusEl.textContent = 'Everything this app needs is installed.';
+        btnAll.onclick = () => runAndPrompt(() => window.api.omarchyInstallTools(wanted), 'The install');
+    } else {
+        btnAll.style.display = 'none';
+        if (!steam || steam.present) {
+            statusEl.style.color = '#66bb6a';
+            statusEl.textContent = 'Everything this app needs is installed.';
+        }
     }
 
-    // ⚠️ The one-click adopt is not a convenience, it is the only route for anyone who has
-    // run the app before. applyTheme() persists cngm_theme on *every* call, including when
-    // it falls back to the built-in default — so "the user has never chosen a theme" stops
-    // being true after the very first launch in the app's history, and the fresh-install
-    // default below can never fire for an existing user. Rather than override a deliberate
-    // choice on their behalf, adopting it is one button.
+    if (recheck) {
+        recheck.onclick = async () => {
+            recheck.disabled = true;
+            const prev = recheck.textContent;
+            recheck.textContent = 'Checking…';
+            statusEl.textContent = '';
+            let fresh = null;
+            try { fresh = await window.api.omarchyStatus(); } catch {}
+            recheck.disabled = false;
+            recheck.textContent = prev;
+            if (fresh?.detected) await renderOmarchyCard(fresh);
+        };
+    }
+
     const themeBtn = document.getElementById('btn-omarchy-theme');
     const label = document.getElementById('omarchy-theme-name');
     if (label) label.textContent = _omarchyThemeName || 'none found';
@@ -11770,6 +11810,7 @@ async function initOmarchyCard() {
         };
     }
 }
+
 // ⚠️ The call that kicks this off lives *below* the theme block, not here: it needs
 // _omarchyThemeReady, and a const is in its temporal dead zone until execution reaches the
 // declaration. Calling it here threw a ReferenceError before the window ever painted.

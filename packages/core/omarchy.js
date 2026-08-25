@@ -128,9 +128,15 @@ const TOOLS = [
     { key: 'umu',      bin: 'umu-run',                 pkg: 'umu-launcher',       repo: 'multilib', required: true,
       label: 'umu-launcher',
       why: 'the recommended way to launch Windows games. Without it the suite falls back to invoking Proton directly, which works but loses umu\'s per-game compatibility fixes.' },
-    { key: 'dosbox',   bin: 'dosbox-staging',           pkg: 'dosbox-staging',     repo: 'aur',      required: true,
-      label: 'DOSBox Staging', alt: ['dosbox', 'dosbox-x'],
-      why: 'DOS games from GOG launch through it. Without any DOSBox, those titles cannot start at all. Staging is the AUR build and the one worth having — but plain `dosbox` from the official repos also satisfies this, and an existing install of either counts.' },
+    // ⚠️ Plain `dosbox` from the official repos, NOT dosbox-staging from the AUR. The suite
+    // accepts any of the three, the Nobara reference host runs plain `dosbox`, and this list
+    // exists to reach parity with that host. Staging is arguably the better emulator, but it
+    // is an AUR source build — minutes of compiling on old hardware, and a dependency on an
+    // AUR helper — for a tier labelled "required". Anyone who wants Staging can install it
+    // themselves and the alternates below pick it up.
+    { key: 'dosbox',   bin: 'dosbox',                   pkg: 'dosbox',             repo: 'extra',    required: true,
+      label: 'DOSBox', alt: ['dosbox-staging', 'dosbox-x'],
+      why: 'DOS games from GOG launch through it. Without any DOSBox, those titles cannot start at all. An existing dosbox-staging or dosbox-x counts just the same.' },
     { key: 'wmctrl',   bin: 'wmctrl',                   pkg: 'wmctrl',             repo: 'extra',    required: false,
       label: 'wmctrl',
       why: 'used to raise the window after a game exits. It is an X11 tool, so on a pure Wayland session it does nothing even when installed — safe to skip on Hyprland.' },
@@ -288,7 +294,11 @@ function installCommand(keys) {
     const parts = [];
     if (repo.length) parts.push(`omarchy pkg add ${repo.join(' ')}`);
     if (aur.length)  parts.push(`omarchy pkg aur add ${aur.join(' ')}`);
-    return parts.join(' && ');
+    // ⚠️ `;` and not `&&`. Chained with &&, a non-zero exit from the repo step — which
+    // includes cases as harmless as "nothing to do" — silently skips the AUR step, and the
+    // user is left being told a package is still missing after watching an install succeed.
+    // These are independent installs; one failing is not a reason to skip the other.
+    return parts.join('; ');
 }
 
 // The terminal to hand a privileged command to. xdg-terminal-exec is the freedesktop

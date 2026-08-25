@@ -29,6 +29,58 @@ function init(ctx = {}) {
     configDir   = ctx.configDir || configDir;
     if (typeof ctx.getDb === 'function')       getDb = ctx.getDb;
     if (typeof ctx.expandTilde === 'function') expandTilde = ctx.expandTilde;
+    ensureCaBundle();
+}
+
+// ── TLS trust for the bundled Python helpers ─────────────────────────────────
+// ⚠️ This is why every GOG install failed on Arch, and it pointed at nothing.
+//
+// gogdl is a frozen PyInstaller binary, and the `requests` inside it resolves its CA bundle
+// from a path baked in at BUILD time. Ours are built on Fedora, so that path is
+// /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem — which does not exist on Arch, Debian,
+// openSUSE or Alpine. On any of those, the very first HTTPS call dies before it is made:
+//
+//     OSError: Could not find a suitable TLS CA certificate bundle, invalid path:
+//              /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+//
+// The user sees "the install failed" on every GOG title, with nothing naming TLS, and the
+// obvious suspects — auth, the token, the network, the store — are all fine. Diagnosed on
+// Omarchy 4 on 2026-08-25 against a real title; setting the variable below fixed it outright.
+//
+// Fedora is listed first because on the host the binaries were built for, the baked-in path
+// is correct and there is nothing to override. Anything already exported by the user wins,
+// so someone with a custom trust store is left alone.
+//
+// ⚠️ It must run before ANY helper is spawned, which is why it lives in init() — the engine
+// calls that during startup, and every child inherits process.env from there.
+const CA_BUNDLES = [
+    '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem',   // Fedora / RHEL / Nobara — the build host
+    '/etc/ca-certificates/extracted/tls-ca-bundle.pem',    // Arch / Omarchy
+    '/etc/ssl/certs/ca-certificates.crt',                  // Debian / Ubuntu (Arch symlinks here too)
+    '/etc/ssl/ca-bundle.pem',                              // openSUSE
+    '/etc/pki/tls/certs/ca-bundle.crt',                    // older RHEL layouts
+    '/etc/ssl/cert.pem',                                   // Alpine, and a common fallback
+];
+
+function ensureCaBundle() {
+    // A value the user set themselves is not ours to second-guess — but an empty or dangling
+    // one is worse than none, so it only counts if it actually resolves to a file.
+    for (const v of ['REQUESTS_CA_BUNDLE', 'SSL_CERT_FILE']) {
+        const cur = process.env[v];
+        if (cur) { try { if (fs.statSync(cur).isFile()) return cur; } catch {} }
+    }
+    for (const p of CA_BUNDLES) {
+        let ok = false;
+        try { ok = fs.statSync(p).isFile(); } catch {}      // statSync follows symlinks, which is
+        if (!ok) continue;                                  // what Arch's /etc/ssl/certs entry is
+        // The first entry is the path the binaries already expect; if it is present there is
+        // nothing to fix and no reason to start overriding a working default.
+        if (p === CA_BUNDLES[0]) return p;
+        process.env.REQUESTS_CA_BUNDLE = p;
+        process.env.SSL_CERT_FILE = p;                       // curl/openssl-based helpers read this
+        return p;
+    }
+    return '';   // nothing found: leave the environment alone and let the helper report it
 }
 
 // ── Paths ────────────────────────────────────────────────────────────────────
