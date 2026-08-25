@@ -1902,9 +1902,16 @@ function isMacNative(game) { return game && (game.MacNative == 1); }
 if (window.api.platform === 'darwin') {
     document.getElementById('mac-native-tool-card')?.style.setProperty('display', '');
 } else {
-    // Not meaningful data on any other host — remove the option rather than hide it, so it's
-    // gone from enhanceSelect()'s popup too (it reads sel.options directly, not CSS visibility).
+    // Not meaningful data on any other host, so REMOVE both surfaces rather than hide them.
+    // Hiding is not enough in either case, for the same underlying reason: several code paths
+    // walk the DOM instead of reading CSS. enhanceSelect()'s popup reads sel.options directly,
+    // and the Control Panel resets `display` on EVERY .tools-section in three places
+    // (openToolsModal, closeTools, and the search filter) — which silently un-did the inline
+    // display:none this card ships with the moment the panel was opened. That shipped in 1.8.0:
+    // Linux users saw a "Mac-Native Games" card offering a scan the backend refuses anyway
+    // (scan-mac-native is gated on host.id === 'darwin').
     document.getElementById('gallery-category-mac-native')?.remove();
+    document.getElementById('mac-native-tool-card')?.remove();
 }
 document.getElementById('btn-scan-mac-native')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-scan-mac-native');
