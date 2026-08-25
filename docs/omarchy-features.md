@@ -183,6 +183,27 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
 
 ---
 
+## Known limits on older hardware
+
+Omarchy runs happily on old machines, and that is part of its appeal — but **Windows games have a
+hard floor that Omarchy has nothing to do with**: Proton renders Direct3D through **DXVK, which is
+Vulkan-only**. On a GPU with no Vulkan support the game starts and closes immediately, and the log
+ends without an error.
+
+Found on a 2011 MacBook Pro (Intel HD 3000 + Radeon HD 6750M — neither supported by Mesa's Vulkan
+drivers). The workaround that works there is **`PROTON_USE_WINED3D=1`**, which renders through
+OpenGL instead; set it under the game's own environment variables. It launched a title that had
+been failing instantly.
+
+Cafe Neurotico now recognises this signature and says so, rather than reporting "the game closed
+immediately" and leaving you to guess.
+
+> ⚠️ Proton Experimental also throws a `Xalia … No displays available` stack trace on such a
+> machine. It is a **red herring** — disabling Xalia removes the trace and the game still dies.
+> The app names Vulkan first for exactly that reason.
+
+---
+
 ## Not done yet
 
 - **A Hyprland equivalent of the per-game screen picker.** `hyprctl keyword windowrulev2 monitor`

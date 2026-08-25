@@ -116,6 +116,10 @@ function monitors() {
 // is a gaming distribution and ships this whole list preinstalled, which is exactly why the
 // gap only becomes visible on a machine like this one.
 //
+// ⚠️ Never name the reference distribution in a `label` or `why` — those strings are rendered
+// in the app, and a user on Omarchy has no reason to be told about another distro. Describe
+// what the tool does instead. (The comments here are developer-facing and may name it.)
+//
 // Every entry names the binary the suite actually probes for, so this list stays honest:
 // `required: true` means something in Cafe Neurotico degrades without it, and the `why`
 // says what. The `extra` group is what Nobara ships and a gamer will want, but which the
@@ -152,10 +156,10 @@ const TOOLS = [
 
     { key: 'gamemode', bin: 'gamemoderun',              pkg: 'gamemode',           repo: 'extra',    required: false, extra: true,
       label: 'GameMode',
-      why: 'applies CPU governor and scheduling tweaks while a game runs. Nobara ships it; the suite does not call it itself.' },
+      why: 'applies CPU governor and scheduling tweaks while a game runs. Gaming-focused distributions ship it as standard; the suite does not call it itself.' },
     { key: 'mangohud', bin: 'mangohud',                 pkg: 'mangohud',           repo: 'extra',    required: false, extra: true,
       label: 'MangoHud',
-      why: 'an in-game performance overlay. Nobara ships it; the suite does not call it itself.' },
+      why: 'an in-game performance overlay showing framerate, temperatures and frame times. The suite does not call it itself.' },
     { key: 'gamescope',bin: 'gamescope',                pkg: 'gamescope',          repo: 'extra',    required: false, extra: true,
       label: 'gamescope',
       why: 'a micro-compositor useful for scaling and framerate limiting, and for games that behave badly on a tiling WM.' },

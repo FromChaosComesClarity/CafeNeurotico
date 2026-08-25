@@ -985,8 +985,35 @@ async function _pumpDownloadQueue() {
     }
     _dlActive = null;
     renderDownloadManager();
-    loadGames();               // refresh the library (Play button etc.) in the background
+    refreshAfterInstall(item.gameId);   // flip INSTALL → PLAY now, not on the next window focus
     _pumpDownloadQueue();      // advance to the next queued download immediately — never blocked on the refresh
+}
+
+// ── After an install finishes ────────────────────────────────────────────────
+// `loadGames()` alone was not enough, and the symptom was that the gamepage kept showing
+// INSTALL until the window was unfocused and focused again — which "fixed" it only because
+// the focus handler does three things this path was missing.
+//
+// The gamepage's button reads `!!game.LaunchCommand`, and for a GRINDER title that command
+// does not exist until GRINDER's own installed state is pulled into the shared DB. So the
+// row can be marked Installed=1 while LaunchCommand is still empty, and the button correctly
+// but uselessly keeps saying INSTALL. Hence the same sequence the focus handler runs:
+// verify, sync, reload, then re-render the open page.
+//
+// Deliberately not awaited by the caller: the download queue must advance immediately rather
+// than wait on a refresh, which is why the previous code left it fire-and-forget too.
+async function refreshAfterInstall(gameId) {
+    try { if (gameId) await window.api.verifyInstallStatus(gameId); } catch {}
+    try { await syncGrinderInstalled(); } catch {}   // where a GRINDER title's LaunchCommand comes from
+    await loadGames();
+
+    // The split pane re-renders itself through loadGames() → applyFilters → renderSplitList,
+    // and FLATGAMEPAGE has no play button, so the classic gamepage is the one left to update.
+    const onGamepage = document.getElementById('view-gamepage')?.classList.contains('active');
+    if (onGamepage && currentGameId && String(currentGameId) === String(gameId)) {
+        const updated = allGames.find(g => String(g.id) === String(currentGameId));
+        if (updated) refreshGamepagePlayBtn(updated);
+    }
 }
 
 function cancelQueuedDownload(gameId) {

@@ -619,6 +619,31 @@ function diagnose(log, protonPath) {
         return { code: 'MISSING_RUNTIME', message: 'The compatibility runtime is missing.' };
     if (/wine: cannot find|is not a valid Win32|Bad EXE format/i.test(t))
         return { code: 'BAD_EXE', message: 'The game executable could not be run by Proton/Wine.' };
+
+    // ⚠️ No Vulkan on this GPU. Proton translates Direct3D through DXVK, which is Vulkan-only,
+    // so on hardware that predates Vulkan the game dies instantly with nothing useful in the
+    // log — Proton gets as far as "fsync: up and running" and stops. Diagnosed on a 2011 Mac
+    // (Intel HD 3000 / Radeon HD 6750M): neither GPU is supported by Mesa's Vulkan drivers,
+    // and the identical launch succeeded with PROTON_USE_WINED3D=1, which uses OpenGL instead.
+    //
+    // Matched on Proton having started and then produced no graphics output at all, which is
+    // what makes this case recognisable: a real crash leaves an error, this leaves silence.
+    if (/fsync: up and running|Proton: Error/i.test(t) && !/vulkan|dxvk|d3d11|opengl|wined3d/i.test(t))
+        return { code: 'NO_VULKAN', message:
+            'The game started and closed immediately with no graphics output. The usual cause is a ' +
+            'GPU with no Vulkan support — Proton renders Direct3D through DXVK, which requires it. ' +
+            'Setting PROTON_USE_WINED3D=1 for this game switches to OpenGL and often works on older ' +
+            'hardware. Add it under the game\'s own environment variables.' };
+
+    // Proton Experimental ships Xalia, an accessibility helper that aborts the launch when SDL
+    // cannot open a display. It is a symptom rather than a cause — but naming it saves the next
+    // person searching a stack trace that has nothing to do with their game.
+    if (/Xalia/i.test(t) && /No displays available/i.test(t))
+        return { code: 'XALIA_NO_DISPLAY', message:
+            'Proton\'s accessibility helper (Xalia) could not open a display and stopped the launch. ' +
+            'PROTON_USE_XALIA=0 disables it. If the game still fails afterwards, the real cause is ' +
+            'elsewhere — most often a GPU without Vulkan support.' };
+
     return { code: 'UNKNOWN', message: 'The game closed immediately after starting.' };
 }
 

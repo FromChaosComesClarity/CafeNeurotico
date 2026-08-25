@@ -2200,6 +2200,77 @@ function reconcileSteamInstalls() {
     return changed;
 }
 
+// ── Rows whose install lives at a path that no longer exists ─────────────────
+// Custom installs — source ports, fan games, mods, anything launched by running a file
+// directly — never went through the checks above: resolveInstallState() returns null unless
+// the row has a steam:// launcher, so their Installed flag was only ever whatever it was set
+// to when the game was installed.
+//
+// ⚠️ That is fine on the machine that did the installing, and wrong everywhere else. Restore
+// a library backup onto a second machine and every source port and fan game still claims to
+// be installed, offering PLAY for files that are not there. Reported on exactly that path:
+// a library carried from one machine to another.
+//
+// Conservative about WHICH rows it judges, and bidirectional about the answer:
+//   • Only absolute paths are judged. A bare command name is resolved through PATH, a URI is
+//     someone else's business, and `flatpak run …` is not a path at all.
+//   • EVERY launcher on the row must be an absolute path, or the row is skipped entirely.
+//     That scoping matters: such rows are owned by no other reconciler, so this cannot fight
+//     with the Steam or GRINDER ones.
+//
+// ⚠️ Bidirectional on purpose. One-directional was the obvious first instinct and it is a
+// trap: a game on an external drive is genuinely installed, just not mounted, and clearing
+// its flag while the drive is unplugged would strand it — nothing else ever sets Installed
+// back to 1 for a path-launched row, so the game would be stuck offering INSTALL forever.
+// Reading it both ways means "installed" tracks "playable right now" and plugging the drive
+// back in restores the Play button on the next start.
+function launcherLocalPath(cmd) {
+    let c = String(cmd || '').trim();
+    if (!c) return '';
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(c)) return '';        // steam://, grinder://, http://…
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(c)) {                // strip leading VAR=value
+        const sp = c.indexOf(' ');
+        if (sp < 0) return '';
+        c = c.slice(sp + 1).trim();
+    }
+    let exe;
+    if (c[0] === '"' || c[0] === "'") {
+        const q = c[0], end = c.indexOf(q, 1);
+        if (end < 0) return '';
+        exe = c.slice(1, end);
+    } else {
+        exe = c.split(/\s+/)[0];
+    }
+    if (exe.startsWith('~/')) exe = path.join(os.homedir(), exe.slice(2));
+    return exe.startsWith('/') ? exe : '';                      // absolute paths only
+}
+
+function reconcileLocalPathInstalls() {
+    if (!db) return 0;
+    let changed = 0;
+    let rows;
+    try {
+        rows = db.prepare(
+            "SELECT id, Store, SteamAppID, GrinderGameId, LaunchCommand, LaunchCommands, Installed FROM games"
+        ).all();
+    } catch { return 0; }
+
+    for (const g of rows) {
+        const cmds = launchCmdsOf(g).filter(Boolean);
+        if (!cmds.length) continue;
+        const paths = cmds.map(launcherLocalPath);
+        if (paths.some(p => !p)) continue;                      // something we cannot judge
+        let present = false;
+        for (const p of paths) {
+            try { if (fs.existsSync(p)) { present = true; break; } } catch {}
+        }
+        const want = present ? 1 : 0;
+        if (g.Installed === want) continue;
+        try { db.prepare("UPDATE games SET Installed=? WHERE id=?").run(want, g.id); changed++; } catch {}
+    }
+    return changed;
+}
+
 let steamInstallWatchers = [];
 function startSteamInstallWatcher(win) {
     steamInstallWatchers.forEach(w => { try { w.close(); } catch(e) {} });
@@ -2207,6 +2278,15 @@ function startSteamInstallWatcher(win) {
     // Reconcile once at boot so a game installed on Steam but fronted by GOG/Epic (Play
     // hidden, Installed stuck at 0) corrects itself without waiting for a manifest change.
     try { if (reconcileSteamInstalls() && win) win.webContents.send('install-status-updated'); } catch(e) {}
+    // Same idea for path-launched rows, and the reason it runs at boot rather than on demand:
+    // a restored library is wrong from the very first paint, before the user touches anything.
+    try {
+        const n = reconcileLocalPathInstalls();
+        if (n) {
+            console.log(`[install] ${n} path-launched row(s) reconciled against what is actually on this machine`);
+            if (win) win.webContents.send('install-status-updated');
+        }
+    } catch(e) {}
     let debounce = null;
     const onChange = (ev, filename) => {
         if (!filename || !filename.startsWith('appmanifest_')) return;
