@@ -213,6 +213,11 @@ const desktop = {
     // The per-game display picker is a KWin script; nothing equivalent exists elsewhere.
     // isSupported() already gates it, so a null here is handled by the existing UI path.
     displayPicker: require('../kwin-display.js'),
+    // Omarchy: still host.id === 'linux', so this is a desktop-level integration sitting
+    // beside the KWin one rather than a platform backend. Both modules gate themselves —
+    // on Nobara, isOmarchy() is false and every surface they feed simply does not appear.
+    omarchy: require('../omarchy.js'),
+    omarchyTheme: require('../omarchy-theme.js'),
 };
 
 // ── Steam ────────────────────────────────────────────────────────────────────

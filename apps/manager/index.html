@@ -6170,6 +6170,27 @@ LOADING...READY.</div>
           <div id="display-status" style="font-size: 11px; text-align:center; font-weight:bold; min-height: 14px; margin-top:4px;"></div>
         </div>
 
+        <div class="tool-card tools-section" id="omarchy-card" data-search="omarchy arch hyprland gaming tools missing umu launcher steam drivers lib32 vulkan install theme wayland" style="display:none;">
+          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 21h18L12 2z"/><path d="M12 9v6"/><path d="M9.5 15h5"/></svg><span>Omarchy</span></div>
+          <div id="omarchy-intro" style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 8px;">Omarchy ships as a developer desktop, so a fresh install has almost none of the gaming stack. Here is what is missing, measured against the reference setup this app is developed on.</div>
+
+          <div id="omarchy-steam-block" style="display:none; margin-bottom:10px; padding:9px 10px; border:1px solid var(--accent); border-radius:6px; background:var(--bg_panel);">
+            <div style="font-size:11px; color:var(--text_main); line-height:1.5; margin-bottom:7px;"><b>Steam is not installed.</b> Most of a library lives there, and Omarchy's own installer also sets up the 32-bit graphics drivers picked for this machine &mdash; which Proton needs.</div>
+            <button id="btn-omarchy-steam" class="primary" style="width:100%; font-size:12px; padding:9px; letter-spacing:1px;">Install Steam with Omarchy</button>
+          </div>
+
+          <div id="omarchy-tools-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;"></div>
+
+          <button id="btn-omarchy-install" style="width:100%; font-size:12px; padding:9px; letter-spacing:1px; display:none;">Install What's Missing</button>
+          <div id="omarchy-status" style="font-size:11px; text-align:center; font-weight:bold; min-height:14px; margin-top:6px;"></div>
+
+          <div style="margin-top:10px; padding-top:9px; border-top:1px solid var(--border);">
+            <div style="font-size:11px; color:var(--text_dim); line-height:1.5;">Cafe Neurotico can wear your actual Omarchy palette &mdash; not a lookalike, the same colours your desktop is using. Change it with <code style="color:var(--accent);">omarchy theme set</code> and this follows along. It is in the theme picker under <b>Your Desktop</b> too.</div>
+            <div style="font-size:11px; color:var(--text_sec); margin:6px 0 7px;">Your Omarchy theme: <b id="omarchy-theme-name" style="color:var(--accent);">&mdash;</b></div>
+            <button id="btn-omarchy-theme" style="width:100%; font-size:12px; padding:9px; letter-spacing:1px;">Match My Omarchy Theme</button>
+          </div>
+        </div>
+
         <div class="tool-card tools-section" data-search="source port fan game custom engine install ironwail vkquake quake openbor gzdoom mod archive zip">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><span>Fan Games &amp; Source Ports</span></div>
           <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 6px;">Install source ports, custom engines and fan games from the file you downloaded. Cafe Neurotico knows where each one comes from and what it needs &mdash; and wires up the game data from a title you already own, so a port never arrives unplayable.</div>

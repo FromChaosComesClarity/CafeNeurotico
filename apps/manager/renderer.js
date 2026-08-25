@@ -130,7 +130,19 @@ async function initDisplayPicker() {
 
     let opts = null;
     try { opts = await window.api.displayOptions(); } catch (e) {}
-    if (!opts || !opts.supported || opts.displays.length < 2) return;   // one screen: no choice to make
+
+    // ⚠️ Unsupported means REMOVE, not hide — the same trap the Mac-Native card fell into.
+    // This card ships with an inline display:none and carries .tools-section, and the
+    // Control Panel resets `display` on every .tools-section in three places, so hiding it
+    // lasts exactly until the panel is opened. On Hyprland (Omarchy) the picker is
+    // legitimately unsupported — it is a KWin script, and KWin is not running — so a KDE-only
+    // card offering "let KDE decide" would otherwise appear on a desktop with no KDE in it.
+    //
+    // Having only one screen is different: the feature works, there is just nothing to
+    // choose, and plugging a second monitor in makes it meaningful again. Hiding is right
+    // there, but it has to survive the same reset, so it is removed too and comes back on
+    // the next start — which is when a newly plugged monitor would be noticed anyway.
+    if (!opts || !opts.supported || opts.displays.length < 2) { card.remove(); return; }
 
     card.style.display = '';
     sel.innerHTML = '<option value="">Default &mdash; let KDE decide</option>';
@@ -11657,8 +11669,162 @@ window.api.getSetting('ui_font').then(f => {   // re-resolve --ui-font regardles
     _uiFont = f || ''; applyUiFont();
     const sel = document.getElementById('ui-font-select'); if (sel) sel.value = _uiFont || 'Poppins';
 });
-window.api.getSetting('cngm_theme').then(saved => {
-    applyTheme(saved && THEMES[saved] ? saved : activeTheme);
+// ── The Omarchy card ─────────────────────────────────────────────────────────
+// Everything Omarchy-specific in one Control Panel card. On any other host the card is
+// REMOVED, not hidden — the Control Panel resets `display` on every .tools-section in three
+// places, so an inline display:none lasts exactly until the panel is opened. That is the
+// Mac-Native bug from 1.8.0, and the display picker above had it too.
+async function initOmarchyCard() {
+    const card = document.getElementById('omarchy-card');
+    if (!card) return;
+
+    let s = null;
+    try { s = await window.api.omarchyStatus(); } catch {}
+    if (!s || !s.detected) { card.remove(); return; }
+
+    card.style.display = '';
+
+    const listEl   = document.getElementById('omarchy-tools-list');
+    const btnAll   = document.getElementById('btn-omarchy-install');
+    const statusEl = document.getElementById('omarchy-status');
+    const steamBlk = document.getElementById('omarchy-steam-block');
+
+    // Steam gets its own block above the list: the library is built from it, and Omarchy's
+    // installer is better than ours because it brings the right graphics drivers with it.
+    const steam = (s.installers || []).find(i => i.key === 'steam');
+    if (steam && !steam.present) {
+        steamBlk.style.display = '';
+        document.getElementById('btn-omarchy-steam').onclick = async () => {
+            const r = await window.api.omarchyRunInstaller('steam');
+            statusEl.style.color = r?.ok ? '#66bb6a' : '#ef5350';
+            statusEl.textContent = r?.ok
+                ? 'Omarchy\'s installer is running in a terminal — finish it there, then reopen this panel.'
+                : (r?.error || 'Could not open a terminal.');
+        };
+    }
+
+    // The gap, in the order that matters: what breaks first, then what is merely nice.
+    const rank = { true: 0, false: 1 };
+    const rows = [
+        ...(s.tools || []).map(t => ({ ...t, kind: 'tool' })),
+        ...(s.installers || []).filter(i => i.key !== 'steam').map(i => ({ ...i, kind: 'installer', required: false })),
+    ].sort((a, b) => (rank[!!a.required] - rank[!!b.required]) || (a.present - b.present));
+
+    listEl.innerHTML = '';
+    for (const r of rows) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:flex-start; gap:7px; font-size:11px; line-height:1.45;';
+        const tier = r.required ? 'needed' : (r.extra ? 'extra' : 'optional');
+        row.innerHTML = `
+            <span style="color:${r.present ? '#66bb6a' : (r.required ? '#ef5350' : 'var(--text_dim)')}; font-weight:900; flex-shrink:0;">${r.present ? '✓' : '✗'}</span>
+            <span style="flex:1; min-width:0;">
+                <b style="color:var(--text_main);">${r.label}</b>
+                <span style="color:var(--text_dim);"> · ${r.present ? 'installed' : tier}</span>
+                ${r.present ? '' : `<div style="color:var(--text_dim); margin-top:1px;">${r.why || ''}</div>`}
+            </span>`;
+        listEl.appendChild(row);
+    }
+
+    // One button for everything the app itself needs. Extras are listed but not bundled in —
+    // installing things the suite never calls, without being asked, is not ours to decide.
+    const wanted = (s.tools || []).filter(t => !t.present && !t.extra).map(t => t.key);
+    if (wanted.length) {
+        btnAll.style.display = '';
+        btnAll.textContent = `Install What's Missing (${wanted.length})`;
+        btnAll.onclick = async () => {
+            const r = await window.api.omarchyInstallTools(wanted);
+            statusEl.style.color = r?.ok ? '#66bb6a' : '#ef5350';
+            statusEl.textContent = r?.ok
+                ? 'Running in a terminal — type your password there, then reopen this panel.'
+                : (r?.error || 'Could not open a terminal.');
+        };
+    } else if (!steam || steam.present) {
+        statusEl.style.color = '#66bb6a';
+        statusEl.textContent = 'Everything this app needs is installed.';
+    }
+
+    // ⚠️ The one-click adopt is not a convenience, it is the only route for anyone who has
+    // run the app before. applyTheme() persists cngm_theme on *every* call, including when
+    // it falls back to the built-in default — so "the user has never chosen a theme" stops
+    // being true after the very first launch in the app's history, and the fresh-install
+    // default below can never fire for an existing user. Rather than override a deliberate
+    // choice on their behalf, adopting it is one button.
+    const themeBtn = document.getElementById('btn-omarchy-theme');
+    const label = document.getElementById('omarchy-theme-name');
+    if (label) label.textContent = _omarchyThemeName || 'none found';
+
+    if (themeBtn) {
+        const themeAvailable = !!THEMES[OMARCHY_THEME_KEY];
+        themeBtn.disabled = !themeAvailable;
+        const sync = () => {
+            const on = activeTheme === OMARCHY_THEME_KEY;
+            themeBtn.textContent = !themeAvailable ? 'No palette to read from this theme'
+                : on ? '✓ Matching your Omarchy theme' : 'Match My Omarchy Theme';
+            themeBtn.classList.toggle('primary', on);
+        };
+        sync();
+        themeBtn.onclick = () => {
+            if (!THEMES[OMARCHY_THEME_KEY]) return;
+            applyTheme(OMARCHY_THEME_KEY);
+            sync();
+        };
+    }
+}
+// ⚠️ The call that kicks this off lives *below* the theme block, not here: it needs
+// _omarchyThemeReady, and a const is in its temporal dead zone until execution reaches the
+// declaration. Calling it here threw a ReferenceError before the window ever painted.
+
+// ── The Omarchy theme ────────────────────────────────────────────────────────
+// Not a copy of an Omarchy theme and not the nearest of ours: the user's actual palette,
+// read from their current theme's colors.toml and mapped into our own shape. It appears as
+// one entry named after whichever theme they are on, and it follows `omarchy theme set`.
+//
+// ⚠️ It has to be registered *before* the saved theme is read, or someone whose saved theme
+// is OMARCHY silently falls back to the default on every start — THEMES[saved] would not
+// exist yet. Hence the promise this chains from rather than a parallel fetch.
+const OMARCHY_THEME_KEY = 'OMARCHY';
+let _omarchyThemeName = '';
+
+function _registerOmarchyTheme(d) {
+    if (!d || !d.available || !d.theme) return false;
+    THEMES[OMARCHY_THEME_KEY] = d.theme;
+    if (!THEME_CATEGORIES['Your Desktop']) {
+        // Put it first: it is the one theme that is about *this* machine.
+        const rebuilt = { 'Your Desktop': [OMARCHY_THEME_KEY], ...THEME_CATEGORIES };
+        Object.keys(THEME_CATEGORIES).forEach(k => delete THEME_CATEGORIES[k]);
+        Object.assign(THEME_CATEGORIES, rebuilt);
+    }
+    return true;
+}
+
+const _omarchyThemeReady = (window.api.omarchyTheme ? window.api.omarchyTheme() : Promise.resolve(null))
+    .then(d => {
+        const ok = _registerOmarchyTheme(d);
+        if (ok) _omarchyThemeName = d.name || '';
+        return ok;
+    })
+    .catch(() => false);
+
+// Following a live theme switch. Only re-applies if the user is actually on the Omarchy
+// theme — someone who picked CYBERPUNK deliberately does not want their desktop overriding
+// it, so the entry is kept up to date but nothing is forced.
+window.api.onOmarchyThemeChanged?.(d => {
+    if (!_registerOmarchyTheme(d)) return;
+    _omarchyThemeName = d.name || '';
+    if (activeTheme === OMARCHY_THEME_KEY) applyTheme(OMARCHY_THEME_KEY);
+    const label = document.getElementById('omarchy-theme-name');
+    if (label) label.textContent = _omarchyThemeName || '—';
+});
+
+_omarchyThemeReady.then(initOmarchyCard).catch(() => {});
+
+_omarchyThemeReady.then(ok => window.api.getSetting('cngm_theme').then(saved => ({ ok, saved })))
+    .then(({ ok, saved }) => {
+    // On Omarchy, matching the desktop is the better default — but only as a *default*.
+    // A saved theme is a deliberate choice and always wins, so this fires on a fresh
+    // install and never overrides someone who went and picked CYBERPUNK on purpose.
+    const saved2 = (!saved && ok && THEMES[OMARCHY_THEME_KEY]) ? OMARCHY_THEME_KEY : saved;
+    applyTheme(saved2 && THEMES[saved2] ? saved2 : activeTheme);
     window.api.signalReady();
     loadPlaylists();
     loadGenres();

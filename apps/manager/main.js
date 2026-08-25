@@ -810,6 +810,41 @@ ipcMain.handle('set-game-display', (_, index) => {
     catch (e) { return { ok: false, error: e.message }; }
 });
 
+// ── Omarchy ──────────────────────────────────────────────────────────────────
+// A desktop-level integration, not a platform: host.id is still 'linux'. Both modules are
+// null on macOS and self-gating on Linux, so every handler here answers "not detected" on a
+// host that is not Omarchy rather than throwing. ⚠️ Optional chaining is not decoration —
+// desktop.displayPicker being null crashed this file once on macOS for want of exactly that.
+const omarchy = host.desktop?.omarchy || null;
+
+ipcMain.handle('omarchy-status', () => {
+    if (!omarchy?.isOmarchy?.()) return { detected: false, hyprland: !!omarchy?.isHyprland?.() };
+    return {
+        detected: true,
+        version: omarchy.version(),
+        hyprland: omarchy.isHyprland(),
+        gap: omarchy.gapSummary(),
+        tools: omarchy.toolStatus(),
+        // Emulation belongs to EmuLatte; this app never offers RetroArch.
+        installers: omarchy.installerStatus().filter(i => !i.emulation),
+    };
+});
+
+// Both of these open a terminal and return immediately — the install itself is the user's,
+// running under their own sudo, and its outcome shows up on the next status read.
+ipcMain.handle('omarchy-install-tools', (_, keys) => {
+    if (!omarchy) return { ok: false, error: 'Not supported on this system.' };
+    return omarchy.openInstallTerminal(Array.isArray(keys) ? keys.map(String) : []);
+});
+
+ipcMain.handle('omarchy-run-installer', (_, key) => {
+    if (!omarchy) return { ok: false, error: 'Not supported on this system.' };
+    return omarchy.runInstaller(String(key || ''));
+});
+
+// ⚠️ 'omarchy-theme' and its live watch are registered in shared-ipc.js, NOT here — CREMA
+// needs them too, and registering the same channel twice throws at startup.
+
 // Paths other games already occupy. Custom installs share a folder with GOG and Epic
 // installs and the names collide — <root>/Witchaven is where GOG puts Witchaven and where
 // a recipe called Witchaven wants to go — so a target that lands on one must be renamed,

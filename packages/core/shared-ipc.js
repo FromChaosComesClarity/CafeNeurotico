@@ -103,6 +103,29 @@ function registerSharedHandlers(ctx) {
         if (url) await shell.openExternal(url);
     });
 
+    // ── The Omarchy theme ────────────────────────────────────────────────────
+    // Shared rather than Manager-only, and that is a correctness matter, not tidiness:
+    // CREMA mirrors the Manager's theme by name when themeSource is MANAGER, resolving it
+    // against its OWN theme table. A theme the Manager knows about and CREMA does not
+    // resolves to null there and the couch face silently falls back to its default — so a
+    // user matching their desktop on one face would stop matching it on the other.
+    //
+    // ⚠️ Null on macOS, and self-gating on Linux: on a host that is not Omarchy this
+    // answers "unavailable" and every face carries on with its own themes.
+    const omarchyTheme = host.desktop?.omarchyTheme || null;
+    ipcMain.handle('omarchy-theme', () => omarchyTheme?.describe?.() || { available: false, name: '', theme: null, mode: '' });
+
+    if (omarchyTheme?.isSupported?.()) {
+        try {
+            const stop = omarchyTheme.watch(d => {
+                for (const w of BrowserWindow.getAllWindows()) {
+                    try { w.webContents.send('omarchy-theme-changed', d); } catch {}
+                }
+            });
+            try { require('electron').app.on('before-quit', () => { try { stop(); } catch {} }); } catch {}
+        } catch {}
+    }
+
     ipcMain.handle('get-setting', (e, key) => { try { const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key); return row ? row.value : null; } catch(e) { return null; } });
 
     ipcMain.handle('set-setting', (e, key, val) => { try { db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, val); return true; } catch(e) { return false; } });

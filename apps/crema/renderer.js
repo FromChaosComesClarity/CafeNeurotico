@@ -287,12 +287,35 @@ async function resolveAndApplyFont() {
 // All three faces ship the same theme set; the only name difference is The Manager's "CREMA",
 // which is CREMA's "CREMA (DEFAULT)".
 const FOLLOW_MANAGER_LABEL = 'FOLLOW THE MANAGER';
+
+// The Manager can be wearing the user's live Omarchy palette, which is not one of the shipped
+// themes — it is generated from their desktop. Registering it here under the same name is what
+// keeps "follow The Manager" honest on Omarchy: without it, mapManagerThemeToCrema() finds no
+// 'OMARCHY' in this face's table, returns null, and the couch face quietly drops back to its
+// own default while the Manager matches the desktop.
+const OMARCHY_THEME_KEY = 'OMARCHY';
+function registerOmarchyTheme(d) {
+  if (!d || !d.available || !d.theme) return false;
+  THEMES[OMARCHY_THEME_KEY] = d.theme;
+  return true;
+}
+const omarchyThemeReady = (window.api.omarchyTheme ? window.api.omarchyTheme() : Promise.resolve(null))
+  .then(registerOmarchyTheme).catch(() => false);
+
+// Live switches reach both faces; re-resolve so a theme change lands here without a restart.
+window.api.onOmarchyThemeChanged?.(d => {
+  if (registerOmarchyTheme(d) && activeTheme === OMARCHY_THEME_KEY) applyTheme(OMARCHY_THEME_KEY);
+});
+
 function mapManagerThemeToCrema(name) {
   if (!name) return null;
   if (name === 'CREMA') return 'CREMA (DEFAULT)';
   return THEMES[name] ? name : null;
 }
 async function resolveAndApplyTheme() {
+  // ⚠️ Wait for the Omarchy palette to be registered first: this runs on startup, and a
+  // race here means 'OMARCHY' is not in THEMES yet and the mirror falls back on first paint.
+  try { await omarchyThemeReady; } catch (e) {}
   if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') {
     try {
       const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme'));

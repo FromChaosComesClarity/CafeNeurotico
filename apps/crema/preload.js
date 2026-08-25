@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('api', {
                                 getCustomMusic: () => ipcRenderer.invoke('get-custom-music'),
                                 getStandardBgm: (m) => ipcRenderer.invoke('get-standard-bgm', m),
                                 getSetting: (k) => ipcRenderer.invoke('get-setting', k),
+                                omarchyTheme: () => ipcRenderer.invoke('omarchy-theme'),
+                                onOmarchyThemeChanged: (cb) => ipcRenderer.on('omarchy-theme-changed', (_e, d) => cb(d)),
                                 setSetting: (k, v) => ipcRenderer.invoke('set-setting', k, v),
                                 getHomeStats: (opts) => ipcRenderer.invoke('get-home-stats', opts),
                                 getRandomGame: (c) => ipcRenderer.invoke('get-random-game', c),

@@ -183,6 +183,11 @@ const desktop = {
     openUrlScheme, focusWindow,
     // No window-rule engine on this host; the UI already handles a null here.
     displayPicker: null,
+    // Omarchy is a Linux distribution, so these are null here for the same reason. Every
+    // caller must guard — a missing null check on displayPicker was an instant crash on this
+    // host once already, and these have exactly the same shape.
+    omarchy: null,
+    omarchyTheme: null,
 };
 
 // ── Steam ────────────────────────────────────────────────────────────────────

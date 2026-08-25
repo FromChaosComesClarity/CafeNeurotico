@@ -183,6 +183,12 @@ contextBridge.exposeInMainWorld('api', {
                                 customInstall:    (payload) => ipcRenderer.invoke('custom-install', payload),
                                 displayOptions:  () => ipcRenderer.invoke('display-options'),
                                 setGameDisplay:  (i) => ipcRenderer.invoke('set-game-display', i),
+                                omarchyStatus:   () => ipcRenderer.invoke('omarchy-status'),
+                                omarchyInstallTools: (keys) => ipcRenderer.invoke('omarchy-install-tools', keys),
+                                omarchyRunInstaller: (key) => ipcRenderer.invoke('omarchy-run-installer', key),
+                                omarchyTheme:    () => ipcRenderer.invoke('omarchy-theme'),
+                                // Fires when the user runs `omarchy theme set`, so the app can follow.
+                                onOmarchyThemeChanged: (cb) => ipcRenderer.on('omarchy-theme-changed', (_e, d) => cb(d)),
                                 customFolderPick: (title) => ipcRenderer.invoke('custom-folder-pick', title),
                                 customFolderScan: (folder) => ipcRenderer.invoke('custom-folder-scan', folder),
                                 customFolderAdd:  (payload) => ipcRenderer.invoke('custom-folder-add', payload),
