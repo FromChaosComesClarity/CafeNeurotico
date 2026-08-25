@@ -2296,6 +2296,89 @@ function reconcileSteamInstalls() {
 // back to 1 for a path-launched row, so the game would be stuck offering INSTALL forever.
 // Reading it both ways means "installed" tracks "playable right now" and plugging the drive
 // back in restores the Play button on the next start.
+// Launchers that are not plain paths but can still be checked. Returns true/false when this
+// launcher's target can be judged, or null when it cannot.
+//
+// ⚠️ These three are the bulk of a restored library's false Play buttons, and none of them was
+// being checked by anything:
+//   • pico8-cart: carries an absolute path to the cart, and a restored config points at the
+//     OTHER machine's config directory — the carts are simply not here.
+//   • flatpak run <id> is verifiable from the exports directory without shelling out.
+//   • grinder://launch/<store>/<id> already has a source of truth in GRINDER's own database;
+//     resolveInstallState() just never reached it, because it returns early unless the row
+//     also has a steam:// launcher. A library with 26 GOG/Epic rows marked installed against
+//     GRINDER's actual 2 is the result.
+const FLATPAK_EXPORT_DIRS = [
+    path.join(os.homedir(), '.local', 'share', 'flatpak', 'exports', 'bin'),
+    '/var/lib/flatpak/exports/bin',
+];
+
+function launcherSchemeInstalled(cmd) {
+    const c = String(cmd || '').trim();
+    if (!c) return null;
+
+    // steam:// can appear bare or wrapped ("steam steam://rungameid/123 -silent"), so match it
+    // anywhere in the command rather than anchoring. isSteamGameInstalled() reads the
+    // appmanifest, which is the same truth reconcileSteamInstalls() uses.
+    const sm = c.match(/steam:\/\/rungameid\/(\d+)/i);
+    if (sm) { try { const v = isSteamGameInstalled(sm[1]); return v === null ? null : !!v; } catch { return null; } }
+
+    const p8 = c.match(/^pico8-cart:(.+)$/i);
+    if (p8) {
+        let f = p8[1].trim().replace(/^["']|["']$/g, '');
+        if (f.startsWith('~/')) f = path.join(os.homedir(), f.slice(2));
+        try { return fs.existsSync(f); } catch { return false; }
+    }
+
+    const fp = c.match(/^flatpak\s+run\s+(?:--[^\s]+\s+)*([A-Za-z0-9_.-]+)/i);
+    if (fp) {
+        const id = fp[1];
+        return FLATPAK_EXPORT_DIRS.some(d => { try { return fs.existsSync(path.join(d, id)); } catch { return false; } });
+    }
+
+    // Every grinder:// form, not just the store ones. GRINDER's database is the single source
+    // of truth for all of them:
+    //   grinder://launch/gog/1234   → key "gog_1234"
+    //   grinder://launch/cn_vkquake → key "cn_vkquake"   (custom installs, source ports, mods)
+    //   grinder://mpiz1xxacr1d      → key "mpiz1xxacr1d" (manually added entries)
+    //
+    // ⚠️ The cn_* case is the bulk of a restored library's false Play buttons and the earlier
+    // version missed it entirely, because it only matched gog|epic. A machine that never
+    // installed those source ports has no rows for them at all, while the imported games.db
+    // still claims all of them are installed.
+    // itch:// games are launched BY the itch app — it owns the install and the URI is
+    // meaningless without it. So the honest test is not "is this game installed" (only itch's
+    // own database knows that) but "can this launcher run at all", and if the app is not on
+    // this machine the answer is no for every itch game in the library.
+    //
+    // ⚠️ Only judged in the negative. If itch IS installed, whether a particular game is
+    // installed lives in itch's butler database, which is not ours to read — so that returns
+    // null and the row is left exactly as it was.
+    if (/^itch:\/\//i.test(c)) {
+        const ITCH = [
+            path.join(os.homedir(), '.var', 'app', 'io.itch.itch'),
+            path.join(os.homedir(), '.config', 'itch'),
+            path.join(os.homedir(), '.local', 'share', 'flatpak', 'exports', 'bin', 'io.itch.itch'),
+            '/var/lib/flatpak/exports/bin/io.itch.itch',
+        ];
+        const present = ITCH.some(d => { try { return fs.existsSync(d); } catch { return false; } });
+        return present ? null : false;
+    }
+
+    const gm = c.match(/^grinder:\/\/(?:launch\/)?(.+)$/i);
+    if (gm) {
+        // ⚠️ No GRINDER database means "cannot judge", NOT "nothing is installed". Without
+        // this guard, a machine where grinder.db has not been created yet would have every
+        // GRINDER-launched game in the library marked uninstalled in one pass.
+        try { if (!grinderDbPath()) return null; } catch { return null; }
+        const key = String(gm[1]).trim().replace(/\/+$/, '')
+            .replace(/^(gog|epic)\//i, (_m, st) => st.toLowerCase() + '_');
+        try { return grinderInstalledSet().has(key); } catch { return null; }
+    }
+
+    return null;
+}
+
 function launcherLocalPath(cmd) {
     let c = String(cmd || '').trim();
     if (!c) return '';
@@ -2330,13 +2413,20 @@ function reconcileLocalPathInstalls() {
     for (const g of rows) {
         const cmds = launchCmdsOf(g).filter(Boolean);
         if (!cmds.length) continue;
-        const paths = cmds.map(launcherLocalPath);
-        if (paths.some(p => !p)) continue;                      // something we cannot judge
-        let present = false;
-        for (const p of paths) {
-            try { if (fs.existsSync(p)) { present = true; break; } } catch {}
-        }
-        const want = present ? 1 : 0;
+
+        // Each launcher resolves to true/false when it can be judged, or null when it cannot
+        // (a bare command resolved through PATH, an unknown URI scheme, a store we do not
+        // track). One unjudgeable launcher and the whole row is left alone — the flag may be
+        // the only record that the game is there.
+        const states = cmds.map(cmd => {
+            const scheme = launcherSchemeInstalled(cmd);
+            if (scheme !== null) return scheme;
+            const local = launcherLocalPath(cmd);
+            if (!local) return null;
+            try { return fs.existsSync(local); } catch { return false; }
+        });
+        if (states.some(v => v === null)) continue;
+        const want = states.some(v => v === true) ? 1 : 0;
         if (g.Installed === want) continue;
         try { db.prepare("UPDATE games SET Installed=? WHERE id=?").run(want, g.id); changed++; } catch {}
     }
