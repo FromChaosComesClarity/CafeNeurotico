@@ -119,11 +119,12 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 Cafe Neurotico also runs on Apple Silicon Macs, built from the exact same codebase behind a host
 boundary rather than a fork. **Linux stays primary** — it's what ships fastest and gets tested
-first — but the Mac build is real: Steam/GOG/Epic sign-in, the full library, and installing and
-launching Mac-native GOG/Epic games all work today, including a filter and cover badge for which
-of your owned games actually have a native macOS build. Windows games need a compatibility layer
-that isn't wired in yet, so that's the one major gap. **[Full install instructions, what works,
-and what doesn't →](docs/macos-guide.md)**
+first — but the Mac build is real: Steam and GOG sign-in, the full library, and installing and
+launching Mac-native GOG games all work today, including a filter and cover badge for which
+of your owned games actually have a native macOS build. Since 1.9, **Windows games run too,
+through CrossOver** — which you install yourself, as it's commercial software and isn't bundled.
+Epic sign-in is the notable gap: it doesn't hold on macOS yet. **[Full install instructions, what
+works, and what doesn't →](docs/macos-guide.md)**
 
 ## The rest of the ecosystem
 

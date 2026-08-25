@@ -11,22 +11,34 @@ macOS reports are genuinely useful right now, this build needs them.
 
 ## What works today
 
-- **The full library**: Steam, GOG and Epic sign-in, sync, and browsing — all three faces (the
+- **The full library**: Steam and GOG sign-in, sync, and browsing — all three faces (the
   Manager, CREMA, and GRINDER)
-- **Installing and launching Mac-native GOG and Epic games** — real downloads through `gogdl` and
-  `legendary` directly, not a browser hand-off
+- **Installing and launching Mac-native GOG games** — real downloads through `gogdl` directly,
+  not a browser hand-off
+- **Windows games, through CrossOver** *(new in 1.9)* — titles that only ship a Windows build are
+  no longer off-limits. Cafe Neurotico drives CrossOver directly, giving each game its own bottle
+  under the same per-game scheme the Linux build uses: created once on first launch, reused after
+  that, nothing to configure. Two caveats, both worth reading before you count on it. CrossOver is
+  commercial software from CodeWeavers and **is not bundled** — you install it yourself, and
+  without it this simply reports as unavailable. And while the plumbing is verified end to end,
+  it has not been driven against a large library of real games yet, so **treat per-title
+  compatibility as unproven**.
 - **A filter for which of your games are actually Mac-native** — the "Mac-Native" option in the
   library's category dropdown, plus a small apple badge on the cover art of anything it applies
-  to. GOG/Epic are checked instantly from what you already own; Steam needs one "Scan for Mac
+  to. GOG is checked instantly from what you already own; Steam needs one "Scan for Mac
   Compatibility" pass (Control Panel → search "mac native") since it's a live check per game
 - Artwork, genres, playlists, save-game backups, themes — everything that isn't platform-specific
   works exactly like the Linux build, because almost all of the app *is* the same code
 
 ## What doesn't work yet
 
-- **Windows games.** No compatibility layer is wired in yet — installing or launching a
-  Windows-only GOG/Epic title won't work. This is the current focus (CrossOver integration); it
-  isn't a small gap, it's the next real chunk of the port.
+- **Epic sign-in.** Signing in to Epic doesn't hold on macOS yet — the browser-based approval
+  completes, but the credentials never reach where `legendary` looks for them, so the Epic half
+  of the library sync comes back empty. Steam and GOG are unaffected; until this lands, treat the
+  macOS build as a Steam-and-GOG one. (Epic on Linux is fine — this is macOS-only.)
+- **Anti-cheat.** BattlEye and EAC aren't wired up. CrossOver advertises its own support for
+  both, but nothing here has been tested against a game that uses them, so assume multiplayer
+  titles that depend on anti-cheat won't run.
 - **A picker for which screen a game opens on.** KDE-only feature on Linux; no macOS equivalent
   exists yet.
 - **Custom installers / source ports / mods** (Ironwail, GZDoom, the Build-engine games, etc.) —
@@ -38,8 +50,10 @@ macOS reports are genuinely useful right now, this build needs them.
 ## Install
 
 1. Download the `.dmg` (or the `.zip`) from the
-   [latest release](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/latest) — look for
-   the macOS asset specifically, it's separate from the Linux AppImage.
+   [1.9.0 release](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/tag/v1.9.0) — the
+   macOS asset is separate from the Linux AppImage, and it sits on that release rather than the
+   newest one. **The current macOS build is 1.9.0**; Linux has since had 1.9.1, a Linux-only fix
+   that ships no Mac asset, so "latest release" won't have a `.dmg` in it.
 2. Open the `.dmg` and drag **Cafe Neurotico** into **Applications** (or, for the `.zip`, unzip it
    and move the `.app` there yourself).
 3. **The build isn't signed** — no Apple Developer account behind it yet — so the very first
@@ -59,8 +73,8 @@ macOS reports are genuinely useful right now, this build needs them.
    You only need to do this once per install. It's not a workaround for something broken — it's
    the standard cost of an app that hasn't gone through Apple's notarization process yet.
 
-4. First launch walks you through connecting Steam/GOG/Epic — the same onboarding as the Linux
-   build. Nothing here is mandatory; everything it offers also lives in the Control Panel later.
+4. First launch walks you through connecting your stores — the same onboarding as the Linux
+   build, though Epic sign-in won't stick yet (see above). Nothing here is mandatory; everything it offers also lives in the Control Panel later.
 
 ## Where things live
 
