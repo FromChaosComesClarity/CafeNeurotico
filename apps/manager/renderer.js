@@ -1719,6 +1719,10 @@ window.api.getBaseDir().then(dir => {
         return (h <= 900 || w <= 1400) ? '0.75' : '1.0';
     }
 
+    // Mirrored for the pre-paint script: applying the zoom after the window is visible makes
+    // the whole layout jump, which is the most obvious part of the startup flash.
+    const _cacheScale = v => { try { localStorage.setItem('cngm_ui_scale_cache', String(v)); } catch {} };
+
     function _markScaleButton(val) {
         document.querySelectorAll('.ui-scale-btn').forEach(btn =>
             btn.classList.toggle('active', btn.getAttribute('data-val') === val));
@@ -1734,6 +1738,7 @@ window.api.getBaseDir().then(dir => {
         if (val && stamp === here) {                 // chosen on this screen — respect it
             window.api.setZoomLevel(parseFloat(val));
             _zoomNow = parseFloat(val);
+            _cacheScale(val);
             _markScaleButton(val);
             return;
         }
@@ -1742,6 +1747,7 @@ window.api.getBaseDir().then(dir => {
             const applied = auto;
             window.api.setZoomLevel(parseFloat(applied));
             _zoomNow = parseFloat(applied);
+            _cacheScale(applied);
             _markScaleButton(applied);
             window.api.setSetting('cngm_ui_scale', applied);
             window.api.setSetting('cngm_ui_scale_screen', here);
@@ -1755,6 +1761,7 @@ window.api.getBaseDir().then(dir => {
         // Nothing saved at all — a genuine first run.
         window.api.setZoomLevel(parseFloat(auto));
         _zoomNow = parseFloat(auto);
+        _cacheScale(auto);
         _markScaleButton(auto);
         window.api.setSetting('cngm_ui_scale', auto);
         window.api.setSetting('cngm_ui_scale_screen', here);
@@ -1818,6 +1825,7 @@ document.querySelectorAll('.ui-scale-btn').forEach(btn => {
         const val = e.target.getAttribute('data-val');
         window.api.setZoomLevel(parseFloat(val));
         _zoomNow = parseFloat(val);
+        try { localStorage.setItem('cngm_ui_scale_cache', String(val)); } catch {}
         await window.api.setSetting('cngm_ui_scale', val);
         // ⚠️ Stamp the screen here too. This handler is separate from setZoom(), and without
         // the stamp a scale picked in the Control Panel would look foreign on the next start
@@ -11805,6 +11813,7 @@ let _zoomNow = 1.0;
 function setZoom(v) {
     _zoomNow = v;
     window.api.setZoomLevel(v);
+    try { localStorage.setItem('cngm_ui_scale_cache', String(v)); } catch {}
     window.api.setSetting('cngm_ui_scale', String(v));
     // ⚠️ Stamp the screen as well. Without this the user's own choice looks foreign on the
     // next start and gets re-derived out from under them.
@@ -11847,7 +11856,7 @@ function applyCompactChrome(on) {
     const controls = bar?.querySelector('.titlebar-controls');
     if (!rail || !pills || !bar || !controls) return;
 
-    document.body.classList.toggle('compact-chrome', !!on);
+    document.documentElement.classList.toggle('compact-chrome', !!on);
     const move = (ids, target) => {
         for (const id of ids) {
             const el = document.getElementById(id);
@@ -11859,7 +11868,20 @@ function applyCompactChrome(on) {
     move(RAIL_IDS,  on ? rail  : controls);
     move(PILL_IDS,  on ? pills : controls);
     if (on) placeHeroPills();
+    // Mirrored for the pre-paint script in index.html — see the comment there. Written on
+    // every call, so the cache cannot drift from what is actually on screen.
+    try { localStorage.setItem('cngm_compact_chrome', on ? '1' : '0'); } catch {}
 }
+
+// ⚠️ Applied synchronously, right here, from the cache the pre-paint script also reads.
+// Scripts block rendering, so this still runs before the first paint — which is the whole
+// point: the buttons are relocated before the window is ever shown, instead of visibly
+// rearranging themselves a couple of seconds later. The IPC round trip below still runs and
+// corrects this if the stored setting disagrees.
+//
+// ⚠️ Must sit AFTER the const declarations above: applyCompactChrome reads RAIL_IDS/PILL_IDS,
+// and a const is in its temporal dead zone until execution reaches it.
+try { applyCompactChrome(localStorage.getItem('cngm_compact_chrome') === '1'); } catch {}
 
 // ⚠️ The pills belong IN the hero, not floating over the window at a fixed offset. Fixed
 // looked right until the gallery was scrolled: the hero moved away and the pills stayed,
@@ -11871,7 +11893,7 @@ function applyCompactChrome(on) {
 // which keeps the listeners intact.
 function placeHeroPills() {
     const pills = document.getElementById('hero-pills');
-    if (!pills || !document.body.classList.contains('compact-chrome')) return;
+    if (!pills || !document.documentElement.classList.contains('compact-chrome')) return;
     const activeView = document.querySelector('#main-content .view.active');
     const hero = activeView?.querySelector('.hero-display');
     const target = hero || document.body;
@@ -11891,9 +11913,14 @@ const VERY_NARROW_AT = 680; // the split list is no longer worth the space it co
 const SHORT_AT = 820;
 
 function applyWidthClasses(w, h) {
-    document.body.classList.toggle('narrow', w < NARROW_AT);
-    document.body.classList.toggle('very-narrow', w < VERY_NARROW_AT);
-    if (typeof h === 'number') document.body.classList.toggle('short', h < SHORT_AT);
+    // ⚠️ On documentElement, not body. The compact-chrome class has to be set by the inline
+    // script in <head>, where document.body does not exist yet — and a compound selector like
+    // `.narrow.compact-chrome` only matches when both classes sit on the SAME element. Keeping
+    // every layout class on <html> is what makes that work.
+    const r = document.documentElement.classList;
+    r.toggle('narrow', w < NARROW_AT);
+    r.toggle('very-narrow', w < VERY_NARROW_AT);
+    if (typeof h === 'number') r.toggle('short', h < SHORT_AT);
 }
 
 try {
@@ -12086,9 +12113,13 @@ let _omarchyThemeName = '';
 let _omarchyRadius = null;
 function applyOmarchyGeometry(active) {
     const on = !!active && _omarchyRadius !== null;
-    document.body.classList.toggle('omarchy-geometry', on);
+    document.documentElement.classList.toggle('omarchy-geometry', on);
     if (on) document.documentElement.style.setProperty('--omarchy-radius', _omarchyRadius + 'px');
     else document.documentElement.style.removeProperty('--omarchy-radius');
+    try {
+        if (on) localStorage.setItem('cngm_omarchy_geometry', String(_omarchyRadius));
+        else localStorage.removeItem('cngm_omarchy_geometry');
+    } catch {}
 }
 
 function _registerOmarchyTheme(d) {

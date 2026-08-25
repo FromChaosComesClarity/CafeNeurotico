@@ -184,7 +184,7 @@
        ⚠️ The nav buttons and pills are MOVED, not duplicated — appendChild relocates a node
        and its listeners intact, so nothing needs rebinding and there is no second copy to
        keep in sync. See applyCompactChrome() in the renderer. */
-    body.compact-chrome #titlebar { display: none; }
+    .compact-chrome #titlebar { display: none; }
     /* ── The hero pills ─────────────────────────────────────────────────────────
        ⚠️ In the title bar these two carry CREMA's own brand colours, hardcoded — a tan
        gradient with an amber border, owing nothing to the theme. That is fine on a bar that
@@ -193,44 +193,44 @@
        Over the hero they are restyled from theme variables only, so they belong to whatever
        palette is loaded, and they recede into the art instead of shouting over it. */
     #hero-pills { display: none; position: absolute; top: 14px; right: 16px; z-index: 12; gap: 7px; align-items: center; -webkit-app-region: no-drag; }
-    body.compact-chrome #hero-pills { display: flex; }
+    .compact-chrome #hero-pills { display: flex; }
     /* Parked on <body> when the active view has no hero to sit in — see placeHeroPills(). */
     body > #hero-pills { position: fixed; top: 32px; right: 34px; z-index: 500; }
 
-    body.compact-chrome #hero-pills #support-cta,
-    body.compact-chrome #hero-pills #crema-cta {
+    .compact-chrome #hero-pills #support-cta,
+    .compact-chrome #hero-pills #crema-cta {
         height: 24px; margin: 0; padding: 0 10px; gap: 6px; border-radius: 6px;
         background: color-mix(in srgb, var(--bg_menu) 78%, transparent);
         border: 1px solid var(--border_solid);
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         backdrop-filter: blur(8px);
         transition: border-color 0.16s ease, background 0.16s ease; }
-    body.compact-chrome #hero-pills #support-cta:hover,
-    body.compact-chrome #hero-pills #crema-cta:hover {
+    .compact-chrome #hero-pills #support-cta:hover,
+    .compact-chrome #hero-pills #crema-cta:hover {
         border-color: var(--accent);
         background: color-mix(in srgb, var(--bg_menu) 92%, var(--accent)); }
-    body.compact-chrome #hero-pills .crema-cta-text,
-    body.compact-chrome #hero-pills .support-cta-text {
+    .compact-chrome #hero-pills .crema-cta-text,
+    .compact-chrome #hero-pills .support-cta-text {
         display: inline; font-size: 9px; font-weight: 900; letter-spacing: 1px;
         text-transform: uppercase; color: var(--text_sec); }
-    body.compact-chrome #hero-pills #support-cta:hover .support-cta-text,
-    body.compact-chrome #hero-pills #crema-cta:hover .crema-cta-text { color: var(--text_main); }
+    .compact-chrome #hero-pills #support-cta:hover .support-cta-text,
+    .compact-chrome #hero-pills #crema-cta:hover .crema-cta-text { color: var(--text_main); }
     /* The icons are artwork in their own right; muted so they sit with the text rather than
        leading it, and brought back to full strength on hover. */
-    body.compact-chrome #hero-pills .crema-cta-icon { width: 14px; height: 14px; opacity: 0.75; }
-    body.compact-chrome #hero-pills .support-cta-heart { width: 11px; height: 10px; opacity: 0.8; filter: none; }
-    body.compact-chrome #hero-pills #crema-cta:hover .crema-cta-icon,
-    body.compact-chrome #hero-pills #support-cta:hover .support-cta-heart { opacity: 1; }
+    .compact-chrome #hero-pills .crema-cta-icon { width: 14px; height: 14px; opacity: 0.75; }
+    .compact-chrome #hero-pills .support-cta-heart { width: 11px; height: 10px; opacity: 0.8; filter: none; }
+    .compact-chrome #hero-pills #crema-cta:hover .crema-cta-icon,
+    .compact-chrome #hero-pills #support-cta:hover .support-cta-heart { opacity: 1; }
     /* Narrow tiles: the words go, the icons stay. */
-    body.narrow.compact-chrome #hero-pills .crema-cta-text,
-    body.narrow.compact-chrome #hero-pills .support-cta-text { display: none; }
-    body.narrow.compact-chrome #hero-pills #support-cta,
-    body.narrow.compact-chrome #hero-pills #crema-cta { padding: 0 8px; }
+    .narrow.compact-chrome #hero-pills .crema-cta-text,
+    .narrow.compact-chrome #hero-pills .support-cta-text { display: none; }
+    .narrow.compact-chrome #hero-pills #support-cta,
+    .narrow.compact-chrome #hero-pills #crema-cta { padding: 0 8px; }
 
     #rail-chrome { display: none; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; border-bottom: 1px solid var(--border_solid); }
-    body.compact-chrome #rail-chrome { display: flex; }
-    body.compact-chrome #rail-chrome button { width: 34px; height: 30px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text_dim); cursor: pointer; border-radius: 5px; padding: 0; position: relative; }
-    body.compact-chrome #rail-chrome button:hover { color: var(--text_main); background: var(--bg_panel); }
+    .compact-chrome #rail-chrome { display: flex; }
+    .compact-chrome #rail-chrome button { width: 34px; height: 30px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text_dim); cursor: pointer; border-radius: 5px; padding: 0; position: relative; }
+    .compact-chrome #rail-chrome button:hover { color: var(--text_main); background: var(--bg_panel); }
     /* The pills are horizontal by nature; in the rail they keep the icon and drop the words. */
 
     /* ── Matching the desktop's geometry ────────────────────────────────────────
@@ -238,28 +238,28 @@
        reads as foreign, so when the user is wearing their Omarchy palette the app takes the
        compositor's corner radius too. Scoped to the cards and surfaces that read as "panels";
        controls keep their own shape so nothing becomes unrecognisable. */
-    body.omarchy-geometry .tool-card,
-    body.omarchy-geometry .theme-swatch,
-    body.omarchy-geometry #modal-tools > div,
-    body.omarchy-geometry #modal-themes > div,
-    body.omarchy-geometry #modal-welcome > div,
-    body.omarchy-geometry #modal-connect > div { border-radius: var(--omarchy-radius, 10px) !important; }
+    .omarchy-geometry .tool-card,
+    .omarchy-geometry .theme-swatch,
+    .omarchy-geometry #modal-tools > div,
+    .omarchy-geometry #modal-themes > div,
+    .omarchy-geometry #modal-welcome > div,
+    .omarchy-geometry #modal-connect > div { border-radius: var(--omarchy-radius, 10px) !important; }
 
     /* Short windows: the hero is a fixed 350px, which on a 680px-tall tile is half the
        window before a single cover is drawn. */
-    body.short .hero-display { height: 190px !important; margin-bottom: 12px !important; }
-    body.short #gallery-category-text { font-size: 24px !important; }
-    body.short #gallery-category-icon { width: 32px !important; height: 32px !important; }
-    body.short #hero-game-name { font-size: 18px !important; }
+    .short .hero-display { height: 190px !important; margin-bottom: 12px !important; }
+    .short #gallery-category-text { font-size: 24px !important; }
+    .short #gallery-category-icon { width: 32px !important; height: 32px !important; }
+    .short #hero-game-name { font-size: 18px !important; }
     /* The empty-hero placeholder is 48px and centred, which collides with the category title
        once the hero is short. It is a placeholder — it should recede, not compete. */
-    body.short #hero-icon { font-size: 22px !important; letter-spacing: 3px !important; opacity: 0.5; }
-    body.narrow.short #hero-icon { font-size: 16px !important; letter-spacing: 2px !important; }
-    body.narrow.short .hero-display { height: 150px !important; }
+    .short #hero-icon { font-size: 22px !important; letter-spacing: 3px !important; opacity: 0.5; }
+    .narrow.short #hero-icon { font-size: 16px !important; letter-spacing: 2px !important; }
+    .narrow.short .hero-display { height: 150px !important; }
     /* Modals have to fit the window they open in, or their buttons end up off-screen — which
        is exactly how the Control Panel's own settings button became unclickable. */
-    body.short .modal-box, body.short #modal-tools > div, body.short #modal-welcome > div,
-    body.short #modal-themes > div, body.short #modal-connect > div { max-height: 92vh !important; }
+    .short .modal-box, .short #modal-tools > div, .short #modal-welcome > div,
+    .short #modal-themes > div, .short #modal-connect > div { max-height: 92vh !important; }
 
     /* ── Responsive shell ───────────────────────────────────────────────────────
        A tiling WM makes a narrow window the normal case rather than the exception: half a
@@ -267,16 +267,16 @@
        ResizeObserver on the shell rather than media queries, because what matters is the
        WINDOW's width, not the screen's — and on a tiled desktop those are different numbers.
        Classes rather than inline styles so a theme can still override anything. */
-    body.narrow #topnav-filter-row { flex-wrap: wrap; row-gap: 4px; }
-    body.narrow .titlebar-brand { display: none; }
-    body.narrow #split-left { width: 210px; }
-    body.very-narrow #icon-rail { width: 40px; }
-    body.very-narrow #rail-chrome .crema-cta-text, body.very-narrow #rail-chrome .support-cta-text { display: none; }
+    .narrow #topnav-filter-row { flex-wrap: wrap; row-gap: 4px; }
+    .narrow .titlebar-brand { display: none; }
+    .narrow #split-left { width: 210px; }
+    .very-narrow #icon-rail { width: 40px; }
+    .very-narrow #rail-chrome .crema-cta-text, .very-narrow #rail-chrome .support-cta-text { display: none; }
     /* Below this the split pane is two columns in a space that barely fits one, so the list
        goes and the detail takes the width. The list is still reachable — every other layout
        still lists games, and this only applies to the split view. */
-    body.very-narrow #split-left { display: none; }
-    body.very-narrow #split-detail { flex: 1 1 100% !important; }
+    .very-narrow #split-left { display: none; }
+    .very-narrow #split-detail { flex: 1 1 100% !important; }
 
     /* ⚠️ overflow-y:auto, NOT hidden. With hidden, a window shorter than the rail's own
        contents clipped the bottom buttons and there was no way to reach them — which is
@@ -286,8 +286,8 @@
     #icon-rail { width: 48px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; background: var(--bg_menu); border-right: 1px solid var(--border_solid); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
     #icon-rail::-webkit-scrollbar { width: 0; height: 0; }
     /* On a short window, tighten the rail before anything has to scroll at all. */
-    body.short #rail-top, body.short #rail-bottom, body.short #rail-chrome { padding: 2px 0; gap: 0; }
-    body.short .rail-btn { height: 34px !important; }
+    .short #rail-top, .short #rail-bottom, .short #rail-chrome { padding: 2px 0; gap: 0; }
+    .short .rail-btn { height: 34px !important; }
     #rail-top, #rail-bottom { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
     .rail-btn { width: 48px; height: 44px; border: none; background: transparent; color: var(--text_dim); cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; transition: color 0.15s; padding: 0; text-transform: none; letter-spacing: 0; border-radius: 0; }
     .rail-btn:hover { color: var(--accent); background: transparent; box-shadow: none; transform: none; }
@@ -3110,7 +3110,40 @@
     /* ── GAMEPAGE: floating PLAY/INSTALL button ─────────────────────────────── */
     #btn-gamepage-play { position:fixed !important; bottom:28px; right:28px; font-size:18px !important; padding:14px 36px !important; border-radius:50px !important; box-shadow:0 8px 28px rgba(0,0,0,0.7) !important; letter-spacing:2px !important; z-index:50; }
   </style>
-  <script>(function(){try{var c=localStorage.getItem('cngm_theme_cache');if(c){var t=JSON.parse(c);Object.keys(t).forEach(function(k){document.documentElement.style.setProperty('--'+k,t[k]);});}}catch(e){}})();</script>
+  <!-- ── Pre-paint state ────────────────────────────────────────────────────────
+       ⚠️ Everything here exists to stop the window being shown mid-transformation. The
+       settings that decide the app's SHAPE — theme, compact chrome, interface scale, and
+       whether the window is narrow or short — all live in the database, and reading them is
+       an async IPC round trip. Anything applied after that round trip is applied to a window
+       the user is already looking at, so the title bar rendered with its buttons and then
+       visibly restructured about two seconds later.
+       So the last known values are mirrored into localStorage, which is synchronous, and
+       applied here before the first paint. The database remains the source of truth and
+       corrects any of this when it arrives; this only removes the flash.
+       Nothing here may throw — a corrupt cache must degrade to "looks like a first run",
+       never to a blank window. -->
+  <script>(function(){
+    var d = document.documentElement;
+    try{var c=localStorage.getItem('cngm_theme_cache');if(c){var t=JSON.parse(c);Object.keys(t).forEach(function(k){d.style.setProperty('--'+k,t[k]);});}}catch(e){}
+    try{
+      var cc=localStorage.getItem('cngm_compact_chrome');
+      // No cache means a first run: fall back to the synchronous Omarchy check from preload,
+      // which is the same default the async path would land on a moment later.
+      if(cc==='1' || (cc===null && window.api && window.api.isOmarchy)) d.classList.add('compact-chrome');
+    }catch(e){}
+    try{ if(localStorage.getItem('cngm_omarchy_geometry')) { d.classList.add('omarchy-geometry'); d.style.setProperty('--omarchy-radius', localStorage.getItem('cngm_omarchy_geometry')+'px'); } }catch(e){}
+    // The width/height classes are cheap to derive right here — no storage needed, and the
+    // window is already at its final size before the first paint.
+    try{
+      var w = d.clientWidth || window.innerWidth, h = d.clientHeight || window.innerHeight;
+      if (w && w < 900) d.classList.add('narrow');
+      if (w && w < 680) d.classList.add('very-narrow');
+      if (h && h < 820) d.classList.add('short');
+    }catch(e){}
+    // Zoom last: it reflows everything, so doing it before the first paint rather than after
+    // is the difference between a window that opens at the right size and one that jumps.
+    try{ var z=localStorage.getItem('cngm_ui_scale_cache'); if(z && window.api && window.api.setZoomLevel) window.api.setZoomLevel(parseFloat(z)); }catch(e){}
+  })();</script>
   <link rel="stylesheet" href="vendor/gridstack.min.css">
   <link rel="stylesheet" href="vendor/gridstack-extra.min.css">
 </head>

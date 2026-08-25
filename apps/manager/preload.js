@@ -1,7 +1,18 @@
 const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
+// ⚠️ Read here, synchronously, purely so the pre-paint script in index.html can know it. The
+// compact-chrome default depends on being on Omarchy, and everything else that knows that is
+// an async IPC away — which is one round trip too late to avoid the window being shown with a
+// title bar it is about to remove. A cached value covers every later run; this covers the
+// first one, when there is nothing cached yet.
+const _isOmarchy = (() => {
+    try { return /^ID=omarchy\s*$/m.test(require('fs').readFileSync('/etc/os-release', 'utf8')); }
+    catch { return false; }
+})();
+
 contextBridge.exposeInMainWorld('api', {
     platform: process.platform,
+    isOmarchy: _isOmarchy,
     getBaseDir: () => ipcRenderer.invoke('get-basedir'),
                                 getGames: () => ipcRenderer.invoke('get-games'),
                                 genreList: () => ipcRenderer.invoke('genre-list'),

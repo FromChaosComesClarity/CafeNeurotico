@@ -176,6 +176,13 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
   assuming 100%, and the screen it was chosen for is stamped alongside it — so a setting that
   arrived in a restored library from another machine is re-derived for the panel in front of you
   rather than inherited. Your own choice is stamped too, so it is never overridden afterwards.
+- **It opens already in its final shape.** The settings that decide the app's *shape* — theme,
+  compact chrome, interface scale, narrow/short layout — all live in the database, and reading
+  them is an async round trip. Anything applied after that lands on a window you are already
+  looking at, so the title bar used to render with its buttons and then visibly restructure
+  itself about two seconds later. Those values are now mirrored into synchronous storage and
+  applied before the first paint, with the database still correcting them if they disagree. A
+  first run, with nothing cached yet, is covered by a synchronous Omarchy check in the preload.
 - **The layout follows the tile.** Half of a 1440px screen is 720px and a third is 480px, so a
   narrow window is the normal case here rather than an exception. The filter row wraps, the game
   list narrows, and below 680px the split view drops its list and gives the width to the game.
