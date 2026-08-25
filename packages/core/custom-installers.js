@@ -1253,9 +1253,32 @@ function linkGameData(dataId, sourceRoot, targetRoot, extraSource, { copy = fals
     return { ok: true, linked };
 }
 
+// ── Where installs are allowed to land ───────────────────────────────────────
+// ⚠️ `installRoot` arrives from a user setting, and that setting is stored the way it was
+// typed — `~/Games/CafeNeurotico`. path.join() does not know what a tilde is, so an
+// unexpanded root produced a real directory literally named "~" inside the home folder:
+//
+//     /home/jose/~/Games/CafeNeurotico/GZDoom/gzdoom.exe
+//
+// The install then reported success, because from its point of view it had unpacked
+// everything correctly. The launcher expands the tilde properly, looked in
+// ~/Games/CafeNeurotico/GZDoom, found nothing, and said "Executable not found" for a file
+// that was sitting on disk the whole time under a nonsense path. 218 MB of it.
+//
+// Expanded here rather than at the call sites: this module is the thing that creates
+// directories, so it is the thing that must never create that one.
+function resolveRoot(root) {
+    const r = String(root || '').trim();
+    if (!r) return r;
+    if (r === '~') return os.homedir();
+    if (r.startsWith('~/')) return path.join(os.homedir(), r.slice(2));
+    return r;
+}
+
 // Unpack a download into its own folder under `installRoot` and work out how to start it.
 // Does not touch any database — the caller decides how to register the result.
 function installFromArchive({ recipeId, archivePath, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
+    installRoot = resolveRoot(installRoot);   // never create a literal "~" directory
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!archivePath || !fs.existsSync(archivePath)) return { ok: false, error: 'That file no longer exists.' };
@@ -1575,6 +1598,7 @@ function writeEngineSearchPaths(engineId, engineRoot, gameFolders) {
 }
 
 function installGameOnEngine({ recipeId, archivePath, engineRoot, engineExe, engines, installRoot, dataRows, dataPath, reserved = [], overwrite = false }) {
+    installRoot = resolveRoot(installRoot);   // never create a literal "~" directory
     const recipe = getRecipe(recipeId);
     if (!recipe) return { ok: false, error: `Unknown recipe "${recipeId}".` };
     if (!engineRoot || !fs.existsSync(engineRoot)) return { ok: false, error: 'The engine folder is missing — reinstall it.' };
