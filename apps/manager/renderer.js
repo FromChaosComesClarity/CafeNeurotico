@@ -12059,6 +12059,39 @@ async function renderOmarchyCard(s) {
         }
     }
 
+    // ── System tuning ────────────────────────────────────────────────────────
+    // Reported, never changed. An entry whose value could not be read at all is shown as
+    // unknown rather than guessed at — a missing /proc entry means the kernel does not have
+    // that knob, which is not the same as it being wrong.
+    const tuneBlock = document.getElementById('omarchy-tuning-block');
+    const tuneList  = document.getElementById('omarchy-tuning-list');
+    const tuneBtn   = document.getElementById('btn-omarchy-tuning');
+    if (tuneBlock && tuneList && Array.isArray(s.tuning) && s.tuning.length) {
+        tuneBlock.style.display = '';
+        tuneList.innerHTML = '';
+        for (const t of s.tuning) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; align-items:flex-start; gap:7px; font-size:11px; line-height:1.45;';
+            const mark = t.ok === null ? '?' : (t.ok ? '✓' : '✗');
+            const col  = t.ok === null ? 'var(--text_dim)' : (t.ok ? '#66bb6a' : '#e0a030');
+            row.innerHTML = `
+                <span style="color:${col}; font-weight:900; flex-shrink:0;">${mark}</span>
+                <span style="flex:1; min-width:0;">
+                    <b style="color:var(--text_main);">${t.label}</b>
+                    <span style="color:var(--text_dim);"> · ${t.ok === null ? 'not readable on this kernel' : (t.ok ? 'already set' : `is ${t.value}, wants ${t.want}`)}</span>
+                    ${t.ok === false ? `<div style="color:var(--text_dim); margin-top:1px;">${t.why || ''}</div>` : ''}
+                </span>`;
+            tuneList.appendChild(row);
+        }
+        const anyOff = s.tuning.some(t => t.ok === false);
+        tuneBtn.style.display = anyOff && s.tuningCommand ? '' : 'none';
+        if (anyOff) {
+            tuneBtn.onclick = () => runAndPrompt(() => window.api.omarchyApplyTuning(), 'The tuning command');
+        }
+    } else if (tuneBlock) {
+        tuneBlock.style.display = 'none';
+    }
+
     if (recheck) {
         recheck.onclick = async () => {
             recheck.disabled = true;

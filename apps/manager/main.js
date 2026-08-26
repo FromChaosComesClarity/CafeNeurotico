@@ -902,6 +902,8 @@ ipcMain.handle('omarchy-status', () => {
         hyprland: omarchy.isHyprland(),
         gap: omarchy.gapSummary(),
         geometry: omarchy.hyprGeometry?.() || null,
+        tuning: omarchy.systemTuning?.() || [],
+        tuningCommand: omarchy.tuningCommand?.() || '',
         tools: omarchy.toolStatus(),
         // Emulation belongs to EmuLatte; this app never offers RetroArch.
         installers: omarchy.installerStatus().filter(i => !i.emulation),
@@ -913,6 +915,15 @@ ipcMain.handle('omarchy-status', () => {
 ipcMain.handle('omarchy-install-tools', (_, keys) => {
     if (!omarchy) return { ok: false, error: 'Not supported on this system.' };
     return omarchy.openInstallTerminal(Array.isArray(keys) ? keys.map(String) : []);
+});
+
+// Hands the tuning command to a terminal, exactly like the package installs. The app never
+// runs it — kernel parameters belong to the person who owns the machine.
+ipcMain.handle('omarchy-apply-tuning', () => {
+    if (!omarchy) return { ok: false, error: 'Not supported on this system.' };
+    const cmd = omarchy.tuningCommand?.() || '';
+    if (!cmd) return { ok: false, error: 'Nothing to change — every setting already matches.' };
+    return omarchy.openTerminalWith(cmd);
 });
 
 ipcMain.handle('omarchy-run-installer', (_, key) => {

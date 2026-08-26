@@ -198,6 +198,7 @@ contextBridge.exposeInMainWorld('api', {
                                 omarchyStatus:   () => ipcRenderer.invoke('omarchy-status'),
                                 omarchyInstallTools: (keys) => ipcRenderer.invoke('omarchy-install-tools', keys),
                                 omarchyRunInstaller: (key) => ipcRenderer.invoke('omarchy-run-installer', key),
+                                omarchyApplyTuning: () => ipcRenderer.invoke('omarchy-apply-tuning'),
                                 omarchyTheme:    () => ipcRenderer.invoke('omarchy-theme'),
                                 // Fires when the user runs `omarchy theme set`, so the app can follow.
                                 onOmarchyThemeChanged: (cb) => ipcRenderer.on('omarchy-theme-changed', (_e, d) => cb(d)),

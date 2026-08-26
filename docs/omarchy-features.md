@@ -201,7 +201,23 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
   your Omarchy palette. Omarchy defaults to square corners, and rounded cards on a square desktop
   read as foreign.
 
-### 8. It gets out of the way while you play
+### 8. It reports the system tuning a gaming distro would have changed
+
+A gaming-focused distribution sets a handful of kernel knobs a general-purpose one leaves alone.
+Most of that gap **does not exist on Arch**: full Mesa and ffmpeg are already here, the kernel is
+newer, and the fsync work that once justified a patched kernel is upstream. Measured on a real
+Omarchy 4 box, two of the three settings worth checking were already correct out of the box —
+only `split_lock_mitigate` differed, and that one is a trade rather than a fix.
+
+The card reports the three, says what each costs when it is wrong, and hands over a single
+command that writes a `sysctl.d` drop-in so the change survives a reboot.
+
+> ⚠️ **This reports. It does not tune.** Kernel parameters belong to the distribution and to the
+> person running the machine; an app that quietly edits them is an app that eventually breaks
+> somebody's system in a way they cannot trace back. Same rule as the package installs: you see
+> the command, you type your own password, in a real terminal.
+
+### 9. It gets out of the way while you play
 
 - **The screen will not lock mid-game.** A gamepad-only CREMA session, a long cutscene or a turn
   spent reading a map produces no keyboard or mouse input at all, so the desktop's idea of idle
@@ -215,7 +231,7 @@ reached 100% (211.73 MiB) where it had previously failed instantly.
 - **The power profile switches to performance while a game runs** and is put back afterwards. The
   previous profile is captured before switching, so this cannot strand a laptop on performance.
 
-### 9. Hyprland-friendly
+### 10. Hyprland-friendly
 
 - **The KDE-only "Which Screen Games Open On" card is removed on Hyprland**, not hidden. It is a
   KWin script and KWin is not running, so a card offering to "let KDE decide" has no business on

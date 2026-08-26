@@ -195,6 +195,87 @@ function applyWindowRules({ floatGames = true } = {}) {
     return { ok: applied > 0, applied, total: rules.length };
 }
 
+// ── System tuning for games ──────────────────────────────────────────────────
+// A gaming-focused distribution sets a handful of kernel knobs that a general-purpose one
+// leaves at defaults. Most of what those distributions are famous for does not apply on Arch
+// — full Mesa and ffmpeg are already here, the kernel is newer, and the fsync work that once
+// justified a patched kernel is upstream — so this list is deliberately short. Measured on a
+// real Omarchy 4 box, two of the three below were already correct out of the box.
+//
+// ⚠️ This REPORTS. It does not tune anything. Kernel parameters belong to the distribution
+// and to the person running the machine; an app that edits them is an app that eventually
+// breaks somebody's system in a way they cannot trace back. The fix is handed over as a
+// command, through a terminal, exactly like package installs.
+const TUNING = [
+    {
+        key: 'max_map_count', label: 'Memory map limit',
+        read: () => procNumber('/proc/sys/vm/max_map_count'),
+        want: 1048576, cmp: 'gte', sysctl: 'vm.max_map_count=1048576',
+        why: 'Some games — Proton titles especially — map far more memory regions than the old default allowed, and hit a wall that looks like a random crash. Modern kernels already ship a high value.',
+    },
+    {
+        key: 'split_lock', label: 'Split-lock mitigation',
+        read: () => procNumber('/proc/sys/kernel/split_lock_mitigate'),
+        want: 0, cmp: 'eq', sysctl: 'kernel.split_lock_mitigate=0',
+        why: 'The kernel penalises a program that performs unaligned atomic operations across a cache line. A few games do it constantly and lose noticeable frames to the penalty. Turning it off trades a hardening measure for that performance.',
+    },
+    {
+        key: 'file_limit', label: 'Open file limit',
+        // /proc/self/limits reflects what this process inherited, which is the same session
+        // default a game launched from here will get — a truer answer than fs.file-max.
+        read: () => {
+            try {
+                const line = fs.readFileSync('/proc/self/limits', 'utf8')
+                    .split('\n').find(l => /max open files/i.test(l)) || '';
+                const n = line.match(/(\d+|unlimited)\s+(\d+|unlimited)/);
+                if (!n) return null;
+                return n[2] === 'unlimited' ? Infinity : parseInt(n[2], 10);
+            } catch { return null; }
+        },
+        want: 524288, cmp: 'gte', sysctl: '',   // not a sysctl — set by systemd, see `fix`
+        fix: 'sudo mkdir -p /etc/systemd/system.conf.d && printf \'[Manager]\\nDefaultLimitNOFILE=524288:524288\\n\' | sudo tee /etc/systemd/system.conf.d/99-gaming-nofile.conf',
+        why: 'esync gives every game thread its own file descriptor, so a low ceiling shows up as a game refusing to start once it is busy enough.',
+    },
+];
+
+function procNumber(p) {
+    try { const v = parseInt(String(fs.readFileSync(p, 'utf8')).trim(), 10); return Number.isFinite(v) ? v : null; }
+    catch { return null; }
+}
+
+function systemTuning() {
+    return TUNING.map(t => {
+        const value = t.read();
+        const ok = value === null ? null
+                 : t.cmp === 'gte' ? value >= t.want
+                 : value === t.want;
+        return {
+            key: t.key, label: t.label, why: t.why,
+            value: value === Infinity ? 'unlimited' : value,
+            want: t.want, ok,
+        };
+    });
+}
+
+// One command for everything that is off, written as a sysctl drop-in so it survives a
+// reboot. Anything without a sysctl (the file limit) carries its own command.
+function tuningCommand() {
+    const bad = TUNING.filter(t => {
+        const v = t.read();
+        if (v === null) return false;
+        return t.cmp === 'gte' ? v < t.want : v !== t.want;
+    });
+    if (!bad.length) return '';
+    const parts = [];
+    const sysctls = bad.filter(t => t.sysctl).map(t => t.sysctl);
+    if (sysctls.length) {
+        parts.push(`printf '${sysctls.join('\\n')}\\n' | sudo tee /etc/sysctl.d/99-cafeneurotico-gaming.conf`);
+        parts.push('sudo sysctl --system');
+    }
+    for (const t of bad) if (!t.sysctl && t.fix) parts.push(t.fix);
+    return parts.join('; ');
+}
+
 // ── The desktop's geometry ───────────────────────────────────────────────────
 // Matching the palette makes the app look like the desktop; matching the geometry makes it
 // sit in it. Omarchy's default is square corners (rounding = 0), and an app full of rounded
@@ -542,7 +623,8 @@ module.exports = {
     hyprctl, hyprctlJson, monitors,
     TOOLS, toolStatus, missingTools, gapSummary,
     INSTALLERS, installerStatus, missingInstallers, runInstaller,
-    WINDOW_RULES, FLOAT_GAMES_RULE, GAME_CLASS_RE, applyWindowRules, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
+    WINDOW_RULES, FLOAT_GAMES_RULE, GAME_CLASS_RE, applyWindowRules,
+    TUNING, systemTuning, tuningCommand, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
     installCommand, openInstallTerminal, openTerminalWith, terminalLauncher,
     isSupported, describe, which,
 };

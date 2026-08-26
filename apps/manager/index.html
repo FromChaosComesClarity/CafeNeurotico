@@ -6364,6 +6364,13 @@ LOADING...READY.</div>
           <div id="omarchy-status" style="font-size:11px; text-align:center; min-height:14px; margin-top:6px; line-height:1.4;"></div>
           <div style="font-size:10px; color:var(--text_dim); text-align:center; margin-top:3px;">Installs run in their own terminal, so press <b>Re-check</b> when one finishes &mdash; no restart needed.</div>
 
+          <div id="omarchy-tuning-block" style="display:none; margin-top:10px; padding-top:9px; border-top:1px solid var(--border);">
+            <div style="font-size:11px; color:var(--text_sec); font-weight:bold; margin-bottom:5px;">System tuning</div>
+            <div style="font-size:11px; color:var(--text_dim); line-height:1.5; margin-bottom:7px;">Kernel settings a gaming-focused distribution changes and a general-purpose one leaves alone. Most of them are already right here &mdash; this only reports, and hands you the command for anything that is not.</div>
+            <div id="omarchy-tuning-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;"></div>
+            <button id="btn-omarchy-tuning" style="width:100%; font-size:12px; padding:9px; letter-spacing:1px; display:none;">Apply Recommended Settings</button>
+          </div>
+
           <div style="margin-top:10px; padding-top:9px; border-top:1px solid var(--border);">
             <div style="font-size:11px; color:var(--text_dim); line-height:1.5;">Cafe Neurotico can wear your actual Omarchy palette &mdash; not a lookalike, the same colours your desktop is using. Change it with <code style="color:var(--accent);">omarchy theme set</code> and this follows along. It is in the theme picker under <b>Your Desktop</b> too.</div>
             <div style="font-size:11px; color:var(--text_sec); margin:6px 0 7px;">Your Omarchy theme: <b id="omarchy-theme-name" style="color:var(--accent);">&mdash;</b></div>
