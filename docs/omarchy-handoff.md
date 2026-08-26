@@ -14,7 +14,7 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
 
 ## The rules that matter before you write anything
 
-1. **Check the glibc floor before publishing — from whichever host you build on.**
+1. **Verify the artifact before publishing — from whichever host you build on.**
 
    This rule used to read "Nobara is the only release host, because building on rolling Arch
    raises the glibc floor for everyone." That was measured on 2026-08-25 and **it is not what
@@ -35,7 +35,9 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
    `better-sqlite3` locally and *that* build bakes in the host's glibc. On Arch that is 2.44, and
    users on older distributions find out as `GLIBC_2.xx not found`.
 
-   So the rule is not "never build here". It is **verify the artifact, every release**:
+   So the rule is not "never build here". It is **verify the artifact, every release**.
+
+   **First check: the glibc floor.**
 
    ```bash
    # after `npm run dist`, before uploading anything
@@ -50,6 +52,42 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
 
    Reproducibility is still a good reason to cut releases from one known machine. The glibc
    argument, on its own, is not.
+
+   **Second check: the release's headline fix is actually in the artifact.** A release exists for
+   a reason — confirm that reason shipped. Grep the packaged asar for a symbol only the fix
+   introduces. For 1.9.2 that was `ensureCaBundle`, the CA-bundle resolution that unbroke GOG
+   installs everywhere outside Fedora:
+
+   ```bash
+   grep -ac ensureCaBundle dist/linux-unpacked/resources/app.asar   # expect a non-zero count
+   ```
+
+   ⚠️ **The `-a` is not optional, and leaving it off fails silently.** `app.asar` is a binary
+   file, so without `-a` this can print nothing and exit 1 — which is indistinguishable from
+   "the fix is missing" — depending on which `grep` actually runs:
+
+   | Runner | `grep -c` | `grep -ac` |
+   |---|---|---|
+   | GNU grep 3.12, in your own terminal | `2` ✅ | `2` ✅ |
+   | Claude Code's `grep` (bundled ugrep, `-I`) | *nothing*, exit 1 ❌ | `2` ✅ |
+
+   Claude Code injects a shell **function** that shadows `grep` — it routes to its own bundled
+   ugrep with `-I` (skip binary files) among the default flags, so the asar is never even read.
+   The check therefore passes by hand and lies when an agent runs it, which is the worst possible
+   direction for a pre-publish gate to fail in. `LC_ALL=C` does **not** help; only `-a` (or
+   `--binary-files=text`) does. Verified on 2026-08-25 while cutting 1.9.2.
+
+   If you want certainty rather than a count, extract the file and grep plain text — this is
+   immune to whose `grep` is on the path:
+
+   ```bash
+   cd "$(mktemp -d)" && npx --yes @electron/asar extract-file \
+     ~/Documents/DEVELOPMENT/CLAUDE/CafeNeurotico/dist/linux-unpacked/resources/app.asar \
+     packages/core/platform/linux.js && grep -n ensureCaBundle linux.js
+   ```
+
+   ⚠️ `npx asar extract-file` writes into the **current** directory. Never run it from the repo
+   root — it will overwrite the real `linux.js` with the packaged copy. Hence the `mktemp -d`.
 2. **Linux outranks macOS; the reference desktop outranks this laptop.** A regression on the Nobara desktop
    blocks a merge. A KDE-only feature not existing under Hyprland is not a regression, and
    neither is the reverse.
@@ -104,7 +142,51 @@ npx electron . grinder    # GRINDER
 alive, so "it stayed open" proves nothing. That mistake has cost real bugs twice on this project.
 
 `npm run dist` builds the AppImage and `postdist` copies it to `~/Games/CNGM/` — that path is
-hardcoded in `package.json` and will simply fail harmlessly if you have no such folder.
+hardcoded in `package.json`. See gap 2 below before you run it.
+
+---
+
+## Three gaps the clone doesn't cover
+
+Everything above assumes `git clone` hands you a working machine. These three are the places it
+doesn't, and each one wastes a first day if you meet it cold.
+
+**1. `.claude/` is gitignored, so Claude Code arrives with no project config.**
+`.gitignore:28` ignores the whole directory, which means `.claude/settings.local.json` — the
+`defaultMode: bypassPermissions` and the long Bash allowlist grown over months of sessions —
+never leaves the desktop. ClaudeMemKeeper's `projectConfig` set covers `~/.claude.json`; do not
+assume it covers a file living inside the repo. The symptom is Claude stopping to ask permission
+for routine `git`/`npm`/`node` calls. The fix is to copy that one file across by hand, on the
+same USB stick as `claudememkeeper-settings.json`:
+
+```bash
+# from the desktop
+cp .claude/settings.local.json /run/media/jose/<stick>/
+# on the laptop
+mkdir -p .claude && cp /run/media/jose/<stick>/settings.local.json .claude/
+```
+
+**2. `postdist` fails loudly on a machine with no `~/Games/CNGM`.** The script is
+`[ -f $D/$F ] && mv …; cp dist/$F $D/$F` — with the directory missing, `cp` exits non-zero and
+npm prints a red `postdist` failure **after the AppImage has already built correctly**. Nothing is
+broken and `dist/CafeNeurotico.AppImage` is fine, but the error reads like a failed build. Create
+the folder once and it never comes up again:
+
+```bash
+mkdir -p ~/Games/CNGM
+```
+
+While you are there: copying the desktop's `~/Games/CNGM/GameManagerConfig/` across gives you a
+real library to test against. Without it the laptop starts empty and no library-shaped bug
+reproduces.
+
+**3. `npm run dist` here is for testing — it is not forbidden, it is just never shippable.**
+Rule 1 says Nobara is the only release host, which is easy to misread as "never build on this
+laptop." Build freely; it is the only way to test the packaged app, and `0f80ab3` is a fix the
+published 1.9.0 AppImage doesn't contain. What must never happen is that artifact reaching a
+GitHub release: it links `better-sqlite3` and Electron against rolling Arch's glibc, which raises
+the floor for every downloader silently. Releases get built on Nobara, from the tag, immediately
+before publishing.
 
 ---
 
@@ -200,7 +282,15 @@ main == experimental == mac        # kept level; all three push to origin
 
 New work goes on `experimental`, ff-merges into `main` when Jose says so, then both are pushed
 and `mac` is brought level. Releases: bump `package.json` + `package-lock.json`, write
-`RELEASE_NOTES_vX.Y.Z.md`, tag, push, build **on Nobara**, `gh release create`.
+`RELEASE_NOTES_vX.Y.Z.md`, tag, push, then **on Nobara**: `git checkout <tag>` — build from the
+tag, never from `main` — `npm install`, `npm run dist`, run **both checks in rule 1**, and only
+then `gh release create`.
+
+Two hard-won constraints on that last step. **Build immediately before publishing**: 1.9.0 shipped
+an AppImage built eleven minutes before its own fix merged, and 1.9.1 exists solely to correct
+that. **Never move a published tag** — the fix for a release missing a commit is a new patch
+version, not a retagged old one. Also clear `dist/` first; a stale AppImage from the previous
+release sits there looking exactly like a fresh one.
 
 Do not delete the `mac` branch — the Air pushes to it, and macOS work continues there.
 

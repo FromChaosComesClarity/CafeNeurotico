@@ -419,6 +419,11 @@ can.
 3. **Anything shared gets verified on Linux before it merges** — the engine, `shared-ipc.js`,
    the renderers, `custom-installers.js`. That means `npm run dist` on the Linux box plus the
    six-path launch smoke test in `docs/mac-port-phase-a.md`, not just "it built".
+   When you confirm a fix actually landed in a packaged bundle, grep the asar with **`grep -a`**
+   — `app.asar` is binary, and without `-a` the check can report "not found" for a fix that is
+   present. Full explanation, and the extract-and-grep alternative, in `docs/omarchy-handoff.md`
+   rule 1. Locate the macOS asar rather than assuming its path — electron-builder's output dir
+   depends on the arch it built: `find dist -name app.asar -path '*Contents/Resources/*'`.
 4. **If a fix belongs to both hosts, make it on Linux first**, confirm the AppImage, then pull
    it over. The Linux box is the reference implementation: when something on the Mac looks
    wrong, diff against what `linux.js` does.
