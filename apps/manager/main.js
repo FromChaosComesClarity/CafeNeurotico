@@ -3151,6 +3151,30 @@ ipcMain.on('open-manual', () => {
     manualWin.on('closed', () => { manualWin = null; });
 });
 
+// ⚠️ The renderer must NOT derive the UI scale from `window.screen`. On a multi-monitor
+// desk that reports the display the window happens to sit on — and on a fresh install, before
+// any bounds are saved, that is Electron's idea of the primary, which `pickDisplay` exists
+// precisely because we cannot trust. A 3440x1440 ultrawide beside a portrait 900x1440 panel
+// derived 0.75 from the panel and shrank the whole UI on the screen actually being used.
+//
+// So placement and scale now answer to the same helper: whichever display `pickDisplay` says
+// the window belongs on is the one the scale is derived from.
+//
+// `layout` identifies the monitor *set*, not one monitor, so dragging the window between
+// screens no longer looks like a different machine and re-derives a choice out from under the
+// user. Plugging in a genuinely different set still does.
+ipcMain.handle('ui-screen-info', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    let bounds = null;
+    try { bounds = win ? win.getBounds() : null; } catch { /* window already gone */ }
+    const wa = pickDisplay(bounds || getSavedBounds()).workArea;
+    const layout = screen.getAllDisplays()
+        .map(d => `${d.workArea.width}x${d.workArea.height}`)
+        .sort()
+        .join('+');
+    return { width: wa.width, height: wa.height, layout };
+});
+
 ipcMain.on('window-minimize', () => { const win = BrowserWindow.getFocusedWindow(); if(win) win.minimize(); });
 ipcMain.on('window-maximize', () => {
     const win = BrowserWindow.getFocusedWindow();

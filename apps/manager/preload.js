@@ -90,6 +90,10 @@ contextBridge.exposeInMainWorld('api', {
 
                                 // --- UI SCALING ---
                                 setZoomLevel: (level) => webFrame.setZoomFactor(level),
+                                // Work area of the display this window belongs on, plus a
+                                // signature of the whole monitor set — see 'ui-screen-info'
+                                // in main.js for why `window.screen` is the wrong source.
+                                getScreenInfo: () => ipcRenderer.invoke('ui-screen-info'),
 
                                 // --- HLTB, PROTON, SGDB & LOCAL MEDIA ---
                                 fetchHltb: (g) => ipcRenderer.invoke('fetch-hltb', g),
