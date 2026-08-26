@@ -213,3 +213,27 @@ not in this repo. Restore it with **ClaudeMemKeeper** — see `MEMORY_RESTORE.md
 Start the first session on this machine with:
 
 > "Resume the Cafe Neurotico project. Read your memory files for context."
+
+### ⚠️ `.claude/` is gitignored, so the project config does not arrive with the clone
+
+`.gitignore:28` ignores the whole directory. That includes **`.claude/settings.local.json`** — the
+`bypassPermissions` default and the Bash allowlist grown over months of sessions — so it never
+leaves the machine it was built on, and `git clone` cannot bring it.
+
+ClaudeMemKeeper's `projectConfig` set covers `~/.claude.json`; **do not assume it covers a file
+living inside the repo.** The symptom is Claude stopping to ask permission for routine
+`git` / `npm` / `node` calls on an otherwise fully restored machine.
+
+Copy that one file by hand, on the same stick as `claudememkeeper-settings.json`:
+
+```bash
+# on the machine that has it
+cp .claude/settings.local.json /run/media/jose/<stick>/
+# on the new machine, from the repo root
+mkdir -p .claude && cp /run/media/jose/<stick>/settings.local.json .claude/
+```
+
+While you are copying things: bringing the reference desktop's `GameManagerConfig/` across gives
+you a real library to test against. Without it the new machine starts empty and no library-shaped
+bug reproduces — and a restored library is itself worth testing, since several bugs only appear in
+one (install paths from the other machine, a UI scale chosen for another screen).
