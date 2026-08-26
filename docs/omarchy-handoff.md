@@ -1,8 +1,14 @@
 # Cafe Neurotico on Omarchy Linux — handoff
 
-**This is a third development machine, not a third platform.** Omarchy is Arch with Hyprland;
-`host.id` is `linux` and it runs the exact same `packages/core/platform/linux.js` the Nobara
-desktop does. Nothing like the macOS port is needed, and there is no `omarchy.js` to write.
+**This is a new desktop environment, not a new platform.** Omarchy is Arch with Hyprland;
+`host.id` is `linux` and it runs the exact same `packages/core/platform/linux.js` every Linux host
+here has always run. Nothing like the macOS port is needed, and there is no `omarchy.js` to write.
+
+⚠️ **Omarchy is now the only Linux machine.** This document was written on 2026-08-24 for an
+Omarchy *laptop* joining a Nobara desktop and a Mac. On **2026-08-25**, hours after 1.9.2 shipped,
+Nobara was wiped and Omarchy installed on the gaming desktop itself. So there is no desktop to
+defer to, no second Linux host to check a regression against, and **releases are cut here.**
+Wherever this document says "the reference desktop", it means this machine.
 
 What is genuinely new here is the **desktop environment**: a Wayland tiling compositor instead of
 KDE/KWin. That is a layer the codebase already has a place for — see *Where Hyprland features go*.
@@ -88,12 +94,17 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
 
    ⚠️ `npx asar extract-file` writes into the **current** directory. Never run it from the repo
    root — it will overwrite the real `linux.js` with the packaged copy. Hence the `mktemp -d`.
-2. **Linux outranks macOS; the reference desktop outranks this laptop.** A regression on the Nobara desktop
-   blocks a merge. A KDE-only feature not existing under Hyprland is not a regression, and
+2. **Linux outranks macOS, and this is the Linux host.** A regression here blocks a merge; a
+   macOS gap does not. A KDE-only feature not existing under Hyprland is not a regression, and
    neither is the reverse.
-3. **Three machines push to one repo. `git fetch` first, always.** This cost three rejected
-   pushes on 2026-08-24. And a rejected push is **not** all-or-nothing — git pushes refs
-   independently, so a tag can land while the branches fail. Use `--atomic` when it matters.
+
+   ⚠️ **KWin code still ships but can no longer be exercised.** `kwin-display.js` is behind an
+   `isSupported()` gate and simply disappears under Hyprland, so it cannot visibly regress here.
+   Treat it as code you can read but not test — and do not delete it because it looks dead.
+3. **Two machines push to one repo — this one and the Air. `git fetch` first, always.** This
+   cost three rejected pushes on 2026-08-24, back when there were three. A rejected push is
+   **not** all-or-nothing — git pushes refs independently, so a tag can land while the branches
+   fail. Use `--atomic` when it matters.
 4. **`apps/*/main.js` stays host-agnostic.** If Hyprland work needs to touch one, the boundary
    is in the wrong place. Same rule the macOS port lives under.
 
@@ -103,14 +114,16 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
 
 ```bash
 sudo pacman -S --needed git base-devel nodejs npm fuse2 github-cli
-node -v                       # want v22.x — Nobara runs 22.22.2
+node -v                       # want v22.x — the last Nobara build ran 22.22.2
 ```
 
 - **`fuse2` is not optional.** AppImages will not run without it, so you cannot test your own
   build otherwise.
 - **`base-devel`** is what rebuilds `better-sqlite3` against Electron's ABI.
-- `gh auth login` if you want to touch releases (you shouldn't from here — see rule 1 — but
-  `gh` is also the git credential helper on the other machines).
+- **`gh auth login` is required, not optional.** Releases are cut here now, and `gh` is also the
+  git credential helper (`credential.https://github.com.helper = !/usr/bin/gh auth git-credential`)
+  — there is no global helper, so **nothing pushes until gh is logged in.** Scopes: `repo`,
+  `workflow`, `gist`, `read:org`.
 
 ---
 
@@ -154,16 +167,15 @@ doesn't, and each one wastes a first day if you meet it cold.
 **1. `.claude/` is gitignored, so Claude Code arrives with no project config.**
 `.gitignore:28` ignores the whole directory, which means `.claude/settings.local.json` — the
 `defaultMode: bypassPermissions` and the long Bash allowlist grown over months of sessions —
-never leaves the desktop. ClaudeMemKeeper's `projectConfig` set covers `~/.claude.json`; do not
-assume it covers a file living inside the repo. The symptom is Claude stopping to ask permission
-for routine `git`/`npm`/`node` calls. The fix is to copy that one file across by hand, on the
-same USB stick as `claudememkeeper-settings.json`:
+never leaves the machine it was written on. ClaudeMemKeeper's `projectConfig` set covers
+`~/.claude.json`; do not assume it covers a file living inside the repo. The symptom is Claude
+stopping to ask permission for routine `git`/`npm`/`node` calls. All six repos' copies were
+rescued before the wipe:
 
 ```bash
-# from the desktop
-cp .claude/settings.local.json /run/media/jose/<stick>/
-# on the laptop
-mkdir -p .claude && cp /run/media/jose/<stick>/settings.local.json .claude/
+mkdir -p .claude
+cp /run/media/jose/backup/irreplaceable/06-claude-config/repo-settings-local/CafeNeurotico/settings.local.json \
+   .claude/
 ```
 
 **2. `postdist` fails loudly on a machine with no `~/Games/CNGM`.** The script is
@@ -176,17 +188,23 @@ the folder once and it never comes up again:
 mkdir -p ~/Games/CNGM
 ```
 
-While you are there: copying the desktop's `~/Games/CNGM/GameManagerConfig/` across gives you a
-real library to test against. Without it the laptop starts empty and no library-shaped bug
-reproduces.
+While you are there: restoring `GameManagerConfig/` gives you a real library to test against.
+Without it the machine starts empty and no library-shaped bug reproduces.
 
-**3. `npm run dist` here is for testing — it is not forbidden, it is just never shippable.**
-Rule 1 says Nobara is the only release host, which is easy to misread as "never build on this
-laptop." Build freely; it is the only way to test the packaged app, and `0f80ab3` is a fix the
-published 1.9.0 AppImage doesn't contain. What must never happen is that artifact reaching a
-GitHub release: it links `better-sqlite3` and Electron against rolling Arch's glibc, which raises
-the floor for every downloader silently. Releases get built on Nobara, from the tag, immediately
-before publishing.
+```bash
+rsync -a /run/media/jose/backup/irreplaceable/01-game-manager-config/ \
+         ~/Games/CNGM/GameManagerConfig/
+```
+
+**3. `npm run dist` here is both the test build and the shipped one.** This gap used to read
+"never shippable", on the theory that building on rolling Arch links `better-sqlite3` and Electron
+against Arch's glibc and silently raises the floor for every downloader. **That was measured on
+2026-08-25 and it is not what happens** — nothing compiles against the host's glibc, and an
+Omarchy-built AppImage demands at most `GLIBC_2.34`. See rule 1.
+
+So build freely, and publish from here too — there is nowhere else. What replaced the old rule is
+not caution about the machine but **verification of the artifact**: both checks in rule 1, every
+release, built from the tag, immediately before publishing.
 
 ---
 
@@ -282,9 +300,9 @@ main == experimental == mac        # kept level; all three push to origin
 
 New work goes on `experimental`, ff-merges into `main` when Jose says so, then both are pushed
 and `mac` is brought level. Releases: bump `package.json` + `package-lock.json`, write
-`RELEASE_NOTES_vX.Y.Z.md`, tag, push, then **on Nobara**: `git checkout <tag>` — build from the
-tag, never from `main` — `npm install`, `npm run dist`, run **both checks in rule 1**, and only
-then `gh release create`.
+`RELEASE_NOTES_vX.Y.Z.md`, tag, push, then: `git checkout <tag>` — build from the tag, never from
+`main` — `npm install`, `npm run dist`, run **both checks in rule 1**, and only then
+`gh release create`.
 
 Two hard-won constraints on that last step. **Build immediately before publishing**: 1.9.0 shipped
 an AppImage built eleven minutes before its own fix merged, and 1.9.1 exists solely to correct
@@ -314,16 +332,10 @@ ClaudeMemKeeper's `projectConfig` set covers `~/.claude.json`; **do not assume i
 living inside the repo.** The symptom is Claude stopping to ask permission for routine
 `git` / `npm` / `node` calls on an otherwise fully restored machine.
 
-Copy that one file by hand, on the same stick as `claudememkeeper-settings.json`:
+It was rescued before the wipe — the restore command is in **gap 1** above, and all six repos'
+copies are under `06-claude-config/repo-settings-local/` on the backup drive.
 
-```bash
-# on the machine that has it
-cp .claude/settings.local.json /run/media/jose/<stick>/
-# on the new machine, from the repo root
-mkdir -p .claude && cp /run/media/jose/<stick>/settings.local.json .claude/
-```
-
-While you are copying things: bringing the reference desktop's `GameManagerConfig/` across gives
-you a real library to test against. Without it the new machine starts empty and no library-shaped
-bug reproduces — and a restored library is itself worth testing, since several bugs only appear in
-one (install paths from the other machine, a UI scale chosen for another screen).
+While you are copying things: restoring `GameManagerConfig/` (gap 2) gives you a real library to
+test against. Without it the new machine starts empty and no library-shaped bug reproduces — and a
+restored library is itself worth testing, since several bugs only appear in one (install paths
+written on another machine, a UI scale chosen for another screen).
