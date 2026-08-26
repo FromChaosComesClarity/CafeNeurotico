@@ -104,7 +104,51 @@ npx electron . grinder    # GRINDER
 alive, so "it stayed open" proves nothing. That mistake has cost real bugs twice on this project.
 
 `npm run dist` builds the AppImage and `postdist` copies it to `~/Games/CNGM/` — that path is
-hardcoded in `package.json` and will simply fail harmlessly if you have no such folder.
+hardcoded in `package.json`. See gap 2 below before you run it.
+
+---
+
+## Three gaps the clone doesn't cover
+
+Everything above assumes `git clone` hands you a working machine. These three are the places it
+doesn't, and each one wastes a first day if you meet it cold.
+
+**1. `.claude/` is gitignored, so Claude Code arrives with no project config.**
+`.gitignore:28` ignores the whole directory, which means `.claude/settings.local.json` — the
+`defaultMode: bypassPermissions` and the long Bash allowlist grown over months of sessions —
+never leaves the desktop. ClaudeMemKeeper's `projectConfig` set covers `~/.claude.json`; do not
+assume it covers a file living inside the repo. The symptom is Claude stopping to ask permission
+for routine `git`/`npm`/`node` calls. The fix is to copy that one file across by hand, on the
+same USB stick as `claudememkeeper-settings.json`:
+
+```bash
+# from the desktop
+cp .claude/settings.local.json /run/media/jose/<stick>/
+# on the laptop
+mkdir -p .claude && cp /run/media/jose/<stick>/settings.local.json .claude/
+```
+
+**2. `postdist` fails loudly on a machine with no `~/Games/CNGM`.** The script is
+`[ -f $D/$F ] && mv …; cp dist/$F $D/$F` — with the directory missing, `cp` exits non-zero and
+npm prints a red `postdist` failure **after the AppImage has already built correctly**. Nothing is
+broken and `dist/CafeNeurotico.AppImage` is fine, but the error reads like a failed build. Create
+the folder once and it never comes up again:
+
+```bash
+mkdir -p ~/Games/CNGM
+```
+
+While you are there: copying the desktop's `~/Games/CNGM/GameManagerConfig/` across gives you a
+real library to test against. Without it the laptop starts empty and no library-shaped bug
+reproduces.
+
+**3. `npm run dist` here is for testing — it is not forbidden, it is just never shippable.**
+Rule 1 says Nobara is the only release host, which is easy to misread as "never build on this
+laptop." Build freely; it is the only way to test the packaged app, and `0f80ab3` is a fix the
+published 1.9.0 AppImage doesn't contain. What must never happen is that artifact reaching a
+GitHub release: it links `better-sqlite3` and Electron against rolling Arch's glibc, which raises
+the floor for every downloader silently. Releases get built on Nobara, from the tag, immediately
+before publishing.
 
 ---
 
