@@ -482,6 +482,12 @@ function ensureGrinderEngine(createIfMissing = false) {
 let _gamesRunning = 0;
 function onGameSession(active) {
     const omarchy = host.desktop?.omarchy;
+    // ⚠️ Re-applied on every launch, not just at startup. Rules set through `hyprctl eval` are
+    // runtime state, and ANY Hyprland config reload discards them — which `omarchy theme set`
+    // does every time. Change your theme once and games silently go back to tiling, with
+    // nothing to indicate why. Re-applying costs four IPC calls and happens at the moment the
+    // float rule actually matters: just before the game's window maps.
+    if (active) { try { applyHyprlandRules(); } catch {} }
     _gamesRunning = Math.max(0, _gamesRunning + (active ? 1 : -1));
     const busy = _gamesRunning > 0;
     try { omarchy?.inhibitIdle?.(busy, powerSaveBlocker); } catch {}

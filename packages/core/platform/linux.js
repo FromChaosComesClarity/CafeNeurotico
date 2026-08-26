@@ -620,6 +620,17 @@ function diagnose(log, protonPath) {
     if (/wine: cannot find|is not a valid Win32|Bad EXE format/i.test(t))
         return { code: 'BAD_EXE', message: 'The game executable could not be run by Proton/Wine.' };
 
+    // The same missing-Vulkan cause, but from a game that got far enough to install its own
+    // crash handler. DOOM + DOOM II dies with an access violation inside dxgi.dll at a null
+    // pointer — DXVK could not create a device, handed back nothing, and the game dereferenced
+    // it. Recognising the module name is what turns "the game crashed, see CRASHLOG.TXT" into
+    // an answer, since that file is written by the game and the app never reads it.
+    if (/dxgi\.dll|d3d11\.dll|dxvk/i.test(t) && /Access Violation|0xc0000005|Exception/i.test(t))
+        return { code: 'NO_VULKAN', message:
+            'The game crashed inside the Direct3D layer. On a GPU with no Vulkan support that is ' +
+            'expected — Proton renders Direct3D through DXVK, which requires it. Setting ' +
+            'PROTON_USE_WINED3D=1 for this game switches to OpenGL and often works on older hardware.' };
+
     // ⚠️ No Vulkan on this GPU. Proton translates Direct3D through DXVK, which is Vulkan-only,
     // so on hardware that predates Vulkan the game dies instantly with nothing useful in the
     // log — Proton gets as far as "fsync: up and running" and stops. Diagnosed on a 2011 Mac

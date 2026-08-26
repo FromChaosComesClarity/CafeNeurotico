@@ -3530,6 +3530,13 @@
           @keyframes hebDrop { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
           /* Full-bleed Home — takes over the whole window (over the sidebar), under the titlebar + modals */
           body.viewing-home #view-home.view { position:fixed; top:35px; left:0; right:0; bottom:0; z-index:500; padding:0 !important; background:var(--bg); overflow-y:auto; }
+          /* ⚠️ In compact chrome the dashboard must NOT cover the icon rail. It always did —
+             left:0 under a z-index:500 overlay — and that was survivable while navigation
+             lived in the title bar. Compact chrome moves navigation INTO the rail, so covering
+             it leaves no way out of the dashboard at all. `top` drops to 0 for the same
+             reason: the 35px was clearance for a title bar that is no longer there. */
+          .compact-chrome body.viewing-home #view-home.view { top:0; left:48px; }
+          .compact-chrome.very-narrow body.viewing-home #view-home.view { left:40px; }
           /* Skeleton loaders */
           .hc-skel { background:linear-gradient(90deg, var(--bg) 25%, var(--bg_panel) 50%, var(--bg) 75%); background-size:200% 100%; animation:hcShim 1.2s linear infinite; }
           @keyframes hcShim { from { background-position:200% 0; } to { background-position:-200% 0; } }
