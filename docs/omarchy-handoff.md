@@ -14,11 +14,43 @@ Companion documents: `docs/mac-port-handoff.md` (the macOS equivalent) and
 
 ## The rules that matter before you write anything
 
-1. **Nobara is the only release host.** Develop here freely; never cut a release from this
-   laptop. The AppImage links `better-sqlite3` and Electron against the *build host's* glibc
-   (2.43 on Nobara). Building a release on rolling Arch silently raises the glibc floor for
-   everyone who downloads it, and they find out as `GLIBC_2.xx not found`.
-2. **Linux outranks macOS; Nobara outranks this laptop.** A regression on the Nobara desktop
+1. **Check the glibc floor before publishing — from whichever host you build on.**
+
+   This rule used to read "Nobara is the only release host, because building on rolling Arch
+   raises the glibc floor for everyone." That was measured on 2026-08-25 and **it is not what
+   happens**. An AppImage built on Omarchy (glibc 2.44) demands at most:
+
+   | Binary | Highest symbol |
+   |---|---|
+   | `cafeneurotico` (the Electron binary) | `GLIBC_2.25` |
+   | `better_sqlite3.node`, `comet` | `GLIBC_2.34` |
+
+   `GLIBC_2.34` is from 2021. Nothing is compiled against the build host's glibc: Electron ships
+   prebuilt from upstream, `better-sqlite3` arrives as a downloaded prebuild
+   (`electron-builder` logs `buildFromSource=false`), and our helpers come from the pinned
+   binaries tarball.
+
+   ⚠️ **The risk is real but conditional.** If `prebuild-install` ever fails — a new Electron ABI
+   with no published prebuild, or anyone passing `--build-from-source` — then node-gyp compiles
+   `better-sqlite3` locally and *that* build bakes in the host's glibc. On Arch that is 2.44, and
+   users on older distributions find out as `GLIBC_2.xx not found`.
+
+   So the rule is not "never build here". It is **verify the artifact, every release**:
+
+   ```bash
+   # after `npm run dist`, before uploading anything
+   find dist/linux-unpacked -type f | while read f; do
+     head -c4 "$f" | grep -q $'\x7fELF' || continue
+     objdump -T "$f" 2>/dev/null | grep -oE "GLIBC_[0-9]+\.[0-9]+"
+   done | sort -uV | tail -3
+   ```
+
+   Anything above **`GLIBC_2.34`** means something got compiled locally — stop and find out what
+   before you publish. Also confirm the build log still says `buildFromSource=false`.
+
+   Reproducibility is still a good reason to cut releases from one known machine. The glibc
+   argument, on its own, is not.
+2. **Linux outranks macOS; the reference desktop outranks this laptop.** A regression on the Nobara desktop
    blocks a merge. A KDE-only feature not existing under Hyprland is not a regression, and
    neither is the reverse.
 3. **Three machines push to one repo. `git fetch` first, always.** This cost three rejected
