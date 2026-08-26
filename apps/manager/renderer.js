@@ -1484,6 +1484,21 @@ window.addEventListener('focus', () => {
 let currentLaunchCmd = '';
 let activeFilters = new Set(); // empty = ALL GAMES
 const STORE_FILTERS     = new Set(['steam','gog','epic','flatpak','pico8','itch','physical','emulation','apps','others','openbor']);
+// ── One definition of "installed" ────────────────────────────────────────────
+// ⚠️ There were six of these, and they disagreed. The gallery cards asked for a launch
+// command AND a non-zero Installed flag, while four of the filters accepted
+// `Installed == 1 || !!LaunchCommand` — so anything carrying a launch command counted as
+// installed no matter what the flag said. On a library imported from another machine that is
+// almost every row, which is why the Installed filter listed 22 games and most of them showed
+// an INSTALL button: the filter and the button were answering different questions.
+//
+// A NULL flag still counts as installed, deliberately: it means "never reconciled", and rows
+// the reconciler cannot judge must not vanish from the filter. An explicit 0 means it was
+// judged and is not here.
+function isGameInstalled(g) {
+    return !!g && !!g.LaunchCommand && (g.Installed == null || g.Installed == 1);
+}
+
 const QUALIFIER_FILTERS = new Set(['installed','favs','want','playable','mac-native']);
 
 // ── Genres ───────────────────────────────────────────────────────────────────
@@ -4561,9 +4576,11 @@ function applyFilters() {
             if (f === 'want'       && game.WANT_TO_PLAY !== 'YES') return false;
             if (f === 'mac-native' && !isMacNative(game)) return false;
             if (f === 'installed') {
-                const cat = storeLower;
-                const isManual = !game.GrinderGameId && (cat.includes('others') || cat.includes('emulation') || cat.includes('physical') || cat.includes('apps'));
-                if (!(isManual ? !!game.LaunchCommand : game.Installed == 1)) return false;
+                // ⚠️ The manual/emulation special case is gone: it accepted any row with a
+                // launch command, which is exactly how uninstalled emulator and RetroArch
+                // entries kept showing up here. A NULL flag still counts, so rows that were
+                // never reconciled behave as before.
+                if (!isGameInstalled(game)) return false;
             }
         }
 
@@ -4660,7 +4677,7 @@ function renderTable(recent, regular) {
         tr.style.cursor = "pointer";
         let displayStore = game.Store ? game.Store.replace(/EPIC/i, 'Epic').replace(/GOG/i, 'GOG') : '';
         const installCmd = getInstallCommand(game);
-        const isInstalled = !!game.LaunchCommand && (game.Installed == null || game.Installed == 1);
+        const isInstalled = isGameInstalled(game);
         let actionCell;
         if (isInstalled) {
             actionCell = `<button class="primary btn-play" data-cmd="${game.LaunchCommand.replace(/"/g, '&quot;')}" data-id="${game.id}" style="padding: 4px 8px;">${t('status.play')}</button>`;
@@ -4747,7 +4764,7 @@ function renderSplitList(games) {
     const _srPlSvg  = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="22" y1="6" x2="16" y2="6"/></svg>`;
 
     games.forEach((game, idx) => {
-        const isInstalled = game.Installed == null || game.Installed == 1;
+        const isInstalled = isGameInstalled(game);
         const isFav  = game.FAV === 'YES';
         const isWant = game.WANT_TO_PLAY === 'YES';
         const row = document.createElement('div');
@@ -4869,7 +4886,7 @@ function renderSplitDetail(game) {
 
     // Play / Install button
     const playBtn = document.getElementById('btn-split-play');
-    const isInstalled = !!game.LaunchCommand && (game.Installed == null || game.Installed == 1);
+    const isInstalled = isGameInstalled(game);
     if (isInstalled) {
         playBtn.textContent = '▶ PLAY';
         playBtn.className = 'primary';
@@ -5568,7 +5585,7 @@ const _macFilterLabels = {
 function _applyMacFilter(src) {
     const s = g => (g.Store || '').toLowerCase();
     switch (_macFilter) {
-        case 'installed':  return src.filter(g => g.Installed == 1);
+        case 'installed':  return src.filter(isGameInstalled);
         case 'favs':       return src.filter(g => g.FAV === 'YES');
         case 'want':       return src.filter(g => g.WANT_TO_PLAY === 'YES');
         case 'steam':      return src.filter(g => s(g).includes('steam'));
@@ -5705,7 +5722,7 @@ function openMacGamepage(game) {
         getLocalizedDescription(game) || '—';
     const launchBtn   = document.getElementById('mgp-btn-launch');
     const installBtn  = document.getElementById('mgp-btn-install');
-    const isInstalled = game.Installed == 1 || (!!game.LaunchCommand && game.Installed == null);
+    const isInstalled = isGameInstalled(game);
     const canInstall  = _isGrinderGame(game) || !!getInstallCommand(game) || isManualCategory(game);
     if (game.LaunchCommand && isInstalled) {
         launchBtn.style.display  = '';
@@ -6045,7 +6062,7 @@ function _xpGetGames() {
     let src = _flatFilter(_xpSearch, picoBypass);
     const s = g => (g.Store || '').toLowerCase();
     switch (_xpFilter) {
-        case 'installed': src = src.filter(g => g.Installed == 1); break;
+        case 'installed': src = src.filter(isGameInstalled); break;
         case 'favs':      src = src.filter(g => g.FAV === 'YES'); break;
         case 'want':      src = src.filter(g => g.WANT_TO_PLAY === 'YES'); break;
         case 'steam':     src = src.filter(g => s(g).includes('steam')); break;
@@ -6360,7 +6377,7 @@ function _kdeGetGames() {
     let src = _flatFilter(_kdeSearch, picoBypass);
     const s = g => (g.Store || '').toLowerCase();
     switch (_kdeFilter) {
-        case 'installed': src = src.filter(g => g.Installed == 1); break;
+        case 'installed': src = src.filter(isGameInstalled); break;
         case 'favs':      src = src.filter(g => g.FAV === 'YES'); break;
         case 'want':      src = src.filter(g => g.WANT_TO_PLAY === 'YES'); break;
         case 'steam':     src = src.filter(g => s(g).includes('steam')); break;
@@ -6616,7 +6633,7 @@ function _c64GetGames() {
         const store = (g.Store||'').toLowerCase();
         if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
-        if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
+        if (f === 'installed') return isGameInstalled(g);
         if (f === 'favs')      return g.is_favourite == 1;
         if (f === 'steam')     return store.includes('steam');
         if (f === 'gog')       return store.includes('gog');
@@ -6795,7 +6812,7 @@ function _nxGetGames() {
         const store = (g.Store||'').toLowerCase();
         if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
-        if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
+        if (f === 'installed') return isGameInstalled(g);
         if (f === 'favs')      return g.is_favourite == 1;
         if (f === 'want')      return g.WANT_TO_PLAY === 'YES';
         if (f === 'steam')     return store.includes('steam');
@@ -7001,7 +7018,7 @@ function _w95GetGames() {
         const store = (g.Store||'').toLowerCase();
         if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
-        if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
+        if (f === 'installed') return isGameInstalled(g);
         if (f === 'favs')      return g.is_favourite == 1;
         if (f === 'want')      return g.WANT_TO_PLAY === 'YES';
         if (f === 'steam')     return store.includes('steam');
@@ -7218,7 +7235,7 @@ function _beosGetGames() {
         const store = (g.Store||'').toLowerCase();
         if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
-        if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
+        if (f === 'installed') return isGameInstalled(g);
         if (f === 'favs')      return g.is_favourite == 1;
         if (f === 'want')      return g.WANT_TO_PLAY === 'YES';
         if (f === 'steam')     return store.includes('steam');
@@ -7412,7 +7429,7 @@ function _amigaGetGames() {
         const store = (g.Store||'').toLowerCase();
         if (_hidePico8 && f !== 'pico8' && _isPico8Only(g.Store)) return false;
         if (f === 'all')       return true;
-        if (f === 'installed') return g.Installed == 1 || !!g.LaunchCommand;
+        if (f === 'installed') return isGameInstalled(g);
         if (f === 'favs')      return g.is_favourite == 1;
         if (f === 'steam')     return store.includes('steam');
         if (f === 'gog')       return store.includes('gog');
@@ -8929,7 +8946,7 @@ function renderGallery(recent, regular) {
         const badgeHtml = (_badges || _macBadge) ? `<div class="gallery-store-badges">${_badges}${_macBadge}</div>` : '';
         const f2pHtml = isFreeToPlay(game) ? `<div class="f2p-pill gallery-f2p-pill" data-f2p-pill="1" title="Free-to-play — click to show/hide these">FREE</div>` : '';
         const installCmdG = getInstallCommand(game);
-        const isInstalled = !!game.LaunchCommand && (game.Installed == null || game.Installed == 1);
+        const isInstalled = isGameInstalled(game);
         const dotHtml = game.LaunchCommand ? `<div class="install-dot ${isInstalled ? 'is-installed' : 'not-installed'}" title="${isInstalled ? t('status.installed') : t('status.not_installed')}"></div>` : '';
         const isFav  = game.FAV === 'YES';
         const isWant = game.WANT_TO_PLAY === 'YES';
@@ -9265,7 +9282,7 @@ document.getElementById('modal-achievements').addEventListener('click', e => {
 function refreshGamepagePlayBtn(game) {
     const playBtn = document.getElementById('btn-gamepage-play');
     currentLaunchCmd = game.LaunchCommand || '';
-    const isInstalled = !!currentLaunchCmd && (game.Installed == null || game.Installed == 1);
+    const isInstalled = isGameInstalled(game);
 
     if (isInstalled) {
         playBtn.style.display = 'block';
