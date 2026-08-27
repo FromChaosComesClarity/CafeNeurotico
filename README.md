@@ -4,7 +4,8 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.8.0-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.9.3-D4A373?style=flat-square)
+![status](https://img.shields.io/badge/status-Experimental-e58a70?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![platform-mac](https://img.shields.io/badge/platform-macOS%20(Experimental)-e58a70?style=flat-square)
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
@@ -12,10 +13,22 @@
 
 **[Download the AppImage](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/latest)** ·
 [macOS build (Experimental)](docs/macos-guide.md) ·
-[Website](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/) ·
-[Support](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/support.html)
+[Support the project](#tip-the-barista)
 
 </div>
+
+---
+
+> [!IMPORTANT]
+> **The app is going through changes, and the builds are experimental for now.**
+>
+> The project is being reworked, and the website is offline while that happens — it has not
+> gone anywhere, it is just not being served. Everything you need is in this README and in the
+> manual that ships inside the app.
+>
+> Current builds are usable — they are what I run myself — but behaviour may change between
+> releases while this is going on. If you have a version that works for you and you need it to
+> stay that way, there is no hurry to update.
 
 ---
 
@@ -26,7 +39,7 @@ cafeneurotico@linux:~$ ./brew
 [ ok ] pouring fullscreen interface.... CREMA
 [ ok ] blending into one shot.......... done
 
-▓▓ CAFE NEUROTICO 1.3 ▓▓
+▓▓ CAFE NEUROTICO 1.9.3 ▓▓
 > three faces, one binary. served.
 ```
 
@@ -99,7 +112,7 @@ All three read and write the **same database**. Favourite a game on the couch, i
 
 **Old Windows games that ship their own fix.** Plenty of nineties titles come with a community patch in a file like `ddraw.dll`, `opengl32.dll` or `dinput8.dll` — a translation, a renderer, a timing fix, a mod loader. On Windows the game's own copy wins; Wine normally overrides it, so the patch never runs and the game either dies on startup or comes up in the wrong language. The suite hands the game its own, with Wine's behind it as a fallback. Nothing to configure, and it applies to every game that does this.
 
-**Games that have been fixed individually.** The rule above is general, and most compatibility problems are. What is left over is the awkward remainder: a fault belonging to one specific game and to nothing else. Those are written down as fixes in their own right and applied when the game starts — *OutRun 2006*, which opens to a white screen and looks hung on the SEGA logo when it is really just grinding through a minute of intro videos; *Resident Evil 2* with Classic REbirth; GOG's Windows builds of *Quake*; *Fallout: New California*; *Realms of Arkania*; *Albion*; *Colony Ship*. Each one cost an evening to work out, which is exactly why it is worth writing down. [**The whole list, with what was wrong in each case →**](https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/fixes.html)
+**Games that have been fixed individually.** The rule above is general, and most compatibility problems are. What is left over is the awkward remainder: a fault belonging to one specific game and to nothing else. Those are written down as fixes in their own right and applied when the game starts — *OutRun 2006*, which opens to a white screen and looks hung on the SEGA logo when it is really just grinding through a minute of intro videos; *Resident Evil 2* with Classic REbirth; GOG's Windows builds of *Quake*; *Fallout: New California*; *Realms of Arkania*; *Albion*; *Colony Ship*. Each one cost an evening to work out, which is exactly why it is worth writing down.
 
 **Pick which version starts.** A GOG release often ships several ways to launch and the store never shows you: Quake: The Offering has seven, and only one of them plays the CD soundtrack. The gamepage lets you choose, and remembers.
 

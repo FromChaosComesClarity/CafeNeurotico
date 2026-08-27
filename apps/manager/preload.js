@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, webFrame } = require('electron');
+const { contextBridge, ipcRenderer, webFrame, clipboard } = require('electron');
 
 // ⚠️ Read here, synchronously, purely so the pre-paint script in index.html can know it. The
 // compact-chrome default depends on being on Omarchy, and everything else that knows that is
@@ -90,6 +90,10 @@ contextBridge.exposeInMainWorld('api', {
 
                                 // --- UI SCALING ---
                                 setZoomLevel: (level) => webFrame.setZoomFactor(level),
+                                // Support details are shown in-app rather than opened in a browser,
+                                // so copying has to actually work — Electron's own clipboard does it
+                                // without needing a secure context.
+                                copyText: (t) => { try { clipboard.writeText(String(t ?? '')); return true; } catch { return false; } },
                                 // Work area of the display this window belongs on, plus a
                                 // signature of the whole monitor set — see 'ui-screen-info'
                                 // in main.js for why `window.screen` is the wrong source.

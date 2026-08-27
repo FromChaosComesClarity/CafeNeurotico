@@ -138,6 +138,11 @@
     .hidden-game-row .hg-title { font-weight: bold; font-size: 13px; color: var(--text_main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hidden-game-row .hg-store { font-size: 11px; color: var(--text_dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hidden-game-row .hg-unhide { flex-shrink: 0; font-size: 11px; padding: 6px 12px; font-weight: bold; letter-spacing: 1px; cursor: pointer; }
+    .support-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(0,0,0,0.18); border: 1px solid var(--border); border-radius: 8px; }
+    .support-meta { flex: 1; min-width: 0; }
+    .support-label { font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: var(--text_dim); margin-bottom: 3px; }
+    .support-value { font-size: 12px; color: var(--text_main); word-break: break-all; }
+    .support-copy { flex-shrink: 0; padding: 6px 14px; font-weight: bold; letter-spacing: 1px; cursor: pointer; }
     .dlc-row { display: flex; align-items: center; gap: 12px; padding: 9px 11px; background: rgba(0,0,0,0.18); border: 1px solid var(--border); border-radius: 8px; }
     .dlc-row .dlc-meta { flex: 1; min-width: 0; }
     .dlc-row .dlc-title { font-weight: bold; font-size: 13px; color: var(--text_main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -6713,6 +6718,39 @@ LOADING...READY.</div>
       <div id="hidden-games-empty" style="display:none; font-size:13px; color:var(--text_dim); padding:24px 0; text-align:center;">No hidden games. Hide one from its game page or a FREE pill.</div>
       <div id="hidden-games-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; min-height:40px;"></div>
       <button id="btn-close-hidden-games" style="margin-top: 4px; width: 100%;" data-i18n="html.close">Close</button>
+    </div>
+  </div>
+
+  <div id="modal-support" class="modal-overlay" style="z-index:29000;">
+    <div class="modal-box" style="max-width: 520px; width: 520px;">
+      <h3 style="margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px;">Tip the barista</h3>
+      <p style="font-size: 12px; color: var(--text_sec); line-height: 1.6; margin: 0 0 4px;">
+        If Cafe Neurotico organized your gaming life, consider buying me a coffee — it keeps the pot warm.
+        <strong>&ldquo;more caffeine is <em>more good</em>.&rdquo;</strong>
+      </p>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:6px;">
+        <div class="support-row">
+          <div class="support-meta">
+            <div class="support-label">Ko-fi &middot; international</div>
+            <code id="support-kofi" class="support-value">https://ko-fi.com/cafeneurotico</code>
+          </div>
+          <button class="support-copy" data-copy="support-kofi" style="font-size:11px;">Copy</button>
+        </div>
+        <div class="support-row">
+          <div class="support-meta">
+            <div class="support-label">PIX &middot; Brazil</div>
+            <code id="support-pix" class="support-value">b734a9e2-e479-42f9-abd6-c88d1b8b880e</code>
+          </div>
+          <button class="support-copy" data-copy="support-pix" style="font-size:11px;">Copy</button>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: var(--text_dim); line-height: 1.6; margin: 14px 0 0;">
+        Free help counts too — star the repo, report what breaks, tell someone who would like it.
+        If you do donate, mail <code style="color:var(--text_sec);">shampooisalie@gmail.com</code> so I can thank you properly.
+      </p>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button id="btn-close-support" class="primary" style="flex:1; font-size:12px;">Close</button>
+      </div>
     </div>
   </div>
 

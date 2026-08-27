@@ -1,6 +1,6 @@
 {
   "name": "cafeneurotico",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Cafe Neurotico — unified suite (Manager + GRINDER + CREMA in one AppImage)",
   "main": "main.js",
   "desktopName": "cafeneurotico.desktop",

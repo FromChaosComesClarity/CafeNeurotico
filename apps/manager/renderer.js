@@ -1730,9 +1730,28 @@ window.api.checkEmuLatte().then(exists => {
 });
 // Always-visible floating CREMA call-to-action
 document.getElementById('crema-cta')?.addEventListener('click', () => window.api.launchCrema());
-// Support pill → project website donation/support page
-const SUPPORT_URL = 'https://shampoo-is-a-lie.github.io/CafeNeuroticoWebSite/support.html';
-document.getElementById('support-cta')?.addEventListener('click', () => window.api.openExternal(SUPPORT_URL));
+// Support pill → an in-app panel. Nothing here opens a browser.
+//
+// ⚠️ This used to open the project website's support.html. The site is offline while the app is
+// being reworked, and a URL baked into a shipped build is the one link that cannot be corrected
+// afterwards — so the app no longer sends anyone anywhere. The details are shown in-app instead,
+// which also means they still work with no network at all. Because nothing is clickable, both
+// values must be copyable, and that is the whole point of the Copy buttons.
+const _supportModal = document.getElementById('modal-support');
+const _closeSupport = () => _supportModal?.classList.remove('active');
+document.getElementById('support-cta')?.addEventListener('click', () => _supportModal?.classList.add('active'));
+document.getElementById('btn-close-support')?.addEventListener('click', _closeSupport);
+_supportModal?.addEventListener('click', e => { if (e.target === _supportModal) _closeSupport(); });
+document.querySelectorAll('.support-copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const el = document.getElementById(btn.getAttribute('data-copy'));
+        if (!el) return;
+        const ok = window.api.copyText ? window.api.copyText(el.textContent.trim()) : false;
+        const was = btn.textContent;
+        btn.textContent = ok ? 'Copied' : 'Failed';
+        setTimeout(() => { btn.textContent = was; }, 1400);
+    });
+});
 document.getElementById('btn-topnav-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-launch-emulatte-sb')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-rail-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
