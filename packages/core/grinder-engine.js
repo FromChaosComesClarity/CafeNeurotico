@@ -299,22 +299,62 @@ const GOG_CLIENT_SECRET = '9d85c43b1482497dbbce61f6e4aa173a433796eeae2ca8c5f6129
 
 const GOG_REDIRECT_URI  = 'https://embed.gog.com/on_login_success?origin=client';
 
+// Which store an appId belongs to, for building a GrinderGameId. The row in grinder.db is
+// authoritative; 'gog' is the fallback because every numeric GOG id reaches here that way.
+function storeOfAppId(appId) {
+    try { return db?.prepare("SELECT store FROM games WHERE app_id=?").get(appId)?.store || 'gog'; }
+    catch { return 'gog'; }
+}
+
 function syncSharedDb(appId, installed) {
     const sharedDbPath = path.join(appImageDir, 'GameManagerConfig', 'games.db');
     if (!fs.existsSync(sharedDbPath)) return;
     try {
         const sdb = new Database(sharedDbPath);
-        // Match by app_id column, or fall back to matching the ID inside the LaunchCommand
-        const byAppId = sdb.prepare("UPDATE games SET Installed=? WHERE app_id=?").run(installed ? 1 : 0, appId);
-        if (byAppId.changes === 0) {
+        // ⚠️ games.db keys GRINDER games by GrinderGameId ('gog_<appId>'), and has no app_id
+        // column at all. Asking for one threw on the first statement, so the whole function
+        // failed inside its own try/catch and the LaunchCommand fallback below was never
+        // reachable — the shared library's Installed flag was simply never written here.
+        const byGid = sdb.prepare("UPDATE games SET Installed=? WHERE GrinderGameId=?")
+                         .run(installed ? 1 : 0, `${storeOfAppId(appId)}_${appId}`);
+        if (byGid.changes === 0) {
             sdb.prepare("UPDATE games SET Installed=? WHERE LaunchCommand LIKE ?").run(installed ? 1 : 0, `%${appId}%`);
         }
         sdb.close();
     } catch {}
 }
 
+// The grinder.db row for a game, creating it if the owned-library sync has not. Mirrors the
+// columns and id convention syncOwnedLibrary uses ('<store>_<appId>'), so a row made here is
+// indistinguishable from a synced one and a later sync's INSERT OR IGNORE leaves it alone.
+function ensureGameRow(store, appId, title, platform) {
+    if (!db) return null;
+    const sel = () => db.prepare("SELECT * FROM games WHERE app_id=? AND store=?").get(appId, store);
+    let game = sel();
+    if (game) return game;
+    try {
+        const plat = platform || 'windows';
+        db.prepare("INSERT OR IGNORE INTO games (id, title, store, app_id, platform, platforms, installed) VALUES (?, ?, ?, ?, ?, ?, 0)")
+          .run(`${store}_${appId}`, title || appId, store, String(appId), plat, plat);
+    } catch {}
+    return sel();
+}
+
 async function headlessInstall(store, appId, platform, installDir, opts = {}) {
-    const title = (() => { try { return db?.prepare("SELECT title FROM games WHERE app_id=? AND store=?").get(appId, store)?.title || appId; } catch { return appId; } })();
+    // The shared library knows the name even when grinder.db has never been synced, and it is
+    // what every progress message shows — without this the user watched "1207666353" download.
+    const sharedTitle = () => {
+        try {
+            const sp = path.join(appImageDir, 'GameManagerConfig', 'games.db');
+            if (!fs.existsSync(sp)) return null;
+            const sdb = new Database(sp, { readonly: true });
+            const row = sdb.prepare("SELECT Game FROM games WHERE GrinderGameId=?").get(`${store}_${appId}`);
+            sdb.close();
+            return row?.Game || null;
+        } catch { return null; }
+    };
+    const title = (() => { try { return db?.prepare("SELECT title FROM games WHERE app_id=? AND store=?").get(appId, store)?.title; } catch { return null; } })()
+        || sharedTitle() || appId;
     const base = { title, store, appId, done: false };
     _installCancelled = false;   // fresh run — cleared so a prior cancel doesn't mislabel this one
     // DLC directives (opts): withDlcs/dlcIds = add DLCs; skipDlcs = base only ("Reset DLCs").
@@ -447,7 +487,17 @@ async function headlessInstall(store, appId, platform, installDir, opts = {}) {
         writeProgress({ ...base, step: 'installing', percent: 100, message: 'Updating library...' });
 
         try {
-            const game = db?.prepare("SELECT * FROM games WHERE app_id=? AND store='gog'").get(appId);
+            // ⚠️ Rows in grinder.db are created by the owned-library sync, NOT by installing.
+            // On a machine where that sync has never run — a rebuilt grinder.db beside a
+            // restored library, which is exactly what a host migration leaves behind — there
+            // was nothing to update. This was `if (game)` with no else: the files downloaded,
+            // the bookkeeping and the redistributables were skipped, "Installation complete!"
+            // was still reported, and the game then refused to start with
+            // 'Game "gog_<id>" not found in GRINDER database.'
+            //
+            // An install already knows everything the row needs, so it creates one rather than
+            // depending on a sync having happened first.
+            const game = ensureGameRow('gog', appId, title, activePlat);
             if (game) {
                 db.prepare("UPDATE games SET installed=1, install_path=?, executable=? WHERE id=?").run(gameInfo.install_path, gameInfo.executable, game.id);
                 writeProgress({ ...base, step: 'redist', percent: 0, message: 'Checking compatibility files...' });
@@ -489,7 +539,8 @@ async function headlessInstall(store, appId, platform, installDir, opts = {}) {
         if (!dlOk) { writeProgress({ ...base, step: 'error', message: _installCancelled ? 'Installation cancelled.' : 'Download failed.', done: true }); return; }
         writeProgress({ ...base, step: 'installing', percent: 100, message: 'Finalizing...' });
         try {
-            const game = db?.prepare("SELECT * FROM games WHERE app_id=? AND store='epic'").get(appId);
+            // Same as the GOG branch above: create the row if the library sync never has.
+            const game = ensureGameRow('epic', appId, title, null);
             if (game) { const info = await getGameInstallInfo(appId); if (info) db.prepare("UPDATE games SET installed=1, install_path=?, executable=? WHERE id=?").run(info.install_path, info.executable, game.id); }
         } catch {}
         syncSharedDb(appId, true);

@@ -266,8 +266,12 @@ function syncInstalledFromGrinder() {
             const val = r.installed ? 1 : 0;
             const res = db.prepare("UPDATE games SET Installed=? WHERE LaunchCommand LIKE ?")
                           .run(val, `%${r.app_id}%`);
+            // ⚠️ games.db has no app_id column — it keys GRINDER games by GrinderGameId, which
+            // is exactly the shape of grinder.db's own row id ('gog_<appId>'). The old fallback
+            // asked for app_id and threw, and because the whole loop sits in one try/catch that
+            // throw abandoned the sync for every remaining row, not just this one.
             if (res.changes === 0)
-                db.prepare("UPDATE games SET Installed=? WHERE app_id=?").run(val, r.app_id);
+                db.prepare("UPDATE games SET Installed=? WHERE GrinderGameId=?").run(val, r.id);
         }
         // The writes above set Installed purely from the GOG/Epic side, which zeroes a
         // mixed-store row (e.g. Steam+GOG) whose Steam copy is the installed one. Re-assert
