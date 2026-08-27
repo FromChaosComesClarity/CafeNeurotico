@@ -1322,8 +1322,13 @@ async function showLaunchFailure(info) {
     //
     // ⚠️ Only offered when the game is known: the variable is per-game, and the engine's
     // launch-issue payload is the only thing that knows which one just failed.
+    //
+    // Offered for D3D_CRASH too: that is the same crash on a machine that DOES have Vulkan, so
+    // the cause is a driver or a build rather than the hardware — but the OpenGL path is still
+    // the one thing worth trying, and its message says so. Naming the variable while making the
+    // user go and find the box would be exactly the worse answer described above.
     const fixBtn = $('pr-fix');
-    const canFixVulkan = info.code === 'NO_VULKAN' && info.grinderGameId != null;
+    const canFixVulkan = (info.code === 'NO_VULKAN' || info.code === 'D3D_CRASH') && info.grinderGameId != null;
     fixBtn.style.display = canFixVulkan ? '' : 'none';
     fixBtn.disabled = false;
     fixBtn.textContent = 'Use OpenGL for this game';

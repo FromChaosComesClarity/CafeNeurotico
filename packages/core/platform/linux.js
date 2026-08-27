@@ -607,6 +607,36 @@ function resolveRuntime(game) {
     return scanRuntimes()[0]?.path || '';
 }
 
+// Does this machine have a usable Vulkan driver? The loader library alone proves nothing —
+// distributions ship it as a dependency of things that never use it — so the test is whether
+// any ICD (installable client driver) is registered. That is exactly what DXVK needs to find.
+//
+// Locations are the Vulkan loader's own search path, so this works on any distribution rather
+// than the handful we happen to have seen. VK_DRIVER_FILES / VK_ICD_FILENAMES override it all,
+// and are honoured first for the same reason the CA-bundle code honours a user's own setting.
+//
+// Cached: it cannot change while the app is running, and it is consulted from a failure path.
+let _vulkanCache = null;
+function hasVulkan() {
+    if (_vulkanCache !== null) return _vulkanCache;
+    const hit = (() => {
+        for (const v of ['VK_DRIVER_FILES', 'VK_ICD_FILENAMES']) {
+            const val = process.env[v];
+            if (val) return val.split(':').some(f => { try { return fs.statSync(f).isFile(); } catch { return false; } });
+        }
+        const dirs = [
+            '/usr/share/vulkan/icd.d', '/usr/local/share/vulkan/icd.d', '/etc/vulkan/icd.d',
+            path.join(process.env.XDG_DATA_HOME || path.join(HOME, '.local', 'share'), 'vulkan', 'icd.d'),
+        ];
+        for (const d of dirs) {
+            try { if (fs.readdirSync(d).some(f => f.endsWith('.json'))) return true; } catch {}
+        }
+        return false;
+    })();
+    _vulkanCache = hit;
+    return hit;
+}
+
 // Turn a dead game's output into something a person can act on. Anything we don't recognise
 // stays UNKNOWN — the face shows the log tail rather than inventing a cause.
 function diagnose(log, protonPath) {
@@ -626,10 +656,28 @@ function diagnose(log, protonPath) {
     // it. Recognising the module name is what turns "the game crashed, see CRASHLOG.TXT" into
     // an answer, since that file is written by the game and the app never reads it.
     if (/dxgi\.dll|d3d11\.dll|dxvk/i.test(t) && /Access Violation|0xc0000005|Exception/i.test(t))
-        return { code: 'NO_VULKAN', message:
-            'The game crashed inside the Direct3D layer. On a GPU with no Vulkan support that is ' +
-            'expected — Proton renders Direct3D through DXVK, which requires it. Setting ' +
-            'PROTON_USE_WINED3D=1 for this game switches to OpenGL and often works on older hardware.' };
+        return hasVulkan()
+            ? { code: 'D3D_CRASH', message:
+                'The game crashed inside the Direct3D layer. This machine does have a Vulkan driver, so ' +
+                'it is not the usual missing-Vulkan cause — more often a driver problem or a game that ' +
+                'needs a specific Proton build. PROTON_USE_WINED3D=1 forces the OpenGL path and is worth ' +
+                'trying under the game\'s own environment variables.' }
+            : { code: 'NO_VULKAN', message:
+                'The game crashed inside the Direct3D layer. On a GPU with no Vulkan support that is ' +
+                'expected — Proton renders Direct3D through DXVK, which requires it. Setting ' +
+                'PROTON_USE_WINED3D=1 for this game switches to OpenGL and often works on older hardware.' };
+
+    // The game had a display and lost it, which is a different failure from never having had
+    // one. On a Wayland session that is XWayland going away underneath the game. It is emitted
+    // by the X client itself, so it is evidence about the display connection and nothing else —
+    // in particular it is NOT a GPU capability problem, and PROTON_USE_WINED3D will not touch it.
+    // This used to be swallowed by the catch-all below and reported as missing Vulkan.
+    if (/X connection to :\d+ broken/i.test(t))
+        return { code: 'DISPLAY_LOST', message:
+            'The game lost its connection to the X server and stopped. On a Wayland desktop that means ' +
+            'XWayland ended underneath it. This is not a graphics-capability problem — forcing OpenGL ' +
+            'will not help. Try launching it again; if it repeats, run the game with the log open and ' +
+            'check whether XWayland is restarting.' };
 
     // ⚠️ No Vulkan on this GPU. Proton translates Direct3D through DXVK, which is Vulkan-only,
     // so on hardware that predates Vulkan the game dies instantly with nothing useful in the
@@ -639,7 +687,20 @@ function diagnose(log, protonPath) {
     //
     // Matched on Proton having started and then produced no graphics output at all, which is
     // what makes this case recognisable: a real crash leaves an error, this leaves silence.
-    if (/fsync: up and running|Proton: Error/i.test(t) && !/vulkan|dxvk|d3d11|opengl|wined3d/i.test(t))
+    //
+    // ⚠️ Two corrections, both of which made this fire far too widely:
+    //
+    //  1. `Proton: Error` was a trigger, but "Proton: Error: unable to use parent for game
+    //     drive, path /home" is printed for ANY game living under /home/<user>/… — which is
+    //     nearly every install. It appears verbatim in a launch that SUCCEEDED. It is noise,
+    //     not evidence, so it no longer counts.
+    //  2. `fsync: up and running` appears in every Proton launch there is, so what remains is
+    //     still only "Proton started and said nothing else". That is too weak to assert a
+    //     hardware limitation from, and asserting it told an RTX 4060 Ti its GPU was too old.
+    //     The claim is now checked against the host's own Vulkan drivers first; when Vulkan is
+    //     present we fall through to the log tail rather than inventing a cause, which is this
+    //     function's stated rule everywhere else.
+    if (!hasVulkan() && /fsync: up and running/i.test(t) && !/vulkan|dxvk|d3d11|opengl|wined3d/i.test(t))
         return { code: 'NO_VULKAN', message:
             'The game started and closed immediately with no graphics output. The usual cause is a ' +
             'GPU with no Vulkan support — Proton renders Direct3D through DXVK, which requires it. ' +
