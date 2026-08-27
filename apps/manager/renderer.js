@@ -902,6 +902,17 @@ function opToastDone(label) {
 function opToastHide() { const tEl = document.getElementById('op-toast'); if (tEl) { clearTimeout(_opToastTimer); tEl.classList.remove('show'); } }
 let _giInstallName = '';
 
+// Redistributable installs report line-by-line with no percentage of their own, so the toast
+// carries the current step rather than a bar that would have to be invented. See
+// 'grinder-run-redist' in main.js for what this is repairing.
+let _redistBusy = false;
+window.api.onRedistProgress(d => {
+    if (!_redistBusy) return;
+    if (d && d.done) return;                       // the awaited result reports the outcome
+    const line = String((d && d.line) || '').trim();
+    if (line) opToast(`Compatibility files: ${line.slice(0, 90)}`);
+});
+
 // Live progress for in-process install/uninstall — drives the global toast always,
 // plus the modal's inline bar while it's still visible (so 'Hide' keeps progress on screen).
 window.api.onGrinderInstallProgress(d => {
@@ -9552,6 +9563,44 @@ function openGamepage(game) {
         } else {
             dlcBtn.style.display = 'none';
             dlcBtn.onclick = null;
+        }
+    }
+
+    // Compatibility files — installed GOG games. GOG ships OpenAL, the VC++ runtimes and the
+    // like beside a game and expects them installed into the prefix; a game missing one starts
+    // and dies at once with nothing in the log naming the cause. Offered for every installed
+    // GOG title rather than only where we think it is needed: whether a game declares
+    // dependencies is GOG's answer to give, and runRedist already says "none required" when
+    // there are none.
+    const redistBtn = document.getElementById('btn-gamepage-redist');
+    if (redistBtn) {
+        if (/^gog_/i.test(game.GrinderGameId || '') && game.Installed == 1) {
+            redistBtn.style.display = 'block';
+            redistBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (_redistBusy) { showAlert('Compatibility files are already being installed.'); return; }
+                const ok = await showConfirm(
+                    `Install the compatibility files "${game.Game}" needs — OpenAL, Visual C++ runtimes and similar — into its Proton prefix?\n\n` +
+                    `The game itself is not re-downloaded. Worth doing when a game installed cleanly but closes immediately when you press Play.`,
+                    'Install');
+                if (!ok) return;
+                _redistBusy = true;
+                opToast('Compatibility files: checking…');
+                let res = null;
+                try { res = await window.api.runRedist(game.GrinderGameId); }
+                catch (err) { res = { ok: false, error: err.message }; }
+                _redistBusy = false;
+                if (res && res.ok) {
+                    const n = res.installed || 0;
+                    opToastDone(n ? `Installed ${n} compatibility package${n === 1 ? '' : 's'}` : 'No compatibility files needed');
+                } else {
+                    opToastHide();
+                    showAlert((res && res.error) || 'The compatibility files could not be installed.');
+                }
+            };
+        } else {
+            redistBtn.style.display = 'none';
+            redistBtn.onclick = null;
         }
     }
 

@@ -821,6 +821,32 @@ ipcMain.handle('dlc-list', async (_, grinderGameId, platform) => {
     return res;
 });
 
+// Install a GOG game's declared redistributables (OpenAL, VC++ runtimes, DirectX and the
+// like) into its Proton prefix, without re-downloading the game.
+//
+// GOG ships these alongside a title and expects them installed INTO the prefix. A game that
+// is missing one usually installs cleanly and then dies the moment it starts, with nothing in
+// the log naming the cause — Baldur's Gate: Enhanced Edition needs openAL and does exactly
+// that. GRINDER has always had this action; the Manager did not, so the only repair was a
+// full reinstall. Every install made before installs created their own grinder.db row skipped
+// runRedist along with the bookkeeping, so those games all need this.
+ipcMain.handle('grinder-run-redist', async (event, grinderGameId) => {
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not found.' };
+    const parsed = parseGrinderId(grinderGameId);
+    if (!parsed || parsed.store !== 'gog')
+        return { ok: false, error: 'Compatibility files are only shipped for GOG games.' };
+    let game = null;
+    try { game = _grinderEngineDb.prepare("SELECT * FROM games WHERE app_id=? AND store='gog'").get(parsed.appId); } catch {}
+    if (!game) return { ok: false, error: 'This game is not in the GRINDER database yet — reinstall it to add it.' };
+    const prefixPath = grinderEngine.prefixPathForGame(game);
+    const protonPath = game.proton_path || (() => {
+        try { return _grinderEngineDb.prepare("SELECT value FROM settings WHERE key='default_proton_path'").get()?.value; }
+        catch { return null; }
+    })();
+    return grinderEngine.runRedist(event.sender, 'redist-progress', parsed.appId,
+                                   game.platform || 'windows', prefixPath, protonPath);
+});
+
 // The alternate ways a GOG release can be started (goggame-<appId>.info playTasks), and
 // the picker's write-back. grinder.db's games.id *is* the GrinderGameId, so the engine's
 // reader takes it unchanged — no lookup by app_id needed here.

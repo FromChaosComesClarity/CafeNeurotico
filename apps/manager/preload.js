@@ -192,6 +192,10 @@ contextBridge.exposeInMainWorld('api', {
                                 // --- in-process install (no GRINDER window) ---
                                 grinderInstall:   (payload) => ipcRenderer.invoke('grinder-install', payload),
                                 dlcList:          (grinderGameId, platform) => ipcRenderer.invoke('dlc-list', grinderGameId, platform),
+                                // Reinstall a GOG game's redistributables into its prefix — see
+                                // 'grinder-run-redist' in main.js for why this exists.
+                                runRedist:        (grinderGameId) => ipcRenderer.invoke('grinder-run-redist', grinderGameId),
+                                onRedistProgress: (cb) => ipcRenderer.on('redist-progress', (_e, d) => cb(d)),
                                 playTasks:        (grinderGameId) => ipcRenderer.invoke('play-tasks', grinderGameId),
                                 customRecipeList: () => ipcRenderer.invoke('custom-recipe-list'),
                                 customInstallPick:(recipeId) => ipcRenderer.invoke('custom-install-pick', recipeId),
