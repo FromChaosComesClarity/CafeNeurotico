@@ -1173,6 +1173,38 @@ async function openGrinderInstall(game) {
     if (nativeBtn) { nativeBtn.textContent = nativeLabel; nativeBtn.title = `Install the native ${nativeLabel} build`; }
 
     const fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1) + ' GB' : (b/1024**2).toFixed(0) + ' MB');
+
+    // ⚠️ A missing store sign-in used to be indistinguishable from a store hiccup, because
+    // every layer below here turns failure into null: getInstallSize catches, gogInstallInfo
+    // returns null on a missing token, and gogdl's own failure is swallowed by the JSON parse.
+    // What the user saw was a dialog showing free space and no size — and, after pressing
+    // Install, a download that failed saying nothing. That is the same silent shape the
+    // CA-bundle bug had, and it cost a day of looking at the wrong things twice.
+    //
+    // Being signed out is the ONE cause that is both far and away the commonest and precisely
+    // knowable, so it is worth a question of its own. It is asked only when the size lookup has
+    // already failed, so the normal path pays nothing. If the check itself cannot answer, no
+    // accusation is made — an unreachable store is not a signed-out one.
+    const store      = _dlStoreOf(gid);
+    const storeLabel = store === 'gog' ? 'GOG' : store === 'epic' ? 'Epic' : '';
+    const storeSignedOut = async () => {
+        if (store !== 'gog' && store !== 'epic') return false;
+        try {
+            const st = store === 'gog' ? await window.api.gogAuthStatus()
+                                       : await window.api.epicAuthStatus();
+            return !st?.loggedIn;
+        } catch { return false; }
+    };
+
+    // When signed out, the primary button stops being a dead end and becomes the fix.
+    let signInMode = false;
+    const setSignInMode = (on) => {
+        signInMode = on;
+        const b = $('gi-install');
+        b.textContent = on ? `Sign in to ${storeLabel}…` : 'Install';
+        b.disabled = false;
+    };
+
     const refreshSizeInfo = async () => {
         const el = $('gi-sizeinfo'); el.textContent = 'Checking size & free space…';
         // Always the resolved platform, even without a choice to make — it's already set
@@ -1193,6 +1225,14 @@ async function openGrinderInstall(game) {
             const low = need && free < need;
             parts.push(`<b style="color:${low ? '#ef5350' : '#66bb6a'}">${fmtB(free)} free</b>${low ? ' — not enough space!' : ''}`);
         }
+        if (!info && await storeSignedOut()) {
+            const freeTxt = free != null ? ` &nbsp;·&nbsp; <span style="color:var(--text_dim)">${fmtB(free)} free</span>` : '';
+            el.innerHTML = `<b style="color:#ef5350">Not signed in to ${storeLabel}.</b> ` +
+                `<span style="color:var(--text_dim)">The download size can’t be read, and installing would fail.</span>${freeTxt}`;
+            setSignInMode(true);
+            return;
+        }
+        setSignInMode(false);
         el.innerHTML = parts.length ? parts.join(' &nbsp;·&nbsp; ') : 'Size info unavailable';
     };
 
@@ -1215,7 +1255,28 @@ async function openGrinderInstall(game) {
         if (dir) { $('gi-dir').value = dir; refreshSizeInfo(); }
     };
     $('gi-cancel').onclick = () => { modal.classList.remove('active'); loadGames(); };
-    $('gi-install').onclick = () => {
+    $('gi-install').onclick = async () => {
+        // Signed out: sign in first, then re-check. The modal stays open so the install the
+        // user came here for is one press away once the sign-in lands.
+        if (signInMode) {
+            const b = $('gi-install');
+            b.disabled = true; b.textContent = 'Waiting for sign-in…';
+            let res = null;
+            try {
+                res = store === 'gog' ? await window.api.gogLogin() : await window.api.epicLogin();
+            } catch { res = null; }
+            b.disabled = false;
+            if (!res?.ok) {
+                // A cancelled sign-in is a choice, not a fault — say nothing extra about it.
+                setSignInMode(true);
+                if (res && res.error && res.error !== 'cancelled' && typeof opToast === 'function') {
+                    opToast(`${storeLabel} sign-in failed: ${res.error}`); setTimeout(opToastHide, 2600);
+                }
+                return;
+            }
+            await refreshSizeInfo();
+            return;
+        }
         // Hand off to the Download Manager queue: it downloads now (or waits its turn),
         // shows progress in the top toast, and is managed by clicking that toast.
         const item = { gameId: game.id, gid, name: game.Game || '', store: _dlStoreOf(gid), dir: $('gi-dir').value };
