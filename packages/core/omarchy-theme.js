@@ -167,7 +167,24 @@ function toCafeTheme(colors = readColors()) {
     const menu = (declaredMenu && declaredMenu !== bg) ? declaredMenu : mix(bg, towardEdge, step);
     // The panel floats *over* artwork, so it wants to be a lift on dark and a settle on
     // light — either way it is translucent, and the alpha is what makes it read as glass.
-    const panel  = pick(colors, 'lighter_background', 'selection', 'muted')
+    // ⚠️ A declared surface role is preferred but never trusted blindly — the same lesson as
+    // tokyoled's dark_background, one step further. `selection` is the sharp case: it is the
+    // text-selection highlight, so it is a proper dark surface in some themes (city-783 uses
+    // #2b2f37) and pure white in others (Crimson). Taken on faith it produced a floating panel
+    // of rgba(255,255,255,0.62) over a #1a1621 page — near-white rows carrying light-grey
+    // secondary text, which is unreadable, and pure-white borders to match.
+    //
+    // So the role is kept in the chain and *validated* instead of dropped: a candidate surface
+    // has to sit on the correct side of the page and stay near it. One that would invert the
+    // layer relationship is treated as absent, and the value is derived. Dropping `selection`
+    // outright was worse — it cost city-783 its declared surface and pushed contrast down.
+    const surfaceOk = (hex) => {
+        if (!hex) return false;
+        const d = luma(hex) - bgLuma;
+        return isLight ? (d <= 24 && d > -70) : (d >= -24 && d < 70);
+    };
+    const panelPick = ['lighter_background', 'selection', 'muted'].map(k => pick(colors, k)).find(surfaceOk);
+    const panel  = panelPick
         || mix(bg, isLight ? '#000000' : '#ffffff', isLight ? 0.06 : 0.10);
 
     // Text tiers, each a measured step from full foreground toward the background.
@@ -176,7 +193,10 @@ function toCafeTheme(colors = readColors()) {
                                                     : mix(main, bg, 0.28);
     const dim  = pick(colors, 'dark_foreground', 'muted') || mix(main, bg, 0.55);
 
-    const solid = pick(colors, 'muted', 'selection') || mix(accent, bg, 0.55);
+    // Borders take the same treatment: a white `selection` here drew pure-white rules
+    // across a dark page.
+    const solidPick = ['muted', 'selection'].map(k => pick(colors, k)).find(surfaceOk);
+    const solid = solidPick || mix(accent, bg, 0.55);
 
     return {
         bg,
