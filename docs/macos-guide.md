@@ -6,7 +6,7 @@ real, working, and actively used, but younger, unsigned, and with less mileage b
 "Experimental" means exactly that: expect it to work for the things listed below as working, and
 expect rough edges anywhere this guide doesn't mention.
 
-If something breaks, [open an issue](https://github.com/shampoo-is-a-lie/CafeNeurotico/issues) —
+If something breaks, [open an issue](https://github.com/FromChaosComesClarity/CafeNeurotico/issues) —
 macOS reports are genuinely useful right now, this build needs them.
 
 ## What works today
@@ -50,7 +50,7 @@ macOS reports are genuinely useful right now, this build needs them.
 ## Install
 
 1. Download the `.dmg` (or the `.zip`) from the
-   [1.9.0 release](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/tag/v1.9.0) — the
+   [1.9.0 release](https://github.com/FromChaosComesClarity/CafeNeurotico/releases/tag/v1.9.0) — the
    macOS asset is separate from the Linux AppImage, and it sits on that release rather than the
    newest one. **The current macOS build is 1.9.0**; Linux has since had 1.9.1, a Linux-only fix
    that ships no Mac asset, so "latest release" won't have a `.dmg` in it.

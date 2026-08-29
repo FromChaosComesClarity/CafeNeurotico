@@ -11,7 +11,7 @@
 ![electron](https://img.shields.io/badge/built%20with-Electron-9EAAB8?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-D4A373?style=flat-square)
 
-**[Download the AppImage](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/latest)** ·
+**[Download the AppImage](https://github.com/FromChaosComesClarity/CafeNeurotico/releases/latest)** ·
 [macOS build (Experimental)](docs/macos-guide.md) ·
 [Support the project](#tip-the-barista)
 
@@ -68,9 +68,9 @@ cafeneurotico@linux:~$ ./brew
 | **CREMA** | the fullscreen, gamepad-first crema on top | *the bon vivant* |
 
 Three apps that used to ship separately are now **one Electron binary with three faces**, dispatched by argv — one runtime, one `better-sqlite3`, one copy of the helper binaries. It replaces the now-archived
-[CafeNeuroticoGameManager](https://github.com/shampoo-is-a-lie/CafeNeuroticoGameManager) ·
-[GRINDER](https://github.com/shampoo-is-a-lie/GRINDER) ·
-[CREMA](https://github.com/shampoo-is-a-lie/CREMA).
+[CafeNeuroticoGameManager](https://github.com/FromChaosComesClarity/CafeNeuroticoGameManager) ·
+[GRINDER](https://github.com/FromChaosComesClarity/GRINDER) ·
+[CREMA](https://github.com/FromChaosComesClarity/CREMA).
 
 ## The three faces
 
@@ -141,16 +141,16 @@ works, and what doesn't →](docs/macos-guide.md)**
 
 ## The rest of the ecosystem
 
-**[EmuLatte](https://github.com/shampoo-is-a-lie/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up and adds it to the app menu and the icon rail.
+**[EmuLatte](https://github.com/FromChaosComesClarity/EmuLatte)** — *"I use RetroArch BTW"* — is the emulation pillar, and it is **entirely optional**. It's a separate AppImage that manages ROMs, emulators and RetroAchievements with its own scraping sources. Cafe Neurotico works perfectly without it; drop `EmuLatte.AppImage` next to it and the suite picks it up and adds it to the app menu and the icon rail.
 
 Your ROM library stays in EmuLatte — Cafe Neurotico doesn't absorb it. You choose which games cross over by **exporting them to Cafe Neurotico from inside EmuLatte**, and only those arrive, as ordinary library entries filed under **Emulation** that play and scrape like anything else. Curate the collection in EmuLatte; promote the handful you actually want on the shelf.
 
-**[CafeNeuroticoClock](https://github.com/shampoo-is-a-lie/CafeNeuroticoClock)** — a desk clock that runs a slideshow of your library's art.
+**[CafeNeuroticoClock](https://github.com/FromChaosComesClarity/CafeNeuroticoClock)** — a desk clock that runs a slideshow of your library's art.
 
 ## Grind your own
 
 ```sh
-git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
+git clone https://github.com/FromChaosComesClarity/CafeNeurotico.git
 cd CafeNeurotico
 npm install          # deps + rebuilds better-sqlite3; pulls the helper binaries (GitHub Release)
 npm start            # run the Manager face

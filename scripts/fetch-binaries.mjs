@@ -50,11 +50,11 @@ const REQUIRED = ['ffmpeg', 'ffprobe', 'yt-dlp', 'gogdl', 'legendary', 'comet'];
 // yt-dlp_macos — rename them when building that tarball rather than branching here.
 const SOURCES = {
     linux: {
-        url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-v2/cafeneurotico-binaries-v2.tar.gz',
+        url:    'https://github.com/FromChaosComesClarity/CafeNeurotico/releases/download/binaries-v2/cafeneurotico-binaries-v2.tar.gz',
         sha256: '876eecaeda3228ee24288c1fae0b87b8f2ed9b1775b1ce48c2d5ad47cc93b3bf',
     },
     darwin: {
-        url:    'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/download/binaries-mac-v2/cafeneurotico-binaries-mac-v2.tar.gz',
+        url:    'https://github.com/FromChaosComesClarity/CafeNeurotico/releases/download/binaries-mac-v2/cafeneurotico-binaries-mac-v2.tar.gz',
         sha256: '892a251259ba6474cfee8860c26068430bbb27b24aba28d82e6447b5e06559c3',
     },
 };

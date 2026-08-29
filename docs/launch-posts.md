@@ -75,7 +75,7 @@ mess like mine, this might suit you.
 **About me:** I'm 47, married, two children, and a full-time job that has nothing to do with
 software development. I'm also a musician and producer. This is what I do in the evenings.
 
-Downloads and source: https://github.com/shampoo-is-a-lie/CafeNeurotico
+Downloads and source: https://github.com/FromChaosComesClarity/CafeNeurotico
 
 Happy to answer anything. Bug reports very welcome — I'm one person and I only have my own
 hardware to test on.
@@ -110,7 +110,7 @@ What it does that I couldn't get elsewhere in one place:
 - 93 themes, including twenty retro-OS palettes each with its era typeface.
 - Everything lives in a folder next to the AppImage. No account, no telemetry, no cloud.
 
-It's GPL-3.0. Downloads and source: https://github.com/shampoo-is-a-lie/CafeNeurotico
+It's GPL-3.0. Downloads and source: https://github.com/FromChaosComesClarity/CafeNeurotico
 
 Happy to answer anything. Bug reports very welcome — I'm one person and I only have my own hardware to test on.
 
@@ -136,7 +136,7 @@ The parts I found most interesting to build:
 - **GOG's second manifest.** GOG ships `goggame-<id>.info` (how to launch) and `goggame-<id>.script` (what the Galaxy installer does afterwards — registry keys, config files). Downloaders read the first and ignore the second, so some games install perfectly and then fail in ways that look nothing like a packaging bug.
 - **Everything is local.** Artwork and metadata are scraped once and stored on disk. No account, no telemetry.
 
-GPL-3.0: https://github.com/shampoo-is-a-lie/CafeNeurotico
+GPL-3.0: https://github.com/FromChaosComesClarity/CafeNeurotico
 
 ---
 
@@ -152,7 +152,7 @@ Short and factual — they get a lot of these.
 > Epic, Flatpak, itch.io, PICO-8 and emulators, scrapes artwork and metadata locally, finds
 > Proton regardless of what the folder is called, and does save-game backup/restore.
 >
-> Repo and downloads: https://github.com/shampoo-is-a-lie/CafeNeurotico
+> Repo and downloads: https://github.com/FromChaosComesClarity/CafeNeurotico
 > Screenshots are in the README.
 >
 > Thanks for everything you do for Linux gaming.
@@ -167,7 +167,7 @@ Short and factual — they get a lot of these.
 >
 > Local artwork, no account, no telemetry. One AppImage. GPL-3.0.
 >
-> https://github.com/shampoo-is-a-lie/CafeNeurotico
+> https://github.com/FromChaosComesClarity/CafeNeurotico
 >
 > #Linux #LinuxGaming #FOSS #OpenSource
 

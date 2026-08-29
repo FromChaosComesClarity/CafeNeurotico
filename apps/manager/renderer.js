@@ -3584,7 +3584,7 @@ if (window.api.platform === 'darwin') {
 
 // Control Panel splash → releases page. There is no in-app updater by design:
 // the user reads the release notes on GitHub and grabs the AppImage themselves.
-const RELEASES_URL = 'https://github.com/shampoo-is-a-lie/CafeNeurotico/releases';
+const RELEASES_URL = 'https://github.com/FromChaosComesClarity/CafeNeurotico/releases';
 document.getElementById('btn-check-app-updates')?.addEventListener('click', () => window.api.openExternal(RELEASES_URL));
 
 // --- MANUAL (opens as separate window) ---

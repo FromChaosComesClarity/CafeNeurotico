@@ -49,7 +49,7 @@ library.
 ## Day 1 — clone and see it fail honestly
 
 ```bash
-git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
+git clone https://github.com/FromChaosComesClarity/CafeNeurotico.git
 cd CafeNeurotico
 git checkout mac
 npm install
@@ -242,7 +242,7 @@ them, `xattr -dr com.apple.quarantine /Applications/Cafe\ Neurotico.app`.
 
 ### Phase B.6 — gogdl, and close the tarball gap — ✅ DONE
 ```bash
-git clone https://github.com/shampoo-is-a-lie/gogdl.git gogdl_fork && cd gogdl_fork
+git clone https://github.com/FromChaosComesClarity/gogdl.git gogdl_fork && cd gogdl_fork
 git submodule update --init --recursive     # xdelta3 — needed for the gogdl_xdelta3 C extension
 python3 -m venv .venv && source .venv/bin/activate
 pip install . pyinstaller

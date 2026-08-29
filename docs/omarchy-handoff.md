@@ -130,7 +130,7 @@ node -v                       # want v22.x — the last Nobara build ran 22.22.2
 ## Day 1 — clone and run
 
 ```bash
-git clone https://github.com/shampoo-is-a-lie/CafeNeurotico.git
+git clone https://github.com/FromChaosComesClarity/CafeNeurotico.git
 cd CafeNeurotico
 npm install
 npm start
