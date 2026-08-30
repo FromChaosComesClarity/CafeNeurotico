@@ -1829,7 +1829,20 @@ window.api.getBaseDir().then(dir => {
         // ⚠️ Only values that exist as buttons — the picker offers 0.5/0.75/1.0/1.25/1.5, and
         // anything else would apply a zoom no button is highlighted for, leaving the panel
         // disagreeing with the actual scale.
-        return (h <= 900 || w <= 1400) ? '0.75' : '1.0';
+        //
+        // ⚠️ The failure this guards against is VERTICAL: on a 1152x720 panel the icon rail ran
+        // past the bottom of the window and the Control Panel button — the one that fixes an
+        // oversized interface — could not be reached. So height is the real test.
+        //
+        // A bare `w <= 1400` used to stand alongside it, and it misfires on a rotated monitor:
+        // a portrait 900x1440 screen is 900 wide and gets classified as small, even though it
+        // has more vertical room than the desktop panel next to it. Measured on a real two-head
+        // Omarchy desk — DP-1 rotated to 900x1440, DP-2 at 2752x1152 — every window that opened
+        // on the portrait head came up at 75% while the landscape one correctly gave 100%.
+        //
+        // Width still matters, but only when the screen is small in BOTH directions; a narrow
+        // screen that is also tall has the room the rail needs.
+        return (h <= 900 || (w <= 1400 && h <= 1400)) ? '0.75' : '1.0';
     }
 
     // A saved scale is only unusable when it is too LARGE for a small screen — that is the
