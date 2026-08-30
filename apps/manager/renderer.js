@@ -78,6 +78,15 @@ function _steamAppId(game) {
     return (id && id !== 'None') ? id : '';
 }
 
+// ⚠️ A SteamAppID does NOT mean the game is owned on Steam. The scrapers attach one to
+// anything they can match by name, so a GOG-only or itch title carries a Steam id purely
+// for metadata and artwork — 224 of them in Jose's library. Ownership lives in `Store`,
+// which is a comma list ("Steam, GOG", "GOG, Steam", "Others, Steam"), so Steam actions
+// are gated on the store, and the id is only used to build the deep link once that holds.
+function _isOnSteam(game) {
+    return (game?.Store || '').toLowerCase().split(',').some(s => s.trim() === 'steam');
+}
+
 // ── "Open in Steam" dropdown — deep-links into the Steam client via steam:// URLs ──
 function _closeSteamMenu() {
     document.getElementById('steam-menu')?.remove();
@@ -5326,10 +5335,10 @@ function openGamepage(game) {
         grinderBtn.onclick = null;
     }
 
-    // "Open in Steam" button — any game carrying a SteamAppID
+    // "Open in Steam" button — only for a game actually owned on Steam.
     const steamBtn = document.getElementById('btn-gamepage-steam');
     if (steamBtn) {
-        const sAppId = _steamAppId(game);
+        const sAppId = _isOnSteam(game) ? _steamAppId(game) : '';
         if (sAppId) {
             steamBtn.style.display = 'block';
             steamBtn.onclick = (e) => { e.stopPropagation(); openSteamMenu(steamBtn, sAppId); };
@@ -5343,7 +5352,9 @@ function openGamepage(game) {
     const uninstallBtn = document.getElementById('btn-gamepage-uninstall');
     if (uninstallBtn) {
         const grinderCan = /^(gog|epic)_/i.test(game.GrinderGameId || '') && (game.Installed == 1);
-        const sAppId = _steamAppId(game);
+        // Same gate: uninstalling "through Steam" a game Steam does not own would open
+        // the client on a title the user never bought there.
+        const sAppId = _isOnSteam(game) ? _steamAppId(game) : '';
         const steamCan = !grinderCan && sAppId && (game.Installed == 1);
         if (grinderCan) {
             uninstallBtn.style.display = 'block';
