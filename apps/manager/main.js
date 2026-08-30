@@ -68,50 +68,8 @@ const baseDir = host.portableBaseDir({ isPackaged: app.isPackaged, execPath: pro
 const configDir = path.join(baseDir, 'GameManagerConfig');
 
 // Write a minimal game entry to GRINDER's DB (called before opening GRINDER for setup)
-function ensureInGrinderDb(id, title, store, appId, installed) {
-    const gdbPath = host.findGrinderDb(baseDir);
-    if (!gdbPath) return false; // GRINDER has never been launched — can't write yet
-    try {
-        const gdb = new Database(gdbPath, { timeout: 5000 });
-        gdb.prepare(`INSERT OR IGNORE INTO games (id, title, store, app_id, installed) VALUES (?, ?, ?, ?, ?)`)
-           .run(id, title, store, appId || null, installed ? 1 : 0);
-        gdb.close();
-        return true;
-    } catch (e) { console.error('[ensureInGrinderDb]', e); return false; }
-}
 
 // Open GRINDER focused on a specific game's setup (called by "Setup with GRINDER" button)
-ipcMain.handle('open-grinder-setup', (_, game) => {
-    const grinderPath = findGrinderPath();
-    if (!grinderPath) return { ok: false, error: 'GRINDER not found.' };
-
-    let grinderGameId = game.GrinderGameId || null;
-
-    if (!grinderGameId) {
-        // Determine what ID and store to use for GRINDER
-        const steamId = game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '') : null;
-        if (steamId) {
-            grinderGameId = `steam_${steamId}`;
-            ensureInGrinderDb(grinderGameId, game.Game, 'steam', steamId, game.Installed);
-            // Link back so verifyAndLaunch routes to GRINDER's headless engine
-            if (db) db.prepare("UPDATE games SET GrinderGameId=? WHERE id=?").run(grinderGameId, game.id);
-        } else {
-            // Others/Physical/non-catalogued — use a deterministic CNGM-prefixed ID
-            const safe = (game.Game || 'game').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32);
-            grinderGameId = `cngm_${safe}_${Date.now().toString(36)}`;
-            const launchCmd = game.LaunchCommand || '';
-            const storeGuess = /grinder.*gog/i.test(launchCmd) ? 'gog'
-                             : /grinder.*epic/i.test(launchCmd) ? 'epic'
-                             : 'custom';
-            ensureInGrinderDb(grinderGameId, game.Game, storeGuess, null, game.Installed);
-            // Write back the GrinderGameId to CNGM's DB so future calls reuse it
-            if (db) db.prepare("UPDATE games SET GrinderGameId=? WHERE id=?").run(grinderGameId, game.id);
-        }
-    }
-
-    spawnGrinder(['setup', grinderGameId]);
-    return { ok: true };
-});
 const imagesDir = path.join(configDir, 'images');
 const trailersDir = path.join(configDir, 'videos');
 const dbPath = path.join(configDir, 'games.db');
@@ -2945,19 +2903,6 @@ ipcMain.handle('set-launch-command', (e, gameId, cmd) => {
     return true;
 });
 
-ipcMain.handle('open-grinder', (_, gameName) => {
-    const args = !gameName ? []
-              : gameName.startsWith('sync-') ? [gameName]
-              : ['search', gameName];
-    spawnGrinder(args);
-    return { ok: true };
-});
-
-// "Manage Storage: GOG & Epic" → open GRINDER on installed games sorted by size on disk.
-ipcMain.handle('open-grinder-storage', () => {
-    spawnGrinder(['storage']);
-    return { ok: true };
-});
 
 // Auto-sync GRINDER installed status into CNGM library.
 // installedIds = array of GRINDER game IDs that are installed (from grinderStatus).

@@ -156,35 +156,6 @@ const binDir = path.join(app.isPackaged ? process.resourcesPath : __dirname, 'as
 // ── Launch engine ─────────────────────────────────────────────────────────────
 
 // ── Window ────────────────────────────────────────────────────────────────────
-function createWindow() {
-    // macOS: real traffic lights instead of the custom win-btn row — see manager/main.js.
-    const chrome = process.platform === 'darwin'
-        ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 12, y: 10 } }
-        : { frame: false };
-    win = new BrowserWindow({
-        width: 1100, height: 700,
-        minWidth: 800, minHeight: 500,
-        ...chrome,
-        show: false,
-        backgroundColor: '#1a0f0a',
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-        }
-    });
-    win.setMenu(null);
-    win.loadFile(path.join(__dirname, 'index.html'));
-
-    const showWin = () => {
-        if (!win.isVisible()) win.show();
-        if (cliSearch)  win.webContents.send('cli-search', cliSearch);
-        if (cliSetupId) win.webContents.send('cli-setup',  cliSetupId);
-        if (cliStorage) win.webContents.send('cli-storage');
-    };
-    ipcMain.once('renderer-ready', showWin);
-    win.once('ready-to-show', () => setTimeout(showWin, 2000));
-}
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 if (cliMode) {
@@ -210,28 +181,12 @@ if (cliMode) {
         setTimeout(() => app.quit(), 500);
     });
 } else {
-    // Single-instance lock for windowed mode — second instance focuses existing window
-    const gotLock = app.requestSingleInstanceLock();
-    if (!gotLock) {
-        app.quit();
-    } else {
-        app.on('second-instance', (_, argv) => {
-            if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
-            const args = argv.slice(2);
-            const si = args.indexOf('search');
-            if (si !== -1 && args[si + 1]) win?.webContents.send('cli-search', args.slice(si + 1).join(' '));
-            const pi = args.indexOf('setup');
-            if (pi !== -1 && args[pi + 1]) win?.webContents.send('cli-setup', args[pi + 1]);
-            if (args.indexOf('sync-gog')  !== -1) win?.webContents.send('cli-sync', 'gog');
-            if (args.indexOf('sync-epic') !== -1) win?.webContents.send('cli-sync', 'epic');
-            if (args.indexOf('storage')   !== -1) win?.webContents.send('cli-storage');
-        });
-        app.whenReady().then(() => {
-            initDb();
-            createWindow();
-        });
-        app.on('window-all-closed', () => app.quit());
-    }
+    // ⚠️ GRINDER has no GUI as of Phase 2B. Its setup modal and storage view live in
+    // the Manager now, so a bare `grinder` invocation has nothing to show. The CLI
+    // paths above — launch, install, uninstall-headless — are the whole face, and the
+    // `grinder://launch/…` scheme every installed game carries still routes here.
+    console.error('GRINDER is headless: use `grinder launch <id>`, `grinder install …` or `grinder uninstall-headless …`.');
+    app.whenReady().then(() => app.quit());
 }
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────

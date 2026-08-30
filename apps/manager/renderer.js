@@ -25,10 +25,6 @@ function openAddCmdDialog(gameId, gameName) {
         await loadGames();
     };
     document.getElementById('add-cmd-cancel').onclick = () => modal.classList.remove('active');
-    document.getElementById('add-cmd-grinder').onclick = () => {
-        modal.classList.remove('active');
-        window.api.openGrinder();
-    };
 }
 
 function openAddGameDialog() {
@@ -57,7 +53,6 @@ function openAddGameDialog() {
         const name = nameInput.value.trim();
         close();
         if (name) { const r = await window.api.addGame(name); if (r.success) await loadGames(); }
-        window.api.openGrinder();
     };
 }
 
@@ -800,7 +795,7 @@ function _installLauncher(game, store, cmd) {
     }
     if (store === 'gog' || store === 'epic') {
         if (/^(gog|epic)_/i.test(game.GrinderGameId || '')) { openGrinderInstall(game); return; }
-        window.api.openGrinder(game.Game); return;
+        _openCompatFor(game); return;
     }
     _doLaunch(game, cmd); // untracked launcher — best-effort launch
 }
@@ -876,7 +871,7 @@ async function _doLaunch(game, cmd) {
             if (args === null) return;
             window.api.launchGame('grinder://launch/' + game.GrinderGameId, args, exe);
         } else {
-            window.api.openGrinder(game.Game);
+            _openCompatFor(game);
         }
         Promise.all([window.api.updateLastPlayed(game.id), window.api.verifyInstallStatus(game.id)]).then(() => loadGames());
         return;
@@ -1147,7 +1142,7 @@ else _wireDownloadManager();
 // In-process GOG/Epic install with a progress modal (no GRINDER window).
 async function openGrinderInstall(game) {
     const gid = game.GrinderGameId || '';
-    if (!/^(gog|epic)_/i.test(gid)) { window.api.openGrinder(game.Game); return; } // custom → GUI setup
+    if (!/^(gog|epic)_/i.test(gid)) { _openCompatFor(game); return; }   // custom → compatibility panel
 
     const modal = document.getElementById('modal-grinder-install');
     const $ = id => document.getElementById(id);
@@ -1470,7 +1465,7 @@ async function handleInstall(game) {
 
     if (_isGrinderGame(game)) {
         if (/^(gog|epic)_/i.test(game.GrinderGameId || '')) { openGrinderInstall(game); return; }
-        window.api.openGrinder(game.Game); return;
+        _openCompatFor(game); return;
     }
     const installCmd = getInstallCommand(game);
     if (installCmd) { window.api.openInstallUrl(installCmd); return; }
@@ -2179,13 +2174,13 @@ function _fmtBytes(n) {
     return (v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + u[i];
 }
 
-// Per-game entry point. A game only reaches the compatibility panel if it has a
-// GRINDER row to edit; anything else still falls back to the GRINDER window until
-// the remaining call sites are converted.
+// Per-game entry point. A game reaches the compatibility panel only if it has a
+// GRINDER row to edit. There is no window to fall back to any more, so a game
+// without one says why instead of doing nothing.
 function _openCompatFor(game) {
     const gid = game?.GrinderGameId || '';
     if (gid) { openCompatModal(gid, game.Game || ''); return true; }
-    window.api.openGrinder(game?.Game);
+    showAlert('This game has no GRINDER entry yet — install it through Cafe Neurotico first, and its compatibility settings appear here.');
     return false;
 }
 
@@ -4672,7 +4667,7 @@ _tbody.addEventListener('click', async (e) => {
             openAddCmdDialog(install.dataset.id, install.dataset.name);
         } else if (install.dataset.grinder) {
             const g = allGames.find(x => x.id == install.dataset.id);
-            if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
+            if (g) handleInstall(g); else showAlert('That game is no longer in the library — refresh and try again.');
         } else {
             const g = allGames.find(x => x.id == install.dataset.id);
             if (g) handleInstall(g); else window.api.openInstallUrl(install.dataset.url);
@@ -4927,7 +4922,7 @@ _grid.addEventListener('click', (e) => {
             openAddCmdDialog(install.dataset.id, install.dataset.name);
         } else if (install.dataset.grinder) {
             const g = allGames.find(x => x.id == install.dataset.id);
-            if (g) handleInstall(g); else window.api.openGrinder(install.dataset.name);
+            if (g) handleInstall(g); else showAlert('That game is no longer in the library — refresh and try again.');
         } else {
             const g = allGames.find(x => x.id == install.dataset.id);
             if (g) handleInstall(g); else window.api.openInstallUrl(install.dataset.url);
@@ -6728,9 +6723,6 @@ function getThemeColors() {
 }
 
 document.getElementById('btn-steam-open-hero')?.addEventListener('click', () => window.api.openInstallUrl('steam://open/main'));
-document.getElementById('btn-grinder-open-gog-hero')?.addEventListener('click', () => window.api.openGrinder());
-document.getElementById('btn-grinder-open-epic-hero')?.addEventListener('click', () => window.api.openGrinder());
-document.getElementById('btn-grinder-open-others-hero')?.addEventListener('click', () => window.api.openGrinder());
 document.getElementById('btn-itch-open-hero')?.addEventListener('click', () => window.api.openInstallUrl('itch://library'));
 document.getElementById('btn-gog-store-hero')?.addEventListener('click', () => window.api.openStoreBrowser('gog', getThemeColors()));
 document.getElementById('btn-epic-store-hero')?.addEventListener('click', () => window.api.openStoreBrowser('epic', getThemeColors()));
@@ -6747,19 +6739,25 @@ document.getElementById('btn-hero-update-steam')?.addEventListener('click', asyn
     loadGames();
 });
 
-document.getElementById('btn-hero-update-gog')?.addEventListener('click', () => {
-    const btn = document.getElementById('btn-hero-update-gog');
-    btn.style.animation = 'spin 0.6s linear';
-    setTimeout(() => { btn.style.animation = ''; }, 650);
-    window.api.openGrinder('sync-gog');
-});
+// Sync runs in-process now — `grinder-refresh-owned` already did the whole job
+// (syncOwnedLibrary plus pruning refunds out of the CN library); it simply had no
+// caller. The spinner runs for as long as the sync actually takes.
+async function _syncOwnedLibrary(btnId) {
+    const btn = document.getElementById(btnId);
+    if (btn?.dataset.busy) return;
+    if (btn) { btn.dataset.busy = '1'; btn.style.animation = 'spin 1s linear infinite'; }
+    try {
+        const r = await window.api.grinderRefreshOwned();
+        if (!r?.available)  { await showAlert('GRINDER data is not set up yet — connect GOG or Epic first.'); return; }
+        if (r.error)        { await showAlert('Could not refresh your library: ' + r.error); return; }
+        await loadGames();
+    } finally {
+        if (btn) { delete btn.dataset.busy; btn.style.animation = ''; }
+    }
+}
+document.getElementById('btn-hero-update-gog')?.addEventListener('click', () => _syncOwnedLibrary('btn-hero-update-gog'));
 
-document.getElementById('btn-hero-update-epic')?.addEventListener('click', () => {
-    const btn = document.getElementById('btn-hero-update-epic');
-    btn.style.animation = 'spin 0.6s linear';
-    setTimeout(() => { btn.style.animation = ''; }, 650);
-    window.api.openGrinder('sync-epic');
-});
+document.getElementById('btn-hero-update-epic')?.addEventListener('click', () => _syncOwnedLibrary('btn-hero-update-epic'));
 
 document.getElementById('btn-hero-update-others')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-hero-update-others');
@@ -7088,11 +7086,7 @@ async function syncGrinderInstalled() {
 
 async function checkGrinderConnect() {
     const statusEl = document.getElementById('grinder-connect-status');
-    const openBtn  = document.getElementById('btn-open-grinder-tool');
     if (!statusEl) return;
-    // The Advanced "open GRINDER" button only appears once the engine data dir exists.
-    const s = await window.api.grinderStatus();
-    if (openBtn) openBtn.style.display = s.found ? '' : 'none';
     // What users actually care about here is whether their stores are connected.
     await renderStoreAuthStatus(statusEl);
 }
@@ -7101,7 +7095,6 @@ document.getElementById('btn-connect-login-gog')?.addEventListener('click',  (e)
     runStoreLogin('gog',  e.currentTarget, document.getElementById('grinder-connect-status')));
 document.getElementById('btn-connect-login-epic')?.addEventListener('click', (e) =>
     runStoreLogin('epic', e.currentTarget, document.getElementById('grinder-connect-status')));
-document.getElementById('btn-open-grinder-tool')?.addEventListener('click', () => window.api.openGrinder());
 
 // ── GRINDER row in detail panel ────────────────────────────────────────────────
 async function updateGrinderRow(game) {

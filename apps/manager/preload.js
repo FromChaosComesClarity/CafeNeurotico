@@ -180,9 +180,6 @@ contextBridge.exposeInMainWorld('api', {
                                 openStoreBrowser: (store, colors) => ipcRenderer.invoke('open-store-browser', store, colors),
 
                                 // --- GRINDER ---
-                                openGrinder: (name) => ipcRenderer.invoke('open-grinder', name),
-                                openGrinderStorage: () => ipcRenderer.invoke('open-grinder-storage'),
-                                openGrinderSetup: (game) => ipcRenderer.invoke('open-grinder-setup', game),
                                 grinderStatus: () => ipcRenderer.invoke('grinder-status'),
                                 // --- headless GOG/Epic sign-in (no GRINDER window) ---
                                 gogLogin:       () => ipcRenderer.invoke('gog-login'),
