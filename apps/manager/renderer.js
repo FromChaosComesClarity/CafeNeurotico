@@ -1713,16 +1713,8 @@ window.api.getSetting('language').then(lang => {
 
 window.api.checkEmuLatte().then(exists => {
     if (exists) {
-        const splitEmu = document.getElementById('btn-split-emulatte');
-        if (splitEmu) splitEmu.style.display = '';
-        const topnavEmu = document.getElementById('btn-topnav-emulatte');
-        if (topnavEmu) topnavEmu.style.display = '';
-        const sbEmu = document.getElementById('btn-launch-emulatte-sb');
-        if (sbEmu) sbEmu.style.display = 'flex';
         const railEmu = document.getElementById('btn-rail-emulatte');
         if (railEmu) railEmu.style.display = '';
-        const cmdEmu = document.getElementById('btn-cmd-emulatte');
-        if (cmdEmu) cmdEmu.style.display = 'flex';
     }
 });
 // Always-visible floating CREMA call-to-action
@@ -1749,30 +1741,8 @@ document.querySelectorAll('.support-copy').forEach(btn => {
         setTimeout(() => { btn.textContent = was; }, 1400);
     });
 });
-document.getElementById('btn-topnav-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
-document.getElementById('btn-launch-emulatte-sb')?.addEventListener('click', () => window.api.launchEmuLatte());
 document.getElementById('btn-rail-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 
-// Top nav filter scroll arrows
-function updateTopnavFilterArrows() {
-    const el = document.getElementById('topnav-filters');
-    if (!el) return;
-    const prev = document.getElementById('topnav-filters-prev');
-    const next = document.getElementById('topnav-filters-next');
-    if (!prev || !next) return;
-    prev.classList.toggle('visible', el.scrollLeft > 2);
-    next.classList.toggle('visible', el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
-}
-document.getElementById('topnav-filters')?.addEventListener('scroll', updateTopnavFilterArrows);
-document.getElementById('topnav-filters-prev')?.addEventListener('click', () => {
-    document.getElementById('topnav-filters')?.scrollBy({ left: -140, behavior: 'smooth' });
-});
-document.getElementById('topnav-filters-next')?.addEventListener('click', () => {
-    document.getElementById('topnav-filters')?.scrollBy({ left: 140, behavior: 'smooth' });
-});
-const _topnavResizeObserver = new ResizeObserver(updateTopnavFilterArrows);
-_topnavResizeObserver.observe(document.getElementById('topnav-filters') || document.body);
-setTimeout(updateTopnavFilterArrows, 200);
 
 // Local variable to hold our gaming history limit preference
 let recentGamesCount = 0;
@@ -2619,57 +2589,32 @@ document.getElementById('btn-f2p-hide-one')?.addEventListener('click', async () 
     document.getElementById('modal-free-games')?.classList.remove('active');
 });
 
-// ── CORNER STYLE (sharp vs round) — classic + flat layout families ────────
-// 'sharp' = current flat look (corners-flat class on body); 'round' = the
-// previous rounded style (no class). Only affects the layouts listed below.
-const _CORNERS_FLAT_LAYOUTS = ['rail', 'sidebar', 'topnav', 'split', 'commander', 'catalog', 'newspaper', 'timeline', 'kanban'];
+// ── CORNER STYLE (sharp vs round) ─────────────────────────────────────────
+// 'sharp' = flat look (corners-flat on body); 'round' = the previous rounded
+// style. One layout now, so it applies unconditionally.
 let _cornersStyle = 'sharp';
 function applyCornersStyle() {
-    const mode = localStorage.getItem('cngm_layout_mode') || 'rail';
-    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
+    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp');
 }
 
-// ── LAYOUT MODE ───────────────────────────────────────────────────────────
-// The TTY and Ancient-OS layout families were retired in Phase 2. They had been
-// unreachable in the picker for some time (their category tabs were display:none)
-// and cost 3,058 lines of renderer and 789 lines of CSS between them — against 39
-// lines for the nine layouts that survive. Anyone still carrying a retired layout
-// in their settings is migrated to its nearest survivor, once, here.
-const _RETIRED_LAYOUTS = {
-    cp: 'rail',                                    // Navigator, removed earlier
-    // TTY family → Commander, the surviving terminal-flavoured layout
-    htop: 'rail', ranger: 'rail', bbs: 'rail', vi: 'rail',
-    adventure: 'rail', mc: 'rail', nethack: 'rail', grub: 'rail',
-    split: 'rail', commander: 'rail',
-    // Ancient-OS family → Classic Sidebar, the surviving labelled-desktop layout
-    mac: 'sidebar', xp: 'sidebar', kde: 'sidebar', c64: 'sidebar',
-    amiga: 'sidebar', beos: 'sidebar', w95: 'sidebar', nextstep: 'sidebar',
-    // Flat family, retired next — the gallery is the shape they were variations of
-    catalog: 'rail', newspaper: 'rail', timeline: 'rail', kanban: 'rail',
-};
-const _LIVE_LAYOUTS = ['rail', 'sidebar', 'topnav'];
-
-function applyLayoutMode(mode) {
-    if (_RETIRED_LAYOUTS[mode]) mode = _RETIRED_LAYOUTS[mode];
-    if (!_LIVE_LAYOUTS.includes(mode)) mode = 'rail';
-    const c = document.getElementById('app-container');
-    _LIVE_LAYOUTS.forEach(m => c.classList.remove('layout-' + m));
-    c.classList.add('layout-' + mode);
-    // Sharp-corner (flat) treatment for the classic + flat layout families,
-    // unless the user opted into the previous rounded style via the Corners setting.
-    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp' && _CORNERS_FLAT_LAYOUTS.includes(mode));
-    document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(b =>
-        b.classList.toggle('active', b.dataset.val === mode));
-    localStorage.setItem('cngm_layout_mode', mode);
-    window.api.setSetting('layout_mode', mode);
+// ── LAYOUT ────────────────────────────────────────────────────────────────
+// There is one layout: the icon side rail.
+//
+// The app carried 24 across four families, and not one of them could be reached
+// in a shipped build — startup always called applyLayoutMode('rail') and ignored
+// the saved layout_mode, while the picker card sat behind display:none. Between
+// them they cost roughly 9,000 lines of renderer and CSS, so they were retired
+// rather than revived: TTY and Ancient-OS first, then the flat family, the split
+// pane, Commander, and finally the labelled sidebar and top nav.
+//
+// applyLayoutMode survives as the single place that stamps the layout class and
+// the corner treatment, because init and the corners setting both call it.
+// Any layout_mode left in an older install is simply ignored.
+function applyLayoutMode() {
+    document.getElementById('app-container').classList.add('layout-rail');
+    document.body.classList.toggle('corners-flat', _cornersStyle === 'sharp');
+    localStorage.setItem('cngm_layout_mode', 'rail');
 }
-document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(btn =>
-    btn.addEventListener('click', () => applyLayoutMode(btn.dataset.val)));
-
-// The layout picker is one flat list of nine. It used to be four family tabs
-// (Classic / Flat / TTY / Ancient OS), but three of them were display:none and
-// the TTY and Ancient-OS families are gone as of Phase 2 — leaving tab chrome
-// over a single visible group. The tabs and _layoutCats went with them.
 
 // ════════════════════════════════════════════════════════════════════════════
 //  HOME — "Control Room" dashboard (optional start screen preceding the library)
@@ -3258,7 +3203,7 @@ document.getElementById('btn-titlebar-library')?.addEventListener('click', () =>
     // could never execute in a shipped build. It is also why the surviving eight
     // are still dormant — reaching them needs this call to honour the saved mode
     // AND the picker card to lose its display:none.
-    applyLayoutMode('rail');
+    applyLayoutMode();
     await loadHomeConfig();
     if (_homeEnabled) { switchView('view-home'); await renderHome(); }
 })();
@@ -3280,8 +3225,6 @@ document.getElementById('btn-refresh-library').addEventListener('click', async (
         if (updated) refreshGamepagePlayBtn(updated);
     }
 });
-document.getElementById('btn-refresh-library-sb')?.addEventListener('click', () =>
-    document.getElementById('btn-refresh-library').click());
 
 function closeGamepageToLibrary() {
     applyFilters();
@@ -3462,7 +3405,7 @@ document.getElementById('btn-edit-playlist-delete')?.addEventListener('click', a
 });
 
 // --- PLAYLISTS NAV MODAL (topnav / split) ---
-['btn-topnav-playlists', 'btn-split-playlists'].forEach(id =>
+[].forEach(id =>
     document.getElementById(id)?.addEventListener('click', () => {
         renderPlaylistPanels();
         document.getElementById('modal-playlists-nav').classList.add('active');
@@ -3908,7 +3851,6 @@ async function openRemoveFromPlaylistModal(game) {
         const remaining = await window.api.getGamePlaylists(game.id);
         if (remaining.length === 0) {
             document.getElementById('btn-gamepage-remove-playlist')?.style && (document.getElementById('btn-gamepage-remove-playlist').style.display = 'none');
-            document.getElementById('btn-split-remove-playlist')?.style && (document.getElementById('btn-split-remove-playlist').style.display = 'none');
         }
     };
     document.getElementById('modal-remove-from-playlist').classList.add('active');
@@ -3923,14 +3865,6 @@ function syncFilterActiveStates() {
     });
     document.querySelectorAll('.panel-filter-btn[data-filter]').forEach(btn => {
         btn.classList.toggle('active', activeFilters.has(btn.dataset.filter));
-    });
-    document.querySelectorAll('#sidebar-filters button[data-filter]').forEach(btn => {
-        const f = btn.dataset.filter;
-        btn.classList.toggle('active', f === 'all' ? activeFilters.size === 0 : activeFilters.has(f));
-    });
-    document.querySelectorAll('.topnav-filter[data-filter]').forEach(btn => {
-        const f = btn.dataset.filter;
-        btn.classList.toggle('active', f === 'all' ? activeFilters.size === 0 : activeFilters.has(f));
     });
     document.querySelectorAll('.split-ftab[data-filter]').forEach(btn => {
         const f = btn.dataset.filter;
@@ -3987,7 +3921,7 @@ function switchView(viewId) {
     // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
     //    centered panel over the (blurred) current view instead of swapping in full-page.
     const _ac = document.getElementById('app-container');
-    const _classicOverlay = ['layout-rail', 'layout-sidebar', 'layout-topnav'].some(c => _ac?.classList.contains(c));
+    const _classicOverlay = true;
     const _overlayGamepage = viewId === 'view-gamepage' && _classicOverlay;
     // The Edit page (view-details), when reached FROM the floating gamepage, floats in the SAME
     // panel box directly on top — so opening/returning feels seamless, not a full-page swap.
@@ -4322,15 +4256,6 @@ document.querySelectorAll('.panel-filter-btn[data-filter]').forEach(btn => {
 });
 // Panel close
 document.getElementById('btn-panel-close')?.addEventListener('click', closePanel);
-// Sidebar filter buttons
-document.querySelectorAll('#sidebar-filters button[data-filter]').forEach(btn => {
-    btn.addEventListener('click', () => activateFilter(btn.dataset.filter));
-});
-// Sidebar search bar
-document.getElementById('search-bar')?.addEventListener('input', _debouncedApplyFilters);
-// Sidebar add-game delegate
-document.getElementById('btn-add-game-sb')?.addEventListener('click', () =>
-    document.getElementById('btn-add-game').click());
 
 // Lowercased search text for a game: the title plus the metadata people actually search by.
 // Searching every column instead (the old `Object.values(game).some(...)`) matched the multi-KB
@@ -4377,7 +4302,7 @@ function pickRandomVisible() {
 }
 
 function applyFilters() {
-    const query = (document.getElementById('gallery-search')?.value || document.getElementById('search-bar')?.value || document.getElementById('topnav-search')?.value || document.getElementById('split-search')?.value || '').toLowerCase();
+    const query = (document.getElementById('gallery-search')?.value || '').toLowerCase();
 
     // Playlist mode: filter within the playlist's game set
     const baseGames = currentPlaylistGames !== null ? currentPlaylistGames : allGames;
@@ -6528,8 +6453,6 @@ window.api.onPico8CartDownloaded(({ name }) => {
     const connectBtn = document.getElementById('btn-open-connect');
     if (connectBtn) connectBtn.addEventListener('click', () => setTimeout(refreshPico8Status, 50));
 })();
-document.getElementById('btn-open-connect-sb')?.addEventListener('click', () =>
-    document.getElementById('btn-open-connect').click());
 
 // ── SEE FILTER VISIBILITY CONFIG ─────────────────────────────────────────
 
@@ -6556,8 +6479,6 @@ async function applySeeFilterVisibility() {
         const hidden = val === '0';
         [
             document.querySelector(`#panel-stores-grid [data-filter="${filter}"]`),
-            document.querySelector(`#sidebar-filters [data-filter="${filter}"]`),
-            document.querySelector(`#topnav-filters .topnav-filter[data-filter="${filter}"]`),
             document.querySelector(`#split-filter-strip .split-ftab[data-filter="${filter}"]`),
         ].forEach(el => { if (el) el.style.display = hidden ? 'none' : ''; });
     }
@@ -6582,8 +6503,6 @@ async function openSeeConfig() {
             await window.api.setSetting(`filter_vis_${filter}`, next ? '1' : '0');
             [
                 document.querySelector(`#panel-stores-grid [data-filter="${filter}"]`),
-                document.querySelector(`#sidebar-filters [data-filter="${filter}"]`),
-                document.querySelector(`#topnav-filters .topnav-filter[data-filter="${filter}"]`),
                 document.querySelector(`#split-filter-strip .split-ftab[data-filter="${filter}"]`),
             ].forEach(el => { if (el) el.style.display = next ? '' : 'none'; });
         });
@@ -6599,7 +6518,7 @@ const _closeSeeConfig = () => {
     const btn = document.getElementById('btn-see-config');
     if (btn) btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 };
-['btn-see-config', 'btn-see-config-sb', 'btn-topnav-cfg'].forEach(id =>
+['btn-see-config'].forEach(id =>
     document.getElementById(id)?.addEventListener('click', openSeeConfig));
 document.getElementById('btn-see-config-close')?.addEventListener('click', _closeSeeConfig);
 document.getElementById('see-config-panel')?.addEventListener('click', e => { if (e.target === e.currentTarget) _closeSeeConfig(); });
@@ -6620,35 +6539,6 @@ const CP_KEYWORDS = {
     'openbor': 'openbor', 'bor': 'openbor', 'beat em up': 'openbor',
 };
 
-// ── TOP NAV BAR WIRING ────────────────────────────────────────────────────
-document.querySelectorAll('.topnav-filter[data-filter]').forEach(btn =>
-    btn.addEventListener('click', () => activateFilter(btn.dataset.filter)));
-document.getElementById('topnav-search')?.addEventListener('input', _debouncedApplyFilters);
-document.getElementById('btn-topnav-gallery')?.addEventListener('click', () => {
-    switchView('view-gallery');
-    document.getElementById('btn-topnav-gallery').classList.add('active');
-    document.getElementById('btn-topnav-list').classList.remove('active');
-});
-document.getElementById('btn-topnav-list')?.addEventListener('click', () => {
-    switchView('view-list');
-    document.getElementById('btn-topnav-list').classList.add('active');
-    document.getElementById('btn-topnav-gallery').classList.remove('active');
-});
-document.getElementById('btn-topnav-refresh')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-topnav-refresh');
-    btn.style.animation = 'spin 0.6s linear infinite';
-    const onGamepage = document.getElementById('view-gamepage').classList.contains('active');
-    if (onGamepage && currentGameId) await window.api.verifyInstallStatus(currentGameId);
-    await updateLibraryFlow({ quiet: true });
-    btn.style.animation = '';
-    if (onGamepage && currentGameId) {
-        const updated = allGames.find(g => g.id === currentGameId);
-        if (updated) refreshGamepagePlayBtn(updated);
-    }
-});
-document.getElementById('btn-topnav-add')?.addEventListener('click', () => document.getElementById('btn-add-game').click());
-document.getElementById('btn-topnav-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect').click());
-document.getElementById('btn-topnav-tools')?.addEventListener('click', () => openToolsModal());
 
 // ── PICO-8 HERO BUTTONS ───────────────────────────────────────────────────
 
@@ -6673,11 +6563,6 @@ function toggleWantFilter() {
     else activeFilters.add('want');
     syncFilterActiveStates();
     applyFilters();
-}
-
-function openPlaylistsModal() {
-    document.getElementById('btn-topnav-playlists')?.click() ||
-    document.getElementById('btn-split-playlists')?.click();
 }
 
 function openConnectModal() {

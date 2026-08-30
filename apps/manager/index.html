@@ -264,15 +264,12 @@
     /* Modals have to fit the window they open in, or their buttons end up off-screen — which
        is exactly how the Control Panel's own settings button became unclickable. */
     .short .modal-box, .short #modal-tools > div, .short #modal-welcome > div,
-    .short #modal-themes > div, .short #modal-connect > div { max-height: 92vh !important; }
-
-    /* ── Responsive shell ───────────────────────────────────────────────────────
+    .short #modal-themes > div, .short #modal-connect > div { max-height: 92vh !important; }/* ── Responsive shell ───────────────────────────────────────────────────────
        A tiling WM makes a narrow window the normal case rather than the exception: half a
        1440px screen is 720px, and a third is 480px. These breakpoints are driven by a
        ResizeObserver on the shell rather than media queries, because what matters is the
        WINDOW's width, not the screen's — and on a tiled desktop those are different numbers.
        Classes rather than inline styles so a theme can still override anything. */
-    .narrow #topnav-filter-row { flex-wrap: wrap; row-gap: 4px; }
     .narrow .titlebar-brand { display: none; }
     .very-narrow #icon-rail { width: 40px; }
     .very-narrow #rail-chrome .crema-cta-text, .very-narrow #rail-chrome .support-cta-text { display: none; }/* Below this the split pane is two columns in a space that barely fits one, so the list
@@ -363,29 +360,9 @@
     #gallery-search-wrap #gallery-category + .cust-sel { width: 132px; flex-basis: 132px; }
     #gallery-search-wrap .cust-sel-btn { padding: 12px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
     #btn-genre-to-playlist:hover { border-color: var(--accent); color: var(--accent); }
-    #main-content { flex: 1; display: flex; flex-direction: column; background-color: transparent; position: relative; overflow: hidden; }
-
-    /* ── CLASSIC SIDEBAR ─────────────────────────────────────────────────────── */
-    #sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 2px solid var(--border); overflow: hidden; background-color: rgba(0,0,0,0.2); }
-    #sidebar-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 15px; padding: 15px 15px 8px; }
-    #sidebar-footer { flex-shrink: 0; border-top: 1px solid var(--border); padding: 0 15px; }
-
-    /* ── LAYOUT SWITCHING (JS adds layout-rail / layout-sidebar / layout-topnav / layout-split) ─── */
-    /* Default: icon-rail active, sidebar hidden */
-    #sidebar { display: none; }
+    #main-content { flex: 1; display: flex; flex-direction: column; background-color: transparent; position: relative; overflow: hidden; }/* ── CLASSIC SIDEBAR ─────────────────────────────────────────────────────── *//* ── LAYOUT SWITCHING (JS adds layout-rail / layout-sidebar / layout-topnav / layout-split) ─── *//* Default: icon-rail active, sidebar hidden */
     #cp-bar, #cp-chips { display: none; }
-    #app-container.layout-sidebar #icon-rail,
-    #app-container.layout-sidebar #side-panel,
-    #app-container.layout-sidebar #gallery-search-wrap { display: none !important; }
-    #app-container.layout-sidebar #sidebar { display: flex !important; }
-    #app-container.layout-rail #sidebar { display: none !important; }
-    /* Top Nav Bar */
-    #topnav { display:none; flex-shrink:0; height:44px; background:var(--bg_menu); border-bottom:1px solid var(--border_solid); align-items:center; padding:0 10px; gap:2px; overflow:hidden; }
-    #app-container.layout-topnav #topnav { display:flex !important; }
-    #app-container.layout-topnav #icon-rail,
-    #app-container.layout-topnav #side-panel,
-    #app-container.layout-topnav #sidebar,
-    #app-container.layout-topnav #gallery-search-wrap { display:none !important; }/* Split Pane *//* specificity beats the hide rule above, so split-edit overlay wins *//* ── COMMAND LAYOUT ─────────────────────────────────────────────────────── *//* Command bar — floating terminal search */
+    #app-container.layout-rail #sidebar { display: none !important; }/* Top Nav Bar *//* Split Pane *//* specificity beats the hide rule above, so split-edit overlay wins *//* ── COMMAND LAYOUT ─────────────────────────────────────────────────────── *//* Command bar — floating terminal search */
     @keyframes cmd-blink { 0%,100%{opacity:1} 50%{opacity:0} }
     @keyframes cmd-err { 0%{color:var(--accent)} 45%{color:#e05c5c} 100%{color:var(--accent)} }/* Command icon bar — vertical, top-right *//* Store filter panel — slides in to the left of the floating icon bar */
     .csp-row { display:flex; align-items:center; gap:9px; width:100%; background:transparent; border:1px solid transparent; color:#cfcfcf; padding:8px 10px; border-radius:8px; cursor:pointer; font-family:'Fira Code','Courier New',monospace; font-size:12px; text-align:left; transition:background 0.14s, color 0.14s, border-color 0.14s; }
@@ -733,13 +710,7 @@
     .btn-split-row-fav.active svg, .btn-split-row-want.active svg { fill:currentColor; }
     .split-inst-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
     .split-inst-dot.on { background:#66bb6a; }
-    .split-inst-dot.off { background:transparent; }/* Left footer nav — 2-row 3-col grid */
-    .split-nav-btn { background:transparent; border:none; color:var(--text_dim); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:8px; font-weight:900; letter-spacing:0.8px; text-transform:uppercase; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 4px; border-radius:6px; transition:0.15s; }
-    .split-nav-btn svg { opacity:0.55; }
-    .split-nav-btn:hover { background:rgba(255,255,255,0.06); color:var(--text_main); }
-    .split-nav-btn:hover svg { opacity:1; }
-    .split-nav-btn.active { color:var(--accent); }
-    .split-nav-btn.active svg { opacity:1; stroke:var(--accent); }/* Search clear button *//* Right detail panel *//* Welcome screen */
+    .split-inst-dot.off { background:transparent; }/* Left footer nav — 2-row 3-col grid *//* Search clear button *//* Right detail panel *//* Welcome screen */
     #split-cover-zoom { position:fixed; inset:0; z-index:25000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.88); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); cursor:zoom-out; }
     #split-cover-zoom.active { display:flex; }
     #split-cover-zoom img { max-height:88vh; max-width:65vw; object-fit:contain; border-radius:14px; box-shadow:0 40px 100px rgba(0,0,0,0.95); animation:coverZoomIn 0.3s cubic-bezier(0.34,1.4,0.64,1); }
@@ -749,29 +720,7 @@
     .split-stat-label { font-size:8px; font-weight:900; color:var(--text_dim); letter-spacing:1.5px; text-transform:uppercase; }
     .split-stat-value { font-size:12px; font-weight:700; color:var(--text_sec); }
     .split-ss-thumb { height:80px; border-radius:6px; object-fit:cover; cursor:pointer; border:2px solid transparent; flex-shrink:0; transition:0.15s; opacity:0.7; }
-    .split-ss-thumb:hover { opacity:1; border-color:var(--accent); transform:none; box-shadow:none; }
-    /* Top Nav: filter row wrapper (filters + cfg button) */
-    #topnav-filter-row { display:flex; align-items:center; flex:1; min-width:0; gap:2px; }
-    /* Top Nav: filter tabs */
-    #topnav-filters { display:flex; align-items:center; gap:1px; overflow-x:auto; scrollbar-width:none; flex:1; min-width:0; }
-    #topnav-filters::-webkit-scrollbar { display:none; }
-    .topnav-filter { background:transparent; border:none; color:var(--text_dim); font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:700; font-size:10px; padding:3px 10px; border-radius:4px; cursor:pointer; letter-spacing:1px; text-transform:uppercase; transition:0.15s; white-space:nowrap; height:28px; }
-    .topnav-filter:hover { background:rgba(255,255,255,0.06); color:var(--text_main); transform:none; box-shadow:none; }
-    .topnav-filter.active { background:var(--accent); color:var(--bg); font-weight:900; }
-    /* Top Nav: separator */
-    .topnav-sep { width:1px; height:22px; background:var(--border_solid); flex-shrink:0; margin:0 6px; }
-    /* Top Nav: search */
-    #topnav-search { background:rgba(0,0,0,0.3); border:1px solid var(--border_solid); color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:12px; padding:5px 12px; border-radius:6px; width:160px; flex-shrink:0; height:28px; box-sizing:border-box; }
-    #topnav-search:focus { outline:none; border-color:var(--accent); }
-    #topnav-search::placeholder { color:var(--text_dim); font-style:italic; font-weight:400; }
-    /* Top Nav: icon action buttons */
-    .topnav-action { background:transparent; border:1px solid transparent; color:var(--text_dim); width:30px; height:30px; padding:0; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.15s; flex-shrink:0; }
-    .topnav-action:hover { background:color-mix(in srgb,var(--accent) 12%,transparent); border-color:var(--accent); color:var(--accent); transform:none; box-shadow:0 0 10px color-mix(in srgb,var(--accent) 35%,transparent); }
-    .topnav-action.active { color:var(--text_main); }
-    /* Top Nav: filter scroll arrows */
-    .topnav-filter-arrow { display:none; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text_dim); cursor:pointer; padding:0 5px; font-size:16px; flex-shrink:0; height:28px; line-height:1; transition:color 0.15s; }
-    .topnav-filter-arrow:hover { color:var(--accent); }
-    .topnav-filter-arrow.visible { display:flex; }
+    .split-ss-thumb:hover { opacity:1; border-color:var(--accent); transform:none; box-shadow:none; }/* Top Nav: filter row wrapper (filters + cfg button) *//* Top Nav: filter tabs *//* Top Nav: separator *//* Top Nav: search *//* Top Nav: icon action buttons *//* Top Nav: filter scroll arrows */
 
     .row { display: flex; gap: 10px; }
     button { background-color: var(--bg_panel); color: var(--text_main); border: 1px solid var(--border_solid); padding: 10px 12px; font-family: var(--ui-font, 'Raleway'), sans-serif; font-weight: 900; cursor: pointer; border-radius: 6px; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-transform: uppercase; letter-spacing: 1px; }
@@ -780,7 +729,7 @@
        (window controls keep their red close; danger buttons keep their red). */
     body.theme-light button:not(.win-btn):not(.cp-rail-danger):hover { background-color: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }/* ── CREMA launch — Ancient-OS faux-desktop launchers (classic/TTY use the titlebar pill) ── *//* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
     
-    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
+    #btn-open-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
         display: none !important;
     }
     button.primary { background-color: var(--accent); color: var(--bg); border: none; }
@@ -874,11 +823,6 @@
 
     input[type="text"], input[type="password"], textarea { background-color: rgba(0,0,0,0.3); color: var(--text_main); border: 1px solid var(--border_solid); padding: 10px; width: 100%; box-sizing: border-box; border-radius: 6px; font-family: var(--ui-font, 'Raleway'), sans-serif; }
     input[type="text"]:focus, input[type="password"]:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 10px var(--border); }
-
-    .filter-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-    .filter-grid button { font-size: 11px; padding: 8px; background-color: var(--bg_menu); border: 1px solid var(--border); color: var(--text_sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .filter-grid button:hover { background-color: var(--accent); color: var(--bg); border-color: var(--accent); }
-    .filter-grid button.active { background-color: var(--text_main); color: var(--bg); border-color: var(--text_main); box-shadow: 0 0 10px var(--text_main); }
 
     .view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: auto; display: none; padding: 20px; box-sizing: border-box; }
     .view.active { display: block; }
@@ -1201,143 +1145,11 @@
   <div id="app-container">
 
     <!-- ── TOP NAV BAR (layout-topnav only) ─────────────────────────────────── -->
-    <div id="topnav">
-      <div id="topnav-filter-row">
-        <button id="topnav-filters-prev" class="topnav-filter-arrow" title="Scroll filters left">&#8249;</button>
-        <div id="topnav-filters">
-          <button class="topnav-filter active" data-filter="all">All</button>
-          <button class="topnav-filter" data-filter="installed">Installed</button>
-          <button class="topnav-filter" data-filter="favs">Favs</button>
-          <button class="topnav-filter" data-filter="want">Want</button>
-          <button class="topnav-filter" data-filter="steam">Steam</button>
-          <button class="topnav-filter" data-filter="epic">Epic</button>
-          <button class="topnav-filter" data-filter="gog">GOG</button>
-          <button class="topnav-filter" data-filter="flatpak">Flatpak</button>
-          <button class="topnav-filter" data-filter="pico8">PICO-8</button>
-          <button class="topnav-filter" data-filter="itch">itch.io</button>
-          <button class="topnav-filter" data-filter="physical">Physical</button>
-          <button class="topnav-filter" data-filter="others">Others</button>
-          <button class="topnav-filter" data-filter="openbor">OpenBOR</button>
-          <button class="topnav-filter" data-filter="emulation">Emulation</button>
-          <button class="topnav-filter" data-filter="apps">Apps</button>
-        </div>
-        <button id="topnav-filters-next" class="topnav-filter-arrow" title="Scroll filters right">&#8250;</button>
-        <button id="btn-topnav-cfg" class="topnav-action" title="Configure visible filters" style="flex-shrink:0;">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
-      <div class="topnav-sep"></div>
-      <input type="text" id="topnav-search" placeholder="Search…" autocomplete="off" spellcheck="false">
-      <div class="topnav-sep"></div>
-      <!-- View toggles -->
-      <button id="btn-topnav-gallery" class="topnav-action active" title="Gallery view">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      </button>
-      <button id="btn-topnav-list" class="topnav-action" title="List view">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-      </button>
-      <div class="topnav-sep"></div>
-      <!-- Actions -->
-      <button id="btn-topnav-refresh" class="topnav-action" title="Refresh library">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.56"/></svg>
-      </button>
-      <button id="btn-topnav-add" class="topnav-action" title="Add game">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      </button>
-      <button id="btn-topnav-connect" class="topnav-action" title="Connect services">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-      </button>
-      <button id="btn-topnav-tools" class="topnav-action" title="Tools &amp; Settings">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-      </button>
-      <button id="btn-topnav-playlists" class="topnav-action" title="Playlists">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      </button>
-      <button id="btn-topnav-emulatte" class="topnav-action" title="Launch EmuLatte" style="display:none;">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="12" rx="4"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
-      </button>
-    </div>
 
 
     <div id="app-inner">
 
     <!-- ── CLASSIC SIDEBAR (layout-sidebar only) ────────────────────────────── -->
-    <div id="sidebar">
-      <div id="sidebar-scroll">
-        <fieldset>
-          <legend data-i18n="html.legend_search">Search &amp; Filter</legend>
-          <input type="text" id="search-bar" placeholder="SEARCH ALL INFO...">
-        </fieldset>
-        <fieldset>
-          <legend style="display:flex; align-items:center; justify-content:space-between; width:calc(100% - 4px); margin:0 2px; background:transparent; padding:0; box-shadow:none;">
-            <span data-i18n="html.legend_see" style="font-weight:900; padding:4px 12px; color:var(--bg); background:var(--accent); border-radius:6px; font-size:11px; letter-spacing:2px; text-transform:uppercase; box-shadow:0 2px 5px rgba(0,0,0,0.3);">See</span>
-            <button id="btn-see-config-sb" title="Configure visible filters" style="padding:4px 8px; background:var(--accent); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.3); transition:opacity 0.2s; font-family:inherit; font-weight:400; font-size:11px; color:var(--bg); letter-spacing:1px;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">+ / -</button>
-          </legend>
-          <div class="filter-grid" id="sidebar-filters">
-            <button class="active" data-filter="all" data-i18n="html.filter_all">All Games</button>
-            <button data-filter="installed" data-i18n="html.filter_installed">Installed</button>
-            <button data-filter="favs" data-i18n="html.filter_favs">Favs</button>
-            <button data-filter="want" data-i18n="html.filter_want">Want</button>
-            <button data-filter="steam">Steam</button>
-            <button data-filter="epic">Epic</button>
-            <button data-filter="gog">GOG</button>
-            <button data-filter="flatpak">Flatpak</button>
-            <button data-filter="pico8">PICO-8</button>
-            <button data-filter="itch">itch.io</button>
-            <button data-filter="physical" data-i18n="html.filter_physical">Physical</button>
-            <button data-filter="others" data-i18n="html.filter_others">Others</button>
-            <button data-filter="openbor">OpenBOR</button>
-            <button data-filter="emulation" data-i18n="html.filter_emulation">Emulation</button>
-            <button data-filter="apps" data-i18n="html.filter_apps">Apps</button>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend style="display:flex; align-items:center; justify-content:space-between; width:calc(100% - 4px); margin:0 2px; background:transparent; padding:0; box-shadow:none;">
-            <span style="font-weight:900; padding:4px 12px; color:var(--bg); background:var(--accent); border-radius:6px; font-size:11px; letter-spacing:2px; text-transform:uppercase; box-shadow:0 2px 5px rgba(0,0,0,0.3);">Playlists</span>
-            <button id="btn-create-playlist-sb" title="New playlist" style="padding:4px 8px; background:var(--accent); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.3); transition:opacity 0.2s; font-family:inherit; font-weight:400; font-size:11px; color:var(--bg); letter-spacing:1px;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">+ New</button>
-          </legend>
-          <div id="sidebar-playlists-list" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
-        </fieldset>
-      </div>
-      <div id="sidebar-footer">
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px;">
-          <button class="split-nav-btn" id="btn-view-gallery-sb" title="Gallery view">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="9"/><rect x="3" y="15" width="7" height="6"/><rect x="14" y="15" width="7" height="6"/></svg>
-            Gallery
-          </button>
-          <button class="split-nav-btn" id="btn-view-list-sb" title="List view">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3" y2="6"/><line x1="3" y1="12" x2="3" y2="12"/><line x1="3" y1="18" x2="3" y2="18"/></svg>
-            List
-          </button>
-          <button class="split-nav-btn" id="btn-refresh-library-sb" title="Refresh library">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.56"/></svg>
-            Refresh
-          </button>
-        </div>
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px;">
-          <button class="split-nav-btn" id="btn-add-game-sb" title="Add Game">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            Add Game
-          </button>
-          <button class="split-nav-btn" id="btn-open-connect-sb" title="Connect">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Connect
-          </button>
-          <button class="split-nav-btn" id="btn-open-tools-sb" title="Tools">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            Tools
-          </button>
-          <button class="split-nav-btn" id="btn-about-sb" title="About CNGM">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            About
-          </button>
-          <button class="split-nav-btn" id="btn-launch-emulatte-sb" title="Launch EmuLatte" style="display:none;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
-            EmuLatte
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- ── ICON RAIL (48px) ──────────────────────────────────────────────────── -->
     <div id="icon-rail">
@@ -2631,21 +2443,6 @@
           <section class="cp-pane" data-pane="system"><div class="cp-pane-title">System</div></section>
           <section class="cp-pane" data-pane="danger"><div class="cp-pane-title">Danger Zone</div></section>
 
-        <!-- Layout picker temporarily removed from the menu for the release build — all layouts
-             remain functional (applyLayoutMode + saved layout_mode untouched); to reintroduce,
-             restore the tools-section class and drop the display:none. -->
-        <div class="tool-card" style="display:none" data-search="layout sidebar rail command palette navigation icon panel view navigator minimal split pane flat catalog newspaper timeline kanban">
-          <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Layout</div>
-          <div id="layout-segmented-control">
-            <div class="lsc-group" data-cat="classic">
-              <button class="lsc-layout" data-val="rail"><span class="lsc-name">Minimal Sidebar</span><span class="lsc-desc">The Espresso. No foam, no frills. Just icons. Pure and focused — you already know what you came for.</span></button>
-              <button class="lsc-layout" data-val="sidebar"><span class="lsc-name">Classic Sidebar</span><span class="lsc-desc">The House Blend. Warm, labeled, always within reach. The regulars' favorite spot at the counter.</span></button>
-              <button class="lsc-layout" data-val="topnav"><span class="lsc-name">Top Nav</span><span class="lsc-desc">The Command Deck. Tabs up top, your whole library spread out below. Wide open. You run this place.</span></button>
-              <button class="lsc-layout" data-val="split"><span class="lsc-name">Split Pane</span><span class="lsc-desc">The Bar Menu. Your full library lined up on the left, every game's profile poured on the right. Two panels, one session, zero switching.</span></button>
-              <button class="lsc-layout" data-val="commander"><span class="lsc-name">Commander</span><span class="lsc-desc">For the true Linux nerd — one command prompt, up and centre. Believe it or not, it opens your TTY Linux apps too (try btop or fastfetch). Small taskbar on the right.</span></button>
-            </div>
-          </div>
-        </div>
 
         <div class="tool-card tools-section" data-search="appearance theme color scheme ui scale zoom size corners corner style sharp round rounded square flat font typeface interface poppins sora inter fraunces chicago">
 
