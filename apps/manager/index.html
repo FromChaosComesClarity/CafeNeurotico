@@ -753,7 +753,10 @@
     /* ── CONTROL PANEL — full-screen two-pane Tools shell ─────────────────────── */
     #modal-tools .cp-panel { width: min(1100px, 95vw); height: 90vh; max-height: 90vh; background: var(--bg_menu); border-radius: 14px; border: 2px solid var(--border_solid); display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow: hidden; }
     .cp-header { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--border_solid); flex-shrink: 0; }
-    .cp-title { margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 15px; white-space: nowrap; }
+    /* ⚠️ `flex: 1` here is load-bearing: it pushes .cp-close to the right edge. The search
+       box used to do that job and was removed with the settings search in 2A, which left
+       the close button sitting against the end of the title. */
+    .cp-title { margin: 0; flex: 1; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 15px; white-space: nowrap; }
     .cp-rail-item svg { flex-shrink: 0; }
     .cp-close { width: 34px; height: 34px; flex-shrink: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec); border-radius: 8px; cursor: pointer; }
     .cp-close:hover { color: var(--accent); border-color: var(--accent); }
