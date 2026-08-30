@@ -451,51 +451,8 @@
     .csp-count { color:var(--text_dim); font-size:11px; font-variant-numeric:tabular-nums; flex-shrink:0; }
     .csp-row.active .csp-count { color:var(--accent); }
     .csp-all { justify-content:space-between; margin-bottom:2px; }
-    .csp-all .csp-name { font-weight:700; }
-
-    #app-container.layout-catalog       #icon-rail, #app-container.layout-catalog       #side-panel, #app-container.layout-catalog       #sidebar, #app-container.layout-catalog       #topnav, #app-container.layout-newspaper     #icon-rail, #app-container.layout-newspaper     #side-panel, #app-container.layout-newspaper     #sidebar, #app-container.layout-newspaper     #topnav, #app-container.layout-timeline      #icon-rail, #app-container.layout-timeline      #side-panel, #app-container.layout-timeline      #sidebar, #app-container.layout-timeline      #topnav, #app-container.layout-kanban        #icon-rail, #app-container.layout-kanban        #side-panel, #app-container.layout-kanban        #sidebar, #app-container.layout-kanban        #topnav { display:none !important; }
-    #app-container.layout-catalog       #main-content, #app-container.layout-newspaper     #main-content, #app-container.layout-timeline      #main-content, #app-container.layout-kanban        #main-content { display:none !important; }
-    #app-container.layout-catalog       #main-content.split-edit, #app-container.layout-newspaper     #main-content.split-edit, #app-container.layout-timeline      #main-content.split-edit, #app-container.layout-kanban        #main-content.split-edit { display:flex !important; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9998; background:var(--bg); }
-    #catalog-shell, #newspaper-shell, #timeline-shell, #kanban-shell { display:none; flex:1; overflow:hidden; }
-    #app-container.layout-catalog       #catalog-shell    { display:flex !important; }
-    #app-container.layout-newspaper     #newspaper-shell  { display:flex !important; }
-    #app-container.layout-timeline      #timeline-shell   { display:flex !important; }
-    #app-container.layout-kanban        #kanban-shell     { display:flex !important; }
-    /* shared flat input */
-    .flat-input-wrap { position:relative; display:flex; align-items:center; }
-    .flat-input { background:rgba(0,0,0,0.3); border:1px solid var(--border_solid); color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:11px; padding:5px 24px 5px 10px; border-radius:0; width:100%; }
-    .flat-input:focus { outline:none; border-color:var(--accent); }
-    .flat-input::placeholder { color:var(--text_dim); font-style:italic; }
-    .flat-input-clear { position:absolute; right:5px; background:none; border:none; color:var(--text_dim); cursor:pointer; font-size:12px; line-height:1; padding:2px 3px; display:none; }
-    .flat-input-clear:hover { color:var(--text_main); }
-    .flat-input-wrap.has-text .flat-input-clear { display:block; }
-    .flat-toolbar { flex-shrink:0; display:flex; align-items:center; gap:12px; padding:7px 14px; border-bottom:1px solid var(--border_solid); background:var(--bg_menu); }
-    .flat-count { font-size:9px; font-weight:900; letter-spacing:1.5px; color:var(--text_dim); white-space:nowrap; text-transform:uppercase; }
-    /* shared flat open-gamepage buttons */
-    .fl-btn { font-family:var(--ui-font,'Raleway'),sans-serif; font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; padding:7px 16px; border-radius:0; transition:opacity 0.15s; }
-    .fl-btn-primary { background:var(--accent); color:var(--bg); border:none; }
-    .fl-btn-primary:hover { opacity:0.82; }
-    .fl-btn-ghost { background:transparent; color:var(--text_dim); border:1px solid var(--border_solid); }
-    .fl-btn-ghost:hover { background:rgba(255,255,255,0.06); color:var(--accent); border-color:var(--accent); }
-    .fl-btn-ghost.active { background:rgba(255,255,255,0.08); color:var(--accent); border-color:var(--accent); }
-    .fl-icon-btn { padding:5px 7px; line-height:0; }
-
-    /* ── CATALOG ────────────────────────────────────────────────────────────── */
-    #catalog-shell { flex-direction:column; }
-    #cat-table-wrap { flex:1; overflow-y:auto; }
-    #cat-table { width:100%; border-collapse:collapse; }
-    #cat-table thead tr { position:sticky; top:0; z-index:2; }
-    #cat-table th { background:var(--bg_menu); padding:8px 10px; text-align:left; font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); cursor:pointer; border-bottom:2px solid var(--border_solid); user-select:none; white-space:nowrap; }
-    #cat-table th:hover { color:var(--text_main); }
-    #cat-table th.cat-sorted { color:var(--accent); }
-    #cat-table th.cat-sorted::after { content:' ↑'; font-size:8px; }
-    #cat-table th.cat-sorted.desc::after { content:' ↓'; }
-    #cat-table td { padding:5px 10px; font-size:11px; border-bottom:1px solid rgba(139,90,43,0.18); color:var(--text_sec); vertical-align:middle; }
-    #cat-table tr:hover td { background:rgba(255,255,255,0.03); cursor:pointer; }
-    .cat-td-cover { width:36px !important; padding:3px 6px 3px 10px !important; }
-    .cat-td-cover img { width:26px; height:35px; object-fit:cover; display:block; }
+    .csp-all .csp-name { font-weight:700; }/* shared flat input *//* shared flat open-gamepage buttons *//* ── CATALOG ────────────────────────────────────────────────────────────── */
     .cat-td-name { font-weight:700; color:var(--text_main) !important; }
-    .cat-td-inst { text-align:center !important; }
     .cat-inst-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
     .cat-inst-dot.on { background:#66bb6a; }
     .cat-inst-dot.off { background:var(--border_solid); }
@@ -503,66 +460,15 @@
     .cat-proton-Gold { color:#ffd700; }
     .cat-proton-Silver { color:#b0b0b0; }
     .cat-proton-Bronze { color:#cd7f32; }
-    .cat-proton-Borked { color:#e05c5c; }
-
-    /* ── NEWSPAPER ──────────────────────────────────────────────────────────── */
-    #newspaper-shell { flex-direction:column; }
-    #np-masthead { font-size:10px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase; flex-shrink:0; }
-    #np-area { flex:1; display:flex; overflow:hidden; }
-    #np-columns { flex:1; overflow-x:auto; overflow-y:hidden; columns:3; column-gap:0; column-rule:1px solid var(--border_solid); }
+    .cat-proton-Borked { color:#e05c5c; }/* ── NEWSPAPER ──────────────────────────────────────────────────────────── */
     .np-entry { break-inside:avoid; display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid rgba(139,90,43,0.18); cursor:pointer; transition:background 0.1s; }
     .np-entry:hover { background:rgba(255,255,255,0.04); }
     .np-entry.active { background:rgba(212,163,115,0.08); border-left:2px solid var(--accent); padding-left:10px; }
     .np-entry-cover { width:24px; height:32px; object-fit:cover; flex-shrink:0; display:block; }
     .np-entry-cover-ph { width:24px; height:32px; background:var(--border_solid); flex-shrink:0; }
     .np-entry-name { font-size:11px; font-weight:700; color:var(--text_main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
-    .np-entry-meta { font-size:9px; color:var(--text_dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
-    #np-panel { width:0; flex-shrink:0; overflow:hidden; transition:width 0.2s ease; position:relative; background:#080808; }
-    #np-panel.open { width:300px; border-left:1px solid var(--border_solid); }
-    #np-panel-hero { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-    #np-panel-grad { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 58%); }
-    #np-panel-content { position:absolute; bottom:0; left:0; right:0; padding:18px 18px 20px; }
-    #np-panel-title { font-size:17px; font-weight:900; color:#fff; margin-bottom:5px; line-height:1.2; }
-    #np-panel-meta { font-size:9px; color:rgba(255,255,255,0.6); letter-spacing:1px; text-transform:uppercase; margin-bottom:11px; }
-    #np-panel-actions { display:flex; gap:6px; }
-    #btn-np-close { position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.7); width:24px; height:24px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; border-radius:0; padding:0; font-family:var(--ui-font,'Raleway'),sans-serif; flex-shrink:0; }
-    #btn-np-close:hover { background:rgba(0,0,0,0.8); color:#fff; }
-
-    /* shared flat input */
-    .flat-input-wrap { position:relative; display:flex; align-items:center; }
-    .flat-input { background:rgba(0,0,0,0.3); border:1px solid var(--border_solid); color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:11px; padding:5px 24px 5px 10px; border-radius:0; width:100%; }
-    .flat-input:focus { outline:none; border-color:var(--accent); }
-    .flat-input::placeholder { color:var(--text_dim); font-style:italic; }
-    .flat-input-clear { position:absolute; right:5px; background:none; border:none; color:var(--text_dim); cursor:pointer; font-size:12px; line-height:1; padding:2px 3px; display:none; }
-    .flat-input-clear:hover { color:var(--text_main); }
-    .flat-input-wrap.has-text .flat-input-clear { display:block; }
-    .flat-toolbar { flex-shrink:0; display:flex; align-items:center; gap:12px; padding:7px 14px; border-bottom:1px solid var(--border_solid); background:var(--bg_menu); }
-    .flat-count { font-size:9px; font-weight:900; letter-spacing:1.5px; color:var(--text_dim); white-space:nowrap; text-transform:uppercase; }
-    /* shared flat open-gamepage buttons */
-    .fl-btn { font-family:var(--ui-font,'Raleway'),sans-serif; font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; padding:7px 16px; border-radius:0; transition:opacity 0.15s; }
-    .fl-btn-primary { background:var(--accent); color:var(--bg); border:none; }
-    .fl-btn-primary:hover { opacity:0.82; }
-    .fl-btn-ghost { background:transparent; color:var(--text_dim); border:1px solid var(--border_solid); }
-    .fl-btn-ghost:hover { background:rgba(255,255,255,0.06); color:var(--accent); border-color:var(--accent); }
-    .fl-btn-ghost.active { background:rgba(255,255,255,0.08); color:var(--accent); border-color:var(--accent); }
-    .fl-icon-btn { padding:5px 7px; line-height:0; }
-
-    /* ── CATALOG ────────────────────────────────────────────────────────────── */
-    #catalog-shell { flex-direction:column; }
-    #cat-table-wrap { flex:1; overflow-y:auto; }
-    #cat-table { width:100%; border-collapse:collapse; }
-    #cat-table thead tr { position:sticky; top:0; z-index:2; }
-    #cat-table th { background:var(--bg_menu); padding:8px 10px; text-align:left; font-size:9px; font-weight:900; letter-spacing:1.5px; text-transform:uppercase; color:var(--text_dim); cursor:pointer; border-bottom:2px solid var(--border_solid); user-select:none; white-space:nowrap; }
-    #cat-table th:hover { color:var(--text_main); }
-    #cat-table th.cat-sorted { color:var(--accent); }
-    #cat-table th.cat-sorted::after { content:' ↑'; font-size:8px; }
-    #cat-table th.cat-sorted.desc::after { content:' ↓'; }
-    #cat-table td { padding:5px 10px; font-size:11px; border-bottom:1px solid rgba(139,90,43,0.18); color:var(--text_sec); vertical-align:middle; }
-    #cat-table tr:hover td { background:rgba(255,255,255,0.03); cursor:pointer; }
-    .cat-td-cover { width:36px !important; padding:3px 6px 3px 10px !important; }
-    .cat-td-cover img { width:26px; height:35px; object-fit:cover; display:block; }
+    .np-entry-meta { font-size:9px; color:var(--text_dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }/* shared flat input *//* shared flat open-gamepage buttons *//* ── CATALOG ────────────────────────────────────────────────────────────── */
     .cat-td-name { font-weight:700; color:var(--text_main) !important; }
-    .cat-td-inst { text-align:center !important; }
     .cat-inst-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
     .cat-inst-dot.on { background:#66bb6a; }
     .cat-inst-dot.off { background:var(--border_solid); }
@@ -570,38 +476,14 @@
     .cat-proton-Gold { color:#ffd700; }
     .cat-proton-Silver { color:#b0b0b0; }
     .cat-proton-Bronze { color:#cd7f32; }
-    .cat-proton-Borked { color:#e05c5c; }
-
-    /* ── NEWSPAPER ──────────────────────────────────────────────────────────── */
-    #newspaper-shell { flex-direction:column; }
-    #np-masthead { font-size:10px; font-weight:900; letter-spacing:3px; color:var(--text_dim); text-transform:uppercase; flex-shrink:0; }
-    #np-area { flex:1; display:flex; overflow:hidden; }
-    #np-columns { flex:1; overflow-x:auto; overflow-y:hidden; columns:3; column-gap:0; column-rule:1px solid var(--border_solid); }
+    .cat-proton-Borked { color:#e05c5c; }/* ── NEWSPAPER ──────────────────────────────────────────────────────────── */
     .np-entry { break-inside:avoid; display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid rgba(139,90,43,0.18); cursor:pointer; transition:background 0.1s; }
     .np-entry:hover { background:rgba(255,255,255,0.04); }
     .np-entry.active { background:rgba(212,163,115,0.08); border-left:2px solid var(--accent); padding-left:10px; }
     .np-entry-cover { width:24px; height:32px; object-fit:cover; flex-shrink:0; display:block; }
     .np-entry-cover-ph { width:24px; height:32px; background:var(--border_solid); flex-shrink:0; }
     .np-entry-name { font-size:11px; font-weight:700; color:var(--text_main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
-    .np-entry-meta { font-size:9px; color:var(--text_dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
-    #np-panel { width:0; flex-shrink:0; overflow:hidden; transition:width 0.2s ease; position:relative; background:#080808; }
-    #np-panel.open { width:300px; border-left:1px solid var(--border_solid); }
-    #np-panel-hero { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-    #np-panel-grad { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 58%); }
-    #np-panel-content { position:absolute; bottom:0; left:0; right:0; padding:18px 18px 20px; }
-    #np-panel-title { font-size:17px; font-weight:900; color:#fff; margin-bottom:5px; line-height:1.2; }
-    #np-panel-meta { font-size:9px; color:rgba(255,255,255,0.6); letter-spacing:1px; text-transform:uppercase; margin-bottom:11px; }
-    #np-panel-actions { display:flex; gap:6px; }
-    #btn-np-close { position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.7); width:24px; height:24px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; border-radius:0; padding:0; font-family:var(--ui-font,'Raleway'),sans-serif; flex-shrink:0; }
-    #btn-np-close:hover { background:rgba(0,0,0,0.8); color:#fff; }
-
-    /* ── TIMELINE ────────────────────────────────────────────────────────────── */
-    #timeline-shell { flex-direction:column; }
-    #tl-track { flex:1; display:flex; overflow-x:auto; overflow-y:hidden; padding:20px 24px 12px; gap:0; scrollbar-width:thin; scrollbar-color:var(--accent) transparent; }
-    #tl-track::-webkit-scrollbar { height:6px; }
-    #tl-track::-webkit-scrollbar-track { background:transparent; }
-    #tl-track::-webkit-scrollbar-thumb { background:var(--accent); border-radius:3px; }
-    #tl-track::-webkit-scrollbar-thumb:hover { opacity:0.8; }
+    .np-entry-meta { font-size:9px; color:var(--text_dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }/* ── TIMELINE ────────────────────────────────────────────────────────────── */
     .tl-year-col { flex-shrink:0; width:140px; display:flex; flex-direction:column; border-right:1px solid rgba(139,90,43,0.25); padding-right:12px; margin-right:12px; }
     .tl-year-col:last-child { border-right:none; }
     .tl-year-label { font-size:20px; font-weight:900; letter-spacing:1px; color:var(--accent); padding-bottom:10px; border-bottom:1px solid var(--border_solid); margin-bottom:10px; flex-shrink:0; line-height:1; }
@@ -612,25 +494,13 @@
     .tl-card:hover .tl-card-name { color:var(--accent); }
     .tl-card-thumb { width:26px; height:35px; object-fit:cover; flex-shrink:0; background:var(--bg_menu); }
     .tl-card-name { font-size:10px; color:var(--text_sec); line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-    .tl-unknown { color:var(--text_dim); font-size:9px; letter-spacing:1px; font-style:italic; }
-
-    /* ── KANBAN ──────────────────────────────────────────────────────────────── */
-    #kanban-shell { flex-direction:column; }
-    #kanban-board { flex:1; display:flex; gap:10px; padding:12px; overflow-x:auto; overflow-y:hidden; min-height:0; }
-    .kb-col { flex:1; min-width:190px; max-width:300px; display:flex; flex-direction:column; border:1px solid var(--border_solid); background:rgba(0,0,0,0.18); }
-    .kb-col-header { padding:9px 12px; font-size:9px; font-weight:900; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid var(--border_solid); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
-    .kb-col-count { color:var(--text_dim); font-size:9px; font-weight:700; }
-    .kb-col-body { flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:5px; }
+    .tl-unknown { color:var(--text_dim); font-size:9px; letter-spacing:1px; font-style:italic; }/* ── KANBAN ──────────────────────────────────────────────────────────────── */
     .kb-card { display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--bg_menu); border:1px solid var(--border_solid); cursor:pointer; user-select:none; }
     .kb-card:hover { border-color:var(--accent); }
     .kb-card-thumb { width:22px; height:30px; object-fit:cover; flex-shrink:0; background:var(--border_solid); }
     .kb-card-info { flex:1; min-width:0; }
     .kb-card-name { font-size:10px; font-weight:700; color:var(--text_main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .kb-card-meta { font-size:8px; color:var(--text_dim); letter-spacing:0.5px; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .kb-col[data-col="backlog"]  .kb-col-header { color:var(--text_dim); }
-    .kb-col[data-col="want"]     .kb-col-header { color:#64b5f6; }
-    .kb-col[data-col="playing"]  .kb-col-header { color:#81c784; }
-    .kb-col[data-col="played"]   .kb-col-header { color:var(--accent); }
     .kb-drop-over { outline:2px dashed var(--accent); }
 
     @keyframes tty-blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
@@ -709,31 +579,10 @@
     .grub-sel .grub-arrow { color:#fff; }
     .grub-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .grub-meta { font-size:9px; color:#777; flex-shrink:0; }
-    .grub-sel .grub-meta { color:#cce; }/* Shared structural base: font, no border-radius, no box-shadow *//* Shared edit-game structural base *//* Shared titlebar *//* ── MC — navy blue, cyan accent ──────────────────────────────────────── *//* ── Layout zoom ─────────────────────────────────────────────────────────── */
-
-    #catalog-shell, #newspaper-shell, #timeline-shell, #kanban-shell { zoom: 1.25; }
-
-    /* ── FLAT DETAIL OVERLAY ─────────────────────────────────────────────────── */
-    #flat-detail-overlay { display:none; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9998; flex-direction:column; background:#080808; }
-    #flat-detail-overlay.open { display:flex; }
-    #fdo-bg { position:absolute; inset:0; overflow:hidden; }
-    #fdo-bg .kb-slide { position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; transition:opacity 1.8s ease; }
-    #fdo-bg .kb-slide.kb-active { opacity:1; }
-    #fdo-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
-    #fdo-grad { position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 28%), linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.55) 50%, transparent 100%); }
-    #fdo-bar { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); flex-shrink:0; }
-    #fdo-store-tag { font-size:9px; font-weight:900; letter-spacing:2px; color:var(--text_dim); text-transform:uppercase; margin-left:4px; }
-    #fdo-spacer { flex:1; }
-    #fdo-cover-wrap { position:absolute; bottom:40px; left:44px; z-index:1; width:130px; height:190px; }
-    #fdo-cover-aura { position:absolute; width:320px; height:320px; top:50%; left:50%; transform:translate(-50%,-50%); object-fit:cover; filter:blur(60px) saturate(2.2) brightness(0.85); opacity:0.72; border-radius:50%; pointer-events:none; display:block; }
-    #fdo-cover-card { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:8px; box-shadow:0 14px 44px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.6); transform:rotate(-2.5deg); display:block; }
-    #fdo-content { position:relative; z-index:3; flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding:32px 44px 40px 200px; overflow-y:auto; min-height:0; }
-    #fdo-title { font-size:38px; font-weight:900; color:#fff; line-height:1.05; margin-bottom:13px; text-shadow:0 2px 14px rgba(0,0,0,0.95); }
-    #fdo-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+    .grub-sel .grub-meta { color:#cce; }/* Shared structural base: font, no border-radius, no box-shadow *//* Shared edit-game structural base *//* Shared titlebar *//* ── MC — navy blue, cyan accent ──────────────────────────────────────── *//* ── Layout zoom ─────────────────────────────────────────────────────────── *//* ── FLAT DETAIL OVERLAY ─────────────────────────────────────────────────── */
     .fdo-meta-pill { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.5); }
     .fdo-meta-pill.accent { color:var(--accent); }
-    .fdo-meta-sep { width:1px; height:10px; background:rgba(255,255,255,0.18); flex-shrink:0; }
-    #fdo-desc { font-size:12px; color:rgba(255,255,255,0.45); line-height:1.75; max-width:640px; max-height:130px; overflow:hidden; }/* hero band *//* main info *//* cover art — full height *//* info box *//* left column *//* achievements */
+    .fdo-meta-sep { width:1px; height:10px; background:rgba(255,255,255,0.18); flex-shrink:0; }/* hero band *//* main info *//* cover art — full height *//* info box *//* left column *//* achievements */
     .tgp-ach-label { font-size:9px; color:#ffff55; letter-spacing:2px; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:7px; }
     .tgp-ach-progress { font-size:9px; color:#ffffff; margin-bottom:14px; line-height:2; }
     .tgp-ach-bar-chars { font-family:'Fira Code','Courier New',monospace; letter-spacing:-1px; font-size:14px; }
@@ -2529,80 +2378,12 @@
     <!-- ── END SPLIT PANE ────────────────────────────────────────────── -->
 
     <!-- ── CATALOG ───────────────────────────────────────────────────────── -->
-    <div id="catalog-shell">
-      <div class="flat-toolbar">
-        <div class="flat-input-wrap" style="width:200px;"><input class="flat-input" id="cat-search" placeholder="Search…" autocomplete="off" spellcheck="false"><button class="flat-input-clear" tabindex="-1">✕</button></div>
-        <span class="flat-count" id="cat-count" style="flex:1;"></span>
-        <button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-home-btn" title="All Games"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="5"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="favs" title="Favourites"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="want" title="Want to Play"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-playlists-btn" title="Playlists"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-connect-btn" title="Connect services"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn" id="btn-cat-tools" title="Tools &amp; Settings"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-      </div>
-      <div id="cat-table-wrap">
-        <table id="cat-table">
-          <thead>
-            <tr>
-              <th class="cat-td-cover"></th>
-              <th data-cat-col="Game">Game</th>
-              <th data-cat-col="Store">Store</th>
-              <th data-cat-col="GENRE">Genre</th>
-              <th data-cat-col="HLTB_Main">HLTB</th>
-              <th data-cat-col="ProtonTier">Proton</th>
-              <th data-cat-col="installed" class="cat-td-inst">✓</th>
-              <th data-cat-col="LastPlayed">Last Played</th>
-            </tr>
-          </thead>
-          <tbody id="cat-tbody"></tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- ── NEWSPAPER ─────────────────────────────────────────────────────── -->
-    <div id="newspaper-shell">
-      <div class="flat-toolbar">
-        <span id="np-masthead">Your Library</span>
-        <div class="flat-input-wrap" style="width:180px; margin-left:8px;"><input class="flat-input" id="np-search" placeholder="Search…" autocomplete="off" spellcheck="false"><button class="flat-input-clear" tabindex="-1">✕</button></div>
-        <span class="flat-count" id="np-count" style="margin-left:auto;"></span>
-        <button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-home-btn" title="All Games"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="5"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="favs" title="Favourites"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="want" title="Want to Play"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-playlists-btn" title="Playlists"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-connect-btn" title="Connect services"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn" id="btn-np-tools" title="Tools &amp; Settings"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-      </div>
-      <div id="np-area">
-        <div id="np-columns"></div>
-        <div id="np-panel">
-          <img id="np-panel-hero" src="">
-          <div id="np-panel-grad"></div>
-          <div id="np-panel-content">
-            <div id="np-panel-title"></div>
-            <div id="np-panel-meta"></div>
-            <div id="np-panel-actions">
-              <button class="fl-btn fl-btn-primary" id="btn-np-open">Open Game Page</button>
-            </div>
-          </div>
-          <button id="btn-np-close">✕</button>
-        </div>
-      </div>
-    </div>
 
     <!-- ── TIMELINE ──────────────────────────────────────────────────────── -->
-    <div id="timeline-shell">
-      <div class="flat-toolbar">
-        <div class="flat-input-wrap" style="flex:1;"><input class="flat-input" id="tl-search" placeholder="Search…" autocomplete="off" spellcheck="false"><button class="flat-input-clear" tabindex="-1">✕</button></div>
-        <span class="flat-count" id="tl-count"></span>
-        <button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-home-btn" title="All Games"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="5"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="favs" title="Favourites"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="want" title="Want to Play"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-playlists-btn" title="Playlists"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-connect-btn" title="Connect services"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn" id="btn-tl-tools" title="Tools &amp; Settings"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-      </div>
-      <div id="tl-track"></div>
-    </div>
 
     <!-- ── KANBAN ──────────────────────────────────────────────────────── -->
-    <div id="kanban-shell">
-      <div class="flat-toolbar">
-        <div class="flat-input-wrap" style="flex:1;"><input class="flat-input" id="kb-search" placeholder="Search…" autocomplete="off" spellcheck="false"><button class="flat-input-clear" tabindex="-1">✕</button></div>
-        <span class="flat-count" id="kb-count"></span>
-        <button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-home-btn" title="All Games"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="5"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="favs" title="Favourites"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-filter-btn" data-filter="want" title="Want to Play"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-playlists-btn" title="Playlists"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn flat-tb-connect-btn" title="Connect services"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><button class="fl-btn fl-btn-ghost fl-icon-btn" id="btn-kb-tools" title="Tools &amp; Settings"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-      </div>
-      <div id="kanban-board">
-        <div class="kb-col" data-col="backlog"><div class="kb-col-header">Backlog <span class="kb-col-count"></span></div><div class="kb-col-body" id="kb-backlog"></div></div>
-        <div class="kb-col" data-col="want"><div class="kb-col-header">Want to Play <span class="kb-col-count"></span></div><div class="kb-col-body" id="kb-want"></div></div>
-        <div class="kb-col" data-col="playing"><div class="kb-col-header">Playing <span class="kb-col-count"></span></div><div class="kb-col-body" id="kb-playing"></div></div>
-        <div class="kb-col" data-col="played"><div class="kb-col-header">Played <span class="kb-col-count"></span></div><div class="kb-col-body" id="kb-played"></div></div>
-      </div>
-    </div>
 
     <!-- ── HTOP ──────────────────────────────────────────────────────────── -->
 
@@ -2729,34 +2510,6 @@
   </div><!-- /#app-container -->
 
   <!-- ── FLAT DETAIL OVERLAY — shown when clicking a game from any flat layout ─ -->
-  <div id="flat-detail-overlay">
-    <div id="fdo-bg">
-      <video id="fdo-video" autoplay muted loop playsinline></video>
-    </div>
-    <div id="fdo-grad"></div>
-    <div id="fdo-bar">
-      <button id="btn-fdo-back" class="fl-btn fl-btn-ghost">← BACK</button>
-      <span id="fdo-store-tag"></span>
-      <div id="fdo-spacer"></div>
-      <button id="btn-fdo-fav" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>FAV</button>
-      <button id="btn-fdo-want" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>WANT</button>
-      <button id="btn-fdo-playlist" class="fl-btn fl-btn-ghost"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="22" y1="6" x2="16" y2="6"/></svg>PLAYLIST</button>
-      <button id="btn-fdo-browse" class="fl-btn fl-btn-ghost" style="display:none;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>FILES</button>
-      <button id="btn-fdo-saves" class="fl-btn fl-btn-ghost" style="display:none;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>SAVES</button>
-      <button id="btn-fdo-trailer" class="fl-btn fl-btn-ghost">▶ TRAILER</button>
-      <button id="btn-fdo-edit" class="fl-btn fl-btn-ghost">EDIT</button>
-      <button id="btn-fdo-launch" class="fl-btn fl-btn-primary">▶ PLAY</button>
-    </div>
-    <div id="fdo-cover-wrap">
-      <img id="fdo-cover-aura" src="" alt="">
-      <img id="fdo-cover-card" src="" alt="">
-    </div>
-    <div id="fdo-content">
-      <div id="fdo-title"></div>
-      <div id="fdo-meta"></div>
-      <div id="fdo-desc"></div>
-    </div>
-  </div>
 
   <!-- TTY Gamepage (DOS) -->
 
@@ -3171,12 +2924,6 @@
               <button class="lsc-layout" data-val="topnav"><span class="lsc-name">Top Nav</span><span class="lsc-desc">The Command Deck. Tabs up top, your whole library spread out below. Wide open. You run this place.</span></button>
               <button class="lsc-layout" data-val="split"><span class="lsc-name">Split Pane</span><span class="lsc-desc">The Bar Menu. Your full library lined up on the left, every game's profile poured on the right. Two panels, one session, zero switching.</span></button>
               <button class="lsc-layout" data-val="commander"><span class="lsc-name">Commander</span><span class="lsc-desc">For the true Linux nerd — one command prompt, up and centre. Believe it or not, it opens your TTY Linux apps too (try btop or fastfetch). Small taskbar on the right.</span></button>
-            </div>
-            <div class="lsc-group" data-cat="flat">
-              <button class="lsc-layout" data-val="catalog"><span class="lsc-name">Catalog</span><span class="lsc-desc">A clean grid of covers. Window-shopping mode.</span></button>
-              <button class="lsc-layout" data-val="newspaper"><span class="lsc-name">Newspaper</span><span class="lsc-desc">Your backlog as the morning edition. Extra! Extra!</span></button>
-              <button class="lsc-layout" data-val="timeline"><span class="lsc-name">Timeline</span><span class="lsc-desc">Games by release date — scroll through history.</span></button>
-              <button class="lsc-layout" data-val="kanban"><span class="lsc-name">Kanban</span><span class="lsc-desc">Drag your backlog around like a to-do board.</span></button>
             </div>
           </div>
         </div>
