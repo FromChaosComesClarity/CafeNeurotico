@@ -754,10 +754,7 @@
     #modal-tools .cp-panel { width: min(1100px, 95vw); height: 90vh; max-height: 90vh; background: var(--bg_menu); border-radius: 14px; border: 2px solid var(--border_solid); display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow: hidden; }
     .cp-header { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--border_solid); flex-shrink: 0; }
     .cp-title { margin: 0; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 15px; white-space: nowrap; }
-    .cp-search-wrap { position: relative; flex: 1; }
-    .cp-search-wrap span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text_dim); font-size: 13px; pointer-events: none; display: flex; }
     .cp-rail-item svg { flex-shrink: 0; }
-    .cp-search-wrap input[type="text"] { width: 100%; padding: 8px 10px 8px 34px; background: var(--bg); border: 1px solid var(--border_solid); border-radius: 8px; font-size: 12px; box-sizing: border-box; color: var(--text_main); }
     .cp-close { width: 34px; height: 34px; flex-shrink: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border_solid); color: var(--text_sec); border-radius: 8px; cursor: pointer; }
     .cp-close:hover { color: var(--accent); border-color: var(--accent); }
     .cp-body { flex: 1; display: flex; min-height: 0; }
@@ -771,8 +768,6 @@
     #tools-cards-container.cp-content { flex: 1; overflow-y: auto; padding: 18px 20px; min-width: 0; }
     .cp-pane { display: none; flex-direction: column; gap: 14px; }
     .cp-pane.active { display: flex; }
-    .cp-content.searching .cp-pane { display: flex; }
-    .cp-content.searching .cp-pane[data-pane="welcome"] { display: none; }   /* splash never mixes into search results */
     /* Control Panel landing splash — typographic wordmark, theme-aware */
     .cp-welcome { position: relative; flex: 1; min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; user-select: none; overflow: hidden; }
     .cp-welcome-glow { position: absolute; width: 560px; height: 560px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 62%); opacity: 0.09; pointer-events: none; }
@@ -801,7 +796,6 @@
     .cp-ver-btn:hover svg { transform: rotate(180deg); }
     .cp-welcome-hint { margin-top: 34px; font-size: 11.5px; color: var(--text_dim); letter-spacing: 0.5px; font-style: italic; }
     .cp-pane-title { margin: 0 0 4px; font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--text_dim); }
-    .cp-content.searching .cp-pane-title { display: none; }
     .cp-tico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 7px; flex-shrink: 0; }
     .cp-bico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 6px; flex-shrink: 0; }
     .cp-footer { flex-shrink: 0; border-top: 1px solid var(--border_solid); padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
@@ -1027,12 +1021,11 @@
 
     /* ── TOOLS MODAL: all text 25% larger, scoped ─────────────────────────── */
     #modal-tools h3                                                    { font-size: 19px !important; }
-    #tools-search                                                      { font-size: 15px !important; }
     #modal-tools button, #modal-tools .segmented-btn                   { font-size: 11px !important; }
     #modal-tools .tool-card-title                                      { font-size: 14px !important; }
     #modal-tools p                                                     { font-size: 14px !important; }
     #update-library-status, #batch-status, #check-install-status,
-    #install-menu-status, #tools-no-results { font-size: 14px !important; }/* ── LAYOUT PICKER: category tabs + 2-col grid ──────────────────────────── */
+    #install-menu-status { font-size: 14px !important; }/* ── LAYOUT PICKER: category tabs + 2-col grid ──────────────────────────── */
     .lsc-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
     .lsc-layout { display:flex; flex-direction:column; gap:3px; text-align:left; padding:9px 11px; background:var(--bg_panel); border:1px solid var(--border_solid); border-radius:8px; color:var(--text_sec); cursor:pointer; font-family:inherit; transition:border-color 0.15s, color 0.15s; }
     .lsc-layout:hover { border-color:var(--accent); background:var(--bg_panel); color:var(--text_main); }
@@ -2383,10 +2376,6 @@
       <!-- Header: title + global search + close -->
       <div class="cp-header">
         <h3 class="cp-title">Control Panel</h3>
-        <div class="cp-search-wrap">
-          <span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-          <input id="tools-search" type="text" data-i18n-ph="html.tools_search_ph" placeholder="Search settings…">
-        </div>
         <button id="btn-close-tools" class="cp-close" title="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
@@ -2407,6 +2396,12 @@
           </button>
           <button class="cp-rail-item" data-pane="system">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg><span>System</span>
+          </button>
+          <button class="cp-rail-item" data-pane="ports">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 13"/></svg><span>Ports &amp; Mods</span>
+          </button>
+          <button class="cp-rail-item" data-pane="desktop">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span>Desktop</span>
           </button>
           <span class="cp-rail-spacer"></span>
           <button class="cp-rail-item cp-rail-danger" data-pane="danger">
@@ -2440,6 +2435,8 @@
           <section class="cp-pane" data-pane="appearance"><div class="cp-pane-title">Appearance</div></section>
           <section class="cp-pane" data-pane="behavior"><div class="cp-pane-title">Behavior</div></section>
           <section class="cp-pane" data-pane="connections"><div class="cp-pane-title">Connections</div></section>
+          <section class="cp-pane" data-pane="ports"><div class="cp-pane-title">Ports &amp; Mods</div></section>
+          <section class="cp-pane" data-pane="desktop"><div class="cp-pane-title">Desktop</div></section>
           <section class="cp-pane" data-pane="system"><div class="cp-pane-title">System</div></section>
           <section class="cp-pane" data-pane="danger"><div class="cp-pane-title">Danger Zone</div></section>
 
@@ -2693,7 +2690,6 @@
           <button id="btn-clear-data" style="width: 100%; background-color: transparent; border: 1px solid #d32f2f; color: #d32f2f; font-size: 11px; margin-top: 4px;"><svg class="cp-bico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span data-i18n="html.btn_wipe_browser">Wipe Secure Browser Data</span></button>
         </div>
 
-        <p id="tools-no-results" style="display: none; text-align: center; color: var(--text_dim); padding: 20px 0; font-size: 12px; letter-spacing: 1px;" data-i18n="html.tools_no_results">No settings found.</p>
 
         </div><!-- /cp-content -->
       </div><!-- /cp-body -->

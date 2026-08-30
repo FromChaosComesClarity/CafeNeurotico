@@ -131,10 +131,11 @@ async function initDisplayPicker() {
     let opts = null;
     try { opts = await window.api.displayOptions(); } catch (e) {}
 
-    // ⚠️ Unsupported means REMOVE, not hide — the same trap the Mac-Native card fell into.
-    // This card ships with an inline display:none and carries .tools-section, and the
-    // Control Panel resets `display` on every .tools-section in three places, so hiding it
-    // lasts exactly until the panel is opened. On Hyprland (Omarchy) the picker is
+    // ⚠️ Unsupported means REMOVE, not hide. This card ships with an inline display:none,
+    // and the Control Panel used to reset `display` on every .tools-section in three places,
+    // so hiding it lasted exactly until the panel was opened. Those resets went with the
+    // settings search in wave 2A, so hiding would hold now — removal is kept because it is
+    // still the honest answer. On Hyprland (Omarchy) the picker is
     // legitimately unsupported — it is a KWin script, and KWin is not running — so a KDE-only
     // card offering "let KDE decide" would otherwise appear on a desktop with no KDE in it.
     //
@@ -2092,9 +2093,10 @@ if (window.api.platform === 'darwin') {
     // Not meaningful data on any other host, so REMOVE both surfaces rather than hide them.
     // Hiding is not enough in either case, for the same underlying reason: several code paths
     // walk the DOM instead of reading CSS. enhanceSelect()'s popup reads sel.options directly,
-    // and the Control Panel resets `display` on EVERY .tools-section in three places
+    // and the Control Panel used to reset `display` on EVERY .tools-section in three places
     // (openToolsModal, closeTools, and the search filter) — which silently un-did the inline
-    // display:none this card ships with the moment the panel was opened. That shipped in 1.8.0:
+    // display:none this card ships with the moment the panel was opened. Those three resets
+    // are gone as of wave 2A. That shipped in 1.8.0:
     // Linux users saw a "Mac-Native Games" card offering a scan the backend refuses anyway
     // (scan-mac-native is gated on host.id === 'darwin').
     document.getElementById('gallery-category-mac-native')?.remove();
@@ -6863,15 +6865,9 @@ function openToolsModal(pane = 'welcome') {
     modalTools.classList.add('active');
     document.getElementById('batch-status').innerText = '';
     document.getElementById('install-menu-status').innerText = '';
-    const search = document.getElementById('tools-search');
-    search.value = '';
-    document.getElementById('tools-cards-container').classList.remove('searching');
-    document.querySelectorAll('.tools-section').forEach(c => c.style.display = '');
-    document.getElementById('tools-no-results').style.display = 'none';
     _cpSelectPane(pane);
     _cpPrefillConnections();
     _cpPrefillInstallDir();
-    setTimeout(() => search.focus(), 150);
 }
 
 // ── Control Panel: global install folder ─────────────────────────────────────
@@ -7008,10 +7004,6 @@ async function updateGrinderRow(game) {
 
 function closeTools() {
     modalTools.classList.remove('active');
-    document.getElementById('tools-search').value = '';
-    document.getElementById('tools-cards-container').classList.remove('searching');
-    document.querySelectorAll('.tools-section').forEach(c => c.style.display = '');
-    document.getElementById('tools-no-results').style.display = 'none';
 }
 document.getElementById('btn-close-tools').addEventListener('click', closeTools);
 modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTools(); });
@@ -7023,12 +7015,19 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
 (function cpInit() {
     const pane = (p) => document.querySelector(`#tools-cards-container .cp-pane[data-pane="${p}"]`);
     const card = (childId) => document.getElementById(childId)?.closest('.tool-card');
-    [
+    // ⚠️ EVERY card must appear here. A card that is not listed is never moved, and
+    // because `.cp-pane { display:none }` hides panes rather than the cards outside
+    // them, an unlisted card renders on TOP of whichever page is showing — on all of
+    // them. Seven cards were in that state (game updates, the display picker, Omarchy,
+    // source ports, DOSBox, genres and Mac-Native), which is why the panel still read
+    // as one flat list even though the panes were already built.
+    const CARD_PANES = [
         ['btn-update-library', 'library'],
         ['btn-storage-grinder', 'library'],
         ['btn-install-dir-change', 'library'],
         ['btn-tools-add-game', 'library'],
-        ['layout-cat-tabs', 'appearance'],
+        ['btn-scan-updates', 'library'],
+        ['btn-scan-genres', 'library'],
         ['btn-theme-switch', 'appearance'],
         ['history-segmented-control', 'behavior'],
         ['recently-imported-segmented-control', 'behavior'],
@@ -7036,16 +7035,24 @@ modalTools.addEventListener('click', e => { if (e.target === modalTools) closeTo
         ['freegames-vis-control', 'behavior'],   // Show/Hide toggles live together in Behavior
         ['btn-open-hidden-games', 'behavior'],
         ['notify-segmented-control', 'behavior'],
+        ['btn-custom-install', 'ports'],
+        ['dosbox-mode-control', 'ports'],
+        ['display-card', 'desktop'],
+        ['omarchy-card', 'desktop'],
+        ['mac-native-tool-card', 'desktop'],
         ['btn-backup-zip', 'system'],
         ['btn-clean-images', 'danger'],
-    ].forEach(([id, p]) => { const c = card(id), pn = pane(p); if (c && pn) pn.appendChild(c); });
+    ];
+    CARD_PANES.forEach(([id, p]) => { const c = card(id), pn = pane(p); if (c && pn) pn.appendChild(c); });
     const connPane = pane('connections');
     if (connPane) document.querySelectorAll('#modal-connect .connect-section').forEach(c => {
         c.classList.add('tools-section'); connPane.appendChild(c);
     });
     document.getElementById('modal-connect')?.remove();
-    const nr = document.getElementById('tools-no-results');
-    if (nr) document.getElementById('tools-cards-container').appendChild(nr); // keep "no results" last
+    // Anything still sitting outside a pane would render on every page — report it.
+    const stray = [...document.querySelectorAll('#tools-cards-container > .tool-card')];
+    if (stray.length) console.warn('[control panel] card(s) not filed into a pane:',
+        stray.map(c => c.querySelector('.tool-card-title')?.textContent?.trim() || c.dataset.search || '?'));
 })();
 
 function _cpSelectPane(pane) {
@@ -7055,8 +7062,6 @@ function _cpSelectPane(pane) {
 
 document.querySelectorAll('#cp-rail .cp-rail-item').forEach(btn =>
     btn.addEventListener('click', () => {
-        const s = document.getElementById('tools-search');
-        if (s.value) { s.value = ''; s.dispatchEvent(new Event('input')); }
         _cpSelectPane(btn.dataset.pane);
     }));
 
@@ -7099,30 +7104,6 @@ function cpTaskEnd(label) {
     _cpTaskTimer = setTimeout(() => tb.classList.remove('active'), 2500);
 }
 document.getElementById('cp-taskbar-stop')?.addEventListener('click', () => { _cpBatchCancel = true; });
-
-// Pre-cache tool card haystacks once (content is static) so textContent isn't
-// re-traversed on every keypress.
-const _toolsCards = [...document.querySelectorAll('.tools-section')];
-_toolsCards.forEach(card => {
-    card._haystack = ((card.dataset.search || '') + ' ' + card.textContent).toLowerCase();
-});
-const _toolsNoResults = document.getElementById('tools-no-results');
-const _toolsContent = document.getElementById('tools-cards-container');
-let _toolsSearchTimer = null;
-document.getElementById('tools-search').addEventListener('input', (e) => {
-    clearTimeout(_toolsSearchTimer);
-    _toolsSearchTimer = setTimeout(() => {
-        const q = e.target.value.trim().toLowerCase();
-        _toolsContent.classList.toggle('searching', !!q);   // flatten across panes while searching
-        let visible = 0;
-        _toolsCards.forEach(card => {
-            const show = !q || card._haystack.includes(q);
-            card.style.display = show ? '' : 'none';
-            if (show) visible++;
-        });
-        _toolsNoResults.style.display = (q && visible === 0) ? 'block' : 'none';
-    }, 120);
-});
 
 // Upgraded Batch Fetcher — filter helper + reusable runner
 function gamesMissingData(list) {
@@ -7678,7 +7659,7 @@ try {
 
 // ── The Omarchy card ─────────────────────────────────────────────────────────
 // Everything Omarchy-specific in one Control Panel card. On any other host the card is
-// REMOVED, not hidden — the Control Panel resets `display` on every .tools-section in three
+// REMOVED, not hidden — the Control Panel used to reset `display` on every .tools-section in three
 // places, so an inline display:none lasts exactly until the panel is opened. That is the
 // Mac-Native bug from 1.8.0, and the display picker above had it too.
 async function initOmarchyCard() {
