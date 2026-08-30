@@ -804,6 +804,22 @@
     .storage-row .sr-name { flex:1; font-size:12.5px; color:var(--text_main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .storage-row .sr-store { font-size:10px; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px; }
     .storage-row .sr-size { font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    /* ── Command palette ── */
+    #palette { padding-top: 12vh; }
+    #palette-box { width: min(620px, 92vw); background: var(--bg_menu); border: 1px solid var(--border_solid); border-radius: 10px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); overflow: hidden; display: flex; flex-direction: column; max-height: 66vh; }
+    #palette-input-wrap { display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--border_solid); color: var(--text_dim); flex-shrink: 0; }
+    #palette-input { flex: 1; background: transparent; border: none; outline: none; color: var(--text_main); font-family: inherit; font-size: 15px; padding: 0; }
+    #palette-input::placeholder { color: var(--text_dim); }
+    #palette-results { overflow-y: auto; flex: 1; }
+    .palette-item { display: flex; align-items: center; gap: 11px; padding: 9px 15px; cursor: pointer; border-left: 2px solid transparent; }
+    .palette-item.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); border-left-color: var(--accent); }
+    .palette-item .pi-name { flex: 1; font-size: 13px; color: var(--text_main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .palette-item .pi-kind { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--text_dim); flex-shrink: 0; }
+    .palette-item .pi-badge { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--bg); background: var(--accent); border-radius: 3px; padding: 1px 5px; flex-shrink: 0; }
+    #palette-foot { display: flex; align-items: center; gap: 14px; padding: 8px 15px; border-top: 1px solid var(--border_solid); font-size: 10px; color: var(--text_dim); flex-shrink: 0; }
+    #palette-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+    .palette-kbd { font-family: inherit; font-size: 9px; letter-spacing: 0.5px; border: 1px solid var(--border_solid); border-radius: 3px; padding: 1px 5px; color: var(--text_dim); }
+    #palette-empty { padding: 22px 15px; text-align: center; font-size: 12px; color: var(--text_dim); }
     .wlc-line { display:flex; align-items:center; gap:8px; }
     .wlc-line .wlc-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .wlc-line .wlc-ok   { background:#66bb6a; }
@@ -2930,6 +2946,25 @@
   <!-- ── Per-game compatibility ────────────────────────────────────────────────
        Everything GRINDER's setup modal owned, in the Manager. Writes go through
        grinder-compat-set, which allowlists the columns it will touch. -->
+  <!-- ── Command palette (Ctrl+K) ──────────────────────────────────────────────
+       Omarchy is keyboard-driven — everything else on this desktop is reachable
+       from a fuzzy menu, and the library was the exception. -->
+  <div id="palette" class="modal-overlay" style="z-index:30000; align-items:flex-start;">
+    <div id="palette-box">
+      <div id="palette-input-wrap">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="palette-input" placeholder="Search games and actions…" autocomplete="off" spellcheck="false">
+        <kbd class="palette-kbd">ESC</kbd>
+      </div>
+      <div id="palette-results"></div>
+      <div id="palette-foot">
+        <span><kbd class="palette-kbd">↑</kbd><kbd class="palette-kbd">↓</kbd> navigate</span>
+        <span><kbd class="palette-kbd">↵</kbd> open</span>
+        <span id="palette-count"></span>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-compat" class="modal-overlay">
     <div class="modal-box" style="max-width: 620px; width: 620px; max-height: 88vh;">
       <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">

@@ -3616,6 +3616,128 @@ function dismissWelcome() {
 }
 
 // Only these two buttons close the modal
+// ── COMMAND PALETTE (Ctrl+K) ─────────────────────────────────────────────────
+// Omarchy is keyboard-driven: everything else on this desktop opens from a fuzzy
+// menu, and the library was the exception. Games and actions share one list, so
+// "quake" and "backup" are the same gesture.
+const _PAL_ACTIONS = [
+    { name: 'Control Panel',            run: () => openToolsModal('welcome') },
+    { name: 'Settings: Library',        run: () => openToolsModal('library') },
+    { name: 'Settings: Appearance',     run: () => openToolsModal('appearance') },
+    { name: 'Settings: Connections',    run: () => openToolsModal('connections') },
+    { name: 'Settings: Ports & Mods',   run: () => openToolsModal('ports') },
+    { name: 'Settings: Desktop',        run: () => openToolsModal('desktop') },
+    { name: 'Themes',                   run: () => document.getElementById('btn-theme-switch')?.click() },
+    { name: 'Manage Storage',           run: () => openStorageModal() },
+    { name: 'Refresh Library',          run: () => document.getElementById('btn-refresh-library')?.click() },
+    { name: 'Add Game',                 run: () => document.getElementById('btn-add-game')?.click() },
+    { name: 'Connect Stores',           run: () => document.getElementById('btn-open-connect')?.click() },
+    { name: 'Gallery View',             run: () => switchView('view-gallery') },
+    { name: 'List View',                run: () => switchView('view-list') },
+    { name: 'Home Dashboard',           run: () => switchView('view-home') },
+    { name: 'Go Fullscreen with CREMA', run: () => document.getElementById('crema-cta')?.click() },
+    { name: 'Launch EmuLatte',          run: () => document.getElementById('btn-rail-emulatte')?.click() },
+];
+
+let _palItems = [], _palSel = 0;
+
+// Subsequence match, the same rule a fuzzy launcher uses: every character of the
+// query must appear in order. Scoring prefers a prefix hit, then a word-start hit,
+// then anything — so "kcd" finds "Kingdom Come: Deliverance" but an exact prefix
+// still wins the top slot.
+function _palScore(hay, q) {
+    const h = hay.toLowerCase();
+    if (!q) return 1;
+    const idx = h.indexOf(q);
+    if (idx === 0) return 1000;
+    if (idx > 0) return 700 - Math.min(idx, 200) + (/[\s:._-]/.test(h[idx - 1]) ? 150 : 0);
+    let i = 0, score = 300, last = -1;
+    for (const ch of q) {
+        const at = h.indexOf(ch, i);
+        if (at === -1) return 0;
+        if (last >= 0 && at === last + 1) score += 12;   // reward contiguity
+        last = at; i = at + 1;
+    }
+    return score;
+}
+
+function _palRender(q) {
+    const box = document.getElementById('palette-results');
+    const rows = [];
+    for (const a of _PAL_ACTIONS) {
+        const s = _palScore(a.name, q);
+        if (s) rows.push({ score: s + 40, kind: 'action', name: a.name, run: a.run });
+    }
+    for (const g of (allGames || [])) {
+        const s = _palScore(g.Game || '', q);
+        if (s) rows.push({ score: s, kind: 'game', name: g.Game, game: g });
+    }
+    rows.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    _palItems = rows.slice(0, 40);
+    _palSel = 0;
+    document.getElementById('palette-count').textContent = rows.length ? `${rows.length} result${rows.length === 1 ? '' : 's'}` : '';
+    if (!_palItems.length) { box.innerHTML = '<div id="palette-empty">Nothing matches that.</div>'; return; }
+    box.innerHTML = _palItems.map((r, i) => {
+        const badge = r.kind === 'game'
+            ? (isGameInstalled(r.game) ? '<span class="pi-badge">play</span>' : '<span class="pi-kind">install</span>')
+            : '<span class="pi-kind">action</span>';
+        return `<div class="palette-item${i === 0 ? ' sel' : ''}" data-i="${i}"><span class="pi-name">${escHtml(r.name)}</span>${badge}</div>`;
+    }).join('');
+}
+
+function _palMove(d) {
+    if (!_palItems.length) return;
+    _palSel = (_palSel + d + _palItems.length) % _palItems.length;
+    const box = document.getElementById('palette-results');
+    box.querySelectorAll('.palette-item').forEach((el, i) => el.classList.toggle('sel', i === _palSel));
+    box.querySelector('.palette-item.sel')?.scrollIntoView({ block: 'nearest' });
+}
+
+function _palRun(i) {
+    const r = _palItems[i];
+    if (!r) return;
+    closePalette();
+    if (r.kind === 'action') { r.run(); return; }
+    // A game opens its page rather than launching outright — Enter on a fuzzy match
+    // is too easy to hit by accident for something that starts a process.
+    openGamepage(r.game);
+}
+
+function openPalette() {
+    const box = document.getElementById('palette');
+    if (!box) return;
+    const inp = document.getElementById('palette-input');
+    inp.value = '';
+    _palRender('');
+    box.classList.add('active');
+    setTimeout(() => inp.focus(), 20);
+}
+function closePalette() { document.getElementById('palette')?.classList.remove('active'); }
+
+document.getElementById('palette-input')?.addEventListener('input', e => _palRender(e.target.value.trim().toLowerCase()));
+document.getElementById('palette-results')?.addEventListener('click', e => {
+    const row = e.target.closest('.palette-item');
+    if (row) _palRun(Number(row.dataset.i));
+});
+document.getElementById('palette')?.addEventListener('click', e => { if (e.target.id === 'palette') closePalette(); });
+document.getElementById('palette-input')?.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); _palMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _palMove(-1); }
+    else if (e.key === 'Enter')  { e.preventDefault(); _palRun(_palSel); }
+    else if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+});
+
+// ⚠️ Capture phase: the gamepage and several modals run their own keydown handlers,
+// and Ctrl+K has to reach the palette from anywhere — including from inside a text
+// field, which is where a user reaches for it most naturally.
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        const open = document.getElementById('palette')?.classList.contains('active');
+        if (open) closePalette(); else openPalette();
+    }
+}, true);
+
 // ── First boot: detect, then propose ─────────────────────────────────────────
 // The welcome screen used to open with six actions and no ordering, presenting
 // empty fields whether or not the work was already done. It now leads with what
