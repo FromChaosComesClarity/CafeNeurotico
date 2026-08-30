@@ -278,10 +278,16 @@ naming a variable and leaving you to find the right box.
 
 ## Not done yet
 
-- **A Hyprland equivalent of the per-game screen picker.** `hyprctl keyword windowrulev2 monitor`
-  is the obvious route and `hyprctl` is a far friendlier IPC surface than KWin turned out to be.
-  It would implement the same interface as `kwin-display.js` and be selected at runtime, so the
-  existing UI would simply start working.
+- ~~A Hyprland equivalent of the per-game screen picker.~~ ✅ **Shipped in Phase 2E**
+  (`packages/core/hypr-display.js`). It implements the same six-method interface as
+  `kwin-display.js` and `linux.js` selects the backend at call time, so the existing card
+  simply started working — no UI change at all.
+  ⚠️ The obvious route in this note, `hyprctl keyword windowrulev2 monitor`, is the one that
+  does **not** work on Omarchy 4; `hyprctl eval` with the Lua helper is the live API, and
+  keyword is kept only as the fallback for a plain Arch + Hyprland box.
+- **A command palette.** ✅ Shipped in Phase 2E: `Ctrl+K` over games *and* actions, subsequence
+  matching, Enter opens a game's page rather than launching it.
+
 - **EmuLatte.** Both modules were written to be copied there unchanged; only the wiring differs.
   RetroArch's entry is already flagged for it.
 - **Omarchy theme *hooks*.** `omarchy hook install theme-set` would remove the need to watch the
