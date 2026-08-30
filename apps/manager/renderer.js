@@ -1806,51 +1806,22 @@ window.api.getBaseDir().then(dir => {
     applySeeFilterVisibility();
 
     // ── UI scale ─────────────────────────────────────────────────────────────
-    // ⚠️ 100% is the wrong default on a small or scaled screen, and the failure is not
-    // cosmetic: on a 1440x900 laptop at 1.25x compositor scale — 1152x720 of actual room —
-    // the icon rail ran past the bottom of the window and the Control Panel button could not
-    // be clicked at all. So a first run picks a scale that fits.
+    // 100% for everyone, always. The user changes it if they want to.
     //
-    // ⚠️ And a saved scale is only trustworthy on the screen it was chosen for. A library
-    // restored from another machine brings that machine's setting with it: a 1.0 chosen on a
-    // desktop arrives on a laptop panel where it does not fit, and because a value IS saved
-    // the first-run path never runs. So the screen it was chosen on is stamped alongside it,
-    // and a mismatch re-derives the scale for the screen actually in front of the user.
+    // ⚠️ This used to derive a scale from the screen — 0.75 on anything small — because on a
+    // 1152x720 panel the icon rail ran past the bottom of the window and the Control Panel
+    // button, the one control that fixes an oversized interface, could not be clicked. Two
+    // Phase 1 changes already removed that trap: the rail is `overflow-y: auto`, so nothing in
+    // it can be out of reach, and Ctrl +/-/0 changes the scale from anywhere (Ctrl+0 lands on
+    // exactly 1.0). The guard was defending against a failure that no longer exists.
     //
-    // Stamped either way, so this re-derives once per screen and never fights a choice the
-    // user makes afterwards.
-    // ⚠️ Screen facts come from the MAIN process, not `window.screen` — see `_screenId` beside
-    // ZOOM_STEPS, and 'ui-screen-info' in main.js for why. `_screenInfo` is filled in below,
-    // before anything reads it; every helper falls back to the old `window.screen` behaviour
-    // if the IPC ever fails, so a broken channel degrades instead of throwing.
-    function _autoScale() {
-        const h = _screenInfo?.height || window.screen?.availHeight || window.innerHeight || 1080;
-        const w = _screenInfo?.width  || window.screen?.availWidth  || window.innerWidth  || 1920;
-        // ⚠️ Only values that exist as buttons — the picker offers 0.5/0.75/1.0/1.25/1.5, and
-        // anything else would apply a zoom no button is highlighted for, leaving the panel
-        // disagreeing with the actual scale.
-        //
-        // ⚠️ The failure this guards against is VERTICAL: on a 1152x720 panel the icon rail ran
-        // past the bottom of the window and the Control Panel button — the one that fixes an
-        // oversized interface — could not be reached. So height is the real test.
-        //
-        // A bare `w <= 1400` used to stand alongside it, and it misfires on a rotated monitor:
-        // a portrait 900x1440 screen is 900 wide and gets classified as small, even though it
-        // has more vertical room than the desktop panel next to it. Measured on a real two-head
-        // Omarchy desk — DP-1 rotated to 900x1440, DP-2 at 2752x1152 — every window that opened
-        // on the portrait head came up at 75% while the landscape one correctly gave 100%.
-        //
-        // Width still matters, but only when the screen is small in BOTH directions; a narrow
-        // screen that is also tall has the room the rail needs.
-        return (h <= 900 || (w <= 1400 && h <= 1400)) ? '0.75' : '1.0';
-    }
-
-    // A saved scale is only unusable when it is too LARGE for a small screen — that is the
-    // failure this whole block exists to prevent (a UI so big the Control Panel button that
-    // fixes it is itself off-screen). Anything at or below the auto value fits by definition,
-    // and a deliberate 1.25 on a roomy screen is a choice, not a hazard: `auto` is a safe
-    // floor, never a maximum, so it must not be used to clamp one down.
-    const _fits = (val) => _autoScale() === '1.0' || parseFloat(val) <= 0.75;
+    // ⚠️ And it was wrong in practice on the very devices it targeted: 0.75 makes everything
+    // too small to read on a Steam Deck, and Jose runs 100% on the 1152x720 MacBook the rule
+    // was written for. Deriving also meant one install disagreed with itself across monitors —
+    // a rotated 900x1440 head derived 75% while the desktop head beside it derived 100%.
+    //
+    // With nothing derived there is nothing to re-derive, so the screen stamp that existed to
+    // stop a saved value being overwritten (`cngm_ui_scale_screen`) is gone with it.
 
     // Mirrored for the pre-paint script: applying the zoom after the window is visible makes
     // the whole layout jump, which is the most obvious part of the startup flash.
@@ -1861,52 +1832,12 @@ window.api.getBaseDir().then(dir => {
             btn.classList.toggle('active', btn.getAttribute('data-val') === val));
     }
 
-    Promise.all([
-        window.api.getScreenInfo ? window.api.getScreenInfo() : null,
-        window.api.getSetting('cngm_ui_scale'),
-        window.api.getSetting('cngm_ui_scale_screen'),
-    ]).then(([info, val, stamp]) => {
-        _screenInfo = info || null;
-        const here = _screenId();
-        const auto = _autoScale();
-
-        const apply = (v) => {
-            window.api.setZoomLevel(parseFloat(v));
-            _zoomNow = parseFloat(v);
-            _cacheScale(v);
-            _markScaleButton(v);
-        };
-
-        if (val && stamp === here) {                 // chosen on this screen — respect it
-            apply(val);
-            return;
-        }
-
-        if (val) {
-            // ⚠️ Unknown provenance — a different monitor set, a config restored from another
-            // machine, or one written before the stamp existed at all (an absent stamp is NOT
-            // evidence of a foreign screen). This used to re-derive unconditionally, which
-            // silently discarded a deliberate choice: a library restored onto this desk carried
-            // cngm_ui_scale=1.0 with no stamp, and the UI came up at 75%.
-            //
-            // A saved value is only overridden when it genuinely does not fit. Otherwise it is
-            // honoured and simply re-stamped for the screen set in front of the user, so this
-            // corrects itself once instead of every start.
-            const applied = _fits(val) ? val : auto;
-            apply(applied);
-            window.api.setSetting('cngm_ui_scale', applied);
-            window.api.setSetting('cngm_ui_scale_screen', here);
-            if (applied !== val && typeof opToast === 'function') {
-                opToast(`Interface scale set to ${Math.round(parseFloat(applied) * 100)}% for this screen`);
-                setTimeout(opToastHide, 3200);
-            }
-            return;
-        }
-
-        // Nothing saved at all — a genuine first run.
-        apply(auto);
-        window.api.setSetting('cngm_ui_scale', auto);
-        window.api.setSetting('cngm_ui_scale_screen', here);
+    window.api.getSetting('cngm_ui_scale').then(val => {
+        const v = val ? parseFloat(val) : 1.0;
+        window.api.setZoomLevel(v);
+        _zoomNow = v;
+        _cacheScale(String(v));
+        _markScaleButton(String(v));
     });
 
     // Load the recently-imported playlist setting at startup
@@ -1960,12 +1891,9 @@ document.querySelectorAll('#recently-imported-segmented-control .segmented-btn')
 });
 
 // Segmented Control Logic for UI Scaling
-// ⚠️ Delegates to setZoom() rather than repeating it. This handler used to carry its own
-// copy of the apply-and-stamp sequence, and the copy drifted: it stamped the bare
-// `window.screen` shape while startup compared against `_screenId()`. Once that became a
-// monitor-set signature the two could never match, so every scale picked in the Control Panel
-// looked foreign on the next start and was re-derived away — exactly the bug both stamps
-// exist to prevent. One caller, one stamp shape, no drift.
+// ⚠️ Delegates to setZoom() rather than repeating it. This handler used to carry its own copy
+// of the apply-and-save sequence and the copy drifted, which is how a scale picked here could
+// be undone on the next start. One caller, one path.
 document.querySelectorAll('.ui-scale-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
         setZoom(parseFloat(e.target.getAttribute('data-val')));
@@ -8862,20 +8790,11 @@ let _zoomNow = 1.0;
 // `layout` names the monitor SET, so dragging the window to another screen is no longer
 // mistaken for another machine. The `window.screen` fallback keeps the old single-screen
 // shape, which is also what pre-existing stamps were written in.
-let _screenInfo = null;
-const _screenId = () => _screenInfo?.layout
-    || `${window.screen?.width || 0}x${window.screen?.height || 0}`;
-
 function setZoom(v) {
     _zoomNow = v;
     window.api.setZoomLevel(v);
     try { localStorage.setItem('cngm_ui_scale_cache', String(v)); } catch {}
     window.api.setSetting('cngm_ui_scale', String(v));
-    // ⚠️ Stamp the screen as well. Without this the user's own choice looks foreign on the
-    // next start and gets re-derived out from under them. Must use the same `_screenId()` the
-    // startup check compares against — stamping a different shape here would guarantee the
-    // mismatch this line exists to prevent.
-    window.api.setSetting('cngm_ui_scale_screen', _screenId());
     document.querySelectorAll('.ui-scale-btn').forEach(btn =>
         btn.classList.toggle('active', parseFloat(btn.getAttribute('data-val')) === v));
     if (typeof opToast === 'function') { opToast(`Interface scale: ${Math.round(v * 100)}%`); setTimeout(opToastHide, 1400); }
