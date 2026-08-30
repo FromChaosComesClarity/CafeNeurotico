@@ -453,7 +453,6 @@
     .csp-all { justify-content:space-between; margin-bottom:2px; }
     .csp-all .csp-name { font-weight:700; }
 
-    /* ── FLAT LAYOUTS — shared ──────────────────────────────────────────────── */
     #app-container.layout-catalog       #icon-rail, #app-container.layout-catalog       #side-panel, #app-container.layout-catalog       #sidebar, #app-container.layout-catalog       #topnav, #app-container.layout-newspaper     #icon-rail, #app-container.layout-newspaper     #side-panel, #app-container.layout-newspaper     #sidebar, #app-container.layout-newspaper     #topnav, #app-container.layout-timeline      #icon-rail, #app-container.layout-timeline      #side-panel, #app-container.layout-timeline      #sidebar, #app-container.layout-timeline      #topnav, #app-container.layout-kanban        #icon-rail, #app-container.layout-kanban        #side-panel, #app-container.layout-kanban        #sidebar, #app-container.layout-kanban        #topnav { display:none !important; }
     #app-container.layout-catalog       #main-content, #app-container.layout-newspaper     #main-content, #app-container.layout-timeline      #main-content, #app-container.layout-kanban        #main-content { display:none !important; }
     #app-container.layout-catalog       #main-content.split-edit, #app-container.layout-newspaper     #main-content.split-edit, #app-container.layout-timeline      #main-content.split-edit, #app-container.layout-kanban        #main-content.split-edit { display:flex !important; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9998; background:var(--bg); }
@@ -634,7 +633,6 @@
     .kb-col[data-col="played"]   .kb-col-header { color:var(--accent); }
     .kb-drop-over { outline:2px dashed var(--accent); }
 
-    /* ── TTY — shared ───────────────────────────────────────────────────────── */
     @keyframes tty-blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
     .htop-stat { color:#666; } .htop-stat b { color:#d4a373; }
     .htop-sort-active { color:#d4a373 !important; }
@@ -711,24 +709,8 @@
     .grub-sel .grub-arrow { color:#fff; }
     .grub-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .grub-meta { font-size:9px; color:#777; flex-shrink:0; }
-    .grub-sel .grub-meta { color:#cce; }
+    .grub-sel .grub-meta { color:#cce; }/* Shared structural base: font, no border-radius, no box-shadow *//* Shared edit-game structural base *//* Shared titlebar *//* ── MC — navy blue, cyan accent ──────────────────────────────────────── *//* ── Layout zoom ─────────────────────────────────────────────────────────── */
 
-    /* ── TTY Layouts — modal theming ────────────────────────────────────────── */
-    /* Shared structural base: font, no border-radius { background:rgba(0,0,0,0.88) !important; }
-
-    /* ── HTOP — amber accent { background:#0a0a0a !important; border:1px solid #444 !important; color:#c8c8c8 !important; }
-
-    /* ── BBS — pure black, muted text, white headings { background:#000 !important; border:1px solid #333 !important; color:#aaa !important; }
-
-    /* ── VI — statusbar palette { background:#0d0d0d !important; border:1px solid #333 !important; color:#d4d4d4 !important; }
-
-    /* ── MC — navy blue { background:#000055 !important; border:1px solid #00aaaa !important; color:#aaaaaa !important; }
-
-    /* ── NETHACK — black, gold keys { background:#000 !important; border:1px solid #555 !important; color:#aaa !important; }
-
-    /* ── GRUB — black, blue selection { background:#000 !important; border:1px solid #555 !important; color:#fff !important; }
-
-    /* ── Layout zoom ─────────────────────────────────────────────────────────── */
     #catalog-shell, #newspaper-shell, #timeline-shell, #kanban-shell { zoom: 1.25; }
 
     /* ── FLAT DETAIL OVERLAY ─────────────────────────────────────────────────── */
@@ -751,7 +733,7 @@
     .fdo-meta-pill { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.5); }
     .fdo-meta-pill.accent { color:var(--accent); }
     .fdo-meta-sep { width:1px; height:10px; background:rgba(255,255,255,0.18); flex-shrink:0; }
-    #fdo-desc { font-size:12px; color:rgba(255,255,255,0.45); line-height:1.75; max-width:640px; max-height:130px; overflow:hidden; }
+    #fdo-desc { font-size:12px; color:rgba(255,255,255,0.45); line-height:1.75; max-width:640px; max-height:130px; overflow:hidden; }/* hero band *//* main info *//* cover art — full height *//* info box *//* left column *//* achievements */
     .tgp-ach-label { font-size:9px; color:#ffff55; letter-spacing:2px; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:7px; }
     .tgp-ach-progress { font-size:9px; color:#ffffff; margin-bottom:14px; line-height:2; }
     .tgp-ach-bar-chars { font-family:'Fira Code','Courier New',monospace; letter-spacing:-1px; font-size:14px; }
@@ -773,11 +755,11 @@
     .tgp-hbar-full .hb-f { color:#55ff55; } .tgp-hbar-full .hb-e { color:#1a1a1a; }
     .tgp-proton-plat { color:#55ffff; } .tgp-proton-gold { color:#ffff55; } .tgp-proton-silv { color:#ffffff; } .tgp-proton-brnz { color:#ffaa55; }
     .tgp-mc-badge { display:inline-block; padding:1px 6px; font-size:9px; }
-    .tgp-mc-badge.g { background:#55ff55; color:#000; }
-    /* CNGM titlebar — black bar, white text { background:#000 !important; border-bottom:2px solid #333 !important; }
+    .tgp-mc-badge.g { background:#55ff55; color:#000; }/* fkeys DOS blue *//* filter widget *//* font picker widget *//* shared TTY layout font menu *//* per-filter image overrides — default (crt) is the base CSS on the img elements *//* ── Mac OS 1.0 system-wide theme — overrides CNGM theme selector ───────── *//* ── Mac OS 1.0 system-wide theme ─────────────────────────────────────────
+       Variables live on body so they cascade to modals outside #app-container.
+       Adding future Ancient OS / TTY themes follows the same pattern.        *//* CNGM titlebar — black bar, white text, Chicago font *//* Hardcoded-color outliers that bypass the variable system *//* #modal-tools has no .modal-box wrapper — override its buttons directly *//* Strip hover zoom from trailer search items — causes glitch in Mac layout *//* Playlist picker — thin scrollbar only when needed *//* Playlist picker buttons — strip box-shadow so it doesn't bleed outside container */
     /* Disabled Mac dropdown item */
-    .mac-ditem-disabled { opacity:0.35; pointer-events:none; cursor:default !important; }
-    /* List — bounded by grid cell { flex:1; min-height:0; overflow-y:scroll; overflow-x:hidden; background:#fff; }
+    .mac-ditem-disabled { opacity:0.35; pointer-events:none; cursor:default !important; }/* Connect modal — Mac OS 1.0 theme *//* Tools modal — Mac OS 1.0 theme *//* Edit game panel — Mac OS 1.0 theme *//* ── Mac OS 1.0 Layout ─────────────────────────────────────────────────── *//* Menubar *//* View dropdown *//* Desktop — CSS Grid guarantees every cell has bounded dimensions *//* Shared Mac window chrome *//* Finder window *//* List — bounded by grid cell, scrolls within its own box */
     .mac-list-row { display:flex; align-items:center; height:18px; cursor:pointer; font-size:11px; border-bottom:1px solid #e8e8e8; background:#fff; color:#000; user-select:none; }
     .mac-list-row:hover { background:#e8e8e8; }
     .mac-list-row.mac-selected { background:#000; color:#fff; }
@@ -785,7 +767,7 @@
     .mac-list-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .mac-list-store { width:100px; flex-shrink:0; font-size:10px; color:#444; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:1px solid #ddd; padding-left:5px; }
     .mac-list-genre { width:110px; flex-shrink:0; font-size:10px; color:#444; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:1px solid #ddd; padding-left:5px; }
-    .mac-list-row.mac-selected .mac-list-store, .mac-list-row.mac-selected .mac-list-genre { color:#bbb; border-left-color:#444; }
+    .mac-list-row.mac-selected .mac-list-store, .mac-list-row.mac-selected .mac-list-genre { color:#bbb; border-left-color:#444; }/* Right column */
     .mac-info-row { display:flex; gap:4px; margin-bottom:5px; font-size:11px; line-height:1.4; color:#000; }
     .mac-info-key { width:68px; flex-shrink:0; font-weight:bold; color:#555; }
     .mac-info-val { flex:1; min-width:0; word-break:break-word; color:#000; }
@@ -814,8 +796,7 @@
     .mac-btn { border:1px solid #000; background:#fff; font-family:'Chicago',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif; font-size:11px; font-weight:bold; padding:3px 14px; cursor:pointer; box-shadow:2px 2px 0 #999; min-width:56px; color:#000 !important; -webkit-font-smoothing:none; }
     .mac-btn:hover { background:#eee; }
     .mac-btn:active { box-shadow:none; transform:translate(1px,1px); }
-    .mac-btn.mac-btn-default { border-width:2px; }
-    /* Sidebar icon strip (right edge { width:26px; flex-shrink:0; background:linear-gradient(180deg,#d8d8d8,#c8c8c8); border-left:1px solid #b0b0b0; display:flex; flex-direction:column; align-items:center; padding:3px 0; gap:1px; }
+    .mac-btn.mac-btn-default { border-width:2px; }/* ── Mandrake Linux 9 / KDE 3 layout ──────────────────────────────────── *//* Konqueror window — gray KDE 3 default decoration *//* Menu bar *//* Toolbar — large icon buttons *//* Location bar *//* Bookmarks bar *//* Body *//* Sidebar: tree + right icon strip *//* Sidebar icon strip (right edge, like Konqueror screenshot) *//* File list */
     .kde-row { display:flex; align-items:center; height:20px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:11px; color:#000; }
     .kde-row:nth-child(even) { background:#f8f8fc; }
     .kde-row:hover { background:#d8e8fc; }
@@ -824,23 +805,22 @@
     .kde-row-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px; }
     .kde-row-store,.kde-row-genre { width:90px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 6px; color:#5060a0; font-size:10px; }
     .kde-row-hltb { width:50px; flex-shrink:0; padding:0 6px; color:#5060a0; font-size:10px; text-align:right; }
-    .kde-sel .kde-row-store,.kde-sel .kde-row-genre,.kde-sel .kde-row-hltb { color:#c0d4f8; }
+    .kde-sel .kde-row-store,.kde-sel .kde-row-genre,.kde-sel .kde-row-hltb { color:#c0d4f8; }/* Status bar *//* Panel — medium blue-gray (matches screenshots) */
     #kde-quicklaunch { display:flex; align-items:center; gap:1px; padding:0 3px; border-left:1px solid #4858a0; border-right:1px solid #7888b8; margin:0 2px; }
     .kde-ql-btn { width:26px; height:26px; background:transparent; border:1px solid transparent; border-radius:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
     .kde-ql-btn:hover { background:rgba(0,0,0,0.1); border-color:rgba(0,0,0,0.2); }
     .kde-ql-btn:active { background:rgba(0,0,0,0.2); }
-    @font-face { font-family:'DSEG7'; src:url('assets/fonts/DSEG7Classic-Regular.ttf') format('truetype'); }
+    @font-face { font-family:'DSEG7'; src:url('assets/fonts/DSEG7Classic-Regular.ttf') format('truetype'); }/* K Menu — single column + dark "KDE 3" strip *//* Gamepage dialog — gray title bar *//* KDE modal / panel theming *//* ── Commodore 64 layout ─────────────────────────────────────────────────── *//* All modal text uses C64 font *//* modal-box *//* Playlist picker *//* Segmented controls *//* Connect & Tools modal containers *//* Edit game panel *//* Now playing card *//* Install picker *//* Tools modal — inner inputs and all elements *//* Connect modal — inner elements *//* About modal *//* Add Game modal *//* Playlists nav modal *//* Welcome modal */
     .c64-row { font-family:'C64 Pro Mono',monospace; font-size:12px; color:#7878f8; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; padding:1px 4px; display:flex; align-items:baseline; gap:0; line-height:1.5; }
     .c64-row:hover { background:#7878f8; color:#0000aa; }
     .c64-row.c64-sel { background:#7878f8; color:#0000aa; }
     .c64-num { width:48px; flex-shrink:0; opacity:0.6; }
     .c64-name { flex:1; }
     .c64-store { width:80px; flex-shrink:0; text-align:right; opacity:0.7; }
-    @keyframes c64blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    @keyframes c64blink { 0%,100%{opacity:1} 50%{opacity:0} }/* C64 gamepage *//* Shell *//* Desktop *//* Main area (window + toolstrip) *//* Main window *//* Title tab *//* Menu bar *//* Content split *//* Left nav panel *//* Right list area */
     .beos-row { display:flex; align-items:center; padding:2px 6px; cursor:pointer; border-bottom:1px solid #c8c8c8; font-size:12px; color:#000; gap:4px; }
     .beos-row:hover { background:#c0d0f0; }
-    .beos-row.beos-sel { background:#2855b0; color:#fff; }
-    /* Title bar — solid navy { height:20px; flex-shrink:0; background:#000080; display:flex; align-items:center; padding:2px 3px; gap:2px; }
+    .beos-row.beos-sel { background:#2855b0; color:#fff; }/* Status bar *//* Deskbar *//* Tool strip *//* Gamepage "File Info" window *//* BeOS modal theming *//* ── Windows 95 layout ──────────────────────────────────────────────────── *//* Shell & desktop *//* Desktop icons *//* Explorer window *//* Title bar — solid navy, NO gradient *//* Menu bar *//* Toolbar *//* Address bar *//* Split content *//* Left tree panel *//* Right file list */
     .w95-row { display:flex; align-items:center; padding:1px 6px; cursor:pointer; border-bottom:1px solid transparent; font-size:11px; color:#000; gap:4px; }
     .w95-row:hover { background:#cce8ff; }
     .w95-row.w95-sel { background:#000080; color:#fff; }
@@ -848,10 +828,7 @@
     .w95-row-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .w95-row-store { width:88px; flex-shrink:0; font-size:11px; }
     .w95-row-genre { width:100px; flex-shrink:0; font-size:11px; }
-    .w95-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:11px; }
-    /* ── Application Menu: floating window on left { width:144px; flex-shrink:0; display:flex; flex-direction:column; background:#f5f5f5; border:1px solid #888; border-top:none; border-left:none; box-shadow:2px 0 6px rgba(0,0,0,0.35); margin:10px 0 10px 10px; }
-    /* Title bar: medium gray knurling { height:22px; flex-shrink:0; background:repeating-linear-gradient(180deg,#adadad 0px,#adadad 1px,#979797 1px,#979797 2px); display:flex; align-items:center; padding:0 4px; border-bottom:1px solid #666; }
-    /* ── Icon view shelf: white bg { flex-shrink:0; background:#fff; border-bottom:2px solid #aaa; display:flex; flex-direction:row; align-items:flex-start; gap:0; padding:8px 10px; overflow-x:auto; min-height:110px; max-height:110px; scrollbar-width:thin; scrollbar-color:#aaa #f0f0f0; }
+    .w95-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:11px; }/* Status bar *//* Taskbar *//* Start menu *//* Gamepage "Properties" dialog *//* Tabs *//* Tab panels *//* Windows 95 modal theming *//* ── Shell: purple-blue desktop matching the reference screenshot *//* ── Application Menu: floating window on left, white body with dark title *//* ── Main area *//* ── File Viewer window *//* Title bar: medium gray knurling, BLACK text (matches screenshot) *//* ── Icon view shelf: white bg, shows game cover art tiles */
     .nx-icon-tile { display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 6px; cursor:pointer; min-width:72px; max-width:72px; flex-shrink:0; }
     .nx-icon-tile:hover { background:#dde8ff; }
     .nx-icon-tile.nx-icon-sel { background:#2244aa; }
@@ -859,7 +836,7 @@
     .nx-icon-img { width:64px; height:64px; object-fit:cover; display:block; }
     .nx-icon-ph { width:64px; height:64px; background:linear-gradient(145deg,#e8e8e8 0%,#c0c0c0 60%,#aaaaaa 100%); border:1px solid #888; display:flex; align-items:center; justify-content:center; font-size:24px; }
     .nx-icon-name { font-size:10px; color:#000; text-align:center; width:68px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.2; }
-    .nx-icon-tile.nx-icon-sel .nx-icon-name { color:#fff; }
+    .nx-icon-tile.nx-icon-sel .nx-icon-name { color:#fff; }/* ── Column browser *//* Left column: filter categories *//* Right column: file list */
     .nx-row { display:flex; align-items:center; padding:2px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:12px; color:#000; gap:6px; }
     .nx-row:hover { background:#dde8ff; }
     .nx-row.nx-sel { background:#2244aa; color:#fff; }
@@ -867,9 +844,7 @@
     .nx-row-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .nx-row-store { width:80px; flex-shrink:0; font-size:11px; }
     .nx-row-genre { width:100px; flex-shrink:0; font-size:11px; }
-    .nx-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:11px; }
-    /* Dock tiles: white/light square icons { width:52px; height:52px; background:#fff; border:1px solid #999; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; gap:2px; flex-shrink:0; box-shadow:1px 1px 4px rgba(0,0,0,0.5); }
-    /* ── Modal theming: white windows, gray knurled headers { font-family:'Helvetica Neue',Helvetica,Arial,sans-serif !important; }
+    .nx-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:11px; }/* Status bar *//* ── Dock: dark strip on right with square icon tiles *//* Dock tiles: white/light square icons, NeXT icon style *//* ── Inspector (gamepage) *//* ── Modal theming: white windows, gray knurled headers, black text *//* ── Classic Amiga / Workbench 1.3 layout ───────────────────────────────── *//* Shell *//* Screen bar *//* Desktop *//* Main window *//* Window title bar *//* Filter bar *//* Column headers *//* File list */
     .amiga-row { display:flex; align-items:center; padding:1px 6px; cursor:pointer; border-bottom:1px solid #999; color:#000; font-family:'PxPlus IBM VGA8',monospace; font-size:12px; gap:4px; white-space:nowrap; }
     .amiga-row:hover { background:#0055aa; color:#fff; }
     .amiga-row.amiga-sel { background:#ff8800; color:#000; }
@@ -877,12 +852,12 @@
     .amiga-row-name { flex:1; overflow:hidden; text-overflow:ellipsis; }
     .amiga-row-store { width:88px; flex-shrink:0; font-size:10px; overflow:hidden; }
     .amiga-row-genre { width:100px; flex-shrink:0; font-size:10px; overflow:hidden; }
-    .amiga-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:10px; }
+    .amiga-row-hltb { width:44px; flex-shrink:0; text-align:right; font-size:10px; }/* Status bar *//* Tool strip (desktop action icons) *//* Gamepage "Information" window *//* Amiga modal theming *//* ── Windows XP layout ──────────────────────────────────────────────────── *//* Explorer window *//* Title bar */
     .xp-caption-group { display:flex; align-items:center; gap:2px; flex-shrink:0; margin-left:4px; }
     .xp-cap-btn { width:22px; height:22px; border-radius:4px; border:1px solid rgba(0,0,0,0.4); background:linear-gradient(180deg,#6898ec 0%,#2c6cd4 50%,#2060c8 100%); color:#fff; font-size:10px; font-weight:bold; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:inset 0 1px 0 rgba(255,255,255,0.3); font-family:Tahoma,sans-serif; line-height:1; }
     .xp-cap-btn:hover { background:linear-gradient(180deg,#88b0ff 0%,#4080e8 50%,#3070d8 100%); }
     .xp-cap-close { background:linear-gradient(180deg,#e87060 0%,#c83020 50%,#b02818 100%) !important; }
-    .xp-cap-close:hover { background:linear-gradient(180deg,#f88878 0%,#d84838 50%,#c02828 100%) !important; }
+    .xp-cap-close:hover { background:linear-gradient(180deg,#f88878 0%,#d84838 50%,#c02828 100%) !important; }/* Menu bar *//* Toolbar *//* Explorer body *//* Task pane *//* File area */
     .xp-row { display:flex; align-items:center; height:20px; cursor:default; font-size:11px; color:#000; user-select:none; }
     .xp-row:hover:not(.xp-selected) { background:#dde8fc; }
     .xp-row.xp-selected { background:#316ac5; color:#fff; }
@@ -891,7 +866,7 @@
     .xp-row-store { width:110px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px; border-left:1px solid #e8e0d8; font-size:10px; color:#555; }
     .xp-row-genre { width:110px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px; border-left:1px solid #e8e0d8; font-size:10px; color:#555; }
     .xp-row-year  { width:52px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px; border-left:1px solid #e8e0d8; font-size:10px; color:#555; }
-    .xp-row.xp-selected .xp-row-store,.xp-row.xp-selected .xp-row-genre,.xp-row.xp-selected .xp-row-year { color:rgba(255,255,255,0.85); border-left-color:rgba(255,255,255,0.2); }
+    .xp-row.xp-selected .xp-row-store,.xp-row.xp-selected .xp-row-genre,.xp-row.xp-selected .xp-row-year { color:rgba(255,255,255,0.85); border-left-color:rgba(255,255,255,0.2); }/* Status bar *//* Taskbar *//* Start Menu */
     /* XP Gamepage — Properties dialog */
     #xp-gamepage { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; }
     #xp-gamepage.open { display:flex; }
@@ -925,8 +900,7 @@
     .xp-btn:active { border-style:inset; }
     .xp-btn.xp-btn-primary { border:2px solid #316ac5; font-weight:bold; }
     .xp-btn-play { background:linear-gradient(180deg,#60c840 0%,#3aac18 100%) !important; color:#fff !important; border:2px outset #1a6808 !important; text-shadow:1px 1px 1px rgba(0,0,0,0.3); font-weight:bold !important; }
-    .xp-btn-play:hover { background:linear-gradient(180deg,#78d858 0%,#4aba28 100%) !important; }
-/* ── tool-card (used in Welcome, Connect { background:#d4d0c8 !important; border:2px inset #aca899 !important; border-radius:0 !important; }
+    .xp-btn-play:hover { background:linear-gradient(180deg,#78d858 0%,#4aba28 100%) !important; }/* ── Windows XP — CSS variable overrides (fixes all inline var() usages) ──── *//* ── Windows XP — global font for all modal / panel content ──────────────── *//* ── Windows XP — modal overlay ─────────────────────────────────────────── *//* ── .modal-box — XP window frame ───────────────────────────────────────── *//* ── h2/h3 → XP title bar (break out of the 30px modal padding) ─────────── *//* ── Text elements ───────────────────────────────────────────────────────── *//* ── Buttons ─────────────────────────────────────────────────────────────── *//* ── Inputs ──────────────────────────────────────────────────────────────── *//* ── tool-card (used in Welcome, Connect, Tools) ────────────────────────── *//* ── Playlist picker rows ────────────────────────────────────────────────── *//* ── Welcome modal — custom non-.modal-box wrapper ──────────────────────── *//* ── Connect & Tools — custom non-.modal-box wrapper ───────────────────── *//* ── Segmented controls ──────────────────────────────────────────────────── *//* ── Edit game panel ─────────────────────────────────────────────────────── *//* ── Now playing card ────────────────────────────────────────────────────── *//* ── Strip hover transforms / glows in modals ────────────────────────────── *//* ── CNGM titlebar ───────────────────────────────────────────────────────── *//* ── Install picker ──────────────────────────────────────────────────────── */
     .sr-row { margin-bottom:30px; }
     .sr-row-label { font-size:9px; font-weight:900; letter-spacing:2px; color:var(--text_dim); text-transform:uppercase; padding:0 18px 10px; display:flex; align-items:center; gap:10px; }
     .sr-row-label span:first-child { flex:1; }
@@ -1065,15 +1039,14 @@
     .topnav-filter-arrow:hover { color:var(--accent); }
     .topnav-filter-arrow.visible { display:flex; }
 
-
     .row { display: flex; gap: 10px; }
     button { background-color: var(--bg_panel); color: var(--text_main); border: 1px solid var(--border_solid); padding: 10px 12px; font-family: var(--ui-font, 'Raleway'), sans-serif; font-weight: 900; cursor: pointer; border-radius: 6px; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-transform: uppercase; letter-spacing: 1px; }
     button:hover { background-color: var(--text_main); color: var(--bg); }
     /* Light themes: the invert-to-text_main hover above lands near-black — highlight with the accent instead
        (window controls keep their red close; danger buttons keep their red). */
-    body.theme-light button:not(.win-btn):not(.cp-rail-danger):hover { background-color: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }
-    /* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
-    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, #btn-split-connect {
+    body.theme-light button:not(.win-btn):not(.cp-rail-danger):hover { background-color: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }/* ── CREMA launch — Ancient-OS faux-desktop launchers (classic/TTY use the titlebar pill) ── *//* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
+    
+    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, #btn-split-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
         display: none !important;
     }
     button.primary { background-color: var(--accent); color: var(--bg); border: none; }
@@ -1156,10 +1129,10 @@
     .cp-taskbar-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s linear; }
     .cp-taskbar-stop { font-size: 10px; padding: 4px 12px; background: transparent; border: 1px solid #e57373; color: #e57373; border-radius: 6px; cursor: pointer; }
     .cp-footer-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
-    .cp-footer-actions button { font-size: 11px; padding: 8px 16px; }
-
-    /* ── Control Panel rail — per-layout polish ──────────────────────────────
-       Layout palettes cascade via CSS vars { border-radius:0 !important; }
+    .cp-footer-actions button { font-size: 11px; padding: 8px 16px; }/* ── Control Panel rail — per-layout polish ──────────────────────────────
+       Layout palettes cascade via CSS vars, so rail colours already adapt; these
+       only fix structure (square + mono on the TTY skins) and hover contrast on
+       the light "ancient OS" skins where a white hover is invisible. *//* Light ancient-OS skins: darken hover so it reads on pale backgrounds */
     .tool-card-title { color: var(--accent); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid var(--border_solid); padding-bottom: 5px; margin-bottom: 2px; }
 
     fieldset { border: 2px solid var(--border); border-radius: 12px; padding: 20px 15px 15px 15px; margin: 5px 0; background: var(--bg_panel); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -1381,7 +1354,7 @@
     #modal-tools .tool-card-title                                      { font-size: 14px !important; }
     #modal-tools p                                                     { font-size: 14px !important; }
     #update-library-status, #batch-status, #check-install-status,
-    #install-menu-status, #tools-no-results { font-size: 14px !important; }
+    #install-menu-status, #tools-no-results { font-size: 14px !important; }/* ── LAYOUT PICKER: category tabs + 2-col grid ──────────────────────────── */
     .lsc-group { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
     .lsc-layout { display:flex; flex-direction:column; gap:3px; text-align:left; padding:9px 11px; background:var(--bg_panel); border:1px solid var(--border_solid); border-radius:8px; color:var(--text_sec); cursor:pointer; font-family:inherit; transition:border-color 0.15s, color 0.15s; }
     .lsc-layout:hover { border-color:var(--accent); background:var(--bg_panel); color:var(--text_main); }
@@ -1389,7 +1362,7 @@
     .lsc-layout.active { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
     .lsc-name { font-size:12px; font-weight:800; letter-spacing:0.3px; }
     .lsc-layout.active .lsc-name { color:var(--accent); }
-    .lsc-desc { font-size:9.5px; line-height:1.35; color:var(--text_dim); font-weight:400; letter-spacing:0; }
+    .lsc-desc { font-size:9.5px; line-height:1.35; color:var(--text_dim); font-weight:400; letter-spacing:0; }/* TTY skins: square + monospace the layout cards to match */
     #layout-segmented-control { display:block; margin-top:0; }
 
     /* ── GAMEPAGE: floating PLAY/INSTALL button ─────────────────────────────── */
@@ -3240,6 +3213,7 @@
             <option value="PxPlus IBM VGA8" style="font-family:'PxPlus IBM VGA8';">PxPlus IBM VGA8</option>
           </select>
         </div>
+
 
 
         <div class="tool-card tools-section" data-search="history gaming recent games clear played">
