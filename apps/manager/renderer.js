@@ -124,9 +124,11 @@ function openSteamMenu(anchorBtn, appId) {
 }
 
 // ── Which screen games open on ───────────────────────────────────────────────
-// KDE only, and the card stays hidden everywhere else rather than showing a setting that
-// cannot work. Nothing inside a game decides which monitor it lands on under Wayland —
-// the compositor does — so this is a KWin rule, applied live without a logout.
+// Two backends behind one interface: a KWin script on KDE, Hyprland window rules on
+// Hyprland (see packages/core/hypr-display.js). The card appears wherever one of them
+// reports isSupported() and stays away everywhere else rather than showing a setting
+// that cannot work. Nothing inside a game decides which monitor it lands on under
+// Wayland — the compositor does.
 async function initDisplayPicker() {
     const card = document.getElementById('display-card');
     const sel = document.getElementById('display-select');
@@ -139,9 +141,9 @@ async function initDisplayPicker() {
     // and the Control Panel used to reset `display` on every .tools-section in three places,
     // so hiding it lasted exactly until the panel was opened. Those resets went with the
     // settings search in wave 2A, so hiding would hold now — removal is kept because it is
-    // still the honest answer. On Hyprland (Omarchy) the picker is
-    // legitimately unsupported — it is a KWin script, and KWin is not running — so a KDE-only
-    // card offering "let KDE decide" would otherwise appear on a desktop with no KDE in it.
+    // still the honest answer. This used to remove the card on Hyprland too, because the
+    // only backend was a KWin script; Hyprland has its own backend now, so the card appears
+    // there and is removed only where neither compositor is running.
     //
     // Having only one screen is different: the feature works, there is just nothing to
     // choose, and plugging a second monitor in makes it meaningful again. Hiding is right
@@ -150,7 +152,8 @@ async function initDisplayPicker() {
     if (!opts || !opts.supported || opts.displays.length < 2) { card.remove(); return; }
 
     card.style.display = '';
-    sel.innerHTML = '<option value="">Default &mdash; let KDE decide</option>';
+    // ⚠️ Compositor-neutral wording: the same card now backs onto KWin or Hyprland.
+    sel.innerHTML = '<option value="">Default &mdash; let the desktop decide</option>';
     for (const d of opts.displays) {
         const o = document.createElement('option');
         o.value = String(d.index);
@@ -175,7 +178,7 @@ async function initDisplayPicker() {
         status.style.color = '#66bb6a';
         status.textContent = res.display
             ? `Games will open on ${res.display.name}. Takes effect on the next game you start.`
-            : 'Back to KDE deciding.';
+            : 'Back to letting the desktop decide.';
     };
 }
 initDisplayPicker();

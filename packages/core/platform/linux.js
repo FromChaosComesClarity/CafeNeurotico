@@ -262,9 +262,27 @@ const desktop = {
     refreshMenu, markTrusted,
     autostartPath, getAutostart, setAutostart,
     openUrlScheme, focusWindow,
-    // The per-game display picker is a KWin script; nothing equivalent exists elsewhere.
-    // isSupported() already gates it, so a null here is handled by the existing UI path.
-    displayPicker: require('../kwin-display.js'),
+    // The per-game display picker has two backends — a KWin script on KDE, Hyprland
+    // window rules on Hyprland — behind one interface, so the Control Panel card does
+    // not know or care which is in use. The backend is chosen per call rather than at
+    // require time: this module is loaded once at startup, and which compositor is
+    // running is not a fact about the build.
+    // ⚠️ Both self-gate through isSupported(), so on a desktop with neither (plain
+    // GNOME, a bare X11 session) every method answers "not supported" instead of
+    // throwing, which is what the existing UI path already handles.
+    displayPicker: (() => {
+        const kwin = require('../kwin-display.js');
+        const hypr = require('../hypr-display.js');
+        const pick = () => (hypr.isSupported() ? hypr : (kwin.isSupported() ? kwin : null));
+        return {
+            configure: (dir) => { kwin.configure(dir); hypr.configure(dir); },
+            isSupported: () => !!pick(),
+            listDisplays: () => pick()?.listDisplays() ?? [],
+            currentDisplay: () => pick()?.currentDisplay() ?? null,
+            setGameDisplay: (i) => pick()?.setGameDisplay(i) ?? { ok: false, error: 'No supported compositor for this.' },
+            apply: () => pick()?.apply() ?? { ok: false, applied: 0 },
+        };
+    })(),
     // Omarchy: still host.id === 'linux', so this is a desktop-level integration sitting
     // beside the KWin one rather than a platform backend. Both modules gate themselves —
     // on Nobara, isOmarchy() is false and every surface they feed simply does not appear.
