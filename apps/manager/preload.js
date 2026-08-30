@@ -207,6 +207,11 @@ contextBridge.exposeInMainWorld('api', {
                                 displayOptions:  () => ipcRenderer.invoke('display-options'),
                                 setGameDisplay:  (i) => ipcRenderer.invoke('set-game-display', i),
                                 grinderSetEnvVar: (payload) => ipcRenderer.invoke('grinder-set-env-var', payload),
+                                // Per-game compatibility — what GRINDER's setup modal used to own.
+                                grinderCompatGet: (gid) => ipcRenderer.invoke('grinder-compat-get', gid),
+                                grinderCompatSet: (payload) => ipcRenderer.invoke('grinder-compat-set', payload),
+                                grinderSetLaunchTarget: (payload) => ipcRenderer.invoke('grinder-set-launch-target', payload),
+                                grinderStorageList: () => ipcRenderer.invoke('grinder-storage-list'),
                                 omarchyStatus:   () => ipcRenderer.invoke('omarchy-status'),
                                 omarchyInstallTools: (keys) => ipcRenderer.invoke('omarchy-install-tools', keys),
                                 omarchyRunInstaller: (key) => ipcRenderer.invoke('omarchy-run-installer', key),

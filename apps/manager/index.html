@@ -797,6 +797,13 @@
     .cp-ver-btn:active { transform: translateY(0); }
     .cp-ver-btn svg { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     .cp-ver-btn:hover svg { transform: rotate(180deg); }
+    .compat-chk { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text_main); cursor:pointer; }
+    .compat-chk input { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+    #modal-compat select, #modal-compat input[type="text"], #modal-compat textarea { width:100%; }
+    .storage-row { display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--bg_panel); border:1px solid var(--border); border-radius:6px; }
+    .storage-row .sr-name { flex:1; font-size:12.5px; color:var(--text_main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .storage-row .sr-store { font-size:10px; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px; }
+    .storage-row .sr-size { font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; white-space:nowrap; }
     .cp-welcome-hint { margin-top: 34px; font-size: 11.5px; color: var(--text_dim); letter-spacing: 0.5px; font-style: italic; }
     .cp-pane-title { margin: 0 0 4px; font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--text_dim); }
     .cp-tico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 7px; flex-shrink: 0; }
@@ -2900,6 +2907,83 @@
       </div>
       <button id="btn-f2p-hide-one" style="margin-top: 6px; width: 100%; display: none; background-color: var(--bg_menu); color: #ef8f5a; border-color: #ef8f5a; font-weight: bold;">Hide only this game</button>
       <button id="btn-close-free-games" style="margin-top: 6px; width: 100%;" data-i18n="html.close">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Per-game compatibility ────────────────────────────────────────────────
+       Everything GRINDER's setup modal owned, in the Manager. Writes go through
+       grinder-compat-set, which allowlists the columns it will touch. -->
+  <div id="modal-compat" class="modal-overlay">
+    <div class="modal-box" style="max-width: 620px; width: 620px; max-height: 88vh;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">
+        Compatibility <span id="compat-game-name" style="opacity:0.6; font-weight:400; text-transform:none; letter-spacing:0;"></span>
+      </h3>
+      <p id="compat-subtitle" style="font-size:11.5px; color:var(--text_dim); margin:0;"></p>
+      <div id="compat-body" style="display:flex; flex-direction:column; gap:12px; overflow-y:auto; padding-right:6px;">
+
+        <div id="compat-row-target" style="display:none; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Launch target</label>
+          <select id="compat-launch-target"></select>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Proton / runtime</label>
+          <select id="compat-proton"></select>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Wine prefix <span style="color:var(--text_dim);">(blank = the default for this game)</span></label>
+          <input type="text" id="compat-prefix" placeholder="~/.config/grinder/prefixes/&lt;Game&gt;">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Launch arguments</label>
+          <input type="text" id="compat-launch-args" placeholder="-windowed -skipintro">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Custom executable <span style="color:var(--text_dim);">(overrides the detected one)</span></label>
+          <input type="text" id="compat-custom-exe" placeholder="">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Environment variables <span style="color:var(--text_dim);">(one NAME=value per line)</span></label>
+          <textarea id="compat-env" rows="3" style="resize:vertical;" placeholder="PROTON_USE_WINED3D=1"></textarea>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Winetricks verbs</label>
+          <input type="text" id="compat-winetricks" placeholder="corefonts vcrun2019">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-top:2px;">
+          <label class="compat-chk"><input type="checkbox" id="compat-esync"> <span>Esync</span></label>
+          <label class="compat-chk"><input type="checkbox" id="compat-fsync"> <span>Fsync</span></label>
+          <label class="compat-chk"><input type="checkbox" id="compat-nvapi"> <span>DXVK-NVAPI</span></label>
+          <label class="compat-chk"><input type="checkbox" id="compat-battleye"> <span>BattlEye</span></label>
+          <label class="compat-chk"><input type="checkbox" id="compat-eac"> <span>Easy Anti-Cheat</span></label>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px; color:var(--text_sec);">Notes</label>
+          <textarea id="compat-notes" rows="2" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div id="compat-status" style="font-size:11.5px; color:var(--text_dim); min-height:15px;"></div>
+      <div class="row" style="gap:8px;">
+        <button id="btn-compat-save" class="primary" style="flex:1;">Save</button>
+        <button id="btn-compat-close" style="flex:1;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Manage storage ──────────────────────────────────────────────────────── -->
+  <div id="modal-storage" class="modal-overlay">
+    <div class="modal-box" style="max-width: 640px; width: 640px; max-height: 84vh;">
+      <h3 style="margin:0; color:var(--accent); text-transform:uppercase; letter-spacing:2px;">Manage Storage</h3>
+      <p id="storage-summary" style="font-size:12px; color:var(--text_sec); margin:0;">Measuring installed games…</p>
+      <div id="storage-list" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; padding-right:4px; min-height:60px;"></div>
+      <button id="btn-close-storage" style="margin-top:4px; width:100%;" data-i18n="html.close">Close</button>
     </div>
   </div>
 

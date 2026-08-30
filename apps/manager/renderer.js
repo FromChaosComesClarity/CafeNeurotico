@@ -2166,7 +2166,150 @@ document.getElementById('hidden-games-list')?.addEventListener('click', async (e
 });
 document.getElementById('btn-open-hidden-games')?.addEventListener('click', openHiddenGamesModal);
 // Manage Storage: open GRINDER on installed games sorted by size (GOG/Epic), or Steam's storage settings.
-document.getElementById('btn-storage-grinder')?.addEventListener('click', () => window.api.openGrinderStorage());
+// ── COMPATIBILITY + STORAGE (absorbed from the GRINDER GUI) ──────────────────
+// GRINDER's per-game setup modal and its storage view were the last two reasons
+// to open that window. Both live here now, against the same grinder.db row.
+let _compatGid = null;
+
+function _fmtBytes(n) {
+    if (!n) return '—';
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0, v = n;
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return (v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + u[i];
+}
+
+// Per-game entry point. A game only reaches the compatibility panel if it has a
+// GRINDER row to edit; anything else still falls back to the GRINDER window until
+// the remaining call sites are converted.
+function _openCompatFor(game) {
+    const gid = game?.GrinderGameId || '';
+    if (gid) { openCompatModal(gid, game.Game || ''); return true; }
+    window.api.openGrinder(game?.Game);
+    return false;
+}
+
+async function openCompatModal(grinderGameId, title = '') {
+    _compatGid = grinderGameId;
+    const box = document.getElementById('modal-compat');
+    document.getElementById('compat-game-name').textContent = title ? '— ' + title : '';
+    document.getElementById('compat-status').textContent = '';
+    box.classList.add('active');
+
+    const res = await window.api.grinderCompatGet(grinderGameId);
+    if (!res || !res.ok) {
+        document.getElementById('compat-status').textContent = res?.error || 'Could not read this game\'s settings.';
+        return;
+    }
+    const g = res.game;
+    document.getElementById('compat-subtitle').textContent =
+        [g.store ? g.store.toUpperCase() : '', g.platform || '', g.install_path || ''].filter(Boolean).join('  ·  ');
+
+    // Proton list: the stored value may point at a runtime that is no longer installed,
+    // so it is added as its own option rather than silently resetting to the default.
+    const psel = document.getElementById('compat-proton');
+    psel.innerHTML = '<option value="">Default (whatever GRINDER picks)</option>';
+    const seen = new Set();
+    (res.protons || []).forEach(pv => {
+        const val = pv.path || pv;
+        const name = pv.label || pv.name || val;
+        if (seen.has(val)) return; seen.add(val);
+        psel.insertAdjacentHTML('beforeend', `<option value="${escHtml(val)}">${escHtml(name)}</option>`);
+    });
+    if (g.proton_path && !seen.has(g.proton_path)) {
+        psel.insertAdjacentHTML('beforeend', `<option value="${escHtml(g.proton_path)}">${escHtml(g.proton_path)} (not installed)</option>`);
+    }
+    psel.value = g.proton_path || '';
+
+    // GOG play tasks — keyed by index, because two tasks can share an executable.
+    const trow = document.getElementById('compat-row-target');
+    const tsel = document.getElementById('compat-launch-target');
+    if ((res.tasks || []).length > 1) {
+        tsel.innerHTML = '<option value="">Default executable</option>';
+        res.tasks.forEach(tk => tsel.insertAdjacentHTML('beforeend',
+            `<option value="${escHtml(String(tk.index))}"${tk.isActive ? ' selected' : ''}>${escHtml(tk.name + (tk.isPrimary ? ' (default)' : ''))}</option>`));
+        trow.style.display = 'flex';
+    } else {
+        trow.style.display = 'none';
+    }
+
+    document.getElementById('compat-prefix').value      = g.prefix_path || '';
+    document.getElementById('compat-launch-args').value = g.launch_args || '';
+    document.getElementById('compat-custom-exe').value  = g.custom_exe  || '';
+    document.getElementById('compat-env').value         = g.custom_env  || '';
+    document.getElementById('compat-winetricks').value  = g.winetricks  || '';
+    document.getElementById('compat-notes').value       = g.notes       || '';
+    // esync/fsync default ON for a game that has never been configured; the rest default OFF.
+    document.getElementById('compat-esync').checked    = g.use_esync !== 0;
+    document.getElementById('compat-fsync').checked    = g.use_fsync !== 0;
+    document.getElementById('compat-nvapi').checked    = !!g.use_dxvk_nvapi;
+    document.getElementById('compat-battleye').checked = !!g.use_battleye;
+    document.getElementById('compat-eac').checked      = !!g.use_eac;
+}
+
+document.getElementById('btn-compat-close')?.addEventListener('click', () =>
+    document.getElementById('modal-compat').classList.remove('active'));
+document.getElementById('modal-compat')?.addEventListener('click', e => {
+    if (e.target.id === 'modal-compat') e.currentTarget.classList.remove('active');
+});
+
+document.getElementById('btn-compat-save')?.addEventListener('click', async () => {
+    if (!_compatGid) return;
+    const status = document.getElementById('compat-status');
+    status.textContent = 'Saving…';
+    const patch = {
+        prefix_path:    document.getElementById('compat-prefix').value.trim(),
+        proton_path:    document.getElementById('compat-proton').value,
+        launch_args:    document.getElementById('compat-launch-args').value.trim(),
+        custom_exe:     document.getElementById('compat-custom-exe').value.trim(),
+        custom_env:     document.getElementById('compat-env').value.trim(),
+        winetricks:     document.getElementById('compat-winetricks').value.trim(),
+        notes:          document.getElementById('compat-notes').value,
+        use_esync:      document.getElementById('compat-esync').checked    ? 1 : 0,
+        use_fsync:      document.getElementById('compat-fsync').checked    ? 1 : 0,
+        use_dxvk_nvapi: document.getElementById('compat-nvapi').checked    ? 1 : 0,
+        use_battleye:   document.getElementById('compat-battleye').checked ? 1 : 0,
+        use_eac:        document.getElementById('compat-eac').checked      ? 1 : 0,
+    };
+    const r = await window.api.grinderCompatSet({ grinderGameId: _compatGid, patch });
+    if (!r || !r.ok) { status.textContent = r?.error || 'Could not save.'; return; }
+    // The launch target is not a plain column — the engine rewrites the stored task.
+    const trow = document.getElementById('compat-row-target');
+    if (trow.style.display !== 'none') {
+        await window.api.grinderSetLaunchTarget({
+            grinderGameId: _compatGid,
+            taskIndex: document.getElementById('compat-launch-target').value,
+        });
+    }
+    status.textContent = 'Saved.';
+    setTimeout(() => { document.getElementById('modal-compat').classList.remove('active'); }, 550);
+});
+
+async function openStorageModal() {
+    const box = document.getElementById('modal-storage');
+    const list = document.getElementById('storage-list');
+    const summary = document.getElementById('storage-summary');
+    list.innerHTML = '';
+    summary.textContent = 'Measuring installed games…';
+    box.classList.add('active');
+    const res = await window.api.grinderStorageList();
+    if (!res || !res.ok) { summary.textContent = res?.error || 'Could not read installed games.'; return; }
+    if (!res.games.length) { summary.textContent = 'No installed games found.'; return; }
+    summary.textContent = `${res.games.length} installed game${res.games.length === 1 ? '' : 's'} · ${_fmtBytes(res.total)} on disk`;
+    list.innerHTML = res.games.map(g => `
+        <div class="storage-row">
+            <span class="sr-name" title="${escHtml(g.install_path || '')}">${escHtml(g.title || g.id)}</span>
+            <span class="sr-store">${escHtml(g.store || '')}</span>
+            <span class="sr-size">${_fmtBytes(g.bytes)}</span>
+        </div>`).join('');
+}
+document.getElementById('btn-close-storage')?.addEventListener('click', () =>
+    document.getElementById('modal-storage').classList.remove('active'));
+document.getElementById('modal-storage')?.addEventListener('click', e => {
+    if (e.target.id === 'modal-storage') e.currentTarget.classList.remove('active');
+});
+
+document.getElementById('btn-storage-grinder')?.addEventListener('click', openStorageModal);
 document.getElementById('btn-storage-steam')?.addEventListener('click', () => window.api.openInstallUrl('steam://settings/storage'));
 
 // ── Add to Desktop — per-game launcher via the --game deeplink ────────────────
@@ -5182,7 +5325,7 @@ function openGamepage(game) {
     const gpStore = (game.Store || '').toLowerCase();
     if (gpStore.includes('gog') || gpStore.includes('epic')) {
         grinderBtn.style.display = 'block';
-        grinderBtn.onclick = () => window.api.openGrinder(game.Game);
+        grinderBtn.onclick = () => _openCompatFor(game);
     } else {
         grinderBtn.style.display = 'none';
         grinderBtn.onclick = null;
@@ -6984,7 +7127,7 @@ async function updateGrinderRow(game) {
         statusEl.textContent = '✓ GRINDER — default launcher';
         statusEl.style.color = '#66bb6a';
         openBtn.style.display = '';
-        openBtn.onclick = () => window.api.openGrinder(game.Game);
+        openBtn.onclick = () => _openCompatFor(game);
         return;
     }
 
@@ -6992,7 +7135,7 @@ async function updateGrinderRow(game) {
     const inGrinder = s.installedGames?.includes(grinderGameId);
     // GOG/Epic always launch via GRINDER
     openBtn.style.display = '';
-    openBtn.onclick = () => window.api.openGrinder(game.Game);
+    openBtn.onclick = () => _openCompatFor(game);
     if (game.GrinderGameId || inGrinder) {
         statusEl.textContent = '✓ GRINDER — default launcher';
         statusEl.style.color = '#66bb6a';

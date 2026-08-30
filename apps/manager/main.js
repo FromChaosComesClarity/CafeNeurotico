@@ -531,6 +531,98 @@ function reportLaunchFailure(info) {
 //
 // ⚠️ Merges rather than overwrites: custom_env is the user's, and a game may already carry
 // variables that matter. Only the named one is touched.
+// ── Per-game compatibility, in the Manager ────────────────────────────────────
+// These three handlers are what let GRINDER go headless: everything its per-game
+// setup modal offered is reachable here, against the same grinder.db row.
+//
+// ⚠️ The writable column list is a hard allowlist. The row is keyed by an id the
+// renderer supplies, so accepting arbitrary column names would let a bad payload
+// rewrite `id`, `store` or `installed` and orphan the game from its library entry —
+// the same class of break as the two-grinder.db split.
+const COMPAT_COLUMNS = new Set([
+    'prefix_path', 'proton_path', 'launch_args', 'custom_exe', 'custom_env',
+    'winetricks', 'use_esync', 'use_fsync', 'use_dxvk_nvapi', 'use_battleye',
+    'use_eac', 'notes',
+]);
+
+ipcMain.handle('grinder-compat-get', async (_, grinderGameId) => {
+    if (!ensureGrinderEngine() || !grinderGameId) return { ok: false, error: 'GRINDER data not available.' };
+    try {
+        const row = _grinderEngineDb.prepare(
+            `SELECT id, title, store, app_id, install_path, executable, platform,
+                    prefix_path, proton_path, launch_args, custom_exe, custom_env,
+                    winetricks, use_esync, use_fsync, use_dxvk_nvapi, use_battleye,
+                    use_eac, launch_target, notes
+             FROM games WHERE id=?`).get(grinderGameId);
+        if (!row) return { ok: false, error: 'Game not found in GRINDER data.' };
+        let protons = [];
+        try { protons = grinderEngine.scanProtonVersions() || []; } catch {}
+        // GOG titles can ship several play tasks (Quake's mission packs are all
+        // glquake.exe and differ only by arguments), so they are keyed by index.
+        let tasks = [];
+        if (row.store === 'gog') { try { tasks = grinderEngine.gogPlayTasks(grinderGameId) || []; } catch {} }
+        return { ok: true, game: row, protons, tasks };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('grinder-compat-set', (_, { grinderGameId, patch } = {}) => {
+    if (!ensureGrinderEngine() || !grinderGameId || !patch) return { ok: false, error: 'Nothing to save.' };
+    const cols = Object.keys(patch).filter(k => COMPAT_COLUMNS.has(k));
+    if (!cols.length) return { ok: false, error: 'No writable fields in that change.' };
+    try {
+        _grinderEngineDb.prepare(`UPDATE games SET ${cols.map(c => `${c}=?`).join(', ')} WHERE id=?`)
+            .run(...cols.map(c => patch[c]), grinderGameId);
+        return { ok: true, saved: cols };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// GOG launch target is not a plain column — the engine rewrites the stored task.
+ipcMain.handle('grinder-set-launch-target', (_, { grinderGameId, taskIndex } = {}) => {
+    if (!ensureGrinderEngine() || !grinderGameId) return { ok: false, error: 'GRINDER data not available.' };
+    try {
+        const tasks = grinderEngine.gogPlayTasks(grinderGameId) || [];
+        const t = tasks.find(x => String(x.index) === String(taskIndex));
+        grinderEngine.setGogLaunchTarget(grinderGameId, t ? t.path : '', t ? t.index : null);
+        return { ok: true };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Manage Storage: installed games with their size on disk, biggest first.
+ipcMain.handle('grinder-storage-list', async () => {
+    if (!ensureGrinderEngine()) return { ok: false, error: 'GRINDER data not available.' };
+    try {
+        const rows = _grinderEngineDb.prepare(
+            'SELECT id, title, store, install_path FROM games WHERE installed=1 AND install_path IS NOT NULL').all();
+        const out = [];
+        for (const r of rows) {
+            let bytes = 0;
+            try { bytes = dirSizeBytes(r.install_path); } catch {}
+            out.push({ ...r, bytes });
+        }
+        out.sort((a, b) => b.bytes - a.bytes);
+        return { ok: true, games: out, total: out.reduce((n, g) => n + g.bytes, 0) };
+    } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Walks a tree once, following no symlinks — a game directory can contain a link
+// back into the prefix, and following it would count the same bytes repeatedly.
+function dirSizeBytes(dir) {
+    let total = 0;
+    const stack = [dir];
+    while (stack.length) {
+        const cur = stack.pop();
+        let entries = [];
+        try { entries = fs.readdirSync(cur, { withFileTypes: true }); } catch { continue; }
+        for (const e of entries) {
+            const full = path.join(cur, e.name);
+            if (e.isSymbolicLink()) continue;
+            if (e.isDirectory()) stack.push(full);
+            else { try { total += fs.statSync(full).size; } catch {} }
+        }
+    }
+    return total;
+}
+
 ipcMain.handle('grinder-set-env-var', (_, { grinderGameId, name, value } = {}) => {
     if (!_grinderEngineDb || !grinderGameId || !name) return { ok: false, error: 'Nothing to set.' };
     try {
