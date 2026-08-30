@@ -385,49 +385,9 @@
     #app-container.layout-topnav #icon-rail,
     #app-container.layout-topnav #side-panel,
     #app-container.layout-topnav #sidebar,
-    #app-container.layout-topnav #gallery-search-wrap { display:none !important; }/* Split Pane *//* specificity beats the hide rule above, so split-edit overlay wins */
-    /* ── COMMAND LAYOUT ─────────────────────────────────────────────────────── */
-    #app-container.layout-commander #icon-rail,
-    #app-container.layout-commander #side-panel,
-    #app-container.layout-commander #sidebar,
-    #app-container.layout-commander #topnav,
-    #app-container.layout-commander #gallery-search-wrap { display:none !important; }
-    /* Command bar — floating terminal search */
-    #cmd-bar { position:fixed; left:50%; transform:translateX(-50%); z-index:500; display:none; align-items:center; gap:10px; background:rgba(6,6,6,0.84); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.13); border-radius:10px; padding:11px 20px; min-width:440px; max-width:660px; box-shadow:0 14px 44px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04); cursor:text; }
-    #cmd-bar.cmd-visible { display:flex; }
-    .cmd-prompt { color:var(--accent); font-size:13px; font-weight:bold; white-space:nowrap; user-select:none; letter-spacing:0.3px; flex-shrink:0; font-family:'Fira Code','Courier New',monospace; }
-    #cmd-search-input { background:transparent; border:none; color:#d4d4d4; font-family:'Fira Code','Courier New',monospace; font-size:14px; flex:1; min-width:0; outline:none; box-shadow:none; -webkit-appearance:none; appearance:none; caret-color:var(--accent); letter-spacing:0.3px; }
-    #cmd-search-input:focus { outline:none; box-shadow:none; border:none; }
-    #cmd-search-input::placeholder { color:transparent; }
-    .cmd-cursor { width:9px; height:16px; background:var(--accent); flex-shrink:0; border-radius:1px; animation:cmd-blink 1.1s step-end infinite; }
-    #cmd-bar:focus-within .cmd-cursor { display:none; }
+    #app-container.layout-topnav #gallery-search-wrap { display:none !important; }/* Split Pane *//* specificity beats the hide rule above, so split-edit overlay wins *//* ── COMMAND LAYOUT ─────────────────────────────────────────────────────── *//* Command bar — floating terminal search */
     @keyframes cmd-blink { 0%,100%{opacity:1} 50%{opacity:0} }
-    .cmd-prompt.cmd-error { animation:cmd-err 0.4s ease; }
-    @keyframes cmd-err { 0%{color:var(--accent)} 45%{color:#e05c5c} 100%{color:var(--accent)} }
-    /* Command icon bar — vertical, top-right */
-    #cmd-icon-bar { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:500; display:none; flex-direction:column; align-items:center; gap:1px; background:rgba(6,6,6,0.72); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:6px 4px; box-shadow:0 8px 28px rgba(0,0,0,0.55); }
-    #cmd-icon-bar.cmd-visible { display:flex; }
-    .cmd-icon-btn { background:transparent; border:none; color:var(--text_dim); width:34px; height:34px; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s,color 0.15s; flex-shrink:0; padding:0; }
-    .cmd-icon-btn svg { opacity:0.5; transition:opacity 0.15s; }
-    .cmd-icon-btn:hover { background:rgba(255,255,255,0.07); color:var(--text_main); }
-    .cmd-icon-btn:hover svg { opacity:1; }
-    .cmd-icon-btn.active { background:rgba(255,255,255,0.1); color:var(--accent); }
-    .cmd-icon-btn.active svg { opacity:1; }
-    .cmd-icon-sep { width:18px; height:1px; background:rgba(255,255,255,0.1); margin:3px auto; }
-
-    /* Store filter panel — slides in to the left of the floating icon bar */
-    #cmd-stores-panel { position:fixed; top:50%; right:58px; z-index:501; width:250px; max-height:72vh; display:flex; flex-direction:column;
-        background:rgba(6,6,6,0.86); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-        border:1px solid rgba(255,255,255,0.13); border-radius:12px; overflow:hidden;
-        box-shadow:0 18px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
-        opacity:0; pointer-events:none; transform:translateY(-50%) translateX(calc(100% + 72px));
-        transition:transform 0.34s cubic-bezier(0.22,1,0.36,1), opacity 0.26s ease; }
-    #cmd-stores-panel.open { opacity:1; pointer-events:auto; transform:translateY(-50%) translateX(0); }
-    .csp-head { display:flex; align-items:center; justify-content:space-between; padding:13px 13px 10px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0; }
-    .csp-head span { color:var(--accent); font-size:11px; font-weight:900; letter-spacing:2px; font-family:'Fira Code','Courier New',monospace; }
-    .csp-x { background:transparent; border:none; color:var(--text_dim); cursor:pointer; font-size:12px; padding:3px 6px; border-radius:6px; line-height:1; }
-    .csp-x:hover { color:#fff; background:rgba(255,255,255,0.08); }
-    #csp-list { overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:3px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.2) transparent; }
+    @keyframes cmd-err { 0%{color:var(--accent)} 45%{color:#e05c5c} 100%{color:var(--accent)} }/* Command icon bar — vertical, top-right *//* Store filter panel — slides in to the left of the floating icon bar */
     .csp-row { display:flex; align-items:center; gap:9px; width:100%; background:transparent; border:1px solid transparent; color:#cfcfcf; padding:8px 10px; border-radius:8px; cursor:pointer; font-family:'Fira Code','Courier New',monospace; font-size:12px; text-align:left; transition:background 0.14s, color 0.14s, border-color 0.14s; }
     .csp-row:hover { background:rgba(255,255,255,0.06); color:#fff; }
     .csp-row.active { background:color-mix(in srgb, var(--accent) 17%, transparent); border-color:var(--accent); color:#fff; }
@@ -820,7 +780,7 @@
        (window controls keep their red close; danger buttons keep their red). */
     body.theme-light button:not(.win-btn):not(.cp-rail-danger):hover { background-color: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }/* ── CREMA launch — Ancient-OS faux-desktop launchers (classic/TTY use the titlebar pill) ── *//* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
     
-    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
+    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
         display: none !important;
     }
     button.primary { background-color: var(--accent); color: var(--bg); border: none; }
@@ -1479,55 +1439,8 @@
 
         <!-- ── COMMAND LAYOUT OVERLAYS ─────────────────────────────────────────── -->
         <!-- Floating terminal command bar (command layout, gallery view only) -->
-        <div id="cmd-bar">
-          <span class="cmd-prompt">~/cngm$</span>
-          <input type="text" id="cmd-search-input" autocomplete="off" spellcheck="false">
-          <div class="cmd-cursor" id="cmd-cursor"></div>
-        </div>
         <!-- Floating vertical icon bar (command layout, gallery view only) -->
-        <div id="cmd-icon-bar">
-          <button class="cmd-icon-btn" id="btn-cmd-home" title="All Games — reset filters &amp; playlists">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="5"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-refresh" title="Refresh library">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.56"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-add" title="Add Game">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          </button>
-          <div class="cmd-icon-sep"></div>
-          <button class="cmd-icon-btn" id="btn-cmd-connect" title="Connect services">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-tools" title="Tools &amp; Settings">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-about" title="About CNGM">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          </button>
-          <div class="cmd-icon-sep"></div>
-          <button class="cmd-icon-btn" id="btn-cmd-favs" data-filter="favs" title="Favourites">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-want" data-filter="want" title="Want to Play">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-stores" title="Filter by store">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7l4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>
-          </button>
-          <div class="cmd-icon-sep"></div>
-          <button class="cmd-icon-btn" id="btn-cmd-playlists" title="Playlists">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3" y2="6"/><line x1="3" y1="12" x2="3" y2="12"/><line x1="3" y1="18" x2="3" y2="18"/></svg>
-          </button>
-          <button class="cmd-icon-btn" id="btn-cmd-emulatte" title="Launch EmuLatte" style="display:none;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
-          </button>
-        </div>
         <!-- Store filter panel (command layout, gallery view only) — slides in from the right -->
-        <div id="cmd-stores-panel">
-          <div class="csp-head"><span>STORES</span><button id="btn-csp-close" class="csp-x" title="Close">&#10005;</button></div>
-          <div id="csp-list"></div>
-        </div>
 
         <!-- Gamepage floating back button — lives outside the scrollable view so it's always at the top -->
         <div id="gamepage-back-bar" style="display:none; position:absolute; top:0; left:0; right:0; z-index:10; padding:15px 20px 24px; background:linear-gradient(to bottom, var(--bg) 50%, transparent 100%); pointer-events:none;">

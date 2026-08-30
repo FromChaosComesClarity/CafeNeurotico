@@ -2638,15 +2638,16 @@ function applyCornersStyle() {
 const _RETIRED_LAYOUTS = {
     cp: 'rail',                                    // Navigator, removed earlier
     // TTY family → Commander, the surviving terminal-flavoured layout
-    htop: 'commander', ranger: 'commander', bbs: 'commander', vi: 'commander',
-    adventure: 'commander', mc: 'commander', nethack: 'commander', grub: 'commander',
+    htop: 'rail', ranger: 'rail', bbs: 'rail', vi: 'rail',
+    adventure: 'rail', mc: 'rail', nethack: 'rail', grub: 'rail',
+    split: 'rail', commander: 'rail',
     // Ancient-OS family → Classic Sidebar, the surviving labelled-desktop layout
     mac: 'sidebar', xp: 'sidebar', kde: 'sidebar', c64: 'sidebar',
     amiga: 'sidebar', beos: 'sidebar', w95: 'sidebar', nextstep: 'sidebar',
     // Flat family, retired next — the gallery is the shape they were variations of
     catalog: 'rail', newspaper: 'rail', timeline: 'rail', kanban: 'rail',
 };
-const _LIVE_LAYOUTS = ['rail', 'sidebar', 'topnav', 'split', 'commander'];
+const _LIVE_LAYOUTS = ['rail', 'sidebar', 'topnav'];
 
 function applyLayoutMode(mode) {
     if (_RETIRED_LAYOUTS[mode]) mode = _RETIRED_LAYOUTS[mode];
@@ -2661,15 +2662,6 @@ function applyLayoutMode(mode) {
         b.classList.toggle('active', b.dataset.val === mode));
     localStorage.setItem('cngm_layout_mode', mode);
     window.api.setSetting('layout_mode', mode);
-    if (mode === 'commander') {
-        switchView('view-gallery');
-    } else {
-        const inp = document.getElementById('cmd-search-input');
-        if (inp) { inp.value = ''; applyFilters(); }
-        document.getElementById('cmd-bar')?.classList.remove('cmd-visible');
-        document.getElementById('cmd-icon-bar')?.classList.remove('cmd-visible');
-        closeCmdStores();
-    }
 }
 document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(btn =>
     btn.addEventListener('click', () => applyLayoutMode(btn.dataset.val)));
@@ -3944,12 +3936,6 @@ function syncFilterActiveStates() {
         const f = btn.dataset.filter;
         btn.classList.toggle('active', f === 'all' ? activeFilters.size === 0 : activeFilters.has(f));
     });
-    document.querySelectorAll('#cmd-icon-bar .cmd-icon-btn[data-filter]').forEach(btn => {
-        btn.classList.toggle('active', activeFilters.has(btn.dataset.filter));
-    });
-    document.querySelectorAll('.flat-tb-filter-btn[data-filter]').forEach(btn => {
-        btn.classList.toggle('active', activeFilters.has(btn.dataset.filter));
-    });
     // Keep the search-bar category dropdown in step with the rail/sidebar buttons.
     // (Value assignment goes through the cust-sel shim → label syncs, no change event.)
     const catSel = document.getElementById('gallery-category');
@@ -4001,7 +3987,7 @@ function switchView(viewId) {
     // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
     //    centered panel over the (blurred) current view instead of swapping in full-page.
     const _ac = document.getElementById('app-container');
-    const _classicOverlay = ['layout-rail', 'layout-sidebar', 'layout-topnav', 'layout-commander'].some(c => _ac?.classList.contains(c));
+    const _classicOverlay = ['layout-rail', 'layout-sidebar', 'layout-topnav'].some(c => _ac?.classList.contains(c));
     const _overlayGamepage = viewId === 'view-gamepage' && _classicOverlay;
     // The Edit page (view-details), when reached FROM the floating gamepage, floats in the SAME
     // panel box directly on top — so opening/returning feels seamless, not a full-page swap.
@@ -4057,173 +4043,8 @@ function switchView(viewId) {
         document.getElementById(id)?.classList.toggle('active', viewId === 'view-gallery'));
     ['btn-view-list', 'btn-view-list-sb'].forEach(id =>
         document.getElementById(id)?.classList.toggle('active', viewId === 'view-list'));
-
-    // Command layout: show/hide floating overlays
-    const isCmd = document.getElementById('app-container').classList.contains('layout-commander');
-    const showCmd = isCmd && viewId === 'view-gallery';
-    document.getElementById('cmd-bar')?.classList.toggle('cmd-visible', showCmd);
-    document.getElementById('cmd-icon-bar')?.classList.toggle('cmd-visible', showCmd);
-    if (showCmd) updateCmdBarTop(0); else closeCmdStores();
 }
 
-// ── COMMAND LAYOUT ───────────────────────────────────────────────────────────
-function updateCmdBarTop(scrollTop) {
-    const bar = document.getElementById('cmd-bar');
-    if (!bar) return;
-    const TITLE_H = 35, VIEW_PAD = 20, HERO_H = 350;
-    const barH = bar.offsetHeight || 44;
-    const atRest = TITLE_H + VIEW_PAD + HERO_H / 2 - barH / 2;
-    bar.style.top = Math.max(TITLE_H + 10, atRest - scrollTop) + 'px';
-}
-
-document.getElementById('view-gallery').addEventListener('scroll', function () {
-    if (document.getElementById('app-container').classList.contains('layout-commander')) {
-        updateCmdBarTop(this.scrollTop);
-    }
-});
-
-// ── COMMAND LAYOUT · store filter panel ──────────────────────────────────────
-const CMD_STORE_DEFS = [
-    { key: 'steam',     label: 'Steam' },
-    { key: 'gog',       label: 'GOG' },
-    { key: 'epic',      label: 'Epic' },
-    { key: 'flatpak',   label: 'Flatpak' },
-    { key: 'itch',      label: 'itch.io' },
-    { key: 'emulation', label: 'Emulation' },
-    { key: 'physical',  label: 'Physical' },
-    { key: 'apps',      label: 'Apps' },
-    { key: 'others',    label: 'Others' },
-    { key: 'pico8',     label: 'PICO-8' },
-    { key: 'openbor',   label: 'OpenBOR' },
-];
-function _cmdStoreMatch(key, game) {
-    const s = (game.Store || '').toLowerCase();
-    switch (key) {
-        case 'steam':     return s.includes('steam');
-        case 'epic':      return s.includes('epic');
-        case 'gog':       return s.includes('gog');
-        case 'physical':  return s.includes('physical');
-        case 'flatpak':   return s.includes('flatpak');
-        case 'pico8':     return s.includes('pico-8');
-        case 'itch':      return s.includes('itch') || (game.LaunchCommand || '').startsWith('itch://');
-        case 'apps':      return s.includes('apps');
-        case 'others':    return s.includes('others');
-        case 'openbor':   return s.includes('openbor');
-        case 'emulation': return s.includes('emulation');
-    }
-    return false;
-}
-function renderCmdStores() {
-    const list = document.getElementById('csp-list');
-    if (!list) return;
-    const base = currentPlaylistGames !== null ? currentPlaylistGames : allGames;
-    const storeActive = [...activeFilters].filter(f => STORE_FILTERS.has(f));
-    let html = `<button class="csp-row csp-all${storeActive.length === 0 ? ' active' : ''}" data-csp="__all"><span class="csp-name">All Stores</span><span class="csp-count">${base.length}</span></button>`;
-    for (const def of CMD_STORE_DEFS) {
-        const count = base.reduce((n, g) => n + (_cmdStoreMatch(def.key, g) ? 1 : 0), 0);
-        if (!count) continue;
-        const active = activeFilters.has(def.key);
-        html += `<button class="csp-row${active ? ' active' : ''}" data-csp="${def.key}"><span class="csp-dot"></span><span class="csp-name">${def.label}</span><span class="csp-count">${count}</span></button>`;
-    }
-    list.innerHTML = html;
-}
-function openCmdStores() {
-    renderCmdStores();
-    document.getElementById('cmd-stores-panel')?.classList.add('open');
-    document.getElementById('btn-cmd-stores')?.classList.add('active');
-}
-function closeCmdStores() {
-    document.getElementById('cmd-stores-panel')?.classList.remove('open');
-    document.getElementById('btn-cmd-stores')?.classList.remove('active');
-}
-function toggleCmdStores() {
-    if (document.getElementById('cmd-stores-panel')?.classList.contains('open')) closeCmdStores();
-    else openCmdStores();
-}
-document.getElementById('btn-cmd-stores')?.addEventListener('click', (e) => { e.stopPropagation(); toggleCmdStores(); });
-document.getElementById('btn-csp-close')?.addEventListener('click', closeCmdStores);
-document.getElementById('csp-list')?.addEventListener('click', (e) => {
-    const row = e.target.closest('.csp-row');
-    if (!row) return;
-    if (row.dataset.csp === '__all') {
-        [...activeFilters].filter(f => STORE_FILTERS.has(f)).forEach(f => activeFilters.delete(f));
-        syncFilterActiveStates();
-        applyFilters();
-    } else {
-        activateFilter(row.dataset.csp);
-    }
-    renderCmdStores();
-});
-// Click outside the panel (but not on its toggle button) closes it
-document.addEventListener('click', (e) => {
-    const p = document.getElementById('cmd-stores-panel');
-    if (!p || !p.classList.contains('open')) return;
-    if (p.contains(e.target) || e.target.closest('#btn-cmd-stores')) return;
-    closeCmdStores();
-});
-
-// Command search input wired to applyFilters; cursor hides when input is focused/has text
-(function () {
-    const inp = document.getElementById('cmd-search-input');
-    const cur = document.getElementById('cmd-cursor');
-    if (!inp || !cur) return;
-    let _cmdFilterTimer = null;
-    inp.addEventListener('input', () => {
-        cur.style.display = inp.value ? 'none' : '';
-        clearTimeout(_cmdFilterTimer);
-        _cmdFilterTimer = setTimeout(applyFilters, 120);
-    });
-    inp.addEventListener('focus', () => { cur.style.display = 'none'; });
-    inp.addEventListener('blur',  () => { if (!inp.value) cur.style.display = ''; });
-    document.getElementById('cmd-bar')?.addEventListener('click', () => inp.focus());
-
-    // Enter — try to run as a shell command first, fall back to opening first visible game
-    inp.addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
-        const val = inp.value.trim();
-        if (!val) return;
-        const result = await window.api.runShellCmd(val);
-        if (result.ok) {
-            inp.value = '';
-            cur.style.display = '';
-            applyFilters();
-        } else {
-            // Command not found — flash the prompt red, leave input as search query
-            const prompt = document.querySelector('.cmd-prompt');
-            if (prompt) {
-                prompt.classList.remove('cmd-error');
-                void prompt.offsetWidth; // force reflow to restart animation
-                prompt.classList.add('cmd-error');
-                prompt.addEventListener('animationend', () => prompt.classList.remove('cmd-error'), { once: true });
-            }
-        }
-    });
-})();
-
-// Command icon bar button wiring
-document.getElementById('btn-cmd-home')?.addEventListener('click', () => activateFilter('all'));
-document.getElementById('btn-cmd-favs')?.addEventListener('click', () => activateFilter('favs'));
-document.getElementById('btn-cmd-want')?.addEventListener('click', () => activateFilter('want'));
-
-document.querySelectorAll('.flat-tb-home-btn').forEach(btn =>
-    btn.addEventListener('click', () => activateFilter('all')));
-document.querySelectorAll('.flat-tb-connect-btn').forEach(btn =>
-    btn.addEventListener('click', () => document.getElementById('btn-open-connect')?.click()));
-document.querySelectorAll('.flat-tb-filter-btn').forEach(btn =>
-    btn.addEventListener('click', () => activateFilter(btn.dataset.filter)));
-document.querySelectorAll('.flat-tb-playlists-btn').forEach(btn =>
-    btn.addEventListener('click', () => document.getElementById('modal-playlists-nav')?.classList.add('active')));
-document.getElementById('btn-cmd-refresh')?.addEventListener('click', () => document.getElementById('btn-refresh-library').click());
-document.getElementById('btn-cmd-add')?.addEventListener('click', () => document.getElementById('btn-add-game').click());
-document.getElementById('btn-cmd-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect').click());
-document.getElementById('btn-cmd-tools')?.addEventListener('click', () => document.getElementById('btn-open-tools').click());
-document.getElementById('btn-cmd-about')?.addEventListener('click', () => {
-    (document.getElementById('btn-about') || document.getElementById('btn-about-sb'))?.click();
-});
-document.getElementById('btn-cmd-playlists')?.addEventListener('click', () => {
-    (document.getElementById('btn-topnav-playlists') || document.getElementById('btn-split-playlists'))?.click();
-});
-document.getElementById('btn-cmd-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
 
 // Debounced applyFilters — collapses rapid successive calls (search keystrokes) into one render.
 let _afTimer = null;
@@ -4556,7 +4377,7 @@ function pickRandomVisible() {
 }
 
 function applyFilters() {
-    const query = (document.getElementById('cmd-search-input')?.value || document.getElementById('gallery-search')?.value || document.getElementById('search-bar')?.value || document.getElementById('topnav-search')?.value || document.getElementById('split-search')?.value || '').toLowerCase();
+    const query = (document.getElementById('gallery-search')?.value || document.getElementById('search-bar')?.value || document.getElementById('topnav-search')?.value || document.getElementById('split-search')?.value || '').toLowerCase();
 
     // Playlist mode: filter within the playlist's game set
     const baseGames = currentPlaylistGames !== null ? currentPlaylistGames : allGames;
