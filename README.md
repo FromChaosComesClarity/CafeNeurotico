@@ -4,7 +4,7 @@
 
 ### *your Linux game library, brewed into one app*
 
-![version](https://img.shields.io/badge/version-1.9.3-D4A373?style=flat-square)
+![version](https://img.shields.io/badge/version-1.10.0-D4A373?style=flat-square)
 ![status](https://img.shields.io/badge/status-Experimental-e58a70?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-1d2420?style=flat-square)
 ![platform-mac](https://img.shields.io/badge/platform-macOS%20(Experimental)-e58a70?style=flat-square)
@@ -39,7 +39,7 @@ cafeneurotico@linux:~$ ./brew
 [ ok ] pouring fullscreen interface.... CREMA
 [ ok ] blending into one shot.......... done
 
-▓▓ CAFE NEUROTICO 1.9.3 ▓▓
+▓▓ CAFE NEUROTICO 1.10.0 ▓▓
 > three faces, one binary. served.
 ```
 
