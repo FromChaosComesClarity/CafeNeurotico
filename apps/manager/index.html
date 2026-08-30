@@ -274,14 +274,10 @@
        Classes rather than inline styles so a theme can still override anything. */
     .narrow #topnav-filter-row { flex-wrap: wrap; row-gap: 4px; }
     .narrow .titlebar-brand { display: none; }
-    .narrow #split-left { width: 210px; }
     .very-narrow #icon-rail { width: 40px; }
-    .very-narrow #rail-chrome .crema-cta-text, .very-narrow #rail-chrome .support-cta-text { display: none; }
-    /* Below this the split pane is two columns in a space that barely fits one, so the list
+    .very-narrow #rail-chrome .crema-cta-text, .very-narrow #rail-chrome .support-cta-text { display: none; }/* Below this the split pane is two columns in a space that barely fits one, so the list
        goes and the detail takes the width. The list is still reachable — every other layout
        still lists games, and this only applies to the split view. */
-    .very-narrow #split-left { display: none; }
-    .very-narrow #split-detail { flex: 1 1 100% !important; }
 
     /* ⚠️ overflow-y:auto, NOT hidden. With hidden, a window shorter than the rail's own
        contents clipped the bottom buttons and there was no way to reach them — which is
@@ -389,17 +385,7 @@
     #app-container.layout-topnav #icon-rail,
     #app-container.layout-topnav #side-panel,
     #app-container.layout-topnav #sidebar,
-    #app-container.layout-topnav #gallery-search-wrap { display:none !important; }
-    /* Split Pane */
-    #split-shell { display:none; flex:1; overflow:hidden; }
-    #app-container.layout-split #split-shell { display:flex !important; }
-    #app-container.layout-split #icon-rail,
-    #app-container.layout-split #side-panel,
-    #app-container.layout-split #sidebar,
-    #app-container.layout-split #gallery-search-wrap,
-    #app-container.layout-split #main-content { display:none !important; }
-    /* specificity beats the hide rule above, so split-edit overlay wins */
-    #app-container.layout-split #main-content.split-edit { display:flex !important; position:fixed; top:35px; left:0; right:0; bottom:0; z-index:9998; background:var(--bg); }
+    #app-container.layout-topnav #gallery-search-wrap { display:none !important; }/* Split Pane *//* specificity beats the hide rule above, so split-edit overlay wins */
     /* ── COMMAND LAYOUT ─────────────────────────────────────────────────────── */
     #app-container.layout-commander #icon-rail,
     #app-container.layout-commander #side-panel,
@@ -765,24 +751,13 @@
     .sr-card-label { position:absolute; bottom:0; left:0; right:0; padding:8px 7px 6px; background:linear-gradient(transparent, rgba(0,0,0,0.9)); opacity:0; transition:opacity 0.14s; }
     .sr-card:hover .sr-card-label { opacity:1; }
     .sr-card-name { font-size:9px; font-weight:900; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
-    .sr-empty { padding:60px 18px; text-align:center; font-size:9px; color:var(--text_dim); letter-spacing:2px; text-transform:uppercase; }
-
-    /* Left list panel */
-    #split-left { width:280px; flex-shrink:0; display:flex; flex-direction:column; border-right:1px solid var(--border_solid); background:var(--bg_menu); overflow:hidden; }
-    #split-left-header { padding:10px 10px 8px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
-    #split-search-row { display:flex; gap:6px; align-items:center; }
-    #split-search-wrap { position:relative; flex:1; min-width:0; display:flex; align-items:center; }
+    .sr-empty { padding:60px 18px; text-align:center; font-size:9px; color:var(--text_dim); letter-spacing:2px; text-transform:uppercase; }/* Left list panel */
     #split-search { background:rgba(0,0,0,0.3); border:1px solid var(--border_solid); color:var(--text_main); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:12px; padding:6px 28px 6px 10px; border-radius:6px; width:100%; box-sizing:border-box; }
     #split-search:focus { outline:none; border-color:var(--accent); }
     #split-search::placeholder { color:var(--text_dim); font-style:italic; font-weight:400; }
-    #btn-split-filter-cfg { background:color-mix(in srgb,var(--accent) 10%,transparent); border:1px solid color-mix(in srgb,var(--accent) 35%,transparent); color:var(--accent); font-family:var(--ui-font,'Raleway'),sans-serif; padding:0; width:30px; height:30px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
-    #btn-split-filter-cfg:hover { background:color-mix(in srgb,var(--accent) 22%,transparent); border-color:var(--accent); box-shadow:0 0 10px color-mix(in srgb,var(--accent) 35%,transparent); transform:scale(1.06); }
-    #split-filter-strip { display:flex; flex-wrap:wrap; gap:3px; justify-content:center; }
     .split-ftab { background:transparent; border:none; color:var(--text_dim); font-family:var(--ui-font,'Raleway'),sans-serif; font-weight:700; font-size:9px; padding:3px 8px; border-radius:3px; cursor:pointer; letter-spacing:0.8px; text-transform:uppercase; transition:0.12s; white-space:nowrap; }
     .split-ftab:hover { background:rgba(255,255,255,0.07); color:var(--text_main); transform:none; box-shadow:none; }
     .split-ftab.active { background:var(--accent); color:var(--bg); font-weight:900; }
-    #split-list-count { font-size:9px; font-weight:900; color:var(--text_dim); letter-spacing:1.5px; text-transform:uppercase; padding:6px 14px 3px; flex-shrink:0; }
-    #split-list-body { flex:1; overflow-y:auto; }
     .split-row { position: relative; display:flex; align-items:center; gap:8px; padding:8px 14px; cursor:pointer; border-left:3px solid transparent; transition:background 0.1s, border-color 0.1s; }
     .split-row:hover { background:rgba(255,255,255,0.04); }
     .split-row.selected { background:rgba(255,255,255,0.06); border-left-color:var(--accent); }
@@ -798,71 +773,21 @@
     .btn-split-row-fav.active svg, .btn-split-row-want.active svg { fill:currentColor; }
     .split-inst-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
     .split-inst-dot.on { background:#66bb6a; }
-    .split-inst-dot.off { background:transparent; }
-    /* Left footer nav — 2-row 3-col grid */
-    #split-left-footer { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; padding:6px; border-top:1px solid var(--border); flex-shrink:0; background:var(--bg_menu); }
+    .split-inst-dot.off { background:transparent; }/* Left footer nav — 2-row 3-col grid */
     .split-nav-btn { background:transparent; border:none; color:var(--text_dim); font-family:var(--ui-font,'Raleway'),sans-serif; font-size:8px; font-weight:900; letter-spacing:0.8px; text-transform:uppercase; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 4px; border-radius:6px; transition:0.15s; }
     .split-nav-btn svg { opacity:0.55; }
     .split-nav-btn:hover { background:rgba(255,255,255,0.06); color:var(--text_main); }
     .split-nav-btn:hover svg { opacity:1; }
     .split-nav-btn.active { color:var(--accent); }
-    .split-nav-btn.active svg { opacity:1; stroke:var(--accent); }
-    /* Search clear button */
-    #btn-split-search-clear { position:absolute; right:6px; background:transparent; border:none; color:var(--text_dim); font-size:13px; line-height:1; padding:2px; cursor:pointer; transition:0.12s; display:none; }
-    #btn-split-search-clear:hover { color:var(--text_main); }
-    /* Right detail panel */
-    #split-right { flex:1; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; background:var(--bg); min-width:0; }
-    /* Welcome screen */
-    #split-welcome { flex:1; display:none; align-items:center; justify-content:center; }
-    .split-welcome-inner { display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; padding:40px; }
-    .split-welcome-mono { font-size:108px; font-weight:900; line-height:1; letter-spacing:-6px; color:var(--accent); text-shadow:0 0 120px color-mix(in srgb,var(--accent) 40%,transparent); }
+    .split-nav-btn.active svg { opacity:1; stroke:var(--accent); }/* Search clear button *//* Right detail panel *//* Welcome screen */
     #split-cover-zoom { position:fixed; inset:0; z-index:25000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.88); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); cursor:zoom-out; }
     #split-cover-zoom.active { display:flex; }
     #split-cover-zoom img { max-height:88vh; max-width:65vw; object-fit:contain; border-radius:14px; box-shadow:0 40px 100px rgba(0,0,0,0.95); animation:coverZoomIn 0.3s cubic-bezier(0.34,1.4,0.64,1); }
-    @keyframes coverZoomIn { from { transform:scale(0.65); opacity:0; } to { transform:scale(1); opacity:1; } }
-    .split-welcome-title { font-size:21px; font-weight:900; color:var(--text_main); letter-spacing:7px; text-transform:uppercase; margin-top:8px; }
-    .split-welcome-sub { font-size:14px; font-weight:900; color:var(--text_dim); letter-spacing:6px; text-transform:uppercase; }
-    .split-welcome-hint { font-size:15px; color:var(--text_dim); letter-spacing:1.5px; margin-top:24px; opacity:0.45; font-style:italic; }
-    #split-empty { flex:1; display:flex; align-items:center; justify-content:center; color:var(--text_dim); font-size:10px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
-    #split-detail { display:none; flex-direction:column; }
-    #split-hero-wrap { position:relative; height:290px; flex-shrink:0; overflow:hidden; background:var(--bg_menu); }
-    #split-hero-bg { position:absolute; inset:0; background-size:cover; background-position:center 30%; opacity:0.7; filter:blur(28px); transform:scale(1.15); }
-    #split-hero-img { position:absolute; inset:0; background-size:cover; background-position:center 30%; opacity:0.55; }
-    #split-hero-grad { position:absolute; inset:0; background:linear-gradient(to top, var(--bg) 0%, transparent 60%); }
-    #split-hero-logo { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); max-height:190px; max-width:78%; object-fit:contain; z-index:5; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.95)); }
-    #split-title-row { display:flex; align-items:center; gap:10px; }
-    #split-game-title { flex:1; min-width:0; }
-    #split-title-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; }
-    .split-action-btn { width:24px; height:24px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:50%; color:var(--text_dim); cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; padding:0; }
-    .split-action-btn:hover { background:rgba(255,255,255,0.14); color:var(--text_main); border-color:rgba(255,255,255,0.25); transform:scale(1.1); }
-    .split-action-btn.active { background:var(--accent); color:var(--bg); border-color:var(--accent); box-shadow:0 0 8px color-mix(in srgb,var(--accent) 60%,transparent); }
-    #split-card-body { padding:0 28px 20px; display:flex; gap:22px; align-items:flex-start; }
-    /* Cover column: image + action buttons stacked below */
-    #split-cover-wrap { flex-shrink:0; margin-top:-60px; position:relative; z-index:2; display:flex; flex-direction:column; gap:6px; width:110px; }
-    #split-cover-img { width:110px; height:165px; object-fit:cover; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.8); border:2px solid rgba(255,255,255,0.1); display:block; }
-    #split-cover-ph { width:110px; height:165px; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.8); border:2px solid rgba(255,255,255,0.1); background:var(--bg_panel); display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--text_dim); text-align:center; padding:10px; font-weight:700; box-sizing:border-box; line-height:1.5; }
-    /* Info column: year/title/meta/play */
-    #split-info { flex:1; min-width:0; padding-top:16px; display:flex; flex-direction:column; gap:8px; }
-    #split-game-year { font-size:11px; font-weight:700; color:var(--accent); letter-spacing:2px; opacity:0.85; }
-    #split-game-title { font-size:22px; font-weight:900; color:var(--text_main); line-height:1.15; }
-    #split-game-meta { font-size:10px; font-weight:700; color:var(--text_dim); letter-spacing:1px; text-transform:uppercase; line-height:1.8; display:flex; flex-wrap:wrap; gap:4px 8px; }
-    .split-meta-chip { background:rgba(255,255,255,0.06); border:1px solid var(--border); padding:2px 8px; border-radius:12px; font-size:9px; font-weight:900; letter-spacing:0.8px; white-space:nowrap; }
-    /* PLAY: floating action button pinned to bottom-right of the detail panel */
-    #btn-split-play { font-size:18px; padding:14px 36px; border-radius:50px; letter-spacing:2px; box-shadow:0 8px 28px rgba(0,0,0,0.7); display:none; position:fixed; bottom:28px; right:28px; z-index:50; }
-    /* Detail body below card */
-    #split-detail-lower { padding:0 28px 40px; display:flex; flex-direction:column; gap:20px; }
-    #split-short-desc { font-size:14px; font-weight:900; color:var(--text_main); line-height:1.7; }
-    #split-game-desc { font-size:13px; color:var(--text_sec); line-height:1.85; }
-    #split-game-desc * { max-width:100% !important; box-sizing:border-box; }
-    #split-ach-container { display:flex; flex-direction:column; gap:10px; }
-    #split-stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    @keyframes coverZoomIn { from { transform:scale(0.65); opacity:0; } to { transform:scale(1); opacity:1; } }/* Cover column: image + action buttons stacked below *//* Info column: year/title/meta/play */
+    .split-meta-chip { background:rgba(255,255,255,0.06); border:1px solid var(--border); padding:2px 8px; border-radius:12px; font-size:9px; font-weight:900; letter-spacing:0.8px; white-space:nowrap; }/* PLAY: floating action button pinned to bottom-right of the detail panel *//* Detail body below card */
     .split-stat-cell { background:var(--bg_menu); padding:10px 14px; display:flex; flex-direction:column; gap:3px; }
     .split-stat-label { font-size:8px; font-weight:900; color:var(--text_dim); letter-spacing:1.5px; text-transform:uppercase; }
     .split-stat-value { font-size:12px; font-weight:700; color:var(--text_sec); }
-    #split-screenshots-row { display:flex; gap:8px; overflow-x:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; padding-bottom:4px; }
-    #split-screenshots-row::-webkit-scrollbar { height:4px; }
-    #split-screenshots-row::-webkit-scrollbar-track { background:transparent; }
-    #split-screenshots-row::-webkit-scrollbar-thumb { background:var(--border_solid); border-radius:2px; }
     .split-ss-thumb { height:80px; border-radius:6px; object-fit:cover; cursor:pointer; border:2px solid transparent; flex-shrink:0; transition:0.15s; opacity:0.7; }
     .split-ss-thumb:hover { opacity:1; border-color:var(--accent); transform:none; box-shadow:none; }
     /* Top Nav: filter row wrapper (filters + cfg button) */
@@ -895,7 +820,7 @@
        (window controls keep their red close; danger buttons keep their red). */
     body.theme-light button:not(.win-btn):not(.cp-rail-danger):hover { background-color: var(--accent) !important; color: var(--bg) !important; border-color: var(--accent) !important; }/* ── CREMA launch — Ancient-OS faux-desktop launchers (classic/TTY use the titlebar pill) ── *//* ── Connect button retired everywhere — Connections now lives in the Control Panel ── */
     
-    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, #btn-split-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
+    #btn-topnav-connect, #btn-open-connect-sb, #btn-open-connect, #btn-cmd-connect, [data-htop-f="connect"], [data-ranger-f="connect"], [data-bbs-f="connect"], [data-vi-f="connect"], [data-adv-f="connect"], [data-mc-f="connect"], [data-nethack-f="connect"], [data-grub-f="connect"] {
         display: none !important;
     }
     button.primary { background-color: var(--accent); color: var(--bg); border: none; }
@@ -2256,128 +2181,6 @@
 
       </div>
     <!-- ── SPLIT PANE (layout-split only) ──────────────────────────────── -->
-    <div id="split-shell">
-      <!-- Left: scrollable game list -->
-      <div id="split-left">
-        <div id="split-left-header">
-          <div id="split-search-row">
-            <div id="split-search-wrap">
-              <input type="text" id="split-search" placeholder="Search…" autocomplete="off" spellcheck="false">
-              <button id="btn-split-search-clear" title="Clear">✕</button>
-            </div>
-            <button id="btn-split-filter-cfg" title="Configure visible filters">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><circle cx="12" cy="4" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="20" r="2"/></svg>
-            </button>
-          </div>
-          <div id="split-filter-strip">
-            <button class="split-ftab active" data-filter="all">All</button>
-            <button class="split-ftab" data-filter="installed">Installed</button>
-            <button class="split-ftab" data-filter="favs">Favs</button>
-            <button class="split-ftab" data-filter="want">Want</button>
-            <button class="split-ftab" data-filter="steam">Steam</button>
-            <button class="split-ftab" data-filter="epic">Epic</button>
-            <button class="split-ftab" data-filter="gog">GOG</button>
-            <button class="split-ftab" data-filter="flatpak">Flatpak</button>
-            <button class="split-ftab" data-filter="pico8">PICO-8</button>
-            <button class="split-ftab" data-filter="itch">itch.io</button>
-            <button class="split-ftab" data-filter="physical">Physical</button>
-            <button class="split-ftab" data-filter="others">Others</button>
-            <button class="split-ftab" data-filter="openbor">OpenBOR</button>
-            <button class="split-ftab" data-filter="emulation">Emulation</button>
-            <button class="split-ftab" data-filter="apps">Apps</button>
-          </div>
-        </div>
-        <div id="split-list-count"></div>
-        <div id="split-list-body"></div>
-        <div id="split-left-footer">
-          <button class="split-nav-btn" id="btn-split-refresh" title="Refresh library">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.56"/></svg>
-            Refresh
-          </button>
-          <button class="split-nav-btn" id="btn-split-connect" title="Connect &amp; Sync">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Connect
-          </button>
-          <button class="split-nav-btn" id="btn-split-tools" title="Tools &amp; Settings">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            Tools
-          </button>
-          <button class="split-nav-btn" id="btn-split-history" title="Recent plays">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            History
-          </button>
-          <button class="split-nav-btn" id="btn-split-playlists" title="Playlists">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            Playlists
-          </button>
-          <button class="split-nav-btn" id="btn-split-emulatte" title="Launch EmuLatte" style="display:none;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M8 8v4"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="14" r="1" fill="currentColor"/></svg>
-            EmuLatte
-          </button>
-        </div>
-      </div>
-      <!-- Right: persistent detail card -->
-      <div id="split-right">
-        <div id="split-empty">← Select a game</div>
-        <div id="split-welcome">
-          <div class="split-welcome-inner">
-            <div class="split-welcome-mono">CNGM</div>
-            <div class="split-welcome-title">CAFE NEUROTICO</div>
-            <div class="split-welcome-sub">GAME MANAGER</div>
-            <div class="split-welcome-hint">← Select a game to explore</div>
-          </div>
-        </div>
-        <div id="split-detail">
-          <div id="split-hero-wrap">
-            <div id="split-hero-bg"></div>
-            <div id="split-hero-img"></div>
-            <div id="split-hero-grad"></div>
-            <img id="split-hero-logo" alt="">
-          </div>
-          <div id="split-card-body">
-            <div id="split-cover-wrap">
-              <img id="split-cover-img" src="" alt="">
-              <div id="split-cover-ph" style="display:none;"></div>
-            </div>
-            <div id="split-info">
-              <div id="split-game-year"></div>
-              <div id="split-title-row">
-                <div id="split-game-title"></div>
-                <div id="split-title-actions">
-                  <button id="btn-split-trailer" class="split-action-btn" title="Watch Trailer">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                  </button>
-                  <button id="btn-split-fav" class="split-action-btn" title="Favourite">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  </button>
-                  <button id="btn-split-want" class="split-action-btn" title="Want to Play">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                  <button id="btn-split-playlist-add" class="split-action-btn" title="Add to Playlist">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="13" y2="18"/><line x1="18" y1="17" x2="18" y2="23"/><line x1="15" y1="20" x2="21" y2="20"/></svg>
-                  </button>
-                  <button id="btn-split-remove-playlist" class="split-action-btn" title="Remove from Playlist" style="display:none; border-color:rgba(239,83,80,0.5); color:#ef5350;">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="11" y2="18"/><line x1="15" y1="16" x2="21" y2="22"/><line x1="21" y1="16" x2="15" y2="22"/></svg>
-                  </button>
-                  <button id="btn-split-edit" class="split-action-btn" title="Edit Details">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div id="split-game-meta"></div>
-            </div>
-          </div>
-          <button id="btn-split-play" class="primary">▶ PLAY</button>
-          <div id="split-detail-lower">
-            <div id="split-short-desc"></div>
-            <div id="split-screenshots-row"></div>
-            <div id="split-stats-grid"></div>
-            <div id="split-ach-container"></div>
-            <div id="split-game-desc"></div>
-          </div>
-        </div>
-      </div>
-    </div>
     <!-- ── END SPLIT PANE ────────────────────────────────────────────── -->
 
     <!-- ── CATALOG ───────────────────────────────────────────────────────── -->

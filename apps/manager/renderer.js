@@ -1018,8 +1018,6 @@ async function refreshAfterInstall(gameId) {
     try { await syncGrinderInstalled(); } catch {}   // where a GRINDER title's LaunchCommand comes from
     await loadGames();
 
-    // The split pane re-renders itself through loadGames() → applyFilters → renderSplitList,
-    // and FLATGAMEPAGE has no play button, so the classic gamepage is the one left to update.
     const onGamepage = document.getElementById('view-gamepage')?.classList.contains('active');
     if (onGamepage && currentGameId && String(currentGameId) === String(gameId)) {
         const updated = allGames.find(g => String(g.id) === String(currentGameId));
@@ -1555,7 +1553,6 @@ window.addEventListener('focus', () => {
             const updated = allGames.find(g => g.id === currentGameId);
             if (updated) refreshGamepagePlayBtn(updated);
         }
-        // Split pane: loadGames() already re-renders via applyFilters → renderSplitList → selectSplitRow
     }, 400);
 });
 let currentLaunchCmd = '';
@@ -2673,7 +2670,6 @@ function applyLayoutMode(mode) {
         document.getElementById('cmd-icon-bar')?.classList.remove('cmd-visible');
         closeCmdStores();
     }
-    document.getElementById('main-content')?.classList.remove('split-edit');
 }
 document.querySelectorAll('#layout-segmented-control .lsc-layout').forEach(btn =>
     btn.addEventListener('click', () => applyLayoutMode(btn.dataset.val)));
@@ -4004,8 +4000,6 @@ function switchView(viewId) {
     setTimeout(() => { try { placeHeroPills(); } catch {} }, 0);
     // ── Floating-overlay gamepage: in the classic layouts, view-gamepage floats as a
     //    centered panel over the (blurred) current view instead of swapping in full-page.
-    //    Split-pane (layout-split) keeps its split-edit behavior; flat/themed layouts use
-    //    their own game pages, so they never reach this and are untouched.
     const _ac = document.getElementById('app-container');
     const _classicOverlay = ['layout-rail', 'layout-sidebar', 'layout-topnav', 'layout-commander'].some(c => _ac?.classList.contains(c));
     const _overlayGamepage = viewId === 'view-gamepage' && _classicOverlay;
@@ -4678,8 +4672,6 @@ function applyFilters() {
 
     renderTable(recentGames, regularGames);
     renderGallery(recentGames, regularGames);
-    if (_splitHistoryMode) { showSplitHistory(); return; }
-    renderSplitList(filtered);
 }
 
 function renderTable(recent, regular) {
@@ -4735,373 +4727,7 @@ function renderTable(recent, regular) {
 
 }
 
-// ── SPLIT PANE ────────────────────────────────────────────────────────────────
-let _splitGames = [], _splitIdx = -1, _splitGame = null, _splitEditActive = false, _splitHistoryMode = false;
 
-function showSplitHistory() {
-    _splitHistoryMode = true;
-    document.getElementById('btn-split-history')?.classList.add('active');
-    document.querySelectorAll('.split-ftab').forEach(b => b.classList.remove('active'));
-    const prevId = _splitGame?.id;
-    const played = allGames
-        .filter(g => g.LastPlayed && g.LastPlayed > 0)
-        .sort((a, b) => b.LastPlayed - a.LastPlayed);
-    _splitIdx = prevId != null ? played.findIndex(g => g.id === prevId) : -1;
-    renderSplitList(played);
-}
-
-function renderSplitList(games) {
-    if (!document.getElementById('app-container')?.classList.contains('layout-split')) return;
-    _splitGames = games;
-    const body = document.getElementById('split-list-body');
-    const count = document.getElementById('split-list-count');
-    if (!body) return;
-    body.innerHTML = '';
-    count.textContent = games.length + ' game' + (games.length !== 1 ? 's' : '');
-
-    const storeLabel = s => {
-        if (!s) return 'OTHER';
-        const sl = s.toLowerCase();
-        if (sl.includes('steam')) return 'STEAM';
-        if (sl.includes('gog')) return 'GOG';
-        if (sl.includes('epic')) return 'EPIC';
-        if (sl.includes('flatpak')) return 'FLATPAK';
-        if (sl.includes('pico')) return 'PICO-8';
-        if (sl.includes('itch')) return 'ITCH';
-        if (sl.includes('emul')) return 'EMU';
-        if (sl.includes('physical')) return 'PHYSICAL';
-        return s.toUpperCase().slice(0, 8);
-    };
-
-    const _srStarSvg = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-    const _srBkSvg  = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
-    const _srPlSvg  = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><line x1="19" y1="3" x2="19" y2="9"/><line x1="22" y1="6" x2="16" y2="6"/></svg>`;
-
-    games.forEach((game, idx) => {
-        const isInstalled = isGameInstalled(game);
-        const isFav  = game.FAV === 'YES';
-        const isWant = game.WANT_TO_PLAY === 'YES';
-        const row = document.createElement('div');
-        row.className = 'split-row' + (idx === _splitIdx ? ' selected' : '');
-        row.dataset.idx = idx;
-        row.innerHTML = `
-            <span class="split-inst-dot ${isInstalled ? 'on' : 'off'}"></span>
-            <span class="split-row-title">${game.Game}</span>
-            <span class="split-store-tag">${storeLabel(game.Store)}</span>
-            <div class="split-row-actions">
-                <button class="btn-split-row-fav${isFav ? ' active' : ''}" title="Favourite">${_srStarSvg}</button>
-                <button class="btn-split-row-want${isWant ? ' active' : ''}" title="Want to play">${_srBkSvg}</button>
-                <button class="btn-split-row-playlist" title="Add to Playlist">${_srPlSvg}</button>
-            </div>`;
-        row.addEventListener('click', (e) => {
-            if (e.target.closest('.split-row-actions')) return;
-            selectSplitRow(idx);
-        });
-        const actions = row.querySelector('.split-row-actions');
-        actions.querySelector('.btn-split-row-fav').addEventListener('click', (e) => {
-            e.stopPropagation();
-            game.FAV = game.FAV === 'YES' ? 'NO' : 'YES';
-            const btn = e.currentTarget;
-            btn.classList.toggle('active', game.FAV === 'YES');
-            window.api.setGameFlag(String(game.id), 'FAV', game.FAV);
-        });
-        actions.querySelector('.btn-split-row-want').addEventListener('click', (e) => {
-            e.stopPropagation();
-            game.WANT_TO_PLAY = game.WANT_TO_PLAY === 'YES' ? 'NO' : 'YES';
-            const btn = e.currentTarget;
-            btn.classList.toggle('active', game.WANT_TO_PLAY === 'YES');
-            window.api.setGameFlag(String(game.id), 'WANT_TO_PLAY', game.WANT_TO_PLAY);
-        });
-        actions.querySelector('.btn-split-row-playlist').addEventListener('click', (e) => {
-            e.stopPropagation();
-            openPlaylistPickerForGame(game);
-        });
-        body.appendChild(row);
-    });
-
-    if (_splitIdx >= 0 && _splitIdx < games.length) {
-        selectSplitRow(_splitIdx, true);
-    } else {
-        _splitIdx = -1;
-        _splitGame = null;
-        showSplitRightPanel('welcome');
-    }
-}
-
-function selectSplitRow(idx, skipScroll = false) {
-    _splitIdx = idx;
-    _splitGame = _splitGames[idx] || null;
-    document.querySelectorAll('#split-list-body .split-row').forEach((el, i) => {
-        el.classList.toggle('selected', i === idx);
-    });
-    if (!skipScroll) {
-        const el = document.querySelector(`#split-list-body .split-row[data-idx="${idx}"]`);
-        el?.scrollIntoView({ block: 'nearest' });
-    }
-    if (_splitGame) renderSplitDetail(_splitGame);
-}
-
-function showSplitRightPanel(which) {
-    document.getElementById('split-empty').style.display   = which === 'empty'   ? 'flex' : 'none';
-    document.getElementById('split-welcome').style.display = which === 'welcome' ? 'flex' : 'none';
-    document.getElementById('split-detail').style.display  = which === 'detail'  ? 'flex' : 'none';
-}
-
-function renderSplitDetail(game) {
-    const detail = document.getElementById('split-detail');
-    if (!detail) return;
-    showSplitRightPanel('detail');
-
-    // Keep currentGameId in sync (needed for achievement modal + trailer search)
-    currentGameId = game.id;
-
-    // Hero: blurred bg + sharp image layer
-    const heroSrc = game.HeroArt ? getSafePath(game.HeroArt)
-                  : (game.Screenshot ? getSafePath(game.Screenshot.split('|')[0]) : '')
-                  || (game.CoverArt ? getSafePath(game.CoverArt) : '');
-    const heroUrl = heroSrc ? `url('${heroSrc}')` : 'none';
-    document.getElementById('split-hero-bg').style.backgroundImage = heroUrl;
-    document.getElementById('split-hero-img').style.backgroundImage = heroUrl;
-
-    // Logo in hero (bottom-center, above the card body)
-    const logoEl = document.getElementById('split-hero-logo');
-    if (game.Logo && game.Logo.trim()) {
-        logoEl.src = getSafePath(game.Logo);
-        logoEl.style.display = 'block';
-    } else {
-        logoEl.style.display = 'none';
-    }
-
-    // Cover art
-    const coverImg = document.getElementById('split-cover-img');
-    const coverPh  = document.getElementById('split-cover-ph');
-    if (game.CoverArt && game.CoverArt.trim()) {
-        coverImg.src = getSafePath(game.CoverArt);
-        coverImg.style.display = 'block';
-        coverImg.style.cursor = 'zoom-in';
-        coverPh.style.display = 'none';
-    } else {
-        coverImg.style.display = 'none';
-        coverImg.style.cursor = '';
-        coverPh.style.display = 'flex';
-        coverPh.textContent = game.Game;
-    }
-
-    // Year, Title, Meta chips
-    document.getElementById('split-game-year').textContent = game.RELEASED || '';
-    document.getElementById('split-game-title').textContent = game.Game || '';
-
-    const metaEl = document.getElementById('split-game-meta');
-    const chips = [];
-    if (primaryGenreLabel(game)) chips.push(primaryGenreLabel(game));
-    if (game.DEV || game.DEVELOPER) chips.push(game.DEV || game.DEVELOPER);
-    if (game.Store) chips.push(game.Store.toUpperCase().replace(/,/g, ' · '));
-    metaEl.innerHTML = chips.map(c => `<span class="split-meta-chip">${c}</span>`).join('');
-
-    // Play / Install button
-    const playBtn = document.getElementById('btn-split-play');
-    const isInstalled = isGameInstalled(game);
-    if (isInstalled) {
-        playBtn.textContent = '▶ PLAY';
-        playBtn.className = 'primary';
-        playBtn.style.display = 'inline-flex';
-        playBtn.onclick = () => verifyAndLaunch(game.id, game.LaunchCommand);
-    } else {
-        const installCmd = getInstallCommand(game);
-        if (_isGrinderGame(game)) {
-            playBtn.textContent = 'INSTALL';
-            playBtn.className = 'btn-install-primary';
-            playBtn.style.display = 'inline-flex';
-            playBtn.onclick = () => handleInstall(game);
-        } else if (installCmd) {
-            playBtn.textContent = 'INSTALL';
-            playBtn.className = 'btn-install-primary';
-            playBtn.style.display = 'inline-flex';
-            playBtn.onclick = () => handleInstall(game);
-        } else if (isManualCategory(game)) {
-            playBtn.textContent = 'INSTALL';
-            playBtn.className = 'btn-install-primary';
-            playBtn.style.display = 'inline-flex';
-            playBtn.onclick = () => openAddCmdDialog(game.id, game.Game);
-        } else {
-            playBtn.style.display = 'none';
-            playBtn.onclick = null;
-        }
-    }
-
-    // Trailer button — always visible; plays local trailer or opens download flow
-    const trailerBtn = document.getElementById('btn-split-trailer');
-    trailerBtn.onclick = () => {
-        document.getElementById('edit-name').value = game.Game;
-        document.getElementById('btn-watch-trailer').click();
-    };
-
-    // Fav/Want toggles
-    const favBtn = document.getElementById('btn-split-fav');
-    favBtn.classList.toggle('active', game.FAV === 'YES');
-    favBtn.onclick = async () => {
-        game.FAV = game.FAV === 'YES' ? 'NO' : 'YES';
-        favBtn.classList.toggle('active', game.FAV === 'YES');
-        window.api.setGameFlag(String(game.id), 'FAV', game.FAV);
-    };
-
-    const wantBtn = document.getElementById('btn-split-want');
-    wantBtn.classList.toggle('active', game.WANT_TO_PLAY === 'YES');
-    wantBtn.onclick = async () => {
-        game.WANT_TO_PLAY = game.WANT_TO_PLAY === 'YES' ? 'NO' : 'YES';
-        wantBtn.classList.toggle('active', game.WANT_TO_PLAY === 'YES');
-        window.api.setGameFlag(String(game.id), 'WANT_TO_PLAY', game.WANT_TO_PLAY);
-    };
-
-    // Edit button — opens view-details as overlay on top of split pane
-    document.getElementById('btn-split-edit').onclick = () => {
-        _splitEditActive = true;
-        const mc = document.getElementById('main-content');
-        mc.classList.add('split-edit');
-        openDetails(game);
-    };
-
-    // Playlist add button — reuses the existing add-to-playlist modal
-    const splitPlaylistAddBtn = document.getElementById('btn-split-playlist-add');
-    splitPlaylistAddBtn.onclick = () => openPlaylistPickerForGame(game);
-
-    // Playlist remove button — visible if the game is in any playlist
-    const splitRemovePlaylistBtn = document.getElementById('btn-split-remove-playlist');
-    splitRemovePlaylistBtn.style.display = 'none';
-    splitRemovePlaylistBtn.onclick = null;
-    window.api.getGamePlaylists(game.id).then(ids => {
-        if (ids.length > 0) {
-            splitRemovePlaylistBtn.style.display = 'flex';
-            splitRemovePlaylistBtn.onclick = () => openRemoveFromPlaylistModal(game);
-        }
-    });
-
-    // Short description (bold) + full Steam HTML description
-    const shortDescEl = document.getElementById('split-short-desc');
-    const fullDescEl  = document.getElementById('split-game-desc');
-    const shortText = getLocalizedDescription(game);
-    if (shortText && shortText.trim()) {
-        shortDescEl.textContent = shortText;
-        shortDescEl.style.display = 'block';
-    } else {
-        shortDescEl.style.display = 'none';
-    }
-    if (game.SteamDesc && game.SteamDesc.trim()) {
-        fullDescEl.innerHTML = game.SteamDesc;
-        fullDescEl.style.display = 'block';
-    } else {
-        fullDescEl.style.display = 'none';
-    }
-
-    // Screenshots row — thumbnails open the existing slideshow modal
-    const ssRow = document.getElementById('split-screenshots-row');
-    ssRow.innerHTML = '';
-    const screens = (game.Screenshot && game.Screenshot.trim())
-        ? game.Screenshot.split('|').filter(s => s.trim())
-        : [];
-    if (screens.length) {
-        const modalSs   = document.getElementById('modal-slideshow');
-        const ssImg     = document.getElementById('slideshow-img');
-        const ssCounter = document.getElementById('slideshow-counter');
-        screens.forEach((src, startIdx) => {
-            const thumb = document.createElement('img');
-            thumb.className = 'split-ss-thumb';
-            thumb.src = getSafePath(src);
-            thumb.style.aspectRatio = '16/9';
-            thumb.addEventListener('click', () => {
-                let currentIdx = startIdx;
-                const updateSlide = () => {
-                    ssImg.src = getSafePath(screens[currentIdx]);
-                    ssCounter.innerText = `${currentIdx + 1} / ${screens.length}`;
-                };
-                updateSlide();
-                document.getElementById('btn-slideshow-prev').onclick = () => {
-                    currentIdx = (currentIdx - 1 + screens.length) % screens.length;
-                    updateSlide();
-                };
-                document.getElementById('btn-slideshow-next').onclick = () => {
-                    currentIdx = (currentIdx + 1) % screens.length;
-                    updateSlide();
-                };
-                document.getElementById('btn-slideshow-close').onclick = () => modalSs.classList.remove('active');
-                modalSs.classList.add('active');
-            });
-            ssRow.appendChild(thumb);
-        });
-    }
-    ssRow.style.display = screens.length ? 'flex' : 'none';
-
-    // Stats grid — only cells with data, auto-fit collapses empty tracks
-    const statsGrid = document.getElementById('split-stats-grid');
-    const statCells = [];
-    const lastPlayed = game.LastPlayed ? new Date(game.LastPlayed).toLocaleDateString() : null;
-    if (lastPlayed) statCells.push(['Last Played', lastPlayed]);
-    if (game.METACRITIC) statCells.push(['Metacritic', game.METACRITIC]);
-    if (game.HLTB_Main) statCells.push(['HowLongToBeat', game.HLTB_Main]);
-    if (game.PUB) statCells.push(['Publisher', game.PUB]);
-    if (game.Coop) statCells.push(['Co-op', game.Coop]);
-    if (game.ProtonTier) statCells.push(['Proton', game.ProtonTier]);
-    statsGrid.innerHTML = statCells.map(([label, val]) =>
-        `<div class="split-stat-cell"><span class="split-stat-label">${label}</span><span class="split-stat-value">${val}</span></div>`
-    ).join('');
-    statsGrid.style.display = statCells.length ? 'grid' : 'none';
-
-    // Achievements — load into split-specific container
-    loadSplitAchievements(game);
-}
-
-let _splitAchToken = 0;
-async function loadSplitAchievements(game) {
-    const token = ++_splitAchToken;
-    const container = document.getElementById('split-ach-container');
-    container.innerHTML = '';
-    const gogId    = _gogAppIdFromGame(game);
-    const steamRaw = game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '') : null;
-    const tasks = [];
-    if (gogId)    tasks.push({ label: 'GOG',   fetch: async () => { let r = await window.api.getGameAchievements(gogId); if (!r.ok || !r.achievements.length) r = await window.api.fetchAchievementsNow(gogId); return r; } });
-    if (steamRaw) tasks.push({ label: 'STEAM', fetch: async () => { const k = `steam_${steamRaw}`; let r = await window.api.getGameAchievements(k); if (!r.ok || !r.achievements.length) r = await window.api.fetchSteamAchievements(steamRaw); return r; } });
-    if (!tasks.length) return;
-    const results = await Promise.all(tasks.map(t => t.fetch()));
-    if (token !== _splitAchToken) return; // a newer call superseded this one
-    container.innerHTML = '';             // clear again in case anything snuck in
-    const multi = results.filter(r => r.ok && r.achievements.length).length > 1;
-    for (let i = 0; i < tasks.length; i++) {
-        const res = results[i];
-        if (!res.ok || !res.achievements.length) continue;
-        const label = tasks[i].label;
-        _achStores[label] = res.achievements;
-        if (!_achAll.length) _achAll = res.achievements;
-        _renderAchStrip(container, label, res.achievements, multi);
-    }
-}
-
-// Observe when view-details loses .active → exit split-edit overlay
-new MutationObserver(() => {
-    if (!_splitEditActive) return;
-    const vd = document.getElementById('view-details');
-    if (vd && !vd.classList.contains('active')) {
-        _splitEditActive = false;
-        document.getElementById('main-content').classList.remove('split-edit');
-        applyFilters();
-    }
-}).observe(document.getElementById('view-details'), { attributes: true, attributeFilter: ['class'] });
-
-// Split filter tabs — also exit history mode
-document.querySelectorAll('#split-filter-strip .split-ftab').forEach(btn => {
-    btn.addEventListener('click', () => {
-        _splitHistoryMode = false;
-        document.getElementById('btn-split-history')?.classList.remove('active');
-        activateFilter(btn.dataset.filter);
-    });
-});
-
-// Cover art zoom overlay
-document.getElementById('split-cover-img')?.addEventListener('click', () => {
-    const src = document.getElementById('split-cover-img').src;
-    if (!src) return;
-    document.getElementById('split-cover-zoom-img').src = src;
-    document.getElementById('split-cover-zoom').classList.add('active');
-});
 // Classic gamepage boxart → reuse the same big-cover lightbox (only when real art is present).
 document.getElementById('gamepage-cover')?.addEventListener('click', () => {
     const el = document.getElementById('gamepage-cover');
@@ -5115,52 +4741,11 @@ document.getElementById('gamepage-cover')?.addEventListener('click', () => {
     });
 });
 
-// Split search — also exits history mode
-document.getElementById('split-search')?.addEventListener('input', () => {
-    if (_splitHistoryMode) {
-        _splitHistoryMode = false;
-        document.getElementById('btn-split-history')?.classList.remove('active');
-    }
-    const clearBtn = document.getElementById('btn-split-search-clear');
-    if (clearBtn) clearBtn.style.display = document.getElementById('split-search').value ? 'inline' : 'none';
-    _debouncedApplyFilters();
-});
-
-document.getElementById('btn-split-search-clear')?.addEventListener('click', () => {
-    const inp = document.getElementById('split-search');
-    inp.value = '';
-    document.getElementById('btn-split-search-clear').style.display = 'none';
-    inp.focus();
-    applyFilters();
-});
-
-// Split filter config button → reuse the SEE config modal
-document.getElementById('btn-split-filter-cfg')?.addEventListener('click', () => openSeeConfig());
-
-// Split footer nav buttons
-document.getElementById('btn-split-connect')?.addEventListener('click', () => document.getElementById('btn-open-connect').click());
-document.getElementById('btn-split-tools')?.addEventListener('click', () => openToolsModal());
-document.getElementById('btn-split-emulatte')?.addEventListener('click', () => window.api.launchEmuLatte());
-document.getElementById('btn-split-refresh')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-split-refresh');
-    btn.classList.add('active');
-    await updateLibraryFlow({ quiet: true });
-    if (_splitHistoryMode) showSplitHistory(); else applyFilters();
-    btn.classList.remove('active');
-});
-document.getElementById('btn-split-history')?.addEventListener('click', () => {
-    if (_splitHistoryMode) {
-        _splitHistoryMode = false;
-        document.getElementById('btn-split-history').classList.remove('active');
-        applyFilters();
-    } else {
-        showSplitHistory();
-    }
-});
-
-// Split keyboard navigation
+// Keyboard: Home scrolls the gallery to top; Escape closes the big-cover lightbox.
+// ⚠️ This block used to be "Split keyboard navigation" and carried the split pane's
+// arrow-key row selection. Both surviving branches are layout-agnostic and the classic
+// gamepage uses the same lightbox, so they outlive the layout that introduced them.
 document.addEventListener('keydown', e => {
-    // Home key: scroll gallery to top from any layout
     if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
         const active = document.activeElement;
         const inTextInput = active && ['INPUT','TEXTAREA'].includes(active.tagName);
@@ -5169,30 +4754,12 @@ document.addEventListener('keydown', e => {
             if (gallery?.classList.contains('active')) {
                 e.preventDefault();
                 gallery.scrollTo({ top: 0, behavior: 'smooth' });
-                if (document.getElementById('app-container').classList.contains('layout-commander')) {
-                    updateCmdBarTop(0);
-                }
                 return;
             }
         }
     }
-
     if (e.key === 'Escape' && document.getElementById('split-cover-zoom')?.classList.contains('active')) {
         document.getElementById('split-cover-zoom').classList.remove('active');
-        return;
-    }
-    if (!document.getElementById('app-container')?.classList.contains('layout-split')) return;
-    if (_splitEditActive) return;
-    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) &&
-        document.activeElement.id !== 'split-search') return;
-    if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (_splitIdx < _splitGames.length - 1) selectSplitRow(_splitIdx + 1);
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (_splitIdx > 0) selectSplitRow(_splitIdx - 1);
-    } else if (e.key === 'Enter' && _splitGame?.LaunchCommand) {
-        verifyAndLaunch(_splitGame.id, _splitGame.LaunchCommand);
     }
 });
 
