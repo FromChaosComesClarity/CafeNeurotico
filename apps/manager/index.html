@@ -1249,7 +1249,10 @@
     }catch(e){}
     // Zoom last: it reflows everything, so doing it before the first paint rather than after
     // is the difference between a window that opens at the right size and one that jumps.
-    try{ var z=localStorage.getItem('cngm_ui_scale_cache'); if(z && window.api && window.api.setZoomLevel) window.api.setZoomLevel(parseFloat(z)); }catch(e){}
+    // ⚠️ Key bumped to _v2 deliberately: the old key holds whatever the retired auto-derivation
+    // cached (usually 0.75), and this script runs BEFORE the reset that clears it — so without a
+    // new key the window would still paint at 75% for a frame on the first launch after the fix.
+    try{ var z=localStorage.getItem('cngm_ui_scale_cache_v2'); if(z && window.api && window.api.setZoomLevel) window.api.setZoomLevel(parseFloat(z)); }catch(e){}
   })();</script>
   <link rel="stylesheet" href="vendor/gridstack.min.css">
   <link rel="stylesheet" href="vendor/gridstack-extra.min.css">

@@ -1825,15 +1825,30 @@ window.api.getBaseDir().then(dir => {
 
     // Mirrored for the pre-paint script: applying the zoom after the window is visible makes
     // the whole layout jump, which is the most obvious part of the startup flash.
-    const _cacheScale = v => { try { localStorage.setItem('cngm_ui_scale_cache', String(v)); } catch {} };
+    const _cacheScale = v => { try { localStorage.setItem('cngm_ui_scale_cache_v2', String(v)); } catch {} };
 
     function _markScaleButton(val) {
         document.querySelectorAll('.ui-scale-btn').forEach(btn =>
             btn.classList.toggle('active', btn.getAttribute('data-val') === val));
     }
 
-    window.api.getSetting('cngm_ui_scale').then(val => {
-        const v = val ? parseFloat(val) : 1.0;
+    // ⚠️ One-time reset. Removing the derivation fixes what a FRESH install gets, but every
+    // existing install is still carrying whatever the old code auto-derived and wrote into
+    // `cngm_ui_scale` — typically 0.75 — and that value is indistinguishable from a scale the
+    // user actually picked. Since it was almost never a choice, and 100% is now the intended
+    // baseline, it is cleared once. A scale chosen after this sticks for good.
+    Promise.all([
+        window.api.getSetting('cngm_ui_scale'),
+        window.api.getSetting('ui_scale_reset_100'),
+    ]).then(([val, done]) => {
+        let v;
+        if (done) {
+            v = val ? parseFloat(val) : 1.0;
+        } else {
+            v = 1.0;
+            window.api.setSetting('cngm_ui_scale', '1.0');
+            window.api.setSetting('ui_scale_reset_100', '1');
+        }
         window.api.setZoomLevel(v);
         _zoomNow = v;
         _cacheScale(String(v));
@@ -8268,7 +8283,7 @@ let _zoomNow = 1.0;
 function setZoom(v) {
     _zoomNow = v;
     window.api.setZoomLevel(v);
-    try { localStorage.setItem('cngm_ui_scale_cache', String(v)); } catch {}
+    try { localStorage.setItem('cngm_ui_scale_cache_v2', String(v)); } catch {}
     window.api.setSetting('cngm_ui_scale', String(v));
     document.querySelectorAll('.ui-scale-btn').forEach(btn =>
         btn.classList.toggle('active', parseFloat(btn.getAttribute('data-val')) === v));
