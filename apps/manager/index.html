@@ -804,6 +804,13 @@
     .storage-row .sr-name { flex:1; font-size:12.5px; color:var(--text_main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .storage-row .sr-store { font-size:10px; color:var(--text_dim); text-transform:uppercase; letter-spacing:1px; }
     .storage-row .sr-size { font-size:12px; color:var(--accent); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .wlc-line { display:flex; align-items:center; gap:8px; }
+    .wlc-line .wlc-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .wlc-line .wlc-ok   { background:#66bb6a; }
+    .wlc-line .wlc-warn { background:#f57c00; }
+    .wlc-line .wlc-off  { background:var(--text_dim); }
+    .wlc-line b { color:var(--text_main); font-weight:700; }
+    .wlc-line span.wlc-detail { color:var(--text_dim); }
     .cp-welcome-hint { margin-top: 34px; font-size: 11.5px; color: var(--text_dim); letter-spacing: 0.5px; font-style: italic; }
     .cp-pane-title { margin: 0 0 4px; font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--text_dim); }
     .cp-tico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 7px; flex-shrink: 0; }
@@ -2083,6 +2090,20 @@
 
       <!-- Scrollable steps -->
       <div style="flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 12px;">
+
+        <!-- STEP 0: WHAT THIS MACHINE HAS.
+             Rendered from real detection at open time, never from assumptions —
+             the gaming-stack gap comes from omarchy-status, the store lines from
+             the same auth check the Connections page uses. Hidden entirely when
+             there is nothing to report. -->
+        <div class="tool-card" id="wlc-detect-card" style="display:none;">
+          <div class="tool-card-title"><span style="color:var(--accent);">✓</span> &nbsp;What This Machine Has</div>
+          <div id="wlc-detect-body" style="display:flex; flex-direction:column; gap:7px; font-size:11.5px; line-height:1.5;"></div>
+          <button id="btn-wlc-install-tools" class="primary" style="width:100%; margin-top:9px; display:none;">Install the missing tools</button>
+          <p id="wlc-detect-note" style="margin:7px 0 0; color:var(--text_dim); font-size:10.5px; line-height:1.5; font-style:italic; display:none;">
+            Opens a terminal and shows you the command — nothing is installed behind your back, and you type your own password.
+          </p>
+        </div>
 
         <!-- STEP 1: IMPORT -->
         <div class="tool-card">

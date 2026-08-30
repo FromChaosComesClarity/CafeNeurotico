@@ -3616,6 +3616,81 @@ function dismissWelcome() {
 }
 
 // Only these two buttons close the modal
+// ── First boot: detect, then propose ─────────────────────────────────────────
+// The welcome screen used to open with six actions and no ordering, presenting
+// empty fields whether or not the work was already done. It now leads with what
+// this machine actually has, so the first thing a new user reads is a fact rather
+// than a form. Everything here is measured at open time; nothing is assumed.
+async function renderWelcomeDetection() {
+    const card = document.getElementById('wlc-detect-card');
+    const body = document.getElementById('wlc-detect-body');
+    const btn  = document.getElementById('btn-wlc-install-tools');
+    const note = document.getElementById('wlc-detect-note');
+    if (!card || !body) return;
+    const lines = [];
+    let missingKeys = [];
+
+    // The gaming stack, but only where we can act on it. On a non-Omarchy host the
+    // installer commands do not exist, so reporting a gap we cannot close is noise.
+    try {
+        const om = await window.api.omarchyStatus();
+        if (om?.detected && om.gap) {
+            const g = om.gap;
+            const missing = [...(g.missingRequired || []), ...(g.missingOptional || [])];
+            missingKeys = missing.map(m => m.key || m).filter(Boolean);
+            if (!missing.length) {
+                lines.push(`<div class="wlc-line"><span class="wlc-dot wlc-ok"></span><b>Gaming tools</b><span class="wlc-detail">all ${g.total} present</span></div>`);
+            } else {
+                const names = missing.map(m => m.key || m).join(', ');
+                lines.push(`<div class="wlc-line"><span class="wlc-dot wlc-warn"></span><b>Gaming tools</b><span class="wlc-detail">${g.present} of ${g.total} — missing ${escHtml(names)}</span></div>`);
+            }
+        }
+    } catch {}
+
+    // Stores: connected is a fact worth stating, because a returning user should not
+    // be asked to sign in to something they already signed in to.
+    let gogOn = false, epicOn = false;
+    try {
+        const [gog, epic] = await Promise.all([
+            window.api.gogAuthStatus().catch(() => ({ loggedIn: false })),
+            window.api.epicAuthStatus().catch(() => ({ loggedIn: false })),
+        ]);
+        gogOn = !!gog.loggedIn; epicOn = !!epic.loggedIn;
+        lines.push(`<div class="wlc-line"><span class="wlc-dot ${gogOn ? 'wlc-ok' : 'wlc-off'}"></span><b>GOG</b><span class="wlc-detail">${gogOn ? 'connected' + (gog.username ? ' — ' + escHtml(gog.username) : '') : 'not connected'}</span></div>`);
+        lines.push(`<div class="wlc-line"><span class="wlc-dot ${epicOn ? 'wlc-ok' : 'wlc-off'}"></span><b>Epic</b><span class="wlc-detail">${epicOn ? 'connected' + (epic.account ? ' — ' + escHtml(epic.account) : '') : 'not connected'}</span></div>`);
+    } catch {}
+
+    // Steam has no on-disk detection here — the library comes through the Web API —
+    // so the honest thing to report is whether the credentials are already stored.
+    try {
+        const [sid, key] = await Promise.all([
+            window.api.getSetting('steam_id'), window.api.getSetting('steam_api_key'),
+        ]);
+        const has = !!(sid && key);
+        lines.push(`<div class="wlc-line"><span class="wlc-dot ${has ? 'wlc-ok' : 'wlc-off'}"></span><b>Steam</b><span class="wlc-detail">${has ? 'key saved — fetch below to refresh' : 'needs a SteamID64 and API key'}</span></div>`);
+        if (has) {
+            const idEl = document.getElementById('wlc-steam-id'), keyEl = document.getElementById('wlc-steam-api-key');
+            if (idEl && !idEl.value) idEl.value = sid;
+            if (keyEl && !keyEl.value) keyEl.value = key;
+        }
+    } catch {}
+
+    if (!lines.length) { card.style.display = 'none'; return; }
+    body.innerHTML = lines.join('');
+    card.style.display = '';
+
+    if (missingKeys.length) {
+        btn.style.display = ''; note.style.display = '';
+        btn.textContent = `Install the missing tools (${missingKeys.length})`;
+        btn.onclick = async () => {
+            btn.disabled = true;
+            try { await window.api.omarchyInstallTools(missingKeys); } finally { btn.disabled = false; }
+        };
+    } else {
+        btn.style.display = 'none'; note.style.display = 'none';
+    }
+}
+
 document.getElementById('btn-welcome-done').addEventListener('click', dismissWelcome);
 document.getElementById('btn-welcome-manual').addEventListener('click', () => { dismissWelcome(); window.api.openManual(); });
 
@@ -3755,6 +3830,7 @@ document.getElementById('btn-show-welcome').addEventListener('click', () => {
     window.api.setSetting('welcome_shown', '');
     document.getElementById('chk-welcome-noshow').checked = false;
     _welcomeModal.classList.add('active');
+    renderWelcomeDetection();
 });
 
 // ── Step 5: Add to system menu (inline, no close) ───────────────────────────
@@ -8095,7 +8171,7 @@ _omarchyThemeReady.then(ok => window.api.getSetting('cngm_theme').then(saved => 
     loadGenres();
     return window.api.getSetting('welcome_shown');
 }).then(shown => {
-    if (!shown) _welcomeModal.classList.add('active');
+    if (!shown) { _welcomeModal.classList.add('active'); renderWelcomeDetection(); }
     // Auto-sync GRINDER installed status on every startup
     syncGrinderInstalled();
 });
