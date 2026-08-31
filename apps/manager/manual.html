@@ -155,6 +155,7 @@
             <button class="manual-nav-btn" data-target="man-19b">19b. Fan Games &amp; Ports</button>
             <button class="manual-nav-btn" data-target="man-20">20. Save Games</button>
             <button class="manual-nav-btn" data-target="man-21">21. Your Data &amp; Backups</button>
+            <button class="manual-nav-btn" data-target="man-omarchy">21b. On Omarchy</button>
             <button class="manual-nav-btn" data-target="man-22">22. Tips &amp; Troubleshooting</button>
         </div>
 
@@ -187,7 +188,7 @@
                 <ul style="margin:0;">
                     <li><strong>The Manager</strong> &mdash; the desktop face. Import, organize, scrape, edit and launch your library with a mouse and keyboard. This is where you are right now.</li>
                     <li><strong>CREMA</strong> &mdash; the fullscreen, gamepad-first face for the living room. Same library, same artwork, same playlists &mdash; zero configuration, always in sync. Launch it with the coffee-cup button in the titlebar or run the AppImage with <code>--crema</code>.</li>
-                    <li><strong>GRINDER</strong> &mdash; the GOG &amp; Epic engine. It signs in to your accounts, downloads games, configures Proton and launches them. It works silently inside the other two faces; its own window (run with <code>grinder</code>) is there for deep per-game tuning.</li>
+                    <li><strong>GRINDER</strong> &mdash; the GOG &amp; Epic engine. It signs in to your accounts, downloads games, configures Proton and launches them. It works silently inside the other two faces and has <strong>no window of its own</strong>: everything it used to show is in the Manager.</li>
                 </ul>
             </div>
             <p><strong>EmuLatte</strong>, the ROM library manager, is a separate app &mdash; but the suite detects <code>EmuLatte.AppImage</code> sitting in the same folder and integrates it into your app menu and sidebar.</p>
@@ -362,7 +363,7 @@
                 <li>Playlists appear in CREMA as first-class categories, marked with <code>&#8801;</code>. Changes sync both ways instantly.</li>
             </ul>
             <h3>Hidden Games</h3>
-            <p>Hide anything via the gamepage&rsquo;s eye button &mdash; it vanishes from every view in both faces, instantly. Unhide from <strong>Control Panel &rarr; Behavior &rarr; Hidden Games</strong> (or CREMA&rsquo;s menu), each game individually.</p>
+            <p>Hide anything via the Manager gamepage&rsquo;s eye button &mdash; it vanishes from every view in both faces, instantly. Unhide from <strong>Control Panel &rarr; Behavior &rarr; Hidden Games</strong>. <strong>Hiding and unhiding are the Manager&rsquo;s job:</strong> CREMA can neither hide a game nor bring one back, because a couch face that could hide a game without being able to recover it is a one-way door. (Older builds let CREMA&rsquo;s menu), each game individually.</p>
             <h3>Free-to-Play</h3>
             <p>Steam free-to-play titles you&rsquo;ve played are imported and tagged with a green <span class="key">FREE</span> pill (gallery, list and gamepage). Click any pill &mdash; or use Control Panel &rarr; Behavior &mdash; to show or hide them all, or hide just that one game.</p>
 
@@ -405,7 +406,7 @@
 
             <h3>Which Screen Games Open On</h3>
             <p>On a multi-monitor machine games land on whichever screen the desktop calls primary, and most of them offer no way to change that. Control Panel &rarr; <strong>Which Screen Games Open On</strong> lists your monitors by name and size &mdash; a connector called DP-4 tells nobody anything &mdash; and every game opens on the one you pick. <strong>Default</strong> hands the decision back to the desktop.</p>
-            <p>This is <strong>KDE only</strong>, and the card is hidden entirely elsewhere, and on a single-monitor machine. It works by asking KWin to place the window, which is the only thing that can decide this under Wayland &mdash; nothing inside the game has a say. Nothing is written to your KDE settings, and the change applies to the next game you start, with no logout.</p>
+            <p>This works on <strong>KDE and on Hyprland</strong>, and the card is hidden on any other desktop and on a single-monitor machine. On Hyprland it also sets the screen you picked as the <strong>primary output for X11 games</strong> &mdash; without one they take whichever monitor sits at the left edge of the desktop, which is how a game ends up running at a small screen&rsquo;s resolution. On KDE it works by asking KWin to place the window, which is the only thing that can decide this under Wayland &mdash; nothing inside the game has a say. Nothing is written to your KDE settings, and the change applies to the next game you start, with no logout.</p>
             <p>One caveat worth knowing: a game that runs fullscreen is re-fitted to the monitor you chose. Sending a game to a smaller screen means it plays at that screen&rsquo;s size, which is a property of the monitor rather than something any setting can talk it out of.</p>
 
             <h3>Detect Genres</h3>
@@ -511,21 +512,23 @@
                 <li><strong>Audio</strong> &mdash; Jukebox mode, sound settings (volumes, SFX).</li>
                 <li><strong>Appearance</strong> &mdash; Color Scheme (all 93 suite themes, in the same ten categories as the desktop; <em>&#9733; Follow The Manager</em> keeps CREMA matched to your desktop theme automatically), <strong>Interface Font</strong> (the same six faces, each shown in itself so you can judge it at TV distance &mdash; and its own <em>&#9733; Follow The Manager</em>, which is how it starts out), Home Screen (startup toggle + row selection), Start Screen mode, Browse mode, Gamepage style (applies live, even inside a gamepage), Screensaver.</li>
                 <li><strong>Controls</strong> &mdash; Keybindings, Gamepad icon set (Xbox / PlayStation / Nintendo), Wake method.</li>
-                <li><strong>Library</strong> &mdash; <strong>Filter by Genre</strong>, Gaming History, PICO-8 / Free-to-Play visibility, <strong>Hidden Games</strong> (unhide individually).</li>
+                <li><strong>Library</strong> &mdash; <strong>Filter by Genre</strong>, Gaming History, PICO-8 / Free-to-Play visibility.</li>
                 <li><strong>System</strong> &mdash; About, Quit.</li>
             </ul>
 
             <!-- ====== SECTION 19 ====== -->
+            <div class="tip-box"><p><strong>CREMA plays; the Manager manages.</strong> The menu on a game (SELECT) holds opinions about it &mdash; Favourite, Want to Play, Played, Add to Playlist, achievements &mdash; and installing what you own. Renaming, scraping, downloading trailers, editing a launch command and uninstalling all live in the Manager, where a keyboard is.</p></div>
+
             <h2 id="man-19">19. GRINDER &mdash; the GOG &amp; Epic Engine</h2>
             <p>GRINDER does the heavy lifting for DRM-free stores: authentication, downloads, Proton/Wine setup, redistributables, launching and uninstalling. Most of the time you never see it &mdash; the Manager and CREMA drive it silently.</p>
             <div class="tip-box"><p><strong>You no longer sign in here.</strong> GOG and Epic logins happen directly in the Manager&rsquo;s Welcome and Connect screens. GRINDER&rsquo;s window is for tuning, not setup.</p></div>
-            <h3>When to Open Its Window</h3>
+            <h3>It Has No Window</h3>
             <ul>
-                <li><strong>Per-game tuning:</strong> Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables. You don&rsquo;t have to set a Proton here &mdash; the suite finds one by itself (&sect;7) &mdash; but this is where you pin a specific build for an awkward game.</li>
+                <li><strong>Per-game tuning</strong> &mdash; now in the Manager&rsquo;s <strong>Compatibility</strong> panel: Proton version, Wine prefix, winetricks, environment variables, esync/fsync, DXVK-NVAPI, launch arguments, custom executables. You don&rsquo;t have to set a Proton here &mdash; the suite finds one by itself (&sect;7) &mdash; but this is where you pin a specific build for an awkward game.</li>
                 <li><strong>&ldquo;&#9654; Log&rdquo; &mdash; Play with Log.</strong> Next to every installed game&rsquo;s Launch button. It starts the game exactly as normal but streams everything the game and Wine print into a live window &mdash; the first thing to reach for when a title refuses to start. Copy the log with one button. Closing the window doesn&rsquo;t disturb the game.</li>
-                <li><strong>&ldquo;&#11015; Size&rdquo; sort</strong> &mdash; order the library by how much disk each install actually occupies. This is what Manage Storage opens.</li>
+                <li><strong>Manage Storage</strong> (Manager &rarr; Control Panel) &mdash; the old &ldquo;&#11015; Size&rdquo; sort: &mdash; order the library by how much disk each install actually occupies. This is what Manage Storage opens.</li>
                 <li><strong>DLC:</strong> list, install and reset the DLC of your installed GOG games.</li>
-                <li>Its own download manager, install log, repair/verify tools and a library view of everything it manages.</li>
+                <li>Its download manager, install log and repair tools are reached from the Manager too.</li>
             </ul>
             <div class="warn-box"><p><strong>GOG DLC is installed as a set.</strong> GOG&rsquo;s downloader cannot safely add one DLC on its own &mdash; asking it to will delete the base game. So the DLC panel always reinstalls the game together with all the DLC you own, which is slower but never destroys anything.</p></div>
             <p>GRINDER&rsquo;s data lives in <code>~/.config/grinder/</code> &mdash; logins and install records are per-machine, which is why a fresh copy of the suite still knows your GOG library on the same computer.</p>
@@ -583,13 +586,38 @@
             <p><strong>Backup ZIP</strong> (Control Panel &rarr; System) packs the whole <code>GameManagerConfig</code> &mdash; and your <strong>RetroArch save states</strong> &mdash; into one dated archive. Restore by unpacking next to the AppImage on any machine.</p>
 
             <!-- ====== SECTION 22 ====== -->
+            <!-- ====== SECTION 21b ====== -->
+            <h2 id="man-omarchy">21b. On Omarchy</h2>
+            <p>Cafe Neurotico runs on any Linux desktop. It is <strong>built and tested on Omarchy</strong>, and there it does a handful of things it cannot do anywhere else.</p>
+
+            <h3>Your Theme, Not Ours</h3>
+            <p>The theme picker has a <strong>Your Desktop</strong> entry that reads the palette Omarchy is actually using &mdash; not a lookalike, the same colours. Change it with <code>omarchy theme set</code> and the app follows on its next start. The Control Panel&rsquo;s Desktop page names the theme it found.</p>
+
+            <h3>How a Game&rsquo;s Window Opens</h3>
+            <p>Control Panel &rarr; Desktop offers <strong>Fullscreen</strong>, <strong>Floating</strong> and <strong>Tiled</strong>. Fullscreen is the default and is what you want almost always: the game is handed the whole monitor the moment it opens, instead of being fitted into a tiling layout and resized a second before it goes fullscreen anyway.</p>
+            <p>Choose <strong>Floating</strong> if a particular game shows a small configuration window before it starts &mdash; every game launched through Proton arrives under the same window class, so a rule cannot tell the launcher from the game.</p>
+            <div class="warn-box"><p><strong>A window rule cannot be taken back.</strong> Hyprland keeps a rule for the rest of the session, so switching between these three normally shows up at your next login. The <strong>Apply To This Session</strong> button underneath makes it immediate by having Hyprland re-read its config and putting Cafe Neurotico&rsquo;s rules back &mdash; at the cost of window rules other tools set this session, which is why it is a button and not automatic.</p></div>
+
+            <h3>Which Screen Games Open On</h3>
+            <p>On top of the window rule, this sets your chosen screen as the <strong>primary output for X11 games</strong>. Hyprland&rsquo;s XWayland starts with no primary at all, and a game that asks for one takes whichever monitor sits at the left edge of the desktop &mdash; if that is a small panel beside a large screen, the game sizes itself to the panel and stays there.</p>
+
+            <h3>The Command Palette</h3>
+            <p><strong>Ctrl+K</strong> in the Manager opens a fuzzy list of every game and every settings page at once. Type a few letters, press Enter. Games open their page; actions run.</p>
+
+            <h3>The Bar Widget and the Launcher</h3>
+            <p>There is a separate <strong>Omarchy plugin</strong> for the bar: it shows how many games are installed and what is playing, with a menu one click from the library, CREMA, Manage Storage and the Control Panel. It also adds a <strong>launcher overlay</strong> &mdash; bind it to a key, type a few letters of a game&rsquo;s name and press Enter to play it, with its cover and a sentence about it beside the list.</p>
+            <p>The plugin reads <code>~/.config/cafeneurotico/desktop.json</code>, which the app writes on every start, so it needs no configuration &mdash; and it needs the app to have been run at least once before it can show you anything.</p>
+
+            <h3>The Gaming Stack</h3>
+            <p>Omarchy ships as a developer desktop, so a fresh install has almost none of the gaming stack. Control Panel &rarr; Desktop lists what is missing &mdash; umu-launcher, Wine, DOSBox, GameMode, MangoHud, gamescope, 32-bit graphics drivers and the rest &mdash; and hands you the install command. It also reports two kernel settings a gaming distribution changes, without touching them: those belong to you and your distribution.</p>
+
             <h2 id="man-22">22. Tips &amp; Troubleshooting</h2>
             <ul>
                 <li><strong>Steam import returns nothing:</strong> your Steam profile&rsquo;s <em>Game Details</em> must be Public. Double-check the SteamID64 (17 digits).</li>
                 <li><strong>A newly bought GOG/Epic game isn&rsquo;t showing:</strong> hit <strong>Refresh Library</strong> &mdash; it pulls the fresh owned list from both stores. If it still doesn&rsquo;t appear, open Connect and check the GOG/Epic cards still say you&rsquo;re signed in; store tokens do expire, and signing in again takes a few seconds.</li>
                 <li><strong>A Windows game won&rsquo;t start:</strong> a game that quits the moment it starts now tells you so, with the technical details one click away. The usual cause is having no <strong>Proton</strong> installed, which the dialog offers to fix in one click &mdash; see &sect;7. If you already have Proton, the same dialog lets you try a different build.</li>
                 <li><strong>Nothing at all seems to happen on the first Windows game:</strong> it&rsquo;s working. A compatibility runtime downloads once per machine and the game&rsquo;s Windows environment is built the first time you play it &mdash; a few minutes, shown on the Now Playing card. Later launches are instant.</li>
-                <li><strong>You want to see exactly what a game printed:</strong> open GRINDER, find it, and press <strong>&#9654; Log</strong> instead of Launch. The verbose window shows what Wine or the game actually complained about &mdash; usually a missing dependency you can install from the same screen&rsquo;s winetricks.</li>
+                <li><strong>You want to see exactly what a game printed:</strong> open the game&rsquo;s page in the Manager and use <strong>Play with Log</strong> from the Compatibility panel. The verbose output shows what Wine or the game actually complained about &mdash; usually a missing dependency you can install from the same panel.</li>
                 <li><strong>A game vanished after Refresh Library:</strong> that&rsquo;s the removal check &mdash; the store no longer reports you as owning it (refunded, or a demo you uninstalled). Re-buy or reinstall it and the next refresh brings it back.</li>
                 <li><strong>A game shows Install instead of Play</strong> (or vice-versa): Refresh Library reconciles install state with GRINDER and Steam. Games owned on several stores at once count as installed if <em>any</em> copy is on disk.</li>
                 <li><strong>Am I running the latest version?</strong> Open the Control Panel &mdash; the splash it lands on tells you your version, and <strong>Check for Updates</strong> next to it opens the releases page so you can compare. There is no automatic check; nothing is downloaded without you.</li>
