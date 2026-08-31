@@ -9,11 +9,11 @@ split or shows the result to someone who has never seen the app.
 
 ---
 
-## The one gate
+## The gate — LIFTED 2026-08-31
 
-⚠️ **Nothing is cut from CREMA until the inventory below is reviewed.** Asked how far
-"eliminate any management feature" goes, Jose chose *"show me the inventory first"* — so W1 is
-a review step with no code in it, and W2 does not start until it comes back marked up.
+W1 came back the same day. Jose took the recommendations as written and settled the two open
+calls: **Add to Playlist — keep. Uninstall via GRINDER — cut.** W2 is unblocked, and the table
+below is now the specification for it rather than a proposal.
 
 ---
 
@@ -54,13 +54,13 @@ renderer, 1,136 of main, 1,047 of markup.
 | Add / Remove Favourite | **keep** | One-button taste, the point of a couch UI |
 | Add / Remove Want to Play | **keep** | Same |
 | Mark / Unmark Played | **keep** | Same |
-| Add to Playlist | **decide** | Assigning is couch-shaped; *creating* playlists is not |
+| Add to Playlist | **KEEP** | Jose's call. Assigning a game from the couch is a taste decision, like the flags above it |
 | Add Launch Command | **cut** | Typing a command line on a gamepad |
 | Rename | **cut** | Editing library data |
 | Scraping | **cut** | The heaviest management feature in CREMA |
 | View Achievements | **keep** | Read-only, and it belongs beside the game |
 | Install via GRINDER | **keep, rebuild** | See W3 — this is the seam that needs fixing |
-| Uninstall via GRINDER | **decide** | Freeing space from the couch is real; so is doing it by accident |
+| Uninstall via GRINDER | **CUT** | Jose's call. Deleting an install is management, and doing it by accident from a gamepad is the failure that matters |
 
 ### Known defect to fix while in here
 
@@ -69,7 +69,7 @@ unavailable". Deliberately unfixed until now because CREMA exposes no auth-statu
 never offer a store login; the honest fix is a "sign in from The Manager" message plus two new
 handlers. **This is the oldest open item in the project.**
 
-**Deliverable:** this table, marked up by Jose. Nothing else.
+**Status: done.** Every verdict above is now a decision, not a recommendation.
 
 ## W2 — Cut what W1 says to cut
 
@@ -142,6 +142,31 @@ appears zero times** despite being where the app now lives.
 
 ⚠️ **This goes last.** CREMA's chapters describe features W2 is about to delete.
 
+## W10 — First run, without the app
+
+Asked whether the plugin can detect a missing app and make getting it easier. It already
+detects it — no descriptor means "not installed, or never run" — but today that is a dead end
+that only states a fact. It should offer the next step.
+
+- The launcher's empty state and the widget's tooltip become **actionable**, not just honest
+- Installing runs **in its own terminal**, the pattern the app already uses for package
+  installs (`terminalLauncher()` → `xdg-terminal-exec`, which is what Omarchy itself sets
+  `TERMINAL` to). A bar widget silently pulling 274 MB in the background is the wrong shape:
+  no progress, no cancel, and an arbitrary binary fetched by a shell script is exactly what a
+  marketplace reviewer should object to
+- `scripts/cn-install` downloads the AppImage, marks it executable, and runs it once so it
+  writes the descriptor the plugin then reads
+
+⚠️ **`/releases/latest` is the wrong endpoint and would ship a broken install.** GitHub
+excludes pre-releases from it, and every experimental build is a pre-release — measured
+2026-08-31: `/releases/latest` returns **v1.9.3**, which does *not* write the descriptor, so
+the plugin would sit at "not installed" forever having just installed the app. The script must
+walk `/releases` and take the newest with an `.AppImage` asset (**v1.11.0**).
+
+⚠️ **Where it lands matters.** The app's data directory is the AppImage's own folder, so the
+install path is also where the library will live. The script proposes a location and says so
+rather than choosing silently.
+
 ## W9 — Publish the plugin
 
 Gated on Jose's testing, not on the app: 1.11.0 ships the descriptor the plugin needs. When
@@ -164,5 +189,5 @@ unblocked: flip the repo public, add `preview.png`, submit to Omarchy's plugin m
 
 W1 gates W2. W8 follows W2 and W4. Everything else is independent.
 
-A sensible run: **W1 → W5 → W6 → W7** (visible, unblocked) while the inventory is being
-reviewed, then **W2 → W3 → W4**, then **W8**, with **W9** whenever Jose says.
+With W1 closed: **W2 → W3 → W4** is the CREMA block and is ready to start. **W5 → W6 → W7**
+are visible and independent. **W8** last. **W10** belongs with **W9**, whenever Jose says.
