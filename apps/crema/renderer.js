@@ -2740,6 +2740,95 @@ function formatJbTime(sec) {
   return m + ":" + (s < 10 ? "0" : "") + s;
 }
 
+/* ── The spectrum ────────────────────────────────────────────────────────────
+ * The old visualiser was five divs on a CSS keyframe loop: it animated whether or not
+ * anything was playing, and never matched the music. This is a real AnalyserNode reading
+ * the element that is actually producing sound.
+ *
+ * ⚠️ createMediaElementSource can be called ONCE per element, and it REROUTES that
+ * element's audio through the graph — forget to connect to the destination and the music
+ * goes silent. Both are why the node is created lazily, kept in a module-level handle, and
+ * always wired source → analyser → destination.
+ *
+ * ⚠️ An AudioContext starts suspended until a user gesture. Opening the jukebox is one, so
+ * resume() is called there; if the browser still refuses, the bars simply stay flat and the
+ * music is unaffected.
+ */
+let _jbAudioCtx = null, _jbAnalyser = null, _jbSourceNode = null, _jbSpectrumRaf = 0;
+
+function _jbEnsureAnalyser() {
+    if (_jbAnalyser) return true;
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx || !bgmAudio) return false;
+        _jbAudioCtx = new Ctx();
+        _jbSourceNode = _jbAudioCtx.createMediaElementSource(bgmAudio);
+        _jbAnalyser = _jbAudioCtx.createAnalyser();
+        _jbAnalyser.fftSize = 128;              // 64 bins — plenty at TV distance
+        _jbAnalyser.smoothingTimeConstant = 0.78;
+        _jbSourceNode.connect(_jbAnalyser);
+        _jbAnalyser.connect(_jbAudioCtx.destination);   // ⚠️ or the music stops
+        return true;
+    } catch (e) {
+        // A failed analyser must never cost the music. Fall back to no bars.
+        _jbAnalyser = null;
+        return false;
+    }
+}
+
+function _jbStopSpectrum() {
+    if (_jbSpectrumRaf) cancelAnimationFrame(_jbSpectrumRaf);
+    _jbSpectrumRaf = 0;
+}
+
+function _jbDrawSpectrum() {
+    // Two canvases, one at a time: the panel's and the fullscreen view's. Drawing into
+    // whichever is on screen keeps a single analyser and a single animation frame.
+    const canvas = jbIsFullscreen
+        ? document.getElementById('jb-fs-spectrum')
+        : document.getElementById('jb-spectrum-canvas');
+    if (!canvas || document.getElementById('jukebox-screen').classList.contains('hidden')) {
+        _jbStopSpectrum(); return;
+    }
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.floor(w * dpr)) { canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#7fd6d0';
+    const bins = 40;
+    const gap = Math.max(2, Math.round(w / bins * 0.28));
+    const bw = Math.max(2, (w - gap * (bins - 1)) / bins);
+
+    let data = null;
+    if (_jbAnalyser) {
+        data = new Uint8Array(_jbAnalyser.frequencyBinCount);
+        _jbAnalyser.getByteFrequencyData(data);
+    }
+
+    for (let i = 0; i < bins; i++) {
+        // Low frequencies carry the energy, so a linear sweep wastes most of the width on
+        // bins that never move. This biases toward the bottom of the spectrum.
+        const src = data ? Math.floor(Math.pow(i / bins, 1.7) * data.length) : 0;
+        const v = data ? data[src] / 255 : 0;
+        const bh = Math.max(1, v * h);
+        ctx.fillStyle = accent;
+        ctx.globalAlpha = 0.35 + v * 0.65;
+        ctx.fillRect(i * (bw + gap), h - bh, bw, bh);
+    }
+    ctx.globalAlpha = 1;
+    _jbSpectrumRaf = requestAnimationFrame(_jbDrawSpectrum);
+}
+
+function _jbStartSpectrum() {
+    _jbEnsureAnalyser();
+    try { if (_jbAudioCtx && _jbAudioCtx.state === 'suspended') _jbAudioCtx.resume(); } catch (e) {}
+    _jbStopSpectrum();
+    _jbDrawSpectrum();
+}
+
 async function openJukebox() {
   gameState = 'JUKEBOX'; setBlur(false);
   ['start-screen', 'main-screen', 'gallery-screen', 'ggp-screen', 'home-screen', 'reader-screen'].forEach(id => {
@@ -2762,12 +2851,14 @@ async function openJukebox() {
   clearInterval(jbUpdateTimer);
   jbUpdateTimer = setInterval(updateJbNowPlayingUI, 1000);
   updateJbNowPlayingUI();
+  _jbStartSpectrum();
 }
 
 function closeJukebox() {
   gameState = previousGameState;
   setBlur(false);
   document.getElementById('jukebox-screen').classList.add('hidden');
+  _jbStopSpectrum();
 
   if (gameState === 'START') {
     document.getElementById('start-screen').classList.remove('hidden');
@@ -3005,43 +3096,50 @@ function updateJbNowPlayingUI() {
 
 function toggleJbFullscreen() {
   jbIsFullscreen = !jbIsFullscreen;
-  const mainCont = document.querySelector('#jukebox-screen .main-container');
-  const hdr = document.querySelector('#jukebox-screen .header');
-  const ftr = document.getElementById('jb-footer');
+  const shell = document.querySelector('#jukebox-screen .jb-shell');
 
   let fsView = document.getElementById('jb-fs-view');
   if (!fsView) {
     fsView = document.createElement('div');
     fsView.id = 'jb-fs-view';
-    fsView.style.cssText = "position: absolute; top:0; left:0; width:100%; height:100%; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; padding: 100px; box-sizing: border-box; background: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%); overflow: hidden; opacity: 0; transition: opacity 0.5s ease;";
+    // ⚠️ Phase 4 W4: the same Cliamp identity as the jukebox behind it — flat ground,
+    // monospace, box-drawing rules, a real spectrum. The three blurred "xmb-wave" gradients
+    // it replaces were a PS3 pastiche sitting inside a terminal-styled player.
+    fsView.style.cssText = "position: absolute; top:0; left:0; width:100%; height:100%; box-sizing: border-box; z-index: 50; display: flex; flex-direction: column; justify-content: center; background: var(--bg); padding: clamp(28px, 5vw, 90px); font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;";
     fsView.innerHTML = `
-    <div class="xmb-wave" style="position:absolute; top:25%; left:-10%; width:120%; height:30%; background: linear-gradient(90deg, transparent, var(--accent), transparent); border-radius: 50%; opacity: 0.4; filter: blur(35px); animation: wave1 8s infinite alternate ease-in-out;"></div>
-    <div class="xmb-wave" style="position:absolute; top:45%; left:-10%; width:120%; height:25%; background: linear-gradient(90deg, transparent, var(--text_sec), transparent); border-radius: 50%; opacity: 0.25; filter: blur(25px); animation: wave2 12s infinite alternate ease-in-out;"></div>
-    <div class="xmb-wave" style="position:absolute; top:65%; left:-10%; width:120%; height:15%; background: linear-gradient(90deg, transparent, var(--text_main), transparent); border-radius: 50%; opacity: 0.15; filter: blur(15px); animation: wave1 10s infinite alternate-reverse ease-in-out;"></div>
-    <div style="position: relative; z-index: 2; display: flex; align-items: center; gap: 50px; width: 100%;">
-    <img id="jb-fs-cover" src="" style="width: 320px; height: 320px; border-radius: 15px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); object-fit: cover; background: #111;">
-    <div style="flex: 1; text-shadow: 0 5px 15px rgba(0,0,0,0.8);">
-    <div id="jb-fs-title" style="font-size: 64px; font-weight: 900; color: #fff; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Title</div>
-    <div id="jb-fs-artist" style="font-size: 36px; color: #ccc; margin-bottom: 50px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Artist</div>
-    <div style="display: flex; align-items: center; gap: 20px; font-size: 24px; color: #aaa; font-weight: bold;">
-    <span id="jb-fs-current" style="min-width: 80px; text-align: right;">0:00</span>
-    <div style="flex: 1; height: 10px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 5px rgba(0,0,0,0.8);">
-    <div id="jb-fs-progress" style="width: 0%; height: 100%; background: var(--accent); box-shadow: 0 0 15px var(--accent); transition: width 1s linear;"></div>
-    </div>
-    <span id="jb-fs-total" style="min-width: 80px;">0:00</span>
-    </div>
-    </div>
+    <div style="font-size: clamp(10px, 0.8vw, 14px); letter-spacing: 0.22em; color: var(--text_dim); opacity:0.8; margin-bottom: clamp(14px, 2vh, 30px);">NOW_PLAYING<span style="opacity:0.5">.fullscreen</span></div>
+
+    <div style="display: flex; align-items: center; gap: clamp(24px, 3vw, 56px); width: 100%; box-sizing: border-box; min-width: 0;">
+      <img id="jb-fs-cover" src="" style="width: clamp(180px, 20vw, 340px); aspect-ratio: 1; border: 1px solid var(--border_solid); background: rgba(0,0,0,0.5); object-fit: cover; flex: none;">
+      <div style="flex: 1; min-width: 0;">
+        <div id="jb-fs-title" style="font-size: clamp(30px, 4vw, 68px); font-weight: 700; color: var(--text_main); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+        <div id="jb-fs-artist" style="font-size: clamp(16px, 1.8vw, 32px); color: var(--accent); letter-spacing: 0.08em; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+
+        <div style="height: 1px; background: var(--text_dim); opacity: 0.25; margin: clamp(18px, 3vh, 44px) 0 clamp(12px, 2vh, 26px);"></div>
+
+        <div style="display: flex; align-items: center; gap: 18px; font-size: clamp(13px, 1.1vw, 20px); color: var(--text_dim); letter-spacing: 0.08em;">
+          <span id="jb-fs-current" style="min-width: 62px; text-align: right;">0:00</span>
+          <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.12);">
+            <div id="jb-fs-progress" style="width: 0%; height: 100%; background: var(--accent);"></div>
+          </div>
+          <span id="jb-fs-total" style="min-width: 62px;">0:00</span>
+        </div>
+
+        <div style="height: clamp(46px, 7vh, 96px); margin-top: clamp(14px, 2vh, 30px);">
+          <canvas id="jb-fs-spectrum" style="width:100%; height:100%; display:block;"></canvas>
+        </div>
+      </div>
     </div>
 
-    <div id="jb-fs-controls-hint" style="position: absolute; bottom: 30px; right: 40px; color: rgba(255,255,255,0.5); font-size: 20px; font-weight: bold; z-index: 5; display: flex; align-items: center; gap: 10px;">
-    ${getMappedBtn('NORTH')} Controls
+    <div id="jb-fs-controls-hint" style="position: absolute; bottom: clamp(18px, 3vh, 40px); right: clamp(22px, 3vw, 56px); color: var(--text_dim); font-size: clamp(11px, 0.85vw, 15px); letter-spacing: 0.1em; display: flex; align-items: center; gap: 10px;">
+    ${getMappedBtn('NORTH')} CONTROLS
     </div>
 
-    <div id="jb-fs-controls-popup" class="hidden" style="position: absolute; bottom: 80px; right: 40px; background: rgba(0,0,0,0.85); border: 2px solid var(--border_solid); border-radius: 12px; padding: 25px; z-index: 10; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: opacity 0.3s ease;">
-    <div style="color: var(--text_main); font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 5px; border-bottom: 1px solid var(--border_solid); padding-bottom: 10px;">FULLSCREEN CONTROLS</div>
-    <div style="color: var(--text_sec); font-size: 20px; display: flex; align-items: center; gap: 15px;">${getMappedBtn('SOUTH')} Play / Pause</div>
-    <div style="color: var(--text_sec); font-size: 20px; display: flex; align-items: center; gap: 15px;">${getBtn('L3')} / ${getBtn('R3')} Prev / Next Track</div>
-    <div style="color: var(--text_sec); font-size: 20px; display: flex; align-items: center; gap: 15px;">${getMappedBtn('WEST')} / ${getMappedBtn('EAST')} Exit Fullscreen</div>
+    <div id="jb-fs-controls-popup" class="hidden" style="position: absolute; bottom: clamp(58px, 8vh, 96px); right: clamp(22px, 3vw, 56px); background: var(--bg_panel); border: 1px solid var(--border_solid); padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="color: var(--text_dim); font-size: clamp(10px, 0.75vw, 13px); letter-spacing: 0.2em; border-bottom: 1px solid var(--border); padding-bottom: 8px;">CONTROLS</div>
+    <div style="color: var(--text_sec); font-size: clamp(13px, 1vw, 18px); display: flex; align-items: center; gap: 14px;">${getMappedBtn('SOUTH')} PLAY / PAUSE</div>
+    <div style="color: var(--text_sec); font-size: clamp(13px, 1vw, 18px); display: flex; align-items: center; gap: 14px;">${getBtn('L3')}${getBtn('R3')} PREVIOUS / NEXT</div>
+    <div style="color: var(--text_sec); font-size: clamp(13px, 1vw, 18px); display: flex; align-items: center; gap: 14px;">${getMappedBtn('EAST')} BACK</div>
     </div>
     `;
     document.getElementById('jukebox-screen').appendChild(fsView);
@@ -3049,14 +3147,14 @@ function toggleJbFullscreen() {
   }
 
   if (jbIsFullscreen) {
-    mainCont.style.display = 'none'; hdr.style.display = 'none'; ftr.style.display = 'none';
+    if (shell) shell.style.display = 'none';
     fsView.classList.remove('hidden'); fsView.style.opacity = '1';
     updateJbNowPlayingUI();
   } else {
     fsView.style.opacity = '0'; fsView.classList.add('hidden');
     const pop = document.getElementById('jb-fs-controls-popup');
     if (pop) pop.classList.add('hidden');
-    mainCont.style.display = 'flex'; hdr.style.display = 'flex'; ftr.style.display = 'flex';
+    if (shell) shell.style.display = 'flex';
   }
 }
 

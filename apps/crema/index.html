@@ -4,6 +4,122 @@
   <meta charset="UTF-8">
   <title>Cafe Crema</title>
   <style>
+  /* ── JUKEBOX (Phase 4 W4) ───────────────────────────────────────────────────
+     After cliamp.stream: monospace, box-drawing rules rather than panels, numbered
+     file-name labels, flat surfaces, one accent. ⚠️ Structure and typography only —
+     every colour is a CREMA theme variable, so the user's chosen theme (93 of them,
+     including the live Omarchy one) still drives the look. */
+  #jukebox-screen {
+    padding: 0;
+    font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  }
+  .jb-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(18px, 2.6vh, 42px) clamp(22px, 3vw, 56px);
+    gap: clamp(10px, 1.4vh, 20px);
+  }
+
+  .jb-top { display: flex; flex-direction: column; gap: 8px; }
+  .jb-wordmark {
+    font-size: clamp(20px, 2.2vw, 34px);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: var(--text_main);
+    text-transform: uppercase;
+  }
+  .jb-wordmark-dim { color: var(--accent); opacity: 0.85; letter-spacing: 0.08em; }
+  .jb-rule { height: 1px; background: var(--text_dim); opacity: 0.28; flex: none; }
+  .jb-status-line {
+    font-size: clamp(11px, 0.85vw, 15px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text_dim);
+  }
+
+  .jb-body { flex: 1; display: flex; gap: clamp(16px, 2vw, 40px); min-height: 0; }
+  .jb-col { display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+  .jb-col-nav  { flex: 2; }
+  .jb-col-list { flex: 4; min-width: 0; }
+  .jb-col-now  { flex: 3; min-width: 0; }
+
+  /* Numbered, file-named section labels — the one Cliamp device that carries meaning
+     here, because these four panes ARE read in order. */
+  .jb-label {
+    font-size: clamp(10px, 0.72vw, 13px);
+    letter-spacing: 0.2em;
+    color: var(--text_dim);
+    opacity: 0.75;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+  }
+  .jb-label::after { content: ""; flex: 1; height: 1px; background: currentColor; opacity: 0.3; }
+  .jb-label-inline { margin-top: 6px; }
+
+  .jb-nav { display: flex; flex-direction: column; gap: 2px; }
+  .jb-nav-item {
+    font-size: clamp(14px, 1.05vw, 20px);
+    letter-spacing: 0.12em;
+    padding: 10px 14px;
+    border-left: 3px solid transparent;
+    color: var(--text_sec);
+  }
+  .jb-nav-item.selected {
+    border-left-color: var(--accent);
+    color: var(--accent);
+    background: rgba(255,255,255,0.04);
+  }
+
+  .jb-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .jb-list::-webkit-scrollbar { display: none; }
+
+  .jb-np { display: flex; gap: 14px; align-items: center; flex: none; }
+  .jb-cover-frame {
+    width: clamp(74px, 6vw, 104px);
+    aspect-ratio: 1;
+    border: 1px solid var(--border_solid);
+    background: rgba(0,0,0,0.45);
+    flex: none;
+    overflow: hidden;
+  }
+  .jb-cover-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .jb-np-meta { min-width: 0; }
+  .jb-np-title {
+    font-size: clamp(15px, 1.15vw, 22px);
+    font-weight: 700;
+    color: var(--text_main);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .jb-np-artist {
+    font-size: clamp(12px, 0.85vw, 16px);
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* The spectrum is a canvas now. Height is generous because from a sofa it is the
+     thing that says "this is playing" before any text is read. */
+  .jb-spectrum { height: clamp(56px, 9vh, 104px); flex: none; }
+  .jb-spectrum canvas { width: 100%; height: 100%; display: block; }
+
+  .jb-queue {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    font-size: clamp(12px, 0.85vw, 16px);
+    color: var(--text_sec);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .jb-queue::-webkit-scrollbar { display: none; }
+
+  .jb-foot { letter-spacing: 0.08em; }
+
     /* All fonts bundled locally (no network dependency) — files in assets/fonts/. */
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Regular.ttf') format('truetype'); font-weight: 400; }
     @font-face { font-family: 'Raleway'; src: url('assets/fonts/Raleway-Bold.ttf') format('truetype'); font-weight: 700; }
@@ -625,45 +741,69 @@
       <div class="footer" id="main-footer" data-i18n="html.loading_hw">Loading Hardware Inputs...</div>
     </div>
 
-    <div id="jukebox-screen" class="screen blur-target hidden" style="padding: 50px; display: flex; flex-direction: column;">
-      <div class="header">
-        <h1 class="header-title"><div class="header-icon" style="-webkit-mask-image: url('assets/gamepad_icons/playstation_triangle.png');"></div>CREMA JUKEBOX</h1>
-        <div class="header-brand" id="jb-status" data-i18n="html.jb_scanning">Scanning Library...</div>
-      </div>
-      <div class="main-container" style="gap: 30px;">
+    <!-- ── JUKEBOX ─────────────────────────────────────────────────────────────
+         Phase 4 W4. Redesigned after cliamp.stream: monospace throughout, box-drawing
+         rules instead of panels, numbered file-name section labels, flat surfaces, and a
+         REAL spectrum rather than five CSS keyframe bars.
+         ⚠️ It takes Cliamp's *structure and typography*, not its palette. CREMA ships 93
+         themes and follows the Omarchy one; hardcoding cyan and magenta would break every
+         theme a person actually chose. Every colour below is a theme variable.
+         ⚠️ Every jb-* id the renderer drives is kept — this is a new view over working
+         logic, not a rewrite of the jukebox. -->
+    <div id="jukebox-screen" class="screen blur-target hidden">
+      <div class="jb-shell">
 
-        <div style="flex: 2; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid var(--border); padding-right: 20px;" id="jb-sidebar">
-            <div class="overlay-item" id="jb-nav-0" data-i18n="html.jb_shuffle">SHUFFLE ALL</div>
-            <div class="overlay-item" id="jb-nav-1">ARTISTS</div>
-            <div class="overlay-item" id="jb-nav-2">ALBUMS</div>
-            <div class="overlay-item" id="jb-nav-3">PLAYLISTS</div>
+        <div class="jb-top">
+          <div class="jb-wordmark">CREMA<span class="jb-wordmark-dim">.jukebox</span></div>
+          <div class="jb-rule"></div>
+          <div class="jb-status-line" id="jb-status" data-i18n="html.jb_scanning">Scanning Library...</div>
         </div>
 
-        <div class="list-view" style="flex: 4;" id="jb-list"></div>
+        <div class="jb-body">
 
-        <div style="flex: 3; background: var(--bg_panel); border: 2px solid var(--border_solid); border-radius: 15px; padding: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative;">
-            <div style="font-size: 18px; color: var(--text_dim); font-weight: bold; letter-spacing: 2px; margin-bottom: 15px;" data-i18n="html.jb_now_playing">NOW PLAYING</div>
-            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px;">
-                <img id="jb-np-cover" src="" style="width: 100px; height: 100px; border-radius: 10px; background: #000; object-fit: cover;">
-                <div style="overflow: hidden;">
-                    <div id="jb-np-title" style="font-size: 26px; font-weight: bold; color: var(--text_main); white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">Title</div>
-                    <div id="jb-np-artist" style="font-size: 18px; color: var(--text_sec); white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">Artist</div>
-                </div>
+          <div class="jb-col jb-col-nav">
+            <div class="jb-label">01_browse</div>
+            <div class="jb-nav" id="jb-sidebar">
+              <div class="overlay-item jb-nav-item" id="jb-nav-0" data-i18n="html.jb_shuffle">SHUFFLE ALL</div>
+              <div class="overlay-item jb-nav-item" id="jb-nav-1">ARTISTS</div>
+              <div class="overlay-item jb-nav-item" id="jb-nav-2">ALBUMS</div>
+              <div class="overlay-item jb-nav-item" id="jb-nav-3">PLAYLISTS</div>
+            </div>
+          </div>
+
+          <div class="jb-col jb-col-list">
+            <div class="jb-label">02_tracks</div>
+            <div class="list-view jb-list" id="jb-list"></div>
+          </div>
+
+          <div class="jb-col jb-col-now">
+            <div class="jb-label">03_now_playing</div>
+
+            <div class="jb-np">
+              <div class="jb-cover-frame">
+                <img id="jb-np-cover" src="" alt="">
+              </div>
+              <div class="jb-np-meta">
+                <div id="jb-np-title" class="jb-np-title">—</div>
+                <div id="jb-np-artist" class="jb-np-artist">—</div>
+              </div>
             </div>
 
-            <div style="display: flex; justify-content: center; gap: 5px; height: 40px; margin-bottom: 20px; align-items: flex-end;" id="jb-visualizer">
-                <div class="bar" style="width: 8px; background: var(--accent); animation: bounce 0.5s infinite alternate ease-in;"></div>
-                <div class="bar" style="width: 8px; background: var(--accent); animation: bounce 0.7s infinite alternate ease-in;"></div>
-                <div class="bar" style="width: 8px; background: var(--accent); animation: bounce 0.4s infinite alternate ease-in;"></div>
-                <div class="bar" style="width: 8px; background: var(--accent); animation: bounce 0.6s infinite alternate ease-in;"></div>
-                <div class="bar" style="width: 8px; background: var(--accent); animation: bounce 0.55s infinite alternate ease-in;"></div>
+            <!-- The spectrum. Canvas, drawn from a real AnalyserNode; the div keeps the id
+                 the old CSS-bar markup used so nothing else has to know it changed. -->
+            <div id="jb-visualizer" class="jb-spectrum">
+              <canvas id="jb-spectrum-canvas"></canvas>
             </div>
 
-            <div style="font-size: 16px; color: var(--text_dim); font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 5px;" data-i18n="html.jb_up_next">UP NEXT</div>
-            <div id="jb-queue" style="flex: 1; overflow-y: auto; scrollbar-width: none; font-size: 18px; color: var(--text_sec); display: flex; flex-direction: column; gap: 8px;"></div>
+            <div class="jb-label jb-label-inline">04_queue</div>
+            <div id="jb-queue" class="jb-queue"></div>
+          </div>
+
         </div>
+
+        <div class="jb-rule"></div>
+        <div class="footer jb-foot" id="jb-footer">Loading Controls...</div>
       </div>
-      <div class="footer" id="jb-footer">Loading Controls...</div>
     </div>
 
     <div id="screensaver-backdrop" class="overlay-backdrop hidden" style="z-index: 500; background: #000; transition: opacity 1s ease;">
