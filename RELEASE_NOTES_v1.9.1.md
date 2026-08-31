@@ -17,6 +17,6 @@ Every desktop the suite has run on so far happens to ship all four tools, which 
 2. `chmod +x CafeNeurotico.AppImage`
 3. Run it
 
-**macOS:** this is a Linux-only fix and no new Mac build is published for it. The [1.9.0 `.dmg`](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/tag/v1.9.0) remains the current macOS build, with Windows-game support through CrossOver. See the [macOS guide](docs/macos-guide.md).
+**macOS:** this is a Linux-only fix and no new Mac build is published for it. The [1.9.0 `.dmg`](https://github.com/FromChaosComesClarity/CafeNeurotico/releases/tag/v1.9.0) remains the current macOS build, with Windows-game support through CrossOver. See the [macOS guide](docs/macos-guide.md).
 
 Upgrading from any 1.x? Just replace the AppImage. Your library, artwork, playlists and settings are untouched.

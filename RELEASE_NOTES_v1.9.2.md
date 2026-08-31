@@ -49,6 +49,6 @@ The suite now recognises [Omarchy](https://omarchy.org/) and settles into it.
 2. `chmod +x CafeNeurotico.AppImage`
 3. Run it
 
-**macOS:** this release is Linux-only. The [1.9.0 `.dmg`](https://github.com/shampoo-is-a-lie/CafeNeurotico/releases/tag/v1.9.0) remains the current macOS build, with Windows-game support through CrossOver. See the [macOS guide](docs/macos-guide.md).
+**macOS:** this release is Linux-only. The [1.9.0 `.dmg`](https://github.com/FromChaosComesClarity/CafeNeurotico/releases/tag/v1.9.0) remains the current macOS build, with Windows-game support through CrossOver. See the [macOS guide](docs/macos-guide.md).
 
 Upgrading from any 1.x? Just replace the AppImage. Your library, artwork, playlists and settings are untouched — and on first start the app will correct install states that were carried over from another machine.

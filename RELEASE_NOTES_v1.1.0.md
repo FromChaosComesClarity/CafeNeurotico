@@ -10,7 +10,7 @@ A small, focused release: Cafe Neurotico now opens **straight to a game**.
 ./CafeNeurotico.AppImage --game=753    # opens straight to that game
 ```
 
-The desk-clock companion, [**CafeNeuroticoClock**](https://github.com/shampoo-is-a-lie/CafeNeuroticoClock), is the first to use it: the game name on its slideshow is now clickable and brings you here, to that exact game.
+The desk-clock companion, [**CafeNeuroticoClock**](https://github.com/FromChaosComesClarity/CafeNeuroticoClock), is the first to use it: the game name on its slideshow is now clickable and brings you here, to that exact game.
 
 Everything else from 1.0 is unchanged — same database, same 92 themes, same three faces.
 

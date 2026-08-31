@@ -7,7 +7,7 @@ at `main` = `75ad08c` = v1.9.3).
 Everything here comes from `git log`, tag metadata, shipped release notes, and the repos' own
 READMEs. Interpretation is marked as such.
 
-> The GitHub account was renamed from `shampoo-is-a-lie` to **`FromChaosComesClarity`**
+> The GitHub account was renamed from its original handle to **`FromChaosComesClarity`**
 > (account ID 276099054, unchanged). Links below use the new handle.
 
 ---
@@ -327,7 +327,7 @@ Between bursts, 8–10 day silences.
 - Counted from each repo's default branch only. The monorepo's `experimental` and `mac` branches
   carry commits not included; `origin/mac` is 6 behind `main`.
 - Commit counts are of history as it stands after merges — a measure of activity, not effort.
-- Four author identities appear across the repos (`joserobertoazevedo@`, `shampooisalie@`, the
+- Four author identities appear across the repos (a personal address, an older one, the
   GitHub noreply address, one `jose@Jose-MBAir.local`); all are the same person on different
   machines.
 - CNGM, CREMA and GRINDER are read at their final state; they are archived, not deleted, and

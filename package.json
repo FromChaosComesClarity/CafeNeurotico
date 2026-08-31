@@ -20,7 +20,7 @@
     "postdist": "node scripts/deploy-appimage.mjs",
     "dist:mac": "electron-builder --mac"
   },
-  "author": "Shampoo is a Lie",
+  "author": "J.R.A.",
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
