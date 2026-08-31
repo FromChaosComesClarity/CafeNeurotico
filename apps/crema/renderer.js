@@ -71,8 +71,8 @@ function applyI18nToDOM() {
 
 let gameState = 'SPLASH';
 let allGames = [], filteredGames = [];
-let currentCategoryIndex = 0, currentGameIndex = 0, currentOverlayIndex = 0, currentSearchIndex = 0;
-let overlayItems = [], searchResults = [];
+let currentCategoryIndex = 0, currentGameIndex = 0, currentOverlayIndex = 0;
+let overlayItems = [];
 
 // Default to 5 recent games for CREMA
 let recentGamesCount = 9;
@@ -99,10 +99,6 @@ const OSK_COLS = 7; const OSK_ROWS = 6;
 const oskKeys = [ ['A', 'B', 'C', 'D', 'E', 'F', 'G'], ['H', 'I', 'J', 'K', 'L', 'M', 'N'], ['O', 'P', 'Q', 'R', 'S', 'T', 'U'], ['V', 'W', 'X', 'Y', 'Z', '0', '1'], ['2', '3', '4', '5', '6', '7', '8'], ['9', 'SPACE', 'BKSP', 'CLEAR', 'DONE', '.', '-'] ];
 let oskR = 0, oskC = 0; let searchQuery = "";
 
-let sgdbResults = []; let sgdbIndex = 0;
-let activeScrapeMode = ''; let scrapeSource = 'STEAM';
-let steamSearchResults = []; let selectedAppId = null; let selectedResolvedName = null;
-let igdbSearchResults = []; let selectedIgdbId = null;
 
 // `categories` is the live, navigable filter list. The base entries are fixed;
 // game playlists + a "RECENTLY IMPORTED" auto-category are appended at runtime by
@@ -1183,7 +1179,7 @@ async function boot() {
   for (let g of allGames) { if (g.Screenshot && String(g.Screenshot).trim() !== "") { let paths = String(g.Screenshot).split('|').filter(s => s.trim() !== ""); paths.forEach(p => availableScreenshots.push({ path: p, game: g })); } }
   let prog = 0; const bar = document.getElementById('splash-bar'); const txt = document.getElementById('splash-text');
   const l = setInterval(() => { prog += 2; bar.style.width = `${prog}%`; if (prog === 30) txt.innerText = t('status.grinding'); if (prog === 60) txt.innerText = t('status.brewing'); if (prog >= 100) { clearInterval(l); document.querySelector('.splash-logo').classList.add('boot-anim'); setTimeout(async () => { hasBooted = true; const setupDone = await window.api.getSetting('setup_complete'); if (!setupDone) { applyBgmMode(); showSetupScreen(); } else { if (audioCfg.homeEnabled) transitionToHome(); else transitionToStart(); applyBgmMode(); resetIdleTimer(); } }, 800); } }, 30);
-  requestAnimationFrame(pollGamepad); window.api.onDownloadProgress(updateDownloadProgressBar);
+  requestAnimationFrame(pollGamepad);
   window.api.onInstallStatusUpdated(() => refreshDatabase());
 }
 
@@ -1451,7 +1447,7 @@ function handleInput(action) {
   if (action === 'R3' && isCustom && audioCfg.bgm && audioCfg.bgm_mode === "CUSTOM") { playNextCustom(); return; }
 
   if (audioCfg.bgm && bgmAudio.paused && bgmAudio.src !== "" && gameState !== 'SPLASH' && audioCfg.bgm_mode !== "OFF" && !isVideoActive() && !window.manualBgmPause) { bgmAudio.volume = audioCfg.vol; bgmAudio.play().catch(e=>{}); } else if (isVideoActive() && !bgmAudio.paused) { bgmAudio.pause(); }
-  if (gameState === 'SPLASH' || gameState === 'PROGRESS') return;
+  if (gameState === 'SPLASH') return;
 
   if (gameState === 'START') {
     if (action === 'BACK' && audioCfg.homeEnabled) { playSound(sfxBack); transitionToHome(); return; }
@@ -1465,8 +1461,10 @@ function handleInput(action) {
     if (filteredGames.length === 0 && action !== 'BACK' && action !== 'LEFT' && action !== 'RIGHT' && action !== 'START' && action !== 'Y_BUTTON') return;
     if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); if (_homeOrigin) { transitionToHome(); } else { transitionToStart(); } } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }
     else if (action === 'X_BUTTON') {
+      // Swaps the trailer and the screenshots. ⚠️ Phase 4: with no trailer this used to open
+      // a YouTube search and download one — fetching media is the Manager's job now, so the
+      // button simply has nothing to swap.
       if (gameHasTrailer) { playSound(sfxSelect); mediaSwapped = !mediaSwapped; const md = document.getElementById('media-container'), mn = document.getElementById('mini-dock'), v = document.getElementById('video-player'), s = document.getElementById('screenshot-player'), wp = !v.paused; if (mediaSwapped) { md.appendChild(s); mn.appendChild(v); } else { md.appendChild(v); mn.appendChild(s); } if (wp) v.play().catch(e=>{}); }
-      else openSearchOverlay();
     }
     else if (action === 'ACCEPT') {
       playSound(sfxSelect);
@@ -1593,40 +1591,24 @@ function handleInput(action) {
   else if (gameState === 'JUKEBOX' || gameState === 'JUKEBOX_OVERLAY') { handleJukeboxInput(action); }
   // NOTE: every overlay-menu gameState must be listed here or it receives no input at all —
   // the overlay draws, then d-pad/A/B do nothing and there is no way back out.
-  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'FONTS', 'MUSIC_STYLE', 'GAME_SCRAPE_MENU', 'CONFIRM_SCRAPE', 'SCRAPE_RESULT', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'GENRE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
+  else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'FONTS', 'MUSIC_STYLE', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'GENRE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
     else if (action === 'BACK') {
       if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'FONTS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'GENRE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
-      else if (gameState === 'GAME_SCRAPE_MENU' || gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
-      else if (gameState === 'CONFIRM_SCRAPE') openGameScrapeMenu();
-      else if (['STEAM_MATCH_SELECTOR','STEAM_SEARCH_FAILED','IGDB_MATCH_SELECTOR','IGDB_SEARCH_FAILED'].includes(currentOverlayType)) { closeOverlay(); openGameScrapeMenu(); }
       else if (currentOverlayType === 'CONFIRM_QUIT' || currentOverlayType === 'ABOUT_CREMA') { openOverlay("MAIN_MENU"); }
       else if (currentOverlayType === 'HISTORY_MENU' || currentOverlayType === 'HISTORY_CLEARED') { openOverlay("MAIN_MENU"); }
       else closeOverlay();
     }
     else if (action === 'ACCEPT') {
-      if (gameState === 'GAME_SCRAPE_MENU') executeGameScrapeAction();
-      else if (gameState === 'CONFIRM_SCRAPE') executeConfirmScrapeAction();
-      else if (gameState === 'SCRAPE_RESULT') openOverlay("GAME_MENU");
-      else executeOverlayAction();
+      executeOverlayAction();
     }
-  }
-  else if (gameState === 'SGDB_GRID') {
-    if (sgdbResults.length === 0 && action !== 'BACK') return;
-    if (action === 'LEFT') { sgdbIndex = Math.max(0, sgdbIndex - 1); playSound(sfxNav); renderSgdbGrid(); } else if (action === 'RIGHT') { sgdbIndex = Math.min(sgdbResults.length - 1, sgdbIndex + 1); playSound(sfxNav); renderSgdbGrid(); } else if (action === 'UP') { sgdbIndex = Math.max(0, sgdbIndex - 4); playSound(sfxNav); renderSgdbGrid(); } else if (action === 'DOWN') { sgdbIndex = Math.min(sgdbResults.length - 1, sgdbIndex + 4); playSound(sfxNav); renderSgdbGrid(); }
-    else if (action === 'BACK') { playSound(sfxBack); document.getElementById('sgdb-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
-    else if (action === 'ACCEPT') { playSound(sfxSelect); executeSgdbApply(); }
   }
   else if (gameState === 'SCREENSAVER_MENU') {
     if (action === 'DOWN') { currentOverlayIndex = (currentOverlayIndex + 1) % overlayItems.length; playSound(sfxNav); renderScreensaverMenu(); } else if (action === 'UP') { currentOverlayIndex = (currentOverlayIndex - 1 + overlayItems.length) % overlayItems.length; playSound(sfxNav); renderScreensaverMenu(); } else if (action === 'LEFT' || action === 'RIGHT') handleScreensaverMenuHorizontal(action); else if (action === 'BACK') { playSound(sfxBack); openOverlay("MAIN_MENU"); } else if (action === 'ACCEPT') executeScreensaverMenuAction();
   }
   else if (gameState === 'KEYBINDINGS') { if (action === 'BACK' || action === 'ACCEPT') closeKeybindingsOverlay(); }
-  else if (gameState === 'SEARCH') {
-    if (searchResults.length === 0 && action !== 'BACK') return;
-    if (action === 'DOWN') { currentSearchIndex = (currentSearchIndex + 1) % searchResults.length; playSound(sfxNav); updateSearchSelection(); } else if (action === 'UP') { currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length; playSound(sfxNav); updateSearchSelection(); } else if (action === 'BACK') closeSearchOverlay(); else if (action === 'ACCEPT') executeSearchAction();
-  }
   else if (gameState === 'SOUND') {
     if (action === 'DOWN') { currentOverlayIndex = (currentOverlayIndex + 1) % overlayItems.length; playSound(sfxNav); renderSoundMenu(); } else if (action === 'UP') { currentOverlayIndex = (currentOverlayIndex - 1 + overlayItems.length) % overlayItems.length; playSound(sfxNav); renderSoundMenu(); } else if (action === 'LEFT' || action === 'RIGHT') handleSoundHorizontal(action); else if (action === 'BACK') closeSoundOverlay(); else if (action === 'ACCEPT') executeSoundAction();
   }
@@ -1653,8 +1635,6 @@ function handleOSKInput(action) {
   if (action === 'UP') { oskR = (oskR - 1 + OSK_ROWS) % OSK_ROWS; playSound(sfxNav); renderOSK(); } else if (action === 'DOWN') { oskR = (oskR + 1) % OSK_ROWS; playSound(sfxNav); renderOSK(); } else if (action === 'LEFT') { oskC = (oskC - 1 + OSK_COLS) % OSK_COLS; playSound(sfxNav); renderOSK(); } else if (action === 'RIGHT') { oskC = (oskC + 1) % OSK_COLS; playSound(sfxNav); renderOSK(); }
   else if (action === 'BACK' || action === 'START') {
     if (oskMode === 'SEARCH') closeOSK();
-    else if (oskMode === 'LAUNCH_CMD' || oskMode === 'RENAME_GAME') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openOverlay('GAME_MENU'); }
-    else if (oskMode === 'SGDB_API' || oskMode === 'REFINE_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
     else if (oskMode === 'NEW_PLAYLIST' || oskMode === 'NEW_PLAYLIST_ADD' || oskMode === 'JB_SEARCH' || oskMode === 'RENAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); gameState = 'JUKEBOX'; }
     else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); if (_newPlFromGallery) { _newPlFromGallery = false; document.getElementById('cfgp-screen').classList.add('hidden'); document.getElementById('ggp-screen').classList.add('hidden'); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; setBlur(false); } else { renderPlaylistAssignMenu(); } }
     else if (oskMode === 'GALLERY_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; }
@@ -1673,17 +1653,7 @@ function handleOSKInput(action) {
     else if (key === 'DONE') {
       if (oskMode === 'GALLERY_SEARCH') { galleryQuery = targetStr; applyGalleryFilter(); renderGalleryGrid(); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; return; }
       if (oskMode === 'SEARCH') { closeOSK(); return; }
-      else if (oskMode === 'LAUNCH_CMD') {
-        const g = filteredGames[currentGameIndex];
-        g.LaunchCommand = targetStr;
-        window.api.saveDbField({game: g.Game, field: 'LaunchCommand', value: targetStr});
-        if (targetStr && isManualCategory(g)) { g.Installed = 1; window.api.saveDbField({game: g.Game, field: 'Installed', value: 1}); }
-        document.getElementById('osk-backdrop').classList.add('hidden'); refreshDatabase(); openOverlay('GAME_MENU'); return;
-      }
-      else if (oskMode === 'RENAME_GAME') { const oldName = filteredGames[currentGameIndex].Game; filteredGames[currentGameIndex].Game = targetStr; window.api.saveDbField({game: oldName, field: 'Game', value: targetStr}); document.getElementById('osk-backdrop').classList.add('hidden'); refreshDatabase(); openOverlay('GAME_MENU'); return; }
       else if (oskMode === 'INSTALL_DIR') { _grinderInstallDir = targetStr || _grinderInstallDir; document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('gc-dir').textContent = _grinderInstallDir; showGrinderConfirm(_grinderConfirmGame); return; }
-      else if (oskMode === 'SGDB_API') { window.api.setSetting('steamgriddb_api', targetStr).then(() => { document.getElementById('osk-backdrop').classList.add('hidden'); openSgdbOverlay(targetStr, selectedResolvedName, selectedAppId); }); return; }
-      else if (oskMode === 'REFINE_SEARCH') { document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('overlay-backdrop').classList.remove('hidden'); triggerSteamSearch(targetStr); return; }
       else if (oskMode === 'NEW_GAME_PLAYLIST') {
         document.getElementById('osk-backdrop').classList.add('hidden');
         const nm = String(targetStr).trim();
@@ -1947,13 +1917,6 @@ function openPico8Menu() {
   renderGenericOverlay('PICO-8 GAMES', mapped);
 }
 
-function openHiddenGamesMenu() {
-  gameState = 'OVERLAY'; currentOverlayType = 'HIDDEN_MENU'; playSound(sfxSelect);
-  const hidden = allGames.filter(g => g.Hidden == 1).sort((a, b) => String(a.Game).localeCompare(String(b.Game)));
-  const items = hidden.length ? ['§SELECT A GAME TO UNHIDE IT', ...hidden.map(g => g.Game)] : ['§NO HIDDEN GAMES'];
-  items.push(t('common.back_to_menu'));
-  renderGenericOverlay('HIDDEN GAMES', items);
-}
 
 function openFreeGamesMenu() {
   gameState = 'OVERLAY';
@@ -1968,20 +1931,26 @@ async function openOverlay(type) {
   if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
-  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, 'FILTER BY GENRE', t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', 'HIDDEN GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
+  if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, 'FILTER BY GENRE', t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
-    const game = filteredGames[currentGameIndex]; const localUrl = await window.api.checkLocalTrailer(game.Game);
-    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED'; const cmdItems = (game.LaunchCommand && game.LaunchCommand.trim() !== "") ? [] : [t('game_menu.add_launch')]; /* EDIT LAUNCH COMMAND removed for release */ const trStr = localUrl ? t('game_menu.delete_trailer') : t('game_menu.download_trailer');
+    // ⚠️ Phase 4: this menu holds opinions about a game, not maintenance of it. Downloading
+    // and deleting trailers, renaming, scraping, typing a launch command and uninstalling all
+    // moved to the Manager — they edit the library, and this is the face you use from a sofa.
+    const game = filteredGames[currentGameIndex];
+    const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED';
     const storeL = (game.Store || '').toLowerCase();
     const isGrinderStore = ((storeL.includes('gog') || storeL.includes('epic')) && game.app_id) || !!game.GrinderGameId;
     const isInstalled = game.Installed == null || game.Installed == 1;
-    const grinderItems = isGrinderStore ? (isInstalled ? ['§GRINDER', 'UNINSTALL VIA GRINDER'] : ['§GRINDER', 'INSTALL VIA GRINDER']) : [];
+    // Install stays: getting a game you own onto the machine is what you came here to do.
+    // Uninstall does not: it is management, and doing it by accident from a gamepad is the
+    // failure that matters.
+    const grinderItems = (isGrinderStore && !isInstalled) ? ['§GRINDER', 'INSTALL VIA GRINDER'] : [];
     const gogId = _cGogAppId(game); const steamRaw = game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '') : null;
     let hasAchievements = false;
     if (gogId) { const r = await window.api.getGameAchievements(gogId); if (r.ok && r.achievements.length) hasAchievements = true; }
     if (!hasAchievements && steamRaw) { const r = await window.api.getGameAchievements(`steam_${steamRaw}`); if (r.ok && r.achievements.length) hasAchievements = true; }
     const achItems = hasAchievements ? ['§ACHIEVEMENTS', 'VIEW ACHIEVEMENTS'] : [];
-    renderGenericOverlay(t('menu.game_options'), [trStr, favStr, wantStr, playedStr, 'ADD TO PLAYLIST', ...cmdItems, t('game_menu.rename'), t('game_menu.scraping'), ...achItems, ...grinderItems, t('common.close_menu')]);
+    renderGenericOverlay(t('menu.game_options'), [favStr, wantStr, playedStr, 'ADD TO PLAYLIST', ...achItems, ...grinderItems, t('common.close_menu')]);
   }
 }
 
@@ -2033,27 +2002,6 @@ function executeOverlayAction() {
     return;
   }
 
-  if (currentOverlayType === 'STEAM_MATCH_SELECTOR') {
-    if (action === t('common.cancel_search')) { openGameScrapeMenu(); }
-    else { const match = steamSearchResults[currentOverlayIndex]; proceedWithScrape(match.id, match.name); }
-    return;
-  }
-
-  if (currentOverlayType === 'STEAM_SEARCH_FAILED') {
-    if (action === t('dialog.refine_search')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('REFINE_SEARCH', t('osk.refine_search'), filteredGames[currentGameIndex].Game); }
-    else if (action === t('dialog.search_igdb')) { triggerIgdbSearch(filteredGames[currentGameIndex].Game); }
-    else { openGameScrapeMenu(); }
-    return;
-  }
-
-  if (currentOverlayType === 'IGDB_MATCH_SELECTOR') {
-    if (action === t('common.cancel_search')) { openGameScrapeMenu(); }
-    else { const match = igdbSearchResults[currentOverlayIndex]; scrapeSource = 'IGDB'; proceedWithIgdbScrape(match.id, match.name); }
-    return;
-  }
-
-  if (currentOverlayType === 'IGDB_SEARCH_FAILED') { openGameScrapeMenu(); return; }
-
   if (currentOverlayType === 'HISTORY_MENU') {
     if (action === t('common.back_to_menu')) {
       openOverlay("MAIN_MENU");
@@ -2072,6 +2020,11 @@ function executeOverlayAction() {
       applyLiveFilters();
       openHistoryMenu();
     }
+    return;
+  }
+
+  if (currentOverlayType === 'NEEDS_MANAGER') {
+    closeOverlay();
     return;
   }
 
@@ -2141,14 +2094,6 @@ function executeOverlayAction() {
     return;
   }
 
-  if (currentOverlayType === 'HIDDEN_MENU') {
-    if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
-    const g = allGames.find(x => x.Game === action && x.Hidden == 1);
-    if (g) { g.Hidden = 0; window.api.saveDbField({ game: g.Game, field: 'Hidden', value: 0 }); applyLiveFilters(); applyGalleryFilter(); }
-    openHiddenGamesMenu();
-    return;
-  }
-
   if (currentOverlayType === 'HOME_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
     const label = String(action).replace('★ ', '');
@@ -2170,13 +2115,7 @@ function executeOverlayAction() {
     else if (action === t('game_menu.add_want') || action === t('game_menu.remove_want')) { const val = action === t('game_menu.add_want') ? "YES" : "NO"; filteredGames[currentGameIndex].WANT_TO_PLAY = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'WANT_TO_PLAY', value: val}); refreshDatabase(); closeOverlay(); }
     else if (action === 'MARK AS PLAYED' || action === 'UNMARK PLAYED') { const val = action === 'MARK AS PLAYED' ? 1 : 0; filteredGames[currentGameIndex].kb_played = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'kb_played', value: val}); refreshDatabase(); closeOverlay(); }
     else if (action === 'ADD TO PLAYLIST') { openPlaylistAssignMenu(); }
-    else if (action === t('game_menu.add_launch') || action === t('game_menu.edit_launch')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('LAUNCH_CMD', t('osk.launch_command'), filteredGames[currentGameIndex].LaunchCommand || ""); }
-    else if (action === t('game_menu.rename')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('RENAME_GAME', t('osk.rename_game'), filteredGames[currentGameIndex].Game); }
-    else if (action === t('game_menu.scraping')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openGameScrapeMenu(); }
-    else if (action === t('game_menu.download_trailer')) openSearchOverlay();
-    else if (action === t('game_menu.delete_trailer')) { clearMediaLoaders(); window.api.deleteTrailer(filteredGames[currentGameIndex].Game).then(() => { setDebug("🗑️ Trailer Deleted", true); refreshDatabase(); closeOverlay(); }); }
     else if (action === 'INSTALL VIA GRINDER') { closeOverlay(); const _ig = filteredGames[currentGameIndex]; tryInstall(_ig, () => { const _stL = (_ig.Store || '').toLowerCase(); if (_ig.GrinderGameId && !_stL.includes('gog') && !_stL.includes('epic')) { window.api.openGrinderGui(_ig.Game); } else { showGrinderConfirm(_ig); } }); }
-    else if (action === 'UNINSTALL VIA GRINDER') { closeOverlay(); triggerGrinderUninstall(filteredGames[currentGameIndex]); }
     else if (action === 'VIEW ACHIEVEMENTS') {
       const game = filteredGames[currentGameIndex];
       document.getElementById('overlay-backdrop').classList.add('hidden');
@@ -2198,7 +2137,6 @@ else if (action === 'FILTER BY GENRE') { openGenreFilterMenu(); }
 else if (action === t('menu.history')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openHistoryMenu(); }
     else if (action === 'PICO-8 GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openPico8Menu(); }
     else if (action === 'FREE-TO-PLAY GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openFreeGamesMenu(); }
-    else if (action === 'HIDDEN GAMES') { document.getElementById('overlay-backdrop').classList.add('hidden'); openHiddenGamesMenu(); }
     else if (action === t('menu.start_screen')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openStartScreenMenu(); }
     else if (action === t('browse.mode')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openBrowseModeMenu(); }
     else if (action === 'GAMEPAGE STYLE') { document.getElementById('overlay-backdrop').classList.add('hidden'); openGamepageStyleMenu(); }
@@ -2353,137 +2291,15 @@ function closeKeybindingsOverlay() {
   openOverlay("MAIN_MENU");
 }
 
-function openGameScrapeMenu() {
-  gameState = 'GAME_SCRAPE_MENU'; playSound(sfxSelect); currentOverlayIndex = 0; scrapeSource = 'STEAM';
-  document.getElementById('overlay-backdrop').classList.remove('hidden');
-  renderGenericOverlay(t('scraping.title'), [t('scraping.all'), t('scraping.clear_all'), t('scraping.custom_cover'), t('scraping.cover'), t('scraping.remove_cover'), t('scraping.screenshots'), t('scraping.remove_screenshots'), t('scraping.metadata'), t('scraping.remove_metadata'), t('common.back_to_game_options')]);
-}
 
-async function executeGameScrapeAction() {
-  playSound(sfxSelect); const action = overlayItems[currentOverlayIndex]; const game = filteredGames[currentGameIndex];
-  if (action === t('common.back_to_game_options')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("GAME_MENU"); }
-  else if (action === t('scraping.clear_all')) {
-    const fields = ['CoverArt', 'Screenshot', 'DEV', 'PUB', 'RELEASED', 'GENRE', 'METACRITIC', 'Description', 'ProtonTier', 'SteamAppID'];
-    fields.forEach(f => { game[f] = ""; window.api.saveDbField({game: game.Game, field: f, value: ""}); });
-    await refreshDatabase(); gameState = 'SCRAPE_RESULT'; renderGenericOverlay(t('dialog.action_completed'), [t('status.all_cleared'), t('common.back_to_game_options')]);
-  }
-  else if (action === t('scraping.remove_cover')) { game.CoverArt = ""; window.api.saveDbField({game: game.Game, field: 'CoverArt', value: ""}); await refreshDatabase(); gameState = 'SCRAPE_RESULT'; renderGenericOverlay(t('dialog.action_completed'), [t('status.cover_removed'), t('common.back_to_game_options')]); }
-  else if (action === t('scraping.remove_screenshots')) { game.Screenshot = ""; window.api.saveDbField({game: game.Game, field: 'Screenshot', value: ""}); await refreshDatabase(); gameState = 'SCRAPE_RESULT'; renderGenericOverlay(t('dialog.action_completed'), [t('status.screenshots_removed'), t('common.back_to_game_options')]); }
-  else if (action === t('scraping.remove_metadata')) { const fields = ['DEV', 'PUB', 'RELEASED', 'GENRE', 'METACRITIC', 'Description', 'ProtonTier', 'SteamAppID']; fields.forEach(f => { game[f] = ""; window.api.saveDbField({game: game.Game, field: f, value: ""}); }); await refreshDatabase(); gameState = 'SCRAPE_RESULT'; renderGenericOverlay(t('dialog.action_completed'), [t('status.metadata_removed'), t('common.back_to_game_options')]); }
-  else {
-    if (action === t('scraping.all')) activeScrapeMode = 'ALL';
-    else if (action === t('scraping.custom_cover')) activeScrapeMode = 'SGDB';
-    else if (action === t('scraping.cover')) activeScrapeMode = 'COVER';
-    else if (action === t('scraping.screenshots')) activeScrapeMode = 'SCREENSHOTS';
-    else if (action === t('scraping.metadata')) activeScrapeMode = 'METADATA';
-    document.getElementById('overlay-backdrop').classList.remove('hidden');
-    triggerSteamSearch(game.Game);
-  }
-}
 
-async function triggerSteamSearch(searchTerm) {
-  document.getElementById('overlay-title').innerText = t('status.searching');
-  document.getElementById('overlay-list').innerHTML = `<div class='overlay-item selected' style='color: var(--accent);'>${t('status.querying_steam')}</div>`;
 
-  steamSearchResults = await window.api.searchSteam(searchTerm);
-  if (steamSearchResults.length === 0) {
-    currentOverlayType = 'STEAM_SEARCH_FAILED'; gameState = 'OVERLAY';
-    renderGenericOverlay(t('dialog.no_matches'), [t('dialog.refine_search'), t('dialog.search_igdb'), t('common.back_to_scraping')]);
-    return;
-  }
 
-  currentOverlayType = 'STEAM_MATCH_SELECTOR'; gameState = 'OVERLAY';
-  let items = steamSearchResults.map(r => `${r.name} (${r.id})`); items.push(t('common.cancel_search'));
-  renderGenericOverlay(t('dialog.select_match'), items);
-}
 
-function proceedWithScrape(appId, resolvedName) {
-  selectedAppId = appId; selectedResolvedName = resolvedName; gameState = 'CONFIRM_SCRAPE';
-  let modeText = activeScrapeMode === 'ALL' ? 'ALL DATA' : activeScrapeMode;
-  renderGenericOverlay(t('confirm.confirm_action'), [t('confirm.proceed_scrape', {mode: modeText}), t('common.cancel')]);
-}
 
-async function triggerIgdbSearch(searchTerm) {
-  document.getElementById('overlay-title').innerText = t('status.searching');
-  document.getElementById('overlay-list').innerHTML = `<div class='overlay-item selected' style='color: var(--accent);'>${t('status.contacting_api')}</div>`;
-  igdbSearchResults = await window.api.searchIgdb(searchTerm);
-  if (igdbSearchResults.length === 0) {
-    currentOverlayType = 'IGDB_SEARCH_FAILED'; gameState = 'OVERLAY';
-    renderGenericOverlay(t('dialog.no_matches'), [t('common.back_to_scraping')]);
-    return;
-  }
-  currentOverlayType = 'IGDB_MATCH_SELECTOR'; gameState = 'OVERLAY';
-  const items = igdbSearchResults.map(r => r.year ? `${r.name} (${r.year})` : r.name);
-  items.push(t('common.cancel_search'));
-  renderGenericOverlay(t('dialog.select_match'), items);
-}
 
-function proceedWithIgdbScrape(igdbId, resolvedName) {
-  selectedIgdbId = igdbId; selectedResolvedName = resolvedName; gameState = 'CONFIRM_SCRAPE';
-  let modeText = activeScrapeMode === 'ALL' ? 'ALL DATA' : activeScrapeMode;
-  renderGenericOverlay(t('confirm.confirm_action'), [t('confirm.proceed_scrape', {mode: modeText}), t('common.cancel')]);
-}
 
-async function executeConfirmScrapeAction() {
-  playSound(sfxSelect); const action = overlayItems[currentOverlayIndex];
-  if (action === t('common.cancel')) { openGameScrapeMenu(); }
-  else {
-    const game = filteredGames[currentGameIndex];
-    if (activeScrapeMode === 'SGDB') {
-      document.getElementById('overlay-backdrop').classList.add('hidden');
-      const key = await window.api.getSetting('steamgriddb_api');
-      if (!key) { openOSK('SGDB_API', t('osk.sgdb_api_key'), ''); } else { openSgdbOverlay(key, selectedResolvedName, selectedAppId); }
-    } else {
-      document.getElementById('overlay-title').innerText = t('status.searching');
-      document.getElementById('overlay-list').innerHTML = `<div class='overlay-item selected' style='color: var(--accent);'>${t('status.contacting_api')}</div>`;
-      let modeText = activeScrapeMode === 'ALL' ? 'ALL DATA' : activeScrapeMode;
-      let success = false;
-      try {
-        if (scrapeSource === 'IGDB') {
-          success = await window.api.scrapeIgdbData(game.Game, activeScrapeMode, selectedIgdbId);
-        } else {
-          success = await window.api.scrapeSteamData(game.Game, activeScrapeMode, selectedAppId);
-        }
-      } catch (err) { console.error('[scrape] failed:', err); }
-      // Refresh separately so a DB/view-refresh error can't strand the 'contacting api'
-      // message on screen — the result overlay below must always replace it.
-      try { await refreshDatabase(); } catch (err) { console.error('[scrape] refresh failed:', err); }
-      gameState = 'SCRAPE_RESULT';
-      renderGenericOverlay(t('dialog.scraping_status'), [success ? t('status.scraped_ok', {mode: modeText}) : t('status.no_data'), t('common.back_to_game_options')]);
-    }
-  }
-}
 
-async function openSgdbOverlay(apiKey, resolvedName, appId) {
-  gameState = 'SGDB_GRID'; sgdbIndex = 0; sgdbResults = [];
-  const bd = document.getElementById('sgdb-backdrop'); const stat = document.getElementById('sgdb-status'); const grid = document.getElementById('sgdb-grid');
-  grid.innerHTML = ''; stat.innerText = t('status.connecting_sgdb'); bd.classList.remove('hidden');
-  let searchName = resolvedName || selectedResolvedName || filteredGames[currentGameIndex].Game;
-  let sAppId = appId || selectedAppId;
-  sgdbResults = await window.api.sgdbSearch(searchName, apiKey, sAppId);
-  if (sgdbResults.length === 0) { stat.innerText = t('status.no_covers'); setTimeout(() => { bd.classList.add('hidden'); gameState = 'SCRAPE_RESULT'; document.getElementById('overlay-backdrop').classList.remove('hidden'); renderGenericOverlay(t('dialog.search_failed'), [t('status.no_custom_covers'), t('common.back_to_game_options')]); }, 2000); return; }
-  stat.innerText = t('sgdb.select_cover'); renderSgdbGrid();
-}
-
-function renderSgdbGrid() {
-  const grid = document.getElementById('sgdb-grid'); grid.innerHTML = '';
-  sgdbResults.forEach((res, i) => {
-    const div = document.createElement('div');
-    div.style.border = (i === sgdbIndex) ? "4px solid var(--accent)" : "4px solid transparent";
-    div.style.borderRadius = "8px"; div.style.overflow = "hidden"; div.style.transition = "transform 0.2s";
-    div.style.transform = (i === sgdbIndex) ? "scale(1.05)" : "scale(1)";
-    const img = document.createElement('img'); img.src = res.thumb; img.style.width = "100%"; img.style.display = "block";
-    div.appendChild(img); grid.appendChild(div);
-    if (i === sgdbIndex) div.scrollIntoView({ behavior: "smooth", block: "center" });
-  });
-}
-
-async function executeSgdbApply() {
-  const bd = document.getElementById('sgdb-backdrop'); const stat = document.getElementById('sgdb-status'); stat.innerText = t('sgdb.downloading_cover');
-  const success = await window.api.sgdbApply(filteredGames[currentGameIndex].Game, sgdbResults[sgdbIndex].url);
-  bd.classList.add('hidden'); await refreshDatabase(); gameState = 'SCRAPE_RESULT'; document.getElementById('overlay-backdrop').classList.remove('hidden');
-  renderGenericOverlay(t('dialog.scraping_status'), [success ? t('status.cover_applied') : t('status.download_failed'), t('common.back_to_game_options')]);
-}
 
 function openScreensaverMenu() { gameState = 'SCREENSAVER_MENU'; playSound(sfxSelect); currentOverlayIndex = 0; document.getElementById('overlay-backdrop').classList.remove('hidden'); renderScreensaverMenu(); }
 function renderScreensaverMenu() { const bd = document.getElementById('overlay-backdrop'); const tit = document.getElementById('overlay-title'); const lst = document.getElementById('overlay-list'); lst.innerHTML = ''; tit.innerText = t('screensaver.title'); overlayItems = [`${t('screensaver.mode_prefix')}: ${audioCfg.screensaver}`, t('screensaver.delay', {n: audioCfg.screensaverDelay}), t('screensaver.view_now'), t('common.back_to_menu')]; overlayItems.forEach((item, i) => { const div = document.createElement('div'); div.className = 'overlay-item'; div.innerText = item; div.id = `ssm-${i}`; lst.appendChild(div); }); document.querySelectorAll('#overlay-backdrop .overlay-item').forEach(el => el.classList.remove('selected')); const el = document.getElementById(`ssm-${currentOverlayIndex}`); if (el) el.classList.add('selected'); }
@@ -2599,13 +2415,6 @@ function executeSoundAction() { playSound(sfxSelect); if (currentOverlayIndex ==
 function closeSoundOverlay() { playSound(sfxBack); document.getElementById('sound-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE') setBlur(false); }
 
 
-async function openSearchOverlay() { if (document.getElementById('overlay-backdrop')) document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = 'SEARCH'; playSound(sfxSelect); setBlur(true); const bd = document.getElementById('search-backdrop'); const lst = document.getElementById('search-list'); const stat = document.getElementById('search-status'); lst.innerHTML = ''; currentSearchIndex = 0; searchResults = []; stat.innerText = t('status.searching_yt'); bd.classList.remove('hidden'); const results = await window.api.searchYoutube(filteredGames[currentGameIndex].Game); if(results.length === 0) { stat.innerText = t('status.no_results'); setTimeout(closeSearchOverlay, 2000); return; } stat.innerText = "Select a video to download:"; searchResults = results; searchResults.forEach((res, i) => { const div = document.createElement('div'); div.className = 'overlay-item'; div.id = `search-${i}`; div.style.display = "flex"; div.style.gap = "20px"; div.style.alignItems = "center"; div.style.textAlign = "left"; const img = document.createElement('img'); img.src = res.thumbnail; img.style.width = "120px"; img.style.borderRadius = "4px"; let ttl = String(res.title); if(ttl.length > 50) ttl = ttl.substring(0, 47) + "..."; div.appendChild(img); const txt = document.createElement('div'); txt.innerText = ttl; div.appendChild(txt); lst.appendChild(div); }); updateSearchSelection(); }
-function updateSearchSelection() { document.querySelectorAll('#search-list .overlay-item').forEach(el => el.classList.remove('selected')); const el = document.getElementById(`search-${currentSearchIndex}`); if (el) el.classList.add('selected'); }
-function closeSearchOverlay() { playSound(sfxBack); document.getElementById('search-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); }
-function executeSearchAction() { playSound(sfxSelect); const selectedVideo = searchResults[currentSearchIndex]; closeSearchOverlay(); openProgressOverlay(filteredGames[currentGameIndex].Game, selectedVideo.title, selectedVideo.id); }
-function openProgressOverlay(gameName, videoTitle, videoId) { gameState = 'PROGRESS'; setBlur(true); const bd = document.getElementById('progress-backdrop'); const gameEl = document.getElementById('progress-game'); const fillEl = document.getElementById('progress-fill'); const percentEl = document.getElementById('progress-percent'); const statusEl = document.getElementById('progress-status'); let ttl = String(videoTitle); if(ttl.length > 45) ttl = ttl.substring(0, 42) + "..."; gameEl.innerText = gameName; statusEl.innerText = t('status.requesting_formats', {title: ttl}); fillEl.style.width = "0%"; percentEl.innerText = "0%"; bd.classList.remove('hidden'); window.api.downloadTrailer(gameName, videoId).then(success => { if(success) { statusEl.innerText = t('status.complete'); setDebug("🎬 Download successful", true); setTimeout(closeProgressOverlay, 1500); } else { statusEl.innerText = t('status.download_failed'); setDebug("❌ Download failed", true); setTimeout(closeProgressOverlay, 3000); } }).catch(() => { statusEl.innerText = t('status.download_failed'); setTimeout(closeProgressOverlay, 3000); }); }
-function updateDownloadProgressBar(percentage) { const fillEl = document.getElementById('progress-fill'); const percentEl = document.getElementById('progress-percent'); const statusEl = document.getElementById('progress-status'); if (gameState !== 'PROGRESS' || !fillEl || !percentEl) return; statusEl.innerText = t('status.ripping'); fillEl.style.width = `${percentage}%`; percentEl.innerText = `${Math.floor(percentage)}%`; }
-function closeProgressOverlay() { document.getElementById('progress-backdrop').classList.add('hidden'); gameState = 'MAIN'; setBlur(false); updateGameSelection(); }
 
 function getMediaForCategory(catName) {
   const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OPENBOR") return s.includes("openbor"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
@@ -4077,7 +3886,6 @@ function updateGalleryGamepageContent(game) {
   const _stL = (game.Store || '').toLowerCase();
   const _hasAppid = game.SteamAppID && String(game.SteamAppID).trim() && String(game.SteamAppID) !== 'None';
   document.getElementById('ggp-btn-steam').style.display = _hasAppid ? 'block' : 'none';
-  document.getElementById('ggp-btn-uninstall').style.display = (isGameInstalled && hasCmd && (_stL.includes('gog') || _stL.includes('epic'))) ? 'block' : 'none';
 
   updateGalleryGamepageBadges(game);
   ggpBuildButtonList();
@@ -4203,9 +4011,8 @@ function clearGalleryMedia() {
 }
 
 function ggpBuildButtonList() {
-  const ids = ['ggp-btn-fav', 'ggp-btn-want', 'ggp-btn-playlist', 'ggp-btn-hide'];
+  const ids = ['ggp-btn-fav', 'ggp-btn-want', 'ggp-btn-playlist'];
   if (document.getElementById('ggp-btn-steam')?.style.display !== 'none') ids.push('ggp-btn-steam');
-  if (document.getElementById('ggp-btn-uninstall')?.style.display !== 'none') ids.push('ggp-btn-uninstall');
   if (document.getElementById('ggp-btn-trailer')?.style.display !== 'none') ids.push('ggp-btn-trailer');
   if (document.getElementById('ggp-btn-play')?.style.display !== 'none') ids.push('ggp-btn-play');
   ggpButtonIds = ids;
@@ -4255,15 +4062,9 @@ function ggpActivateButton() {
     filteredGames = galleryGames; currentGameIndex = galleryIndex;
     _plAssignReturn = 'GALLERY_GAMEPAGE';
     openPlaylistAssignMenu(game);
-  } else if (id === 'ggp-btn-hide') {
-    game.Hidden = 1;
-    window.api.saveDbField({ game: game.Game, field: 'Hidden', value: 1 });
-    if (_homeOrigin) { transitionToHome(); } else { closeGalleryGamepage(); }
   } else if (id === 'ggp-btn-steam') {
     const appid = String(game.SteamAppID || '').replace(/\.0+$/, '');
     if (appid) window.api.openInstallUrl('steam://nav/games/details/' + appid);
-  } else if (id === 'ggp-btn-uninstall') {
-    triggerGrinderUninstall(game);
   } else if (id === 'ggp-btn-trailer') {
     const url = document.getElementById('ggp-btn-trailer')?.dataset?.url;
     if (url) { ggpPlayTrailer(url); }
@@ -4271,8 +4072,10 @@ function ggpActivateButton() {
     const playBtnEl = document.getElementById('ggp-btn-play');
     if (playBtnEl?.dataset?.installMode === 'add_cmd') {
       previousGameState = 'GALLERY_GAMEPAGE';
-      document.getElementById('overlay-backdrop').classList.add('hidden');
-      openOSK('LAUNCH_CMD', t('osk.launch_command'), '');
+      currentOverlayType = 'NEEDS_MANAGER';
+      renderGenericOverlay('SET THIS UP IN THE MANAGER', ['OK'],
+        'This game has no launch command yet. Open Cafe Neurotico on your desk and add it there — ' +
+        'CREMA plays what the Manager has set up.');
     } else if (playBtnEl?.dataset?.installMode === '1') {
       tryInstall(game, () => {
         const stL = (game.Store || '').toLowerCase();
@@ -4558,7 +4361,6 @@ async function openCremaFlatGamepage(game) {
   const _cHasAppid = game.SteamAppID && String(game.SteamAppID).trim() && String(game.SteamAppID) !== 'None';
   const _cInstalled = game.Installed == null || game.Installed == 1;
   document.getElementById('cfgp-btn-steam').style.display = _cHasAppid ? '' : 'none';
-  document.getElementById('cfgp-btn-uninstall').style.display = (_cInstalled && game.LaunchCommand && (_cstL.includes('gog') || _cstL.includes('epic'))) ? '' : 'none';
   const _cf2 = document.getElementById('cfgp-f2p-pill'); if (_cf2) _cf2.style.display = game.FreeToPlay == 1 ? '' : 'none';
 
   _cfgpBuildButtonList();
@@ -4586,7 +4388,7 @@ function _cfgpUpdateBadges(game) {
 }
 
 function _cfgpBuildButtonList() {
-  _cfgpBtns = ['cfgp-btn-back','cfgp-btn-fav','cfgp-btn-want','cfgp-btn-playlist','cfgp-btn-hide','cfgp-btn-steam','cfgp-btn-uninstall','cfgp-btn-trailer','cfgp-btn-play']
+  _cfgpBtns = ['cfgp-btn-back','cfgp-btn-fav','cfgp-btn-want','cfgp-btn-playlist','cfgp-btn-steam','cfgp-btn-trailer','cfgp-btn-play']
     .map(id => document.getElementById(id))
     .filter(b => b && b.style.display !== 'none');
 }
@@ -4619,17 +4421,9 @@ function _cfgpActivateBtn() {
   } else if (id === 'cfgp-btn-playlist') {
     _plAssignReturn = 'CREMA_FGP';
     openPlaylistAssignMenu(game);
-  } else if (id === 'cfgp-btn-hide') {
-    game.Hidden = 1;
-    window.api.saveDbField({ game: game.Game, field: 'Hidden', value: 1 });
-    closeCremaFlatGamepage();
-    if (_homeOrigin) { transitionToHome(); }
-    else { applyGalleryFilter(); renderGalleryGrid(); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); }
   } else if (id === 'cfgp-btn-steam') {
     const appid = String(game.SteamAppID || '').replace(/\.0+$/, '');
     if (appid) window.api.openInstallUrl('steam://nav/games/details/' + appid);
-  } else if (id === 'cfgp-btn-uninstall') {
-    triggerGrinderUninstall(game);
   } else if (id === 'cfgp-btn-trailer') {
     const video = document.getElementById('cfgp-video');
     if (video.src && video.style.display !== 'none') {
@@ -4642,8 +4436,10 @@ function _cfgpActivateBtn() {
     const mode = btn.dataset.installMode;
     if (mode === 'add_cmd') {
       previousGameState = 'CREMA_FGP';
-      document.getElementById('overlay-backdrop').classList.add('hidden');
-      openOSK('LAUNCH_CMD', t('osk.launch_command'), '');
+      currentOverlayType = 'NEEDS_MANAGER';
+      renderGenericOverlay('SET THIS UP IN THE MANAGER', ['OK'],
+        'This game has no launch command yet. Open Cafe Neurotico on your desk and add it there — ' +
+        'CREMA plays what the Manager has set up.');
     } else if (mode === '1') {
       tryInstall(game, () => {
         const stL = (game.Store || '').toLowerCase();
@@ -4850,21 +4646,6 @@ async function triggerGrinderInstall() {
     showGrinderProgress(false);
 }
 
-async function triggerGrinderUninstall(game) {
-    _grinderConfirmGame = game;
-    const storeL = (game.Store || '').toLowerCase();
-    const store = storeL.includes('gog') ? 'gog' : 'epic';
-    // app_id may be missing (older/imported / CNGM rows) — extract from the LaunchCommand, same as install.
-    let appId = game.app_id;
-    if (!appId && game.LaunchCommand) {
-        const m = game.LaunchCommand.match(/grinder:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
-        if (m) appId = m[1];
-    }
-    if (!appId) { alert('No store app ID found — open GRINDER directly to uninstall.'); return; }
-    const result = await window.api.grinderHeadlessUninstall(store, appId);
-    if (!result.ok) { alert(result.error); return; }
-    showGrinderProgress(true);
-}
 
 // ── GPU IDLE SUSPEND ──────────────────────────────────────────────────────────
 // Freeze all CSS animations + videos when CREMA is hidden or unfocused (e.g. while a

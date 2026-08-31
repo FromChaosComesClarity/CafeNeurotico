@@ -724,9 +724,7 @@
           <button id="ggp-btn-fav" class="ggp-btn">+ FAV</button>
           <button id="ggp-btn-want" class="ggp-btn">WANT TO PLAY</button>
           <button id="ggp-btn-playlist" class="ggp-btn">+ PLAYLIST</button>
-          <button id="ggp-btn-hide" class="ggp-btn">HIDE</button>
           <button id="ggp-btn-steam" class="ggp-btn" style="display:none;">STEAM</button>
-          <button id="ggp-btn-uninstall" class="ggp-btn" style="display:none;">UNINSTALL</button>
           <button id="ggp-btn-trailer" class="ggp-btn" style="display:none;">🎬 WATCH TRAILER</button>
           <button id="ggp-btn-play" class="ggp-btn" style="display:none;">▶ PLAY</button>
         </div>
@@ -792,9 +790,7 @@
         <button id="cfgp-btn-fav"  class="cfgp-btn">★ FAV</button>
         <button id="cfgp-btn-want" class="cfgp-btn">WANT</button>
         <button id="cfgp-btn-playlist" class="cfgp-btn">+ PLAYLIST</button>
-        <button id="cfgp-btn-hide" class="cfgp-btn">HIDE</button>
         <button id="cfgp-btn-steam" class="cfgp-btn" style="display:none;">STEAM</button>
-        <button id="cfgp-btn-uninstall" class="cfgp-btn" style="display:none;">UNINSTALL</button>
         <button id="cfgp-btn-trailer" class="cfgp-btn" style="display:none;">▶ TRAILER</button>
         <button id="cfgp-btn-play" class="cfgp-btn cfgp-btn-primary" style="display:none;">▶ PLAY</button>
       </div>
@@ -823,25 +819,7 @@
       </div>
     </div>
 
-    <div id="search-backdrop" class="overlay-backdrop hidden" style="z-index: 105;">
-      <div class="overlay-modal" style="width: 800px;">
-        <div class="overlay-title" data-i18n="html.trailer_title">SELECT TRAILER</div>
-        <div id="search-status" style="text-align: center; color: var(--accent); font-size: 24px; margin-bottom: 20px;" data-i18n="html.trailer_searching">Searching YouTube...</div>
-        <div class="overlay-list" id="search-list"></div>
-      </div>
-    </div>
 
-    <div id="progress-backdrop" class="overlay-backdrop hidden" style="z-index: 200;">
-      <div class="overlay-modal" style="width: 700px; text-align: center;">
-        <div class="overlay-title" data-i18n="html.download_title">DOWNLOADING</div>
-        <div id="progress-game" style="color: var(--accent); font-size: 28px; font-weight: bold; margin-bottom: 30px;"></div>
-        <div style="width: 100%; height: 25px; background-color: var(--bg_menu); border-radius: 12px; overflow: hidden; position: relative;">
-          <div id="progress-fill" style="height: 100%; width: 0%; background-color: var(--accent); transition: width 0.1s linear;"></div>
-          <div id="progress-percent" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; color: var(--text_main); font-weight: bold;">0%</div>
-        </div>
-        <div id="progress-status" style="margin-top: 15px; color: var(--text_sec); font-size: 20px;">Parsing formats...</div>
-      </div>
-    </div>
 
     <div id="sound-backdrop" class="overlay-backdrop hidden" style="z-index: 105;">
       <div class="overlay-modal">
@@ -921,14 +899,6 @@
       .crema-ach-card .c-lock { font-size:18px; opacity:0.3; margin-top:4px; }
     </style>
 
-    <div id="sgdb-backdrop" class="overlay-backdrop hidden" style="z-index: 150;">
-      <div class="overlay-modal" style="width: 1200px; text-align: center;">
-        <div class="overlay-title" data-i18n="html.sgdb_title">SELECT CUSTOM COVER</div>
-        <div id="sgdb-status" style="color: var(--accent); font-size: 20px; margin-bottom: 20px;" data-i18n="html.sgdb_connecting">Connecting to SteamGridDB...</div>
-        <div id="sgdb-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-height: 600px; overflow: hidden; padding: 15px;"></div>
-        <div style="margin-top: 30px; color: var(--text_dim); font-size: 18px;" data-i18n-html="html.sgdb_cancel">Press <strong>[B]</strong> to Cancel</div>
-      </div>
-    </div>
 
     <div id="keybindings-backdrop" class="overlay-backdrop hidden" style="z-index: 105;">
       <div class="overlay-modal" style="width: 800px; text-align: left;">
