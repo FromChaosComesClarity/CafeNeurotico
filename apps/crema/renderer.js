@@ -91,6 +91,8 @@ let screensaverStartTime = 0;
 let availableScreenshots = []; let currentSSGame = null;
 const delayOptions = [1, 2, 3, 4, 5, 10, 15, 30];
 
+// When the current install started, for the estimate. Reset on each new one.
+let _gpStarted = 0, _gpLastPct = 0;
 let _grinderConfirmGame = null; let _grinderInstallDir = ''; let _grinderProgressInterval = null; let _grinderProgressActive = false; let _grinderConfirmActive = false;
 let _lpGame = null; let _lpList = []; let _lpIndex = 0;
 
@@ -1545,7 +1547,7 @@ function handleInput(action) {
   }
   else if (gameState === 'OSK') { handleOSKInput(action); }
   else if (gameState === 'GRINDER_CONFIRM') {
-    if (action === 'ACCEPT') { triggerGrinderInstall(); }
+    if (action === 'ACCEPT') { if (_gcBlocked) { playSound(sfxBack); return; } triggerGrinderInstall(); }
     else if (action === 'BACK') { playSound(sfxBack); hideGrinderConfirm(); }
     else if (action === 'Y_BUTTON') { hideGrinderConfirm(); openOSK('INSTALL_DIR', 'Install Directory', _grinderInstallDir); }
   }
@@ -4509,6 +4511,20 @@ function _setGrinderProgressStep(step, isUninstall) {
     if (step === 'error') all.forEach((s, i) => { if (i <= Math.max(idx, 0)) _gpStep(`gp-step-${s}`, i === Math.max(idx, 0) ? 'error' : 'done'); });
 }
 
+// Set while the confirm dialog is up when the install cannot proceed, and why. Null means
+// it can go ahead.
+let _gcBlocked = null;
+
+// The [ A ] CONFIRM hint is a lie when confirming does nothing, so it is painted from the
+// blocked state rather than being static markup.
+function _gcPaintActions() {
+    const el = document.getElementById('gc-actions');
+    if (!el) return;
+    el.innerHTML = _gcBlocked
+        ? `<span style="color:var(--text_sec)">[ Y ]</span> CHANGE DIR &nbsp;&nbsp; <span style="color:var(--text_dim)">[ B ]</span> CANCEL`
+        : `<span style="color:var(--accent)">[ A ]</span> CONFIRM &nbsp;&nbsp; <span style="color:var(--text_sec)">[ Y ]</span> CHANGE DIR &nbsp;&nbsp; <span style="color:var(--text_dim)">[ B ]</span> CANCEL`;
+}
+
 function showGrinderConfirm(game) {
     _grinderConfirmGame = game;
     if (!_grinderInstallDir) _grinderInstallDir = '~/Games/CafeNeurotico';
@@ -4519,14 +4535,50 @@ function showGrinderConfirm(game) {
     const _gid = game.GrinderGameId || '';
     const _fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1)+' GB' : (b/1024**2).toFixed(0)+' MB');
     const _sz = document.getElementById('gc-sizeinfo'); if (_sz) _sz.textContent = 'Checking size & space…';
-    Promise.all([window.api.getInstallSize(_gid).catch(() => null), window.api.getDiskSpace(_grinderInstallDir).catch(() => null)]).then(([info, free]) => {
+    _gcBlocked = null;
+    Promise.all([
+        window.api.getInstallSize(_gid).catch(() => null),
+        window.api.getDiskSpace(_grinderInstallDir).catch(() => null),
+        window.api.storeAuthStatus().catch(() => null),
+    ]).then(([info, free, auth]) => {
         if (!_sz) return;
+
+        // ⚠️ The size comes back null far more often because the store is signed out than
+        // because anything is broken — and "Size info unavailable" told you neither. Say which
+        // it is, and where it is fixed. CREMA never offers the login itself.
+        if (!info) {
+            const store = (game.Store || '').toLowerCase().includes('epic') ? 'Epic' : 'GOG';
+            const signedOut = auth && auth.engine && !(store === 'Epic' ? auth.epic : auth.gog);
+            if (signedOut) {
+                _gcBlocked = `Signed out of ${store}`;
+                _sz.innerHTML = `<span style="color:#ef9a9a;">You are signed out of ${store}.</span>` +
+                    `<br><span style="color:var(--text_dim);">Open Cafe Neurotico on your desk to sign in, then come back.</span>`;
+                _gcPaintActions();
+                return;
+            }
+            _sz.innerHTML = `<span style="color:var(--text_dim);">Could not read the download size. The install can still be tried.</span>`;
+            _gcPaintActions();
+            return;
+        }
+
         const parts = [];
-        if (info?.download_size) parts.push(`Download ${_fmtB(info.download_size)}`);
-        if (info?.disk_size) parts.push(`On disk ${_fmtB(info.disk_size)}`);
-        const need = info?.disk_size || info?.download_size || 0;
-        if (free != null) parts.push(`${_fmtB(free)} free${need && free < need ? '  ⚠️ NOT ENOUGH SPACE' : ''}`);
-        _sz.textContent = parts.length ? parts.join('   ·   ') : 'Size info unavailable';
+        if (info.download_size) parts.push(`Download ${_fmtB(info.download_size)}`);
+        if (info.disk_size) parts.push(`On disk ${_fmtB(info.disk_size)}`);
+        const need = info.disk_size || info.download_size || 0;
+        if (free != null) {
+            // ⚠️ This used to print "NOT ENOUGH SPACE" and then let you start anyway, so the
+            // install ran until the disk filled. If it cannot fit, it does not start.
+            if (need && free < need) {
+                _gcBlocked = 'Not enough space';
+                _sz.innerHTML = `${parts.join('   ·   ')}<br><span style="color:#ef9a9a;">Only ${_fmtB(free)} free — this needs ${_fmtB(need)}.</span>` +
+                    `<br><span style="color:var(--text_dim);">Press [ Y ] to install somewhere else.</span>`;
+                _gcPaintActions();
+                return;
+            }
+            parts.push(`${_fmtB(free)} free`);
+        }
+        _sz.textContent = parts.join('   ·   ');
+        _gcPaintActions();
     });
     document.getElementById('grinder-confirm-backdrop').classList.remove('hidden');
     _grinderConfirmActive = true;
@@ -4596,22 +4648,71 @@ function hideGrinderProgress() {
     gameState = previousGameState;
 }
 
+// Percent over elapsed time. ⚠️ Deliberately crude: the engine reports no rate, and a
+// download's speed is not steady enough for a precise figure to stay true — so this rounds
+// hard and disappears entirely until there is enough progress to mean anything.
+function _installEta(percent) {
+    if (!_gpStarted || !percent || percent < 3 || percent >= 100) return '';
+    const elapsed = (Date.now() - _gpStarted) / 1000;
+    const remaining = elapsed * (100 - percent) / percent;
+    if (remaining < 45) return 'less than a minute left';
+    if (remaining < 5400) return Math.round(remaining / 60) + ' min left';
+    return (remaining / 3600).toFixed(1) + ' h left';
+}
+
 async function pollGrinderProgress(isUninstall) {
     const p = await window.api.grinderGetProgress();
     if (!p) return;
     _setGrinderProgressStep(p.step, isUninstall);
-    document.getElementById('gp-bar').style.width = (p.percent || 0) + '%';
-    document.getElementById('gp-message').textContent = p.message || '';
+    const pct = p.percent || 0;
+    document.getElementById('gp-bar').style.width = pct + '%';
+    // The engine's message already carries "1.2 GiB / 4.5 GiB" while downloading; the percent
+    // and the estimate are what it does not have, and what you read from across a room.
+    const eta = _installEta(pct);
+    const big = pct > 0 && !p.done ? `<span style="font-size:22px; font-weight:900; color:var(--accent);">${Math.round(pct)}%</span>  ` : '';
+    const tail = eta ? `<span style="color:var(--text_dim);"> · ${eta}</span>` : '';
+    document.getElementById('gp-message').innerHTML = big + escHtmlCrema(p.message || '') + tail;
     if (p.done) {
         clearInterval(_grinderProgressInterval); _grinderProgressInterval = null;
-        document.getElementById('gp-cancel-hint').style.display = 'none';
+        _gpStarted = 0;
+        const hint = document.getElementById('gp-cancel-hint');
         if (p.step === 'done') {
+            hint.style.display = 'none';
             document.getElementById('gp-bar').style.width = '100%';
             window.api.syncGrinderInstalled().catch(() => {}).finally(() => {
                 hideGrinderProgress(); refreshDatabase();
             });
+        } else {
+            // ⚠️ Anything that is not 'done' is a failure, and it used to leave the error on
+            // screen with the only hint hidden — no percentage, no cause, no way out stated.
+            document.getElementById('gp-message').innerHTML =
+                escHtmlCrema(p.message || 'The install stopped.') +
+                '<br><span style="color:var(--text_dim);">Nothing was installed. Press [ B ] to close, or set it up from the Manager on your desk.</span>';
+            hint.style.display = '';
+            hint.innerHTML = '<span style="color:var(--text_dim)">[ B ]</span> CLOSE';
         }
     }
+}
+
+// A store's error text goes into innerHTML, and it can contain anything the store said.
+function escHtmlCrema(v) {
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Every way an install can fail ends here, saying what happened and what to do about it.
+// ⚠️ There is no "open GRINDER" any more — GRINDER lost its window in Phase 2B — so an
+// instruction to open it is one the user cannot follow.
+function showInstallFailure(game, headline, detail) {
+    hideGrinderConfirm();
+    _grinderConfirmGame = game;
+    document.getElementById('gp-action-title').textContent = headline;
+    document.getElementById('gp-game-title').textContent = game?.Game || '';
+    document.getElementById('gp-message').innerHTML = detail;
+    document.getElementById('gp-bar').style.width = '0%';
+    document.getElementById('gp-cancel-hint').style.display = '';
+    document.getElementById('grinder-progress-backdrop').classList.remove('hidden');
+    _grinderProgressActive = true;
+    previousGameState = gameState; gameState = 'GRINDER_PROGRESS';
 }
 
 async function triggerGrinderInstall() {
@@ -4627,22 +4728,21 @@ async function triggerGrinderInstall() {
     }
 
     if (!appId) {
-        hideGrinderConfirm();
-        _grinderConfirmGame = game;
-        document.getElementById('gp-action-title').textContent = 'INSTALL ERROR';
-        document.getElementById('gp-game-title').textContent = game.Game;
-        document.getElementById('gp-message').textContent = 'No store app ID found. Open GRINDER directly to install it.';
-        document.getElementById('gp-bar').style.width = '0%';
-        document.getElementById('gp-cancel-hint').style.display = '';
-        document.getElementById('grinder-progress-backdrop').classList.remove('hidden');
-        _grinderProgressActive = true;
-        previousGameState = gameState; gameState = 'GRINDER_PROGRESS';
+        showInstallFailure(game, 'CANNOT INSTALL THIS ONE',
+            'This game has no store id recorded, so there is nothing to download.<br>' +
+            '<span style="color:var(--text_dim);">Open Cafe Neurotico on your desk and install it from there.</span>');
         return;
     }
 
     hideGrinderConfirm();
     const result = await window.api.grinderHeadlessInstall(store, appId, 'windows', _grinderInstallDir);
-    if (!result.ok) { alert(result.error); return; }
+    if (!result.ok) {
+        showInstallFailure(game, 'INSTALL DID NOT START',
+            escHtmlCrema(result.error || 'GRINDER refused the request.') +
+            '<br><span style="color:var(--text_dim);">Nothing was downloaded. Try again, or set it up from the Manager on your desk.</span>');
+        return;
+    }
+    _gpStarted = Date.now(); _gpLastPct = 0;
     showGrinderProgress(false);
 }
 

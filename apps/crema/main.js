@@ -992,6 +992,25 @@ function getGrinderDbPath() {
     return host.findGrinderDb(baseDir);
 }
 
+/*
+ * Whether the stores are signed in — REPORTED, never offered.
+ *
+ * ⚠️ CREMA does not and must not have a store login: it is a gamepad UI on a television, and
+ * a device-code flow with a browser and a password field has no business there. But it does
+ * need to be able to say *why* an install cannot start, because "Size info unavailable" for a
+ * signed-out account is the least useful sentence in the app — it was the oldest open bug in
+ * the project. Reading the status is not offering a login.
+ */
+ipcMain.handle('crema-store-auth', async () => {
+    if (!ensureGrinderEngine()) return { gog: false, epic: false, engine: false };
+    // ⚠️ Both are async — read synchronously they return a Promise, which is truthy without
+    // `.loggedIn`, so every account came back signed out.
+    let gog = false, epic = false;
+    try { gog = !!(await grinderEngine.gogStatus())?.loggedIn; } catch {}
+    try { epic = !!(await grinderEngine.epicStatus())?.loggedIn; } catch {}
+    return { gog, epic, engine: true };
+});
+
 ipcMain.handle('grinder-get-default-install-dir', () => {
     const gDbPath = getGrinderDbPath();
     if (!gDbPath) return null;

@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('api', {
                                 // --- GRINDER headless install/uninstall ---
                                 openGrinderGui: (term) => ipcRenderer.invoke('open-grinder-gui', term),
                                 syncGrinderInstalled: () => ipcRenderer.invoke('sync-grinder-installed'),
+                                storeAuthStatus: () => ipcRenderer.invoke('crema-store-auth'),
                                 grinderGetDefaultInstallDir: () => ipcRenderer.invoke('grinder-get-default-install-dir'),
                                 getDiskSpace:   (p)   => ipcRenderer.invoke('get-disk-space', p),
                                 getInstallSize: (gid) => ipcRenderer.invoke('get-install-size', gid),
