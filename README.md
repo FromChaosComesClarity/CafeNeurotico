@@ -4,7 +4,7 @@
 
 ### *the game center for Omarchy*
 
-![version](https://img.shields.io/badge/version-1.11.0-2fe0d6?style=flat-square)
+![version](https://img.shields.io/badge/version-1.12.0-2fe0d6?style=flat-square)
 ![status](https://img.shields.io/badge/status-Experimental-ff5fa2?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Linux-0e1113?style=flat-square)
 ![license](https://img.shields.io/badge/license-GPL--3.0-2fe0d6?style=flat-square)
