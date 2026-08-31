@@ -166,22 +166,52 @@ const WINDOW_RULES = [
     },
 ];
 
-// ── Games float rather than tile ─────────────────────────────────────────────
-// A game that opens tiled gets shoved into whatever slot the layout has free, resized to it,
-// and then goes fullscreen a moment later — so the first thing you see of a game is it being
-// squashed into half a screen. Floating means it opens at the size it asked for, centred,
-// and the transition to fullscreen is the only change you see.
+// ── How a game's window opens ────────────────────────────────────────────────
+// Three answers, and the default is fullscreen.
+//
+// A game that opens TILED gets shoved into whatever slot the layout has free and resized to
+// it, a moment before it goes fullscreen anyway — so the first thing you see of a game is it
+// being squashed into half a screen.
+//
+// FLOATING was the old default and fixed that, but not the thing underneath it: a floating
+// game opens at whatever size it decided on, which on a multi-monitor desk is frequently the
+// wrong one. It then stays that size, so pressing the compositor's fullscreen key scales a
+// small picture up rather than giving the game the screen.
+//
+// FULLSCREEN hands it the whole monitor at map time, which is what a game wants and what
+// Omarchy's own rules already do for RetroArch and Moonlight. ⚠️ It also fullscreens a game's
+// little pre-launch configuration dialog, since umu gives every Proton title the same window
+// class and nothing distinguishes the two — which is exactly why floating remains one click
+// away rather than being deleted.
 //
 // Same class list the KWin picker uses: everything through umu/Proton arrives as steam_app_*,
 // and the rest are the runners the suite launches directly.
-const FLOAT_GAMES_RULE = {
-    lua: `o.window({ class = "${GAME_CLASS_RE}" }, { float = true, center = true })`,
-    keyword: ['float', `class:${GAME_CLASS_RE}`],
+const GAME_WINDOW_MODES = {
+    fullscreen: {
+        lua: `o.window({ class = "${GAME_CLASS_RE}" }, { fullscreen = true })`,
+        keyword: ['fullscreen', `class:${GAME_CLASS_RE}`],
+    },
+    float: {
+        lua: `o.window({ class = "${GAME_CLASS_RE}" }, { float = true, center = true })`,
+        keyword: ['float', `class:${GAME_CLASS_RE}`],
+    },
+    // 'tile' is the compositor's own behaviour, so it is the absence of a rule rather than
+    // a rule of its own. ⚠️ Which also means switching TO it needs a fresh session: a
+    // Hyprland rule cannot be withdrawn once set, only not re-applied.
+    tile: null,
 };
 
-function applyWindowRules({ floatGames = true } = {}) {
+const GAME_WINDOW_MODE_DEFAULT = 'fullscreen';
+
+function applyWindowRules({ gameWindowMode = GAME_WINDOW_MODE_DEFAULT } = {}) {
     if (!isHyprland() || !hyprctlBin()) return { ok: false, applied: 0, total: 0 };
-    const rules = floatGames ? [...WINDOW_RULES, FLOAT_GAMES_RULE] : WINDOW_RULES;
+    // ⚠️ `hasOwnProperty`, not `||`: 'tile' is a real mode whose rule is deliberately null, and
+    // an `||` reads that as "unknown mode" and quietly substitutes fullscreen — so the one
+    // setting that means "leave my windows alone" did the opposite.
+    const modeRule = Object.prototype.hasOwnProperty.call(GAME_WINDOW_MODES, gameWindowMode)
+        ? GAME_WINDOW_MODES[gameWindowMode]
+        : GAME_WINDOW_MODES[GAME_WINDOW_MODE_DEFAULT];
+    const rules = modeRule ? [...WINDOW_RULES, modeRule] : WINDOW_RULES;
     let applied = 0;
     for (const r of rules) {
         let out = hyprctl(['eval', r.lua]);
@@ -623,7 +653,7 @@ module.exports = {
     hyprctl, hyprctlJson, monitors,
     TOOLS, toolStatus, missingTools, gapSummary,
     INSTALLERS, installerStatus, missingInstallers, runInstaller,
-    WINDOW_RULES, FLOAT_GAMES_RULE, GAME_CLASS_RE, applyWindowRules,
+    WINDOW_RULES, GAME_WINDOW_MODES, GAME_WINDOW_MODE_DEFAULT, GAME_CLASS_RE, applyWindowRules,
     TUNING, systemTuning, tuningCommand, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
     installCommand, openInstallTerminal, openTerminalWith, terminalLauncher,
     isSupported, describe, which,

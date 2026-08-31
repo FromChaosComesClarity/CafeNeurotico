@@ -980,14 +980,24 @@ try {
 // of pretending otherwise.
 function applyHyprlandRules() {
     try {
-        let floatGames = true;
-        try {
-            const row = db?.prepare("SELECT value FROM settings WHERE key='omarchy_float_games'").get();
-            if (row && row.value === '0') floatGames = false;
-        } catch {}
-        const r = host.desktop?.omarchy?.applyWindowRules?.({ floatGames });
-        if (r?.applied) console.log(`[hyprland] ${r.applied}/${r.total} window rules applied` + (floatGames ? ' (games float)' : ' (games tile)'));
+        const r = host.desktop?.omarchy?.applyWindowRules?.({ gameWindowMode: gameWindowMode() });
+        if (r?.applied) console.log(`[hyprland] ${r.applied}/${r.total} window rules applied (games ${gameWindowMode()})`);
     } catch {}
+}
+
+// fullscreen | float | tile. ⚠️ The old boolean `omarchy_float_games` is read once and
+// translated, because a row that says '1' is someone who went and ticked the box — that is a
+// choice for floating and it is kept. An absent row was only ever the old default, so it
+// becomes the new one.
+function gameWindowMode() {
+    const DEFAULT = host.desktop?.omarchy?.GAME_WINDOW_MODE_DEFAULT || 'fullscreen';
+    try {
+        const row = db?.prepare("SELECT value FROM settings WHERE key='omarchy_game_window'").get();
+        if (row && ['fullscreen', 'float', 'tile'].includes(row.value)) return row.value;
+        const legacy = db?.prepare("SELECT value FROM settings WHERE key='omarchy_float_games'").get();
+        if (legacy) return legacy.value === '0' ? 'tile' : 'float';
+    } catch {}
+    return DEFAULT;
 }
 
 ipcMain.handle('display-options', () => {

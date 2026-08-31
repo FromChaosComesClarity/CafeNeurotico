@@ -2582,7 +2582,7 @@
 
         <div class="tool-card tools-section" id="display-card" data-search="display monitor screen multi-monitor which screen games open kde kwin hyprland wayland" style="display:none;">
           <div class="tool-card-title"><svg class="cp-tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span>Which Screen Games Open On</span></div>
-          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 6px;">On a multi-monitor desktop it is the compositor that decides where a game lands, not the game. This adds a single KDE window rule so they open where you want. It is the one setting that writes outside Cafe Neurotico's own folder &mdash; it owns that one rule, touches nothing else in your window rules, and removes it again when set back to Default.</div>
+          <div style="font-size: 11px; color: var(--text_dim); line-height: 1.5; margin-bottom: 6px;">On a multi-monitor desktop it is the compositor that decides where a game lands, not the game. This adds a single window rule so they open where you want, and on Hyprland it also makes that screen the primary one for X11 games &mdash; without a primary they pick whichever monitor sits at the left edge of the desktop, which on most desks is the small one. Both are the only settings that reach outside Cafe Neurotico's own folder: they own that one rule, touch nothing else, and are undone by setting this back to Default and restarting the session.</div>
           <select id="display-select" title="Screen games open on" aria-label="Screen games open on" style="width:100%; box-sizing:border-box; padding:9px 10px; background:var(--bg); border:1px solid var(--border_solid); color:var(--text_main); border-radius:6px; font-family:var(--ui-font,'Raleway'),sans-serif; font-size:12px; font-weight:700;"></select>
           <div id="display-status" style="font-size: 11px; text-align:center; font-weight:bold; min-height: 14px; margin-top:4px;"></div>
         </div>
@@ -2619,11 +2619,13 @@
           </div>
 
           <div style="margin-top:10px; padding-top:9px; border-top:1px solid var(--border);">
-            <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-bottom:9px;">
-              <input type="checkbox" id="omarchy-float-games" style="margin-top:2px; flex-shrink:0;">
-              <span style="font-size:11px; color:var(--text_sec); line-height:1.5;"><b>Games open floating</b><br>
-                <span style="color:var(--text_dim);">A tiling window manager would otherwise squeeze a game into whatever slot is free and resize it, a moment before it goes fullscreen anyway. Floating lets it open at its own size, centred. <i>Takes effect next time the app starts.</i></span></span>
-            </label>
+            <div style="font-size:11px; color:var(--text_sec); line-height:1.5; margin-bottom:5px;"><b>How a game's window opens</b></div>
+            <div class="segmented-control" id="omarchy-game-window-control" style="margin-bottom:6px;">
+              <button class="segmented-btn omarchy-game-window-btn active" data-val="fullscreen">Fullscreen</button>
+              <button class="segmented-btn omarchy-game-window-btn" data-val="float">Floating</button>
+              <button class="segmented-btn omarchy-game-window-btn" data-val="tile">Tiled</button>
+            </div>
+            <div id="omarchy-game-window-hint" style="font-size:11px; color:var(--text_dim); line-height:1.5; margin-bottom:9px;"></div>
 
             <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
               <input type="checkbox" id="omarchy-compact-chrome" style="margin-top:2px; flex-shrink:0;">

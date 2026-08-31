@@ -176,8 +176,11 @@ async function initDisplayPicker() {
             return;
         }
         status.style.color = '#66bb6a';
+        // Two separate things happened on Hyprland, and only one of them is a window rule —
+        // say so, because the second one changed something about the X session.
+        const xNote = res.xPrimary?.ok ? ` ${res.display.name} is now the primary screen for X11 games too.` : '';
         status.textContent = res.display
-            ? `Games will open on ${res.display.name}. Takes effect on the next game you start.`
+            ? `Games will open on ${res.display.name}. Takes effect on the next game you start.${xNote}`
             : 'Back to letting the desktop decide.';
     };
 }
@@ -8213,15 +8216,34 @@ async function renderOmarchyCard(s) {
         };
     }
 
-    // Games floating. Applied by the main process at startup, because Hyprland rules cannot be
-    // withdrawn once set for a session — so this stores the choice and the label says when it
-    // takes effect rather than implying it is live.
-    const floatBox = document.getElementById('omarchy-float-games');
-    if (floatBox) {
-        const saved = await window.api.getSetting('omarchy_float_games').catch(() => null);
-        floatBox.checked = saved === null || saved === undefined ? true : saved === '1';
-        floatBox.onchange = () =>
-            window.api.setSetting('omarchy_float_games', floatBox.checked ? '1' : '0');
+    // How a game's window opens. Applied by the main process at startup, because Hyprland rules
+    // cannot be withdrawn once set for a session — so this stores the choice and the hint says
+    // when it takes effect rather than implying it is live.
+    const gameWinCtl = document.getElementById('omarchy-game-window-control');
+    if (gameWinCtl) {
+        const HINTS = {
+            fullscreen: 'The game gets the whole screen the moment it opens, which is what it wants and what stops it settling on some other monitor\u2019s resolution. A game that shows a small setup window first will have that fullscreened too \u2014 switch to Floating if one does.',
+            float: 'The game opens at whatever size it asked for, centred, and you send it fullscreen yourself. Use this for a game whose launcher or configuration window needs to stay small.',
+            tile: 'No rule at all: the window manager treats a game like any other window and fits it into the layout. Honest, and almost never what you want for a game.',
+        };
+        let saved = await window.api.getSetting('omarchy_game_window').catch(() => null);
+        if (!HINTS[saved]) {
+            // The old boolean, translated the same way the main process translates it.
+            const legacy = await window.api.getSetting('omarchy_float_games').catch(() => null);
+            saved = legacy === null || legacy === undefined ? 'fullscreen' : (legacy === '0' ? 'tile' : 'float');
+        }
+        const paint = (val) => {
+            gameWinCtl.querySelectorAll('.omarchy-game-window-btn')
+                .forEach(b => b.classList.toggle('active', b.dataset.val === val));
+            const hint = document.getElementById('omarchy-game-window-hint');
+            if (hint) hint.innerHTML = `${HINTS[val]} <i>Takes effect next time the app starts.</i>`;
+        };
+        paint(saved);
+        gameWinCtl.querySelectorAll('.omarchy-game-window-btn').forEach(btn =>
+            btn.addEventListener('click', () => {
+                paint(btn.dataset.val);
+                window.api.setSetting('omarchy_game_window', btn.dataset.val);
+            }));
     }
 
     const themeBtn = document.getElementById('btn-omarchy-theme');

@@ -100,8 +100,54 @@ function currentDisplay() {
     return found ? found.index : null;
 }
 
-// Sends every window matching the game classes to one monitor. `apply()` is also called
-// at startup, so this survives the logout that clears session rules.
+/*
+ * ⚠️ The compositor rule is only half the answer, and the smaller half.
+ *
+ * Hyprland's XWayland starts with NO primary output — measured: `xrandr --query` prints no
+ * `primary` on a stock Omarchy 4 desk. An X11 game (which on Proton is nearly all of them)
+ * then asks RandR which screen to use and takes the first one listed, which is the output
+ * nearest the origin of the X screen — on a desk where a small panel sits left of the main
+ * monitor, that is the small panel. The game sizes itself to it and keeps that size, so
+ * sending the window fullscreen afterwards only scales a small picture up.
+ *
+ * Setting the primary costs one xrandr call, is session-scoped exactly like the window rules,
+ * and points at the screen the user has already said their games should open on — so it
+ * makes X agree with a choice they made rather than making a new one for them. Nothing is
+ * touched when no choice is set.
+ *
+ * ⚠️ Best-effort and verified by reading it back: a name that XWayland does not know is
+ * skipped rather than guessed at, and the whole thing is skipped when there is no X server
+ * to talk to (a pure-Wayland session, where the problem does not exist either).
+ */
+function xwaylandOutputs() {
+    if (!process.env.DISPLAY || !which('xrandr')) return null;
+    const r = spawnSync('xrandr', ['--query'], { encoding: 'utf8' });
+    if (r.status !== 0) return null;
+    const out = [];
+    for (const line of String(r.stdout || '').split('\n')) {
+        const m = line.match(/^(\S+) connected( primary)?/);
+        if (m) out.push({ name: m[1], primary: !!m[2] });
+    }
+    return out;
+}
+
+function setXwaylandPrimary(name) {
+    const outputs = xwaylandOutputs();
+    if (!outputs) return { ok: false, reason: 'no X server' };
+    const target = outputs.find(o => o.name === name);
+    if (!target) return { ok: false, reason: `XWayland does not know a monitor called ${name}` };
+    if (target.primary) return { ok: true, already: true };
+    spawnSync('xrandr', ['--output', name, '--primary'], { encoding: 'utf8' });
+    // Read it back rather than trusting the exit status: xrandr against XWayland warns on
+    // stderr and still exits 0 for things it did not do.
+    const after = xwaylandOutputs();
+    const ok = !!after?.find(o => o.name === name && o.primary);
+    return { ok, reason: ok ? '' : 'xrandr accepted the call but the primary did not change' };
+}
+
+// Sends every window matching the game classes to one monitor, and tells X11 games that the
+// same monitor is the primary one. `apply()` is also called at startup, so both survive the
+// logout that clears session rules.
 function apply() {
     if (!isSupported()) return { ok: false, applied: 0 };
     const choice = readChoice();
@@ -113,11 +159,12 @@ function apply() {
         out = hyprctl(['keyword', 'windowrulev2', `monitor ${name}, class:${GAME_CLASS_RE}`]);
     }
     const ok = !!(out && /^ok\b/i.test(out.trim()));
+    const xPrimary = setXwaylandPrimary(name);
     // ⚠️ `display` is the display OBJECT, not its name — kwin-display.js returns the
     // object and the Control Panel reads `res.display.name`. Returning a bare string
     // here would have printed "undefined" on Hyprland and nowhere else.
     const obj = listDisplays().find(d => d.name === name) || { name };
-    return { ok, applied: ok ? 1 : 0, display: obj };
+    return { ok, applied: ok ? 1 : 0, display: obj, xPrimary };
 }
 
 function setGameDisplay(index) {
@@ -141,7 +188,7 @@ function setGameDisplay(index) {
         return { ok: false, error: `Could not save the choice: ${e.message}` };
     }
     const r = apply();
-    return { ok: true, display: target, applied: r.applied };
+    return { ok: true, display: target, applied: r.applied, xPrimary: r.xPrimary };
 }
 
-module.exports = { configure, isSupported, listDisplays, currentDisplay, setGameDisplay, apply, GAME_CLASS_RE };
+module.exports = { configure, isSupported, listDisplays, currentDisplay, setGameDisplay, apply, xwaylandOutputs, setXwaylandPrimary, GAME_CLASS_RE };
