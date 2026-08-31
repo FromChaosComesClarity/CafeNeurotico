@@ -8236,7 +8236,10 @@ async function renderOmarchyCard(s) {
             gameWinCtl.querySelectorAll('.omarchy-game-window-btn')
                 .forEach(b => b.classList.toggle('active', b.dataset.val === val));
             const hint = document.getElementById('omarchy-game-window-hint');
-            if (hint) hint.innerHTML = `${HINTS[val]} <i>Takes effect next time the app starts.</i>`;
+            // ⚠️ "next time the app starts" was wrong and made this look broken: a rule set for
+            // the session outlives the app, so a new one only wins from the next LOGIN — or
+            // from the button below, which is why the button exists.
+            if (hint) hint.innerHTML = `${HINTS[val]} <i>Takes effect at your next login, or press the button below.</i>`;
         };
         paint(saved);
         gameWinCtl.querySelectorAll('.omarchy-game-window-btn').forEach(btn =>
@@ -8244,6 +8247,29 @@ async function renderOmarchyCard(s) {
                 paint(btn.dataset.val);
                 window.api.setSetting('omarchy_game_window', btn.dataset.val);
             }));
+
+        // Without this the setting looks broken: switching from Fullscreen to Floating leaves
+        // the fullscreen rule in place, still winning, and nothing appears to have happened.
+        const applyBtn = document.getElementById('btn-omarchy-apply-rules');
+        const applyStatus = document.getElementById('omarchy-apply-rules-status');
+        applyBtn?.addEventListener('click', async () => {
+            applyBtn.disabled = true;
+            const was = applyStatus.innerHTML;
+            applyStatus.style.color = 'var(--text_dim)';
+            applyStatus.textContent = 'Reloading Hyprland\u2019s config\u2026';
+            let res = null;
+            try { res = await window.api.applyHyprlandRulesNow(); } catch (e) {}
+            applyBtn.disabled = false;
+            if (!res || !res.ok) {
+                applyStatus.style.color = '#ef5350';
+                applyStatus.textContent = (res && res.error) || 'Could not apply it.';
+                setTimeout(() => { applyStatus.style.color = 'var(--text_dim)'; applyStatus.innerHTML = was; }, 6000);
+                return;
+            }
+            applyStatus.style.color = '#66bb6a';
+            applyStatus.textContent = `Live now \u2014 games open ${res.mode}. Try one.`;
+            setTimeout(() => { applyStatus.style.color = 'var(--text_dim)'; applyStatus.innerHTML = was; }, 8000);
+        });
     }
 
     const themeBtn = document.getElementById('btn-omarchy-theme');

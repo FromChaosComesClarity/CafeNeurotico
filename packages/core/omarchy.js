@@ -203,6 +203,25 @@ const GAME_WINDOW_MODES = {
 
 const GAME_WINDOW_MODE_DEFAULT = 'fullscreen';
 
+/*
+ * Drop every window rule added at runtime, by re-reading the user's own Hyprland config.
+ *
+ * ⚠️ This exists because a Hyprland rule cannot be withdrawn — the Lua API has `unbind` for
+ * keys and nothing at all for window rules (checked against 0.56.2's `hl` table). So the only
+ * way to stop a rule applying is to make the compositor forget every dynamic one, which
+ * `hyprctl reload` does: measured, a rule added by eval no longer matched afterwards, and the
+ * monitor layout came back untouched because that lives in the user's config.
+ *
+ * ⚠️ It is therefore NOT free: rules other tools set at runtime this session go too, and only
+ * ours are put back. That is why nothing calls this on its own — it happens when the user asks
+ * for the change to take effect now, and the button says what it does.
+ */
+function reloadConfig() {
+    if (!isHyprland() || !hyprctlBin()) return { ok: false };
+    const out = hyprctl(['reload']);
+    return { ok: !!(out && /^ok\b/i.test(out.trim())) };
+}
+
 function applyWindowRules({ gameWindowMode = GAME_WINDOW_MODE_DEFAULT } = {}) {
     if (!isHyprland() || !hyprctlBin()) return { ok: false, applied: 0, total: 0 };
     // ⚠️ `hasOwnProperty`, not `||`: 'tile' is a real mode whose rule is deliberately null, and
@@ -653,7 +672,7 @@ module.exports = {
     hyprctl, hyprctlJson, monitors,
     TOOLS, toolStatus, missingTools, gapSummary,
     INSTALLERS, installerStatus, missingInstallers, runInstaller,
-    WINDOW_RULES, GAME_WINDOW_MODES, GAME_WINDOW_MODE_DEFAULT, GAME_CLASS_RE, applyWindowRules,
+    WINDOW_RULES, GAME_WINDOW_MODES, GAME_WINDOW_MODE_DEFAULT, GAME_CLASS_RE, applyWindowRules, reloadConfig,
     TUNING, systemTuning, tuningCommand, inhibitIdle, setGamingPower, powerProfile, hyprGeometry,
     installCommand, openInstallTerminal, openTerminalWith, terminalLauncher,
     isSupported, describe, which,

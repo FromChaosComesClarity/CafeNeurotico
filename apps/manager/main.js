@@ -1000,6 +1000,28 @@ function gameWindowMode() {
     return DEFAULT;
 }
 
+/*
+ * "Apply to this session" behind the game-window setting.
+ *
+ * ⚠️ A Hyprland rule cannot be withdrawn, so switching from Fullscreen to Floating does
+ * nothing on its own — the old rule is still there and still wins, which is exactly what it
+ * looks like from the outside: a setting that did nothing. The only way round it is to make
+ * the compositor forget every runtime rule and put ours back, which is what this does, and
+ * why it is a button the user presses rather than something that happens behind their back.
+ */
+ipcMain.handle('apply-hyprland-rules-now', () => {
+    const om = host.desktop?.omarchy;
+    if (!om?.reloadConfig) return { ok: false, error: 'This needs a running Hyprland session.' };
+    const reloaded = om.reloadConfig();
+    if (!reloaded.ok) return { ok: false, error: 'Hyprland did not accept the config reload.' };
+    // Everything we own, put back in the order a fresh start would: the window rules first,
+    // then the screen choice, which also re-asserts the X11 primary.
+    const rules = om.applyWindowRules({ gameWindowMode: gameWindowMode() });
+    let display = null;
+    try { if (kwinDisplay?.isSupported()) display = kwinDisplay.apply(); } catch {}
+    return { ok: !!rules.applied, mode: gameWindowMode(), applied: rules.applied, total: rules.total, display };
+});
+
 ipcMain.handle('display-options', () => {
     if (!kwinDisplay?.isSupported()) return { supported: false, displays: [], current: null };
     return { supported: true, displays: kwinDisplay.listDisplays(), current: kwinDisplay.currentDisplay() };
