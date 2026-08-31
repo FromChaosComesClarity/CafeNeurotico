@@ -2903,11 +2903,33 @@ function openHomeGameById(id, fallback) {
 // Opened with --game=<id> (the Clock links its artwork back here). If the library hasn't
 // finished loading, wait for it rather than silently doing nothing.
 window.api.onOpenGame?.(id => {
-    const tryOpen = (attempt = 0) => {
-        if (Array.isArray(allGames) && allGames.length) { openHomeGameById(id); return; }
-        if (attempt < 20) setTimeout(() => tryOpen(attempt + 1), 250);
-    };
-    tryOpen();
+    whenLibraryReady(() => openHomeGameById(id));
+});
+
+// A request that arrives before the library is loaded is not a request to ignore — the app
+// may have been started *by* it. Wait the five seconds it takes, then act.
+function whenLibraryReady(fn, attempt = 0) {
+    if (Array.isArray(allGames) && allGames.length) { fn(); return; }
+    if (attempt < 20) setTimeout(() => whenLibraryReady(fn, attempt + 1), 250);
+}
+
+// --play=<id> — the Omarchy launcher overlay's Enter. Deliberately the same call the Play
+// button makes, so the store picker, the engine and IWAD dialogs, the last-played write and
+// the install-state check all happen exactly as they do for a click.
+// ⚠️ An uninstalled game opens its page instead of failing quietly: that page is where the
+// Install button is, which is what someone who just typed its name actually wants next.
+window.api.onPlayGame?.(id => {
+    whenLibraryReady(() => {
+        const game = allGames.find(g => String(g.id) === String(id));
+        if (!game) return;
+        if (!isGameInstalled(game)) { openHomeGameById(game.id); return; }
+        verifyAndLaunch(game.id, game.LaunchCommand);
+    });
+});
+
+// --action=<id> — one of the command palette's actions, asked for from outside.
+window.api.onRunAction?.(id => {
+    whenLibraryReady(() => runPaletteAction(id));
 });
 
 function _homeFeatured(t, pill) {
@@ -3623,24 +3645,39 @@ function dismissWelcome() {
 // Omarchy is keyboard-driven: everything else on this desktop opens from a fuzzy
 // menu, and the library was the exception. Games and actions share one list, so
 // "quake" and "backup" are the same gesture.
+// ⚠️ Each `id` is a name the desktop knows us by — the Omarchy launcher overlay runs
+// these from outside the app as `--action=<id>` — so an id is renamed only with the same
+// care as a CLI flag. The visible `name` is free to change whenever the wording improves.
 const _PAL_ACTIONS = [
-    { name: 'Control Panel',            run: () => openToolsModal('welcome') },
-    { name: 'Settings: Library',        run: () => openToolsModal('library') },
-    { name: 'Settings: Appearance',     run: () => openToolsModal('appearance') },
-    { name: 'Settings: Connections',    run: () => openToolsModal('connections') },
-    { name: 'Settings: Ports & Mods',   run: () => openToolsModal('ports') },
-    { name: 'Settings: Desktop',        run: () => openToolsModal('desktop') },
-    { name: 'Themes',                   run: () => document.getElementById('btn-theme-switch')?.click() },
-    { name: 'Manage Storage',           run: () => openStorageModal() },
-    { name: 'Refresh Library',          run: () => document.getElementById('btn-refresh-library')?.click() },
-    { name: 'Add Game',                 run: () => document.getElementById('btn-add-game')?.click() },
-    { name: 'Connect Stores',           run: () => document.getElementById('btn-open-connect')?.click() },
-    { name: 'Gallery View',             run: () => switchView('view-gallery') },
-    { name: 'List View',                run: () => switchView('view-list') },
-    { name: 'Home Dashboard',           run: () => switchView('view-home') },
-    { name: 'Go Fullscreen with CREMA', run: () => document.getElementById('crema-cta')?.click() },
-    { name: 'Launch EmuLatte',          run: () => document.getElementById('btn-rail-emulatte')?.click() },
+    { id: 'control-panel',        name: 'Control Panel',            run: () => openToolsModal('welcome') },
+    { id: 'settings-library',     name: 'Settings: Library',        run: () => openToolsModal('library') },
+    { id: 'settings-appearance',  name: 'Settings: Appearance',     run: () => openToolsModal('appearance') },
+    { id: 'settings-connections', name: 'Settings: Connections',    run: () => openToolsModal('connections') },
+    { id: 'settings-ports',       name: 'Settings: Ports & Mods',   run: () => openToolsModal('ports') },
+    { id: 'settings-desktop',     name: 'Settings: Desktop',        run: () => openToolsModal('desktop') },
+    { id: 'themes',               name: 'Themes',                   run: () => document.getElementById('btn-theme-switch')?.click() },
+    { id: 'manage-storage',       name: 'Manage Storage',           run: () => openStorageModal() },
+    { id: 'refresh-library',      name: 'Refresh Library',          run: () => document.getElementById('btn-refresh-library')?.click() },
+    { id: 'add-game',             name: 'Add Game',                 run: () => document.getElementById('btn-add-game')?.click() },
+    { id: 'connect-stores',       name: 'Connect Stores',           run: () => document.getElementById('btn-open-connect')?.click() },
+    { id: 'view-gallery',         name: 'Gallery View',             run: () => switchView('view-gallery') },
+    { id: 'view-list',            name: 'List View',                run: () => switchView('view-list') },
+    { id: 'view-home',            name: 'Home Dashboard',           run: () => switchView('view-home') },
+    { id: 'crema',                name: 'Go Fullscreen with CREMA', run: () => document.getElementById('crema-cta')?.click() },
+    { id: 'emulatte',             name: 'Launch EmuLatte',          run: () => document.getElementById('btn-rail-emulatte')?.click() },
 ];
+
+// Publish the list so the desktop offers exactly the actions this build has, rather than
+// a copy that drifts the first time one is added or renamed. Sent once — they are static.
+try { window.api.publishPaletteActions?.(_PAL_ACTIONS.map(a => ({ id: a.id, name: a.name }))); } catch (e) {}
+
+// One way to run an action, whether it was picked in the palette or asked for from outside.
+function runPaletteAction(id) {
+    const a = _PAL_ACTIONS.find(x => x.id === id);
+    if (!a) return false;
+    a.run();
+    return true;
+}
 
 let _palItems = [], _palSel = 0;
 
@@ -3669,9 +3706,13 @@ function _palRender(q) {
     const rows = [];
     for (const a of _PAL_ACTIONS) {
         const s = _palScore(a.name, q);
-        if (s) rows.push({ score: s + 40, kind: 'action', name: a.name, run: a.run });
+        if (s) rows.push({ score: s + 40, kind: 'action', name: a.name, id: a.id });
     }
     for (const g of (allGames || [])) {
+        // A user-hidden game is hidden here too. applyFilters() drops them from every
+        // library view, and the palette reads allGames directly — which is how they kept
+        // turning up in the one list that was supposed to be the fastest way in.
+        if (isHidden(g)) continue;
         const s = _palScore(g.Game || '', q);
         if (s) rows.push({ score: s, kind: 'game', name: g.Game, game: g });
     }
@@ -3700,7 +3741,7 @@ function _palRun(i) {
     const r = _palItems[i];
     if (!r) return;
     closePalette();
-    if (r.kind === 'action') { r.run(); return; }
+    if (r.kind === 'action') { runPaletteAction(r.id); return; }
     // A game opens its page rather than launching outright — Enter on a fuzzy match
     // is too easy to hit by accident for something that starts a process.
     openGamepage(r.game);

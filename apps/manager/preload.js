@@ -244,6 +244,10 @@ contextBridge.exposeInMainWorld('api', {
                                 onGameLaunchProgress: (cb) => ipcRenderer.on('game-launch-progress', (e, d) => cb(d)),
                                 onWindowRefocused: (cb) => ipcRenderer.on('window-refocused', () => cb()),
                                 onOpenGame: (cb) => ipcRenderer.on('open-game', (e, id) => cb(id)),
+                                // --play=<id> / --action=<id>, the Omarchy launcher overlay's way in.
+                                onPlayGame: (cb) => ipcRenderer.on('play-game', (e, id) => cb(id)),
+                                onRunAction: (cb) => ipcRenderer.on('run-action', (e, id) => cb(id)),
+                                publishPaletteActions: (actions) => ipcRenderer.send('publish-palette-actions', actions),
 
                                 // --- PLAYLISTS ---
                                 getPlaylists:           ()           => ipcRenderer.invoke('get-playlists'),

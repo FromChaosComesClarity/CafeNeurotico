@@ -5,6 +5,7 @@ const os = require('os');
 const Database = require('better-sqlite3');
 const { registerSharedHandlers } = require('../../packages/core/shared-ipc.js');
 const host = require('../../packages/core/platform/index.js');
+const desktopDescriptor = require('../../packages/core/desktop-descriptor.js');
 const fs = require('fs');
 const { exec, execFile, spawn } = require('child_process');
 
@@ -189,25 +190,46 @@ function createWindow () {
     win.webContents.once('did-finish-load', () => startSteamInstallWatcher(win));
 }
 
-// --game=<id> opens straight to that game's page. Companion apps (the Clock) use it to
-// link a piece of art back here. Read from argv on first launch, and from the *second*
-// instance's argv when we are already running — otherwise the request would be dropped
-// on the floor and the user would just see the library.
-const gameIdFromArgv = (argv) => {
-    const hit = (argv || []).find(a => a.startsWith('--game='));
-    if (!hit) return null;
-    const id = hit.slice('--game='.length).trim();
-    return /^\d+$/.test(id) ? id : null;
-};
-let pendingGameId = gameIdFromArgv(process.argv);
+// Three ways in from the outside, all the same shape: find the request in argv, hand it
+// to the renderer, let the renderer do exactly what the equivalent click would do.
+//
+//   --game=<id>     open that game's page   (the Clock links its artwork back here)
+//   --play=<id>     play it, as if Play had been pressed
+//   --action=<id>   run one of the command palette's actions
+//
+// ⚠️ play and action exist for the Omarchy launcher overlay, and they deliberately do
+// their work *in here*. The alternative — the plugin spawning games itself — would mean
+// a second launcher that re-implements the engine and IWAD pickers, the install-state
+// verification and the last-played write, and it would drift the day one of them changed.
+// The overlay finds the row; the app performs it.
+//
+// Read from argv on first launch, and from the *second* instance's argv when we are
+// already running — otherwise the request is dropped on the floor and the user just
+// sees the library.
+const REQUEST_ARGS = [
+    { flag: '--game=',   channel: 'open-game',  valid: v => /^\d+$/.test(v) },
+    { flag: '--play=',   channel: 'play-game',  valid: v => /^\d+$/.test(v) },
+    { flag: '--action=', channel: 'run-action', valid: v => /^[a-z0-9][a-z0-9-]{0,39}$/.test(v) },
+];
 
-function openGameInWindow(id) {
-    if (!id) return;
+const requestFromArgv = (argv) => {
+    for (const { flag, channel, valid } of REQUEST_ARGS) {
+        const hit = (argv || []).find(a => a.startsWith(flag));
+        if (!hit) continue;
+        const value = hit.slice(flag.length).trim();
+        if (valid(value)) return { channel, value };
+    }
+    return null;
+};
+let pendingRequest = requestFromArgv(process.argv);
+
+function sendRequestToWindow(req) {
+    if (!req) return;
     const w = BrowserWindow.getAllWindows()[0];
     if (!w) return;
     if (w.isMinimized()) w.restore();
     w.focus();
-    w.webContents.send('open-game', id);
+    w.webContents.send(req.channel, req.value);
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -217,22 +239,38 @@ if (!gotLock) {
     app.on('second-instance', (_e, argv) => {
         const w = BrowserWindow.getAllWindows()[0];
         if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
-        openGameInWindow(gameIdFromArgv(argv));
+        sendRequestToWindow(requestFromArgv(argv));
     });
 }
 
 // The renderer tells us when it can accept it; before that the game list isn't loaded.
 ipcMain.on('renderer-ready', () => {
-    if (!pendingGameId) return;
-    const id = pendingGameId;
-    pendingGameId = null;
-    setTimeout(() => openGameInWindow(id), 400);
+    if (!pendingRequest) return;
+    const req = pendingRequest;
+    pendingRequest = null;
+    setTimeout(() => sendRequestToWindow(req), 400);
 });
+
+// The command palette's actions, published for the desktop (see desktop-descriptor.js).
+// The renderer owns the list — every action is a closure over the UI — so it reports the
+// ids and names once the palette is wired, and this only writes them down.
+ipcMain.on('publish-palette-actions', (_e, actions) => { desktopDescriptor.publishActions(actions); });
 
 app.whenReady().then(() => {
     if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
     if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
     if (!fs.existsSync(trailersDir)) fs.mkdirSync(trailersDir, { recursive: true });
+
+    // Tell the desktop where this installation lives, so a bar widget or an overlay can
+    // read our paths instead of hardcoding someone else's. Rewritten every start: the
+    // AppImage moves, and the grinder database appears the first time a store is linked.
+    desktopDescriptor.publish({
+        version: app.getVersion(),
+        baseDir,
+        libraryDb: dbPath,
+        grinderDb: host.findGrinderDb(baseDir),
+        selfExecutable: host.selfExecutable(),
+    });
 
     try {
         db = new Database(dbPath);
@@ -3081,8 +3119,9 @@ ipcMain.handle('install-to-menu', () => {
         fs.writeFileSync(path.join(iconsDir, 'GRINDER.svg'),  Buffer.from(GRINDER_SVG_B64,  'base64'));
         fs.writeFileSync(path.join(iconsDir, 'EmuLatte.svg'), Buffer.from(EMULATTE_SVG_B64, 'base64'));
         const files = fs.readdirSync(baseDir);
-        const suiteFile    = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
-        const suitePath    = suiteFile ? path.join(baseDir, suiteFile) : (host.selfExecutable() || null);
+        // One answer to "which binary is the suite?", shared with the desktop descriptor so
+        // the app menu and the Omarchy plugin open the same file.
+        const suitePath    = desktopDescriptor.suiteExecutable(baseDir, host.selfExecutable());
         const emulatteFile = files.find(f => /^EmuLatte.*\.AppImage$/i.test(f));
 
         // Remove stale pre-merge launchers (separate CNGM/GRINDER AppImages are gone).
@@ -3138,9 +3177,7 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
         if (!targets.menu && !targets.desktop) return { ok: false, message: 'No location selected.' };
 
         // The suite AppImage (or the exec path in dev).
-        const files = (() => { try { return fs.readdirSync(baseDir); } catch { return []; } })();
-        const suiteFile = files.find(f => /^CafeNeurotico.*\.AppImage$/i.test(f));
-        const suitePath = suiteFile ? path.join(baseDir, suiteFile) : host.selfExecutable();
+        const suitePath = desktopDescriptor.suiteExecutable(baseDir, host.selfExecutable());
         try { if (/\.AppImage$/i.test(suitePath)) fs.chmodSync(suitePath, '755'); } catch {}
 
         // Icon: prefer a squarish Icon/Logo, fall back to the cover, then the CN app icon.
@@ -3191,8 +3228,7 @@ ipcMain.handle('get-crema-autostart', () => host.desktop.getAutostart(CREMA_AUTO
 ipcMain.handle('set-crema-autostart', (_, enabled) => {
     try {
         if (!enabled) return host.desktop.setAutostart(CREMA_AUTOSTART_ID, false);
-        const sf = (() => { try { return fs.readdirSync(baseDir).find(f => /^CafeNeurotico.*\.AppImage$/i.test(f)); } catch { return null; } })();
-        const suitePath = sf ? path.join(baseDir, sf) : host.selfExecutable();
+        const suitePath = desktopDescriptor.suiteExecutable(baseDir, host.selfExecutable());
         const iconsDir = path.join(baseDir, 'icons');
         try { fs.mkdirSync(iconsDir, { recursive: true }); fs.writeFileSync(path.join(iconsDir, 'CREMA.svg'), Buffer.from(CREMA_SVG_B64, 'base64')); } catch {}
         return host.desktop.setAutostart(CREMA_AUTOSTART_ID, true, {
