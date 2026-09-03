@@ -70,6 +70,17 @@ function rewrite(db, table, column, from, to) {
     if (APPLY) sql(db, `UPDATE ${table} SET ${column} = REPLACE(${column}, '${from}', '${to}') WHERE ${column} LIKE '%${from}%';`);
 }
 
+// Settings are stored as key/value rows, so a renamed key orphans its value silently:
+// the app reads the new name, finds nothing, and falls back to a default. Nothing errors,
+// which is exactly why this is easy to miss.
+function renameSettingKey(db, from, to) {
+    const has = k => Number(sql(db, `SELECT count(*) FROM settings WHERE key='${k}';`));
+    if (has(to))   return skip(`settings: '${to}' already present`);
+    if (!has(from)) return skip(`settings: '${from}' not set`);
+    act(`settings: '${from}' → '${to}'`);
+    if (APPLY) sql(db, `UPDATE settings SET key='${to}' WHERE key='${from}';`);
+}
+
 function renameColumn(db, table, from, to) {
     const cols = sql(db, `SELECT group_concat(name) FROM pragma_table_info('${table}');`).split(',');
     if (cols.includes(to))   return skip(`${table}.${to} already renamed`);
@@ -179,6 +190,14 @@ if (fs.existsSync(gamesDb)) {
         rewrite(gamesDb, t, c, '/Games/CafeNeurotico/', '/Games/Clarity/');
         rewrite(gamesDb, t, c, 'GOG via GRINDER',       'GOG via Installer');
     }
+    for (const [a, b] of [
+        ['cngm_theme',            'clarity_theme'],
+        ['cngm_ui_scale',         'clarity_ui_scale'],
+        ['cngm_ui_scale_screen',  'clarity_ui_scale_screen'],
+        ['crema_gallery_sort',    'couch_gallery_sort'],
+        ['crema_hide_pico8',      'couch_hide_pico8'],
+    ]) renameSettingKey(gamesDb, a, b);
+
     // Verify rather than assume: re-query for any brand token that should now be gone.
     console.log('\n▸ Post-migration check (games.db)');
     if (APPLY) {
