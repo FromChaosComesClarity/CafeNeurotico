@@ -146,6 +146,14 @@ move(path.join(appDir, 'CafeNeurotico.AppImage'),     path.join(appDir, 'Clarity
 move(path.join(appDir, 'CafeNeurotico_old.AppImage'), path.join(appDir, 'Clarity_old.AppImage'));
 move(path.join(gmc, 'grinder-progress.json'),             path.join(gmc, 'installer-progress.json'));
 
+// Companion apps keep their own state inside the shared library directory, so they
+// move with it — but their *names* are part of the rebrand too.
+console.log('\n▸ Companion app data');
+move(path.join(gmc, 'CafeNeuroticoClock'), path.join(gmc, 'ClarityClock'));
+move(path.join(gmc, 'CREMA_wallpapers'),   path.join(gmc, 'couch_wallpapers'));
+const apps = path.join(HOME, 'Apps');
+move(path.join(apps, 'CafeNeuroticoClock.AppImage'), path.join(apps, 'ClarityClock.AppImage'));
+
 console.log('\n▸ Installer database (library.db)');
 const libDb = path.join(engine, 'library.db');
 for (const ext of ['', '-wal', '-shm']) move(path.join(engine, `grinder.db${ext}`), `${libDb}${ext}`);
