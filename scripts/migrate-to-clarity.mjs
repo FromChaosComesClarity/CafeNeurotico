@@ -213,6 +213,22 @@ if (fs.existsSync(gamesDb)) {
     else console.log('  ─ no stray save archives');
 }
 
-console.log('\n  NOT handled here (edit by hand):');
-console.log('    ~/.config/hypr/bindings.lua — SUPER+CTRL+G still names ...cafeneurotico;');
-console.log('    change it to io.github.fromchaoscomesclarity.clarity\n');
+// Desktop integration lives outside this project, so it is checked rather than assumed.
+console.log('\n▸ Desktop integration');
+for (const [file, label] of [
+    [path.join(HOME, '.config', 'hypr', 'bindings.lua'), 'Hyprland binding'],
+    [path.join(HOME, '.config', 'omarchy', 'shell.json'), 'Omarchy bar'],
+]) {
+    try {
+        const stale = fs.readFileSync(file, 'utf8').includes('cafeneurotico');
+        stale ? warn(`${label}: ${H(file)} still names cafeneurotico — point it at io.github.fromchaoscomesclarity.clarity`)
+              : console.log(`  ✓ ${label}: ${H(file)} already on the clarity id`);
+    } catch { skip(`${label}: ${H(file)} not present`); }
+}
+const plugDir = path.join(HOME, '.config', 'omarchy', 'plugins');
+try {
+    const old = fs.readdirSync(plugDir).filter(d => d.includes('cafeneurotico') && !d.includes('.bak.'));
+    old.length ? old.forEach(d => warn(`stale plugin still installed: ${H(path.join(plugDir, d))}`))
+               : console.log('  ✓ Omarchy plugin: no cafeneurotico plugin directory remains');
+} catch {}
+console.log('');
