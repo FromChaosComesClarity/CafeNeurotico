@@ -3156,26 +3156,22 @@ ipcMain.handle('install-to-menu', () => {
         const suitePath    = desktopDescriptor.suiteExecutable(baseDir, host.selfExecutable());
         const emulatteFile = files.find(f => /^EmuLatte.*\.AppImage$/i.test(f));
 
-        // Remove stale pre-merge launchers (separate Clarity/Installer AppImages are gone).
-        for (const stale of ['cafe-neurotico-game-manager', 'cafe-neurotico-installer'])
-            host.desktop.removeLauncher(appsDir, stale);
-
         const installed = [];
         if (suitePath) {
             try { fs.chmodSync(suitePath, '755'); } catch {}
             host.desktop.writeLauncher(appsDir, {
-                id: 'cafe-neurotico', name: 'Clarity',
+                id: 'clarity', name: 'Clarity',
                 comment: 'Your game library — Manager, Installer and Couch in one.',
                 exec: suitePath, icon: path.join(iconsDir, 'Clarity.svg'),
                 categories: ['Game', 'Utility'], wmClass: 'clarity',
             });
             host.desktop.writeLauncher(appsDir, {
-                id: 'cafe-neurotico-couch', name: 'Couch (Fullscreen)',
+                id: 'clarity-couch', name: 'Couch (Fullscreen)',
                 comment: 'Clarity in fullscreen, gamepad-first mode — made for the living room / TV.',
                 exec: suitePath, args: ['--couch'], icon: path.join(iconsDir, 'Couch.svg'),
                 categories: ['Game'], wmClass: 'couch',
                 keywords: ['couch', 'tv', 'living room', 'gamepad', 'controller', 'fullscreen',
-                           'big picture', 'bigpicture', 'clarity', 'couch'],
+                           'big picture', 'bigpicture', 'clarity'],
             });
             installed.push('Clarity', 'Couch');
         }
@@ -3183,7 +3179,7 @@ ipcMain.handle('install-to-menu', () => {
             const p = path.join(baseDir, emulatteFile);
             try { fs.chmodSync(p, '755'); } catch {}
             host.desktop.writeLauncher(appsDir, {
-                id: 'cafe-neurotico-emulatte', name: 'EmuLatte',
+                id: 'clarity-emulatte', name: 'EmuLatte',
                 comment: 'Clarity EmuLatte — ROM library manager.',
                 exec: p, icon: path.join(iconsDir, 'EmuLatte.svg'),
                 categories: ['Game', 'Emulator'],
@@ -3230,7 +3226,7 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
         }
 
         const entry = {
-            id: `cafe-neurotico-game-${game.id}`,
+            id: `clarity-game-${game.id}`,
             name: String(game.Game || 'Game'),
             comment: `Launch ${String(game.Game || 'Game')} via Clarity`,
             exec: suitePath, args: [`--game=${game.id}`], icon: iconPath,
@@ -3255,15 +3251,15 @@ ipcMain.handle('add-game-shortcut', (_, gameId, targets) => {
 
 // Opt-in: auto-start the Couch (fullscreen) face on login (living-room / HTPC). Off by default.
 // State = presence of the XDG autostart entry; no separate setting to drift.
-const Couch_AUTOSTART_ID = 'cafe-neurotico-couch';
-ipcMain.handle('get-couch-autostart', () => host.desktop.getAutostart(Couch_AUTOSTART_ID));
+const COUCH_AUTOSTART_ID = 'clarity-couch';
+ipcMain.handle('get-couch-autostart', () => host.desktop.getAutostart(COUCH_AUTOSTART_ID));
 ipcMain.handle('set-couch-autostart', (_, enabled) => {
     try {
-        if (!enabled) return host.desktop.setAutostart(Couch_AUTOSTART_ID, false);
+        if (!enabled) return host.desktop.setAutostart(COUCH_AUTOSTART_ID, false);
         const suitePath = desktopDescriptor.suiteExecutable(baseDir, host.selfExecutable());
         const iconsDir = path.join(baseDir, 'icons');
         try { fs.mkdirSync(iconsDir, { recursive: true }); fs.writeFileSync(path.join(iconsDir, 'Couch.svg'), Buffer.from(Couch_SVG_B64, 'base64')); } catch {}
-        return host.desktop.setAutostart(Couch_AUTOSTART_ID, true, {
+        return host.desktop.setAutostart(COUCH_AUTOSTART_ID, true, {
             name: 'Couch (Fullscreen)',
             comment: 'Clarity — auto-start in fullscreen / gamepad mode on login.',
             exec: suitePath, args: ['--couch'], icon: path.join(iconsDir, 'Couch.svg'),
