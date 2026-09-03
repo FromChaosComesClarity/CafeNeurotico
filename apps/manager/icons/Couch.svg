@@ -11,7 +11,7 @@
   <!-- Espresso Cup Base -->
   <circle cx="256" cy="256" r="160" fill="#432818" stroke="#D4A373" stroke-width="16"/>
 
-  <!-- Crema / Vinyl Swirls -->
+  <!-- Couch / Vinyl Swirls -->
   <path d="M 256 136 A 120 120 0 0 1 376 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
   <path d="M 256 376 A 120 120 0 0 1 136 256" fill="none" stroke="#D4A373" stroke-width="16" stroke-linecap="round"/>
   <path d="M 186 256 A 70 70 0 0 1 256 186" fill="none" stroke="#FFE6A7" stroke-width="12" stroke-linecap="round"/>
