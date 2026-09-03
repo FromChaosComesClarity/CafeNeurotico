@@ -33,9 +33,9 @@ Upgrading from 1.0.0? Just replace the AppImage. Your `GameManagerConfig` folder
 - Linux only. The suite ships as a single AppImage; there are no Windows or macOS builds.
 - The About dialog now reads 1.1.0.
 
-## Tip the barista
+## Spread the good vibes
 
-If Clarity organized your gaming life, consider buying me a coffee — it keeps the pot warm. *"more caffeine is `more good`."*
+If Clarity got your gaming life together, consider sending a little support my way — it keeps the good vibes flowing. *"stay positive and love your life."*
 
 - **Ko-fi (Intl):** https://ko-fi.com/clarity
 - **PIX (Brazil):** `b734a9e2-e479-42f9-abd6-c88d1b8b880e`

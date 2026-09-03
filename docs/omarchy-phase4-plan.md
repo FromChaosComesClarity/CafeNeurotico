@@ -117,7 +117,7 @@ tokens as the launcher.
 
 Currently **offline on purpose** (Pages disabled, nothing deleted) and three releases behind.
 
-- The cliamp.stream identity, and **drop the coffee-shop theme** for this phase
+- The cliamp.stream identity, and **drop the old themed styling** for this phase
 - The message: the app is changing, and it has found a home in Omarchy
 - A slideshow from `/home/jose/Pictures/CN_Omarchy Screenshots` — **106 shots, 78 MB** — a
   selected handful converted to webp

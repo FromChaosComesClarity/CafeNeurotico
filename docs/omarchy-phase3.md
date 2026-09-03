@@ -150,7 +150,7 @@ scored the same, and an empty query is ordered by recency.
 
 The plugin is ~9 KB of QML and two scripts. It has no library, no launcher and no games of its
 own, so **it requires Clarity ≥ 1.11.0** — the first release that writes the descriptor.
-Installed without the app it degrades honestly: the bar shows a bare coffee cup with no count,
+Installed without the app it degrades honestly: the bar shows a bare icon with no count,
 and the launcher says the app has not been run on this machine yet.
 
 ```

@@ -2,7 +2,7 @@
 
 # Clarity
 
-### *the game center for Omarchy*
+### *the game manager for Omarchy*
 
 ![version](https://img.shields.io/badge/version-1.12.0-2fe0d6?style=flat-square)
 ![status](https://img.shields.io/badge/status-Experimental-ff5fa2?style=flat-square)

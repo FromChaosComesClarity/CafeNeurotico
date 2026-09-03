@@ -221,8 +221,7 @@ command that writes a `sysctl.d` drop-in so the change survives a reboot.
 
 - **The screen will not lock mid-game.** A gamepad-only Couch session, a long cutscene or a turn
   spent reading a map produces no keyboard or mouse input at all, so the desktop's idea of idle
-  and the player's are completely different — and the lock screen wins that argument. Cafe
-  Neurotico holds an idle inhibitor for exactly as long as a game is running.
+  and the player's are completely different — and the lock screen wins that argument. Clarity holds an idle inhibitor for exactly as long as a game is running.
 
   > ⚠️ An inhibitor, deliberately, rather than flipping your idle setting: an inhibitor dies with
   > the process holding it, whereas a toggle left flipped by a crash would leave your lock screen

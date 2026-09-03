@@ -238,7 +238,7 @@ Verified by actually launching the packaged `.app` (not just checking the build 
 bar correctly reads "Clarity", not "Electron", confirming the icon and identity are both
 wired. Because it's built locally, the `.app` never gets a quarantine bit and **Gatekeeper
 doesn't appear at all**. That friction only exists for someone who *downloads* the dmg — for
-them, `xattr -dr com.apple.quarantine /Applications/Cafe\ Neurotico.app`.
+them, `xattr -dr com.apple.quarantine /Applications/Clarity.app`.
 
 ### Phase B.6 — gogdl, and close the tarball gap — ✅ DONE
 ```bash

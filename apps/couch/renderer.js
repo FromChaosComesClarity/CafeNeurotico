@@ -1058,7 +1058,7 @@ async function openReader(url, title, source) {
   let host = ''; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
   document.getElementById('rd-src').textContent = [source, host].filter(Boolean).join('  ·  ');
   const body = document.getElementById('rd-body');
-  body.innerHTML = '<div class="rd-status">Brewing the article…</div>';
+  body.innerHTML = '<div class="rd-status">Getting the article…</div>';
   document.getElementById('reader-scroll').scrollTop = 0;
   const res = await window.api.fetchArticle(url).catch(() => null);
   if (gameState !== 'READER' || _readerUrl !== url) return;   // user backed out meanwhile
@@ -1074,7 +1074,7 @@ async function openReader(url, title, source) {
       if ((frag.textContent || '').trim().length >= 300) { body.innerHTML = ''; while (frag.firstChild) body.appendChild(frag.firstChild); ok = true; }
     } catch (e) { console.error('[reader]', e); }
   }
-  if (!ok) body.innerHTML = '<div class="rd-status">Couldn\'t brew a readable version of this page.<br><br>Press X to open it in the browser instead &nbsp;·&nbsp; B to go back.</div>';
+  if (!ok) body.innerHTML = '<div class="rd-status">Couldn\'t put together a readable version of this page.<br><br>Press X to open it in the browser instead &nbsp;·&nbsp; B to go back.</div>';
 }
 function closeReader() {
   document.getElementById('reader-screen').classList.add('hidden');
