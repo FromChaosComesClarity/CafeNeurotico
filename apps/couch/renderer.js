@@ -4,7 +4,7 @@ window.onerror = function(message, source, lineno) {
 };
 
 let baseDir = ""; let sfxNav, sfxSelect, sfxBack; let bgmAudio = new Audio();
-let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "CREMA (DEFAULT)", themeSource: "CUSTOM", uiFont: "Poppins", fontSource: "MANAGER", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
+let audioCfg = { bgm: true, sfx: true, vol: 0.3, bgm_mode: "AMBIENT", theme: "Couch (DEFAULT)", themeSource: "CUSTOM", uiFont: "Poppins", fontSource: "MANAGER", screensaver: "SCREENSHOTS", screensaverDelay: 3, gamepadLayout: "XBOX", wakeMethod: "START + SELECT", startScreenMode: "CAROUSEL", browseMode: "LIST", gamepageStyle: "IMMERSIVE", homeEnabled: true, homeRows: ["recent","gems","played"] };
 let customPlaylist = []; let customIndex = 0; let isCustom = false;
 let npTimeout = null;
 
@@ -18,15 +18,15 @@ function t(key, vars = {}) {
 const CAT_KEYS = { "ALL GAMES": "cat.all_games", "OTHERS": "cat.others", "PHYSICAL": "cat.physical", "EMULATION": "cat.emulation", "APPS": "cat.apps", "WANT TO PLAY": "cat.want", "FAVS": "cat.favs", "INSTALLED": "cat.installed" };
 
 function isManualCategory(game) {
-    if (game.GrinderGameId) return false;
+    if (game.InstallerGameId) return false;
     const s = (game.Store || '').toLowerCase();
     return /physical|others|emulation|apps/.test(s) && !/steam|epic|gog|itch|pico/.test(s);
 }
 
 function getInstallCommand(game) {
     const cmd = game.LaunchCommand || '';
-    if (/grinder:\/\/launch/i.test(cmd)) {
-        const m = cmd.match(/grinder:\/\/launch\/[^"\s]+/i);
+    if (/installer:\/\/launch/i.test(cmd)) {
+        const m = cmd.match(/installer:\/\/launch\/[^"\s]+/i);
         return m ? m[0] : null;
     }
     if (/steam:\/\/rungameid/i.test(cmd) && game.SteamAppID && String(game.SteamAppID).trim() !== '' && String(game.SteamAppID) !== 'None') {
@@ -74,17 +74,17 @@ let allGames = [], filteredGames = [];
 let currentCategoryIndex = 0, currentGameIndex = 0, currentOverlayIndex = 0;
 let overlayItems = [];
 
-// Default to 5 recent games for CREMA
+// Default to 5 recent games for Couch
 let recentGamesCount = 9;
-let _cremaHidePico8 = false; // when true, PICO-8 games show only inside the PICO-8 category
-let _cremaHideFree = false;  // when true, Steam free-to-play games (FreeToPlay==1) are hidden everywhere
-let _cremaGallerySort = 'alpha'; // gallery sort (X in gallery) — mirrors the Manager's sort dropdown
+let _couchHidePico8 = false; // when true, PICO-8 games show only inside the PICO-8 category
+let _couchHideFree = false;  // when true, Steam free-to-play games (FreeToPlay==1) are hidden everywhere
+let _couchGallerySort = 'alpha'; // gallery sort (X in gallery), mirrors the Manager's sort dropdown
 let numRecentInList = 0;
 
 let trailerTimeout = null, screenshotInterval = null, bgmFadeInterval = null;
 let screenshotArray = [], currentScreenshotIndex = 0;
 let gameHasTrailer = false, mediaSwapped = false;
-let activeThemeCategory = ""; let activeTheme = "CREMA (DEFAULT)";
+let activeThemeCategory = ""; let activeTheme = "Couch (DEFAULT)";
 
 let hasBooted = false; let idleTimer = null; let screensaverInterval = null; let ssClockInterval = null;
 let screensaverStartTime = 0;
@@ -93,7 +93,7 @@ const delayOptions = [1, 2, 3, 4, 5, 10, 15, 30];
 
 // When the current install started, for the estimate. Reset on each new one.
 let _gpStarted = 0, _gpLastPct = 0;
-let _grinderConfirmGame = null; let _grinderInstallDir = ''; let _grinderProgressInterval = null; let _grinderProgressActive = false; let _grinderConfirmActive = false;
+let _installerConfirmGame = null; let _installerInstallDir = ''; let _installerProgressInterval = null; let _installerProgressActive = false; let _installerConfirmActive = false;
 let _lpGame = null; let _lpList = []; let _lpIndex = 0;
 
 let oskMode = 'SEARCH'; let tempOskString = '';
@@ -116,7 +116,7 @@ const RECENTLY_IMPORTED_LIMIT = 50;
 const PLAYLIST_CAT_PREFIX = "≡ ";
 // Genre is a FILTER, not a category. Putting one entry per genre in the category strip
 // would have added forty-odd stops to a list you walk with a d-pad; instead a genre
-// narrows whatever category you are already in — GOG *and* CRPG — and is chosen from
+// narrows whatever category you are already in, GOG *and* CRPG, and is chosen from
 // its own menu (System ▸ Filter by Genre). Session-only on purpose: a filter that
 // survived a restart would be an invisible reason the library looks half empty.
 let genreCats = [];              // [{ slug, label, count }], biggest first
@@ -129,7 +129,7 @@ let recentlyImportedIds = new Set();
 
 const THEMES = {
   "DARK GRAY": {bg: "#141414", bg_panel: "rgba(0,0,0,0.5)", bg_menu: "#222222", accent: "#ffffff", accent_menu: "#00e5ff", text_main: "#ffffff", text_sec: "#bbbbbb", text_dim: "#777777", border: "rgba(255,255,255,0.1)", border_solid: "#555555"},
-  "CREMA (DEFAULT)": {bg: "#2C1E16", bg_panel: "rgba(67, 40, 24, 0.6)", bg_menu: "#432818", accent: "#D4A373", accent_menu: "#D4A373", text_main: "#FFE6A7", text_sec: "#E6CC98", text_dim: "#A47148", border: "rgba(212, 163, 115, 0.2)", border_solid: "#8B5A2B"},
+  "Couch (DEFAULT)": {bg: "#2C1E16", bg_panel: "rgba(67, 40, 24, 0.6)", bg_menu: "#432818", accent: "#D4A373", accent_menu: "#D4A373", text_main: "#FFE6A7", text_sec: "#E6CC98", text_dim: "#A47148", border: "rgba(212, 163, 115, 0.2)", border_solid: "#8B5A2B"},
   "CYBERPUNK": {bg: "#09090b", bg_panel: "rgba(26, 26, 46, 0.7)", bg_menu: "#1a1a2e", accent: "#f3e600", accent_menu: "#00ffcc", text_main: "#00ffcc", text_sec: "#e0e0e0", text_dim: "#ff003c", border: "rgba(243, 230, 0, 0.2)", border_solid: "#ff003c"},
   "VAPOUR OS": {bg: "#171a21", bg_panel: "rgba(27, 40, 56, 0.7)", bg_menu: "#1b2838", accent: "#66c0f4", accent_menu: "#66c0f4", text_main: "#c7d5e0", text_sec: "#8f98a0", text_dim: "#556b82", border: "rgba(102, 192, 244, 0.2)", border_solid: "#2a475e"},
   "PSIV BLUE": {bg: "#000022", bg_panel: "rgba(0, 67, 156, 0.4)", bg_menu: "#001144", accent: "#ffffff", accent_menu: "#0070cc", text_main: "#ffffff", text_sec: "#aaaaaa", text_dim: "#666666", border: "rgba(0, 112, 204, 0.3)", border_solid: "#00439c"},
@@ -199,13 +199,13 @@ const THEMES = {
   "DAYBREAK": {bg: "#fff9f0", bg_panel: "rgba(255,236,205,0.75)", bg_menu: "#ffefd8", accent: "#c05b18", accent_menu: "#d47820", text_main: "#3a2510", text_sec: "#6a4520", text_dim: "#b08060", border: "rgba(192,91,24,0.18)", border_solid: "#e8c898"},
   "OAKANIZER LIGHT": {bg: "#f5f0f8", bg_panel: "rgba(228,219,237,0.75)", bg_menu: "#e4dbed", accent: "#46295a", accent_menu: "#46295a", text_main: "#1e0a30", text_sec: "#6b547b", text_dim: "#907f9c", border: "rgba(70,41,90,0.12)", border_solid: "#c0b4cc"},
   "OAKANIZER DARK": {bg: "#120a1a", bg_panel: "rgba(35,20,45,0.6)", bg_menu: "#23142d", accent: "#b5a9bd", accent_menu: "#b5a9bd", text_main: "#dad4de", text_sec: "#907f9c", text_dim: "#6b547b", border: "rgba(181,169,189,0.2)", border_solid: "#46295a"},
-  // BrewBalance (imported from the BrewBalance app — espresso & latte brand set)
+  // BrewBalance (imported from the BrewBalance app, espresso & latte brand set)
   "BREWBALANCE DARK": {bg: "#17100a", bg_panel: "rgba(30, 21, 13, 0.6)", bg_menu: "#1e150d", accent: "#d4a373", accent_menu: "#d4a373", text_main: "#efe3d2", text_sec: "#b89b7d", text_dim: "#7a5f45", border: "rgba(212, 163, 115, 0.2)", border_solid: "#3f2d1c"},
   "BREWBALANCE LIGHT": {bg: "#fbf7ef", bg_panel: "rgba(243, 235, 221, 0.75)", bg_menu: "#f3ebdd", accent: "#b5651d", accent_menu: "#b5651d", text_main: "#2a241c", text_sec: "#7c6b53", text_dim: "#9a8a72", border: "rgba(181, 101, 29, 0.12)", border_solid: "#d6c6ab"},
   "MOCHA": {bg: "#1a1210", bg_panel: "rgba(36, 24, 19, 0.6)", bg_menu: "#241813", accent: "#c98a5e", accent_menu: "#c98a5e", text_main: "#f0dfcf", text_sec: "#c7a98f", text_dim: "#8a6a54", border: "rgba(201, 138, 94, 0.2)", border_solid: "#4a3226"},
   "FLAT WHITE": {bg: "#f6f1e9", bg_panel: "rgba(253, 250, 244, 0.75)", bg_menu: "#fdfaf4", accent: "#8a5a2b", accent_menu: "#8a5a2b", text_main: "#33291f", text_sec: "#6b5a48", text_dim: "#a4917a", border: "rgba(138, 90, 43, 0.12)", border_solid: "#e0d4c0"},
   "MATCHA": {bg: "#12160f", bg_panel: "rgba(26, 32, 21, 0.6)", bg_menu: "#1a2015", accent: "#9bbf6b", accent_menu: "#9bbf6b", text_main: "#e6efd8", text_sec: "#b3c79b", text_dim: "#6d8556", border: "rgba(155, 191, 107, 0.2)", border_solid: "#33422a"},
-  // Systems (imported from LatteWrite) — retro-OS palettes; each carries its era `font` (applied as --ui-font while active)
+  // Systems (imported from LatteWrite), retro-OS palettes; each carries its era `font` (applied as --ui-font while active)
   "MS-DOS": {bg: "#0a0a0a", bg_panel: "rgba(0, 0, 0, 0.6)", bg_menu: "#000000", accent: "#ffffff", accent_menu: "#ffffff", text_main: "#d2d2d2", text_sec: "#a2a2a2", text_dim: "#7e7e7e", border: "rgba(255, 255, 255, 0.25)", border_solid: "#4a4a4a", font: 'PxPlus IBM VGA8'},
   "COMMODORE 64": {bg: "#0000aa", bg_panel: "rgba(0, 0, 170, 0.6)", bg_menu: "#0000aa", accent: "#b9b6ff", accent_menu: "#b9b6ff", text_main: "#d0ccff", text_sec: "#9e9beb", text_dim: "#7976db", border: "rgba(185, 182, 255, 0.25)", border_solid: "#4341c5", font: 'C64 Pro Mono'},
   "MACOS 1.0": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
@@ -228,7 +228,7 @@ const THEMES = {
   "GEOS": {bg: "#ffffff", bg_panel: "rgba(255, 255, 255, 0.6)", bg_menu: "#ffffff", accent: "#000000", accent_menu: "#000000", text_main: "#000000", text_sec: "#3d3d3d", text_dim: "#6b6b6b", border: "rgba(0, 0, 0, 0.25)", border_solid: "#adadad", font: 'Chicago'},
 };
 const THEME_CATEGORIES = {
-  "Originals & System": ["CREMA (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "OAKANIZER DARK"],
+  "Originals & System": ["Couch (DEFAULT)", "DARK GRAY", "CYBERPUNK", "SNOW", "MOVIESFLIX", "VAPOUR OS", "PSIV BLUE", "GREEN BOX", "OAKANIZER DARK"],
   "BrewBalance": ["BREWBALANCE DARK", "BREWBALANCE LIGHT", "MOCHA", "FLAT WHITE", "MATCHA"],
   "Light & Minimal": ["PAPER", "SOLARIZED LIGHT", "CATPPUCCIN LATTE", "GITHUB LIGHT", "GRUVBOX LIGHT", "ROSÉ PINE DAWN", "NORD LIGHT", "DAYBREAK", "OAKANIZER LIGHT"],
   "Gaming Legends": ["GAME BOY DMG", "PIP BOY", "SEVASTOPOL", "RIP AND TEAR CLASSIC", "SUPER BROTHERS", "GREEN HILL", "NES", "SNES", "BLOODBORNE", "METROID PRIME", "SILENT HILL", "DIABLO", "HALF-LIFE", "SHOVEL KNIGHT"],
@@ -244,9 +244,9 @@ function updateAppScale() { const wrapper = document.getElementById('app-scale-w
 function setBlur(enable) { document.querySelectorAll('.blur-target').forEach(el => el.classList.toggle('is-blurred', enable)); }
 function isVideoActive() { const vid = document.getElementById('video-player'); return vid && !vid.paused && vid.src && vid.src.includes('file://'); }
 function applyTheme(themeName) {
-  activeTheme = THEMES[themeName] ? themeName : "CREMA (DEFAULT)";
+  activeTheme = THEMES[themeName] ? themeName : "Couch (DEFAULT)";
   const t = THEMES[activeTheme]; const root = document.documentElement;
-  // `font` is not a colour token — it's the theme's era typeface, applied through --ui-font below.
+  // `font` is not a colour token, it's the theme's era typeface, applied through --ui-font below.
   Object.keys(t).forEach(key => { if (key !== 'font') root.style.setProperty(`--${key}`, t[key]); });
   applyUiFont();
 }
@@ -259,7 +259,7 @@ function applyTheme(themeName) {
 const UI_FONTS = ['Poppins', 'Raleway', 'Sora', 'Inter', 'Fraunces', 'Chicago', 'PxPlus IBM VGA8'];
 const FONT_LABELS = { 'Chicago': 'CHICAGOFLF' };   // display name where it differs from the family
 const fontLabel = f => FONT_LABELS[f] || f.toUpperCase();
-let _uiFont = '';   // the resolved family — whatever CREMA is currently painting with
+let _uiFont = '';   // the resolved family, whatever Couch is currently painting with
 
 function applyUiFont() {
   const themeFont = THEMES[activeTheme] && THEMES[activeTheme].font;
@@ -280,15 +280,15 @@ async function resolveAndApplyFont() {
 
 // ── THEME INHERITANCE (follow The Manager) ─────────────────────────────────────
 // The Manager stores its chosen theme in the shared games.db under the setting key
-// 'cngm_theme'. When audioCfg.themeSource === 'MANAGER', CREMA mirrors it; picking a theme by
-// hand switches to 'CUSTOM' (the default for new installs, so CREMA opens on its own look).
-// All three faces ship the same theme set; the only name difference is The Manager's "CREMA",
-// which is CREMA's "CREMA (DEFAULT)".
+// 'clarity_theme'. When audioCfg.themeSource === 'MANAGER', Couch mirrors it; picking a theme by
+// hand switches to 'CUSTOM' (the default for new installs, so Couch opens on its own look).
+// All three faces ship the same theme set; the only name difference is The Manager's "Couch",
+// which is Couch's "Couch (DEFAULT)".
 const FOLLOW_MANAGER_LABEL = 'FOLLOW THE MANAGER';
 
 // The Manager can be wearing the user's live Omarchy palette, which is not one of the shipped
-// themes — it is generated from their desktop. Registering it here under the same name is what
-// keeps "follow The Manager" honest on Omarchy: without it, mapManagerThemeToCrema() finds no
+// themes. It is generated from their desktop. Registering it here under the same name is what
+// keeps "follow The Manager" honest on Omarchy: without it, mapManagerThemeToCouch() finds no
 // 'OMARCHY' in this face's table, returns null, and the couch face quietly drops back to its
 // own default while the Manager matches the desktop.
 const OMARCHY_THEME_KEY = 'OMARCHY';
@@ -305,9 +305,9 @@ window.api.onOmarchyThemeChanged?.(d => {
   if (registerOmarchyTheme(d) && activeTheme === OMARCHY_THEME_KEY) applyTheme(OMARCHY_THEME_KEY);
 });
 
-function mapManagerThemeToCrema(name) {
+function mapManagerThemeToCouch(name) {
   if (!name) return null;
-  if (name === 'CREMA') return 'CREMA (DEFAULT)';
+  if (name === 'Couch') return 'Couch (DEFAULT)';
   return THEMES[name] ? name : null;
 }
 async function resolveAndApplyTheme() {
@@ -316,11 +316,11 @@ async function resolveAndApplyTheme() {
   try { await omarchyThemeReady; } catch (e) {}
   if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') {
     try {
-      const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme'));
+      const mapped = mapManagerThemeToCouch(await window.api.getSetting('clarity_theme'));
       if (mapped) { applyTheme(mapped); return; }
     } catch (e) {}
   }
-  applyTheme(audioCfg.theme && THEMES[audioCfg.theme] ? audioCfg.theme : 'CREMA (DEFAULT)');
+  applyTheme(audioCfg.theme && THEMES[audioCfg.theme] ? audioCfg.theme : 'Couch (DEFAULT)');
 }
 
 // App Assets Helper
@@ -379,7 +379,7 @@ function rebuildCategories() {
   if (galleryCatIndex >= categories.length) galleryCatIndex = 0;
 }
 
-// The genres worth offering, biggest first — the menu scrolls, so every non-empty genre
+// The genres worth offering, biggest first, the menu scrolls, so every non-empty genre
 // is listed, unlike the category strip which had to stay short.
 async function loadGenreCategories() {
   try {
@@ -388,7 +388,7 @@ async function loadGenreCategories() {
       .filter(g => g.count > 0)
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   } catch (e) { genreCats = []; }
-  // A genre can empty out (games hidden, a re-scan) — drop a filter that now matches
+  // A genre can empty out (games hidden, a re-scan), drop a filter that now matches
   // nothing rather than leaving the library looking mysteriously empty.
   if (activeGenreFilter && !genreCats.some(g => g.slug === activeGenreFilter)) activeGenreFilter = null;
 }
@@ -479,7 +479,7 @@ function _fpGradient(ctx, w, h, r, g, b, dir) {
     grad.addColorStop(0, d1); grad.addColorStop(1, d2);
     ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
     const glow = ctx.createRadialGradient(w/2,h/2,0, w/2,h/2, Math.max(w,h)*.55);
-    glow.addColorStop(0, `rgba(${r},${g},${b},.32)`); glow.addColorStop(1, 'rgba(0,0,0,0)');
+    glow.addColorStop(0, `rgba(${r},${g},${b}.32)`); glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
 }
 
@@ -641,7 +641,7 @@ function setupOptions() {
       { id: 'GRID',     img: 'assets/setup/start_grid.png',     name: t('start_screen.grid'),     desc: 'Your cover art in a mosaic grid. Your entire collection at a glance.' },
     ],
     browse: [
-      { id: 'LIST',    img: 'assets/setup/browse_list.png',    name: t('browse.list'),    desc: '1-click play. A focused side-by-side layout — game list on the left, screenshots and metadata on the right.' },
+      { id: 'LIST',    img: 'assets/setup/browse_list.png',    name: t('browse.list'),    desc: '1-click play. A focused side-by-side layout, game list on the left, screenshots and metadata on the right.' },
       { id: 'GALLERY', img: 'assets/setup/browse_gallery.png', name: t('browse.gallery'), desc: 'An immersive cover art grid. Select any game to open its full dedicated gamepage with rich details.' },
     ]
   };
@@ -672,7 +672,7 @@ function renderSetupScreen() {
     ? 'CHOOSE YOUR START SCREEN'
     : 'HOW WOULD YOU LIKE TO BROWSE?';
   document.getElementById('setup-subtitle').innerText = isPhase1
-    ? 'Select the view that greets you every time CREMA opens. You can change this anytime in the System Menu.'
+    ? 'Select the view that greets you every time Couch opens. You can change this anytime in the System Menu.'
     : 'Pick your preferred way to browse. Your games, artwork and playlists come from the desktop app and stay in sync automatically.';
 
   // Cards
@@ -737,9 +737,9 @@ async function completeSetup() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  HOME — "Marquee" couch dashboard (optional start screen, precedes the library)
+//  HOME, "Marquee" couch dashboard (optional start screen, precedes the library)
 //  Data comes from the shared core engine (window.api.getHomeStats), the same
-//  one The Manager uses — so the numbers never drift between the two faces.
+//  one The Manager uses, so the numbers never drift between the two faces.
 // ════════════════════════════════════════════════════════════════════════════
 let homeRows = [];                 // [{ key, cells:[{type,game?,id,el}] }]
 let homeFocus = { row: 0, col: 0 };
@@ -750,7 +750,7 @@ function _che(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').repl
 function _chImg(t, hero) { if (!t) return ''; const p = hero ? (t.HeroArt || t.Screenshot || t.CoverArt) : (t.CoverArt || t.HeroArt || t.Logo); return p ? convertSafePath(String(p).split('|')[0]) : ''; }
 function _chFmt(amount, currency) { if (amount == null) return ''; const a = Number(amount); if (!isFinite(a)) return ''; if (currency === 'USD' || currency === 'CAD' || currency === 'AUD') return '$' + a.toFixed(2); if (currency === 'EUR') return '€' + a.toFixed(2); if (currency === 'GBP') return '£' + a.toFixed(2); if (currency === 'BRL') return 'R$' + a.toFixed(2); return a.toFixed(2) + (currency ? (' ' + currency) : ''); }
 
-// Home footer — real glyph footer like every other screen; L3/R3 music appears only
+// Home footer, real glyph footer like every other screen; L3/R3 music appears only
 // while custom music is actually playing. Rebuilt on input-method/layout changes and
 // on bgm play/pause (via _chUpdateJbTile → updateHomeFooter).
 function _homeFooterHtml() {
@@ -836,10 +836,10 @@ async function renderHomeScreen() {
   const enabled = audioCfg.homeRows || ['recent', 'gems', 'played'];
   const wantProton = enabled.includes('protonwatch');
   const myToken = ++_homeRenderToken;
-  // Fast path — only cheap/cached reads (no network) so the Marquee paints instantly.
-  // Every source is .catch-guarded — one rejection must never blank the whole Home.
+  // Fast path, only cheap/cached reads (no network) so the Marquee paints instantly.
+  // Every source is .catch-guarded, one rejection must never blank the whole Home.
   const [snap, achRes, protonRes] = await Promise.all([
-    window.api.getHomeStats({ hidePico8: _cremaHidePico8 }).then(s => s || {}).catch(() => ({})),
+    window.api.getHomeStats({ hidePico8: _couchHidePico8 }).then(s => s || {}).catch(() => ({})),
     window.api.achGet().catch(() => null),
     wantProton ? window.api.protonWatchGet().catch(() => null) : Promise.resolve(null),
   ]);
@@ -848,7 +848,7 @@ async function renderHomeScreen() {
   const rows = [];
   let html = '<div class="ch-wrap">';
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  html += `<div class="ch-top"><div class="ch-greet"><div class="g1">CREMA</div><div class="g2">${_che(dateStr)}</div></div><div class="ch-stats">`
+  html += `<div class="ch-top"><div class="ch-greet"><div class="g1">Couch</div><div class="g2">${_che(dateStr)}</div></div><div class="ch-stats">`
     + `<div class="ch-stat"><div class="n">${c.total || 0}</div><div class="l">Games</div></div>`
     + `<div class="ch-stat"><div class="n">${c.installed || 0}</div><div class="l">Installed</div></div>`
     + `<div class="ch-stat"><div class="n">${c.backlog || 0}</div><div class="l">Backlog</div></div>`
@@ -870,7 +870,7 @@ async function renderHomeScreen() {
   aHtml += `<div class="ch-act" id="che-a1"><div class="ai">${_CH_DICE}</div><div><div class="at">Surprise Me</div><div class="asub">Random pick</div></div></div>`;
   aCells.push({ type: 'roulette', id: 'che-a1' });
   if (snap.continuePlaying) { const cg = snap.continuePlaying, cov = _chImg(cg, false); aHtml += `<div class="ch-act" id="che-a2">${cov ? `<img class="cov" src="${cov}">` : `<div class="ai">${_CH_LIB}</div>`}<div><div class="at">Continue</div><div class="asub">${_che(cg.Game)}</div></div></div>`; aCells.push({ type: 'game', game: cg, id: 'che-a2' }); }
-  // Jukebox tile — rendered idle here; _chUpdateJbTile() (also wired to bgmAudio
+  // Jukebox tile, rendered idle here; _chUpdateJbTile() (also wired to bgmAudio
   // play/pause events) patches in the live now-playing state from boot onwards.
   aHtml += `<div class="ch-act ch-act-jb" id="che-aj">`
     + `<div class="ai" id="che-aj-art">${_CH_NOTE}</div>`
@@ -920,7 +920,7 @@ async function renderHomeScreen() {
       rh += '</div></div>'; html += rh; rows.push({ key: 'protonwatch', cells });
     }
   }
-  html += `<div id="home-foot" style="display:none"></div>`;   // invisible anchor — online rows insert before it; the real footer is the fixed #home-footer-bar
+  html += `<div id="home-foot" style="display:none"></div>`;   // invisible anchor, online rows insert before it; the real footer is the fixed #home-footer-bar
   html += '</div>';
   document.getElementById('home-content').innerHTML = html;
   rows.forEach(r => r.cells.forEach(cell => { cell.el = document.getElementById(cell.id); }));
@@ -1001,7 +1001,7 @@ function homeHandleInput(action) {
   else if (action === 'RIGHT') { if (homeFocus.col < row.cells.length - 1) { homeFocus.col++; playSound(sfxNav); updateHomeFocus(); } }
   else if (action === 'ACCEPT') {
     const cell = row.cells[homeFocus.col]; if (!cell) return; playSound(sfxSelect);
-    if (cell.type === 'game') cremaOpenGame(cell.game);
+    if (cell.type === 'game') couchOpenGame(cell.game);
     else if (cell.type === 'library') transitionToStart();
     else if (cell.type === 'roulette') homeSpin();
     else if (cell.type === 'wrapped') openWrapped();
@@ -1011,9 +1011,9 @@ function homeHandleInput(action) {
   }
 }
 
-async function homeSpin() { const g = await window.api.getRandomGame({ hidePico8: _cremaHidePico8 }); if (g) cremaOpenGame(g); }
+async function homeSpin() { const g = await window.api.getRandomGame({ hidePico8: _couchHidePico8 }); if (g) couchOpenGame(g); }
 
-// ── TV READER — in-app article view for the news rows (themed, big fonts, gamepad) ──
+// ── TV READER, in-app article view for the news rows (themed, big fonts, gamepad) ──
 // Fetches the page's raw HTML via IPC, extracts the readable content with DOMParser
 // (no external browser on the couch), sanitizes it to a strict tag whitelist.
 let _readerUrl = '';
@@ -1058,7 +1058,7 @@ async function openReader(url, title, source) {
   let host = ''; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
   document.getElementById('rd-src').textContent = [source, host].filter(Boolean).join('  ·  ');
   const body = document.getElementById('rd-body');
-  body.innerHTML = '<div class="rd-status">Brewing the article…</div>';
+  body.innerHTML = '<div class="rd-status">Getting the article…</div>';
   document.getElementById('reader-scroll').scrollTop = 0;
   const res = await window.api.fetchArticle(url).catch(() => null);
   if (gameState !== 'READER' || _readerUrl !== url) return;   // user backed out meanwhile
@@ -1074,12 +1074,12 @@ async function openReader(url, title, source) {
       if ((frag.textContent || '').trim().length >= 300) { body.innerHTML = ''; while (frag.firstChild) body.appendChild(frag.firstChild); ok = true; }
     } catch (e) { console.error('[reader]', e); }
   }
-  if (!ok) body.innerHTML = '<div class="rd-status">Couldn\'t brew a readable version of this page.<br><br>Press X to open it in the browser instead &nbsp;·&nbsp; B to go back.</div>';
+  if (!ok) body.innerHTML = '<div class="rd-status">Couldn\'t put together a readable version of this page.<br><br>Press X to open it in the browser instead &nbsp;·&nbsp; B to go back.</div>';
 }
 function closeReader() {
   document.getElementById('reader-screen').classList.add('hidden');
   document.getElementById('home-screen')?.classList.remove('hidden');
-  gameState = 'HOME';   // Home DOM is untouched — no re-render needed
+  gameState = 'HOME';   // Home DOM is untouched, no re-render needed
 }
 function readerHandleInput(action) {
   const sc = document.getElementById('reader-scroll');
@@ -1096,7 +1096,7 @@ function readerHandleInput(action) {
 // Open a specific game from Home, honoring the browse mode: GALLERY opens that
 // game's gamepage (like clicking a gallery cell); LIST selects it in the library
 // (its classic gamepage panel is always shown for the selected game).
-function cremaOpenGame(game) {
+function couchOpenGame(game) {
   if (!game) return;
   document.getElementById('home-screen')?.classList.add('hidden');
   const i = categories.indexOf('ALL GAMES'); currentCategoryIndex = i >= 0 ? i : 0;
@@ -1121,7 +1121,7 @@ function openHomeMenu() {
   renderGenericOverlay('HOME SCREEN', items);
 }
 
-// ── Cinematic "Wrapped" — full-screen, gamepad-paged library year-in-review ──
+// ── Cinematic "Wrapped", full-screen, gamepad-paged library year-in-review ──
 const _CH_STAR = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z"/></svg>`;
 let wrappedSlides = [], wrappedIndex = 0;
 function buildWrappedSlides(w) {
@@ -1138,7 +1138,7 @@ function buildWrappedSlides(w) {
 }
 async function openWrapped() {
   playSound(sfxSelect);
-  const snap = (await window.api.getHomeStats({ hidePico8: _cremaHidePico8 })) || {};
+  const snap = (await window.api.getHomeStats({ hidePico8: _couchHidePico8 })) || {};
   wrappedSlides = buildWrappedSlides(snap.wrapped || {});
   wrappedIndex = 0;
   gameState = 'WRAPPED';
@@ -1170,11 +1170,11 @@ async function boot() {
   strings = await window.api.getStrings(currentLang);
   applyI18nToDOM();
   updateAppScale(); await initAudio(); await resolveAndApplyFont(); await resolveAndApplyTheme(); renderHardwareIcons();
-  const recSetting = await window.api.getSetting('crema_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
-  _cremaHidePico8 = (await window.api.getSetting('crema_hide_pico8')) === '1';
-  _cremaHideFree = (await window.api.getSetting('crema_hide_free')) === '1';
-  const gsSaved = await window.api.getSetting('crema_gallery_sort'); if (gsSaved && ['alpha','played','favs','want','added','scraped'].includes(gsSaved)) _cremaGallerySort = gsSaved;
-  await window.api.syncGrinderInstalled().catch(() => {});
+  const recSetting = await window.api.getSetting('couch_recent_count'); if (recSetting !== null) { recentGamesCount = parseInt(recSetting, 10); }
+  _couchHidePico8 = (await window.api.getSetting('couch_hide_pico8')) === '1';
+  _couchHideFree = (await window.api.getSetting('couch_hide_free')) === '1';
+  const gsSaved = await window.api.getSetting('couch_gallery_sort'); if (gsSaved && ['alpha','played','favs','want','added','scraped'].includes(gsSaved)) _couchGallerySort = gsSaved;
+  await window.api.syncInstallerInstalled().catch(() => {});
   const res = await window.api.getGames(); allGames = (res.games || []).filter(g => g.Game && String(g.Game).trim() !== "");
   await loadGamePlaylists();
   await loadGenreCategories();
@@ -1188,9 +1188,9 @@ async function boot() {
 let inputDebounce = false; let navRepeatDelay = 180; let lastSelectionTime = 0; let wakeHoldFrames = 0;
 
 // Every store a row can be played or installed from, each with its install state (Steam
-// appmanifest / GOG-Epic grinder.db). Main resolves this from the row's store fields, not
+// appmanifest / GOG-Epic library.db). Main resolves this from the row's store fields, not
 // just LaunchCommands, so a mixed-store row that never got the plural column written still
-// lists both stores. [] on failure — callers fall back to the single-launcher path.
+// lists both stores. [] on failure, callers fall back to the single-launcher path.
 async function launcherStatesFor(game) {
   try { return await window.api.launcherStates(game.id) || []; } catch (e) { return []; }
 }
@@ -1218,13 +1218,13 @@ async function tryInstall(game, fallback) {
 // store always offers Play and an uninstalled one always offers Install.
 function showLauncherPicker(game, states, mode = 'launch') {
   // An untracked launcher (flatpak / custom / emulator) has no install state to read, so
-  // it counts as playable — its command is the only thing we know about it.
+  // it counts as playable, its command is the only thing we know about it.
   _lpGame = game; _lpIndex = 0;
   _lpList = states.map(st => ({ ...st, installed: st.installed !== false || st.store === null }));
   document.getElementById('lp-game-title').textContent = game.Game;
   const prompt = document.getElementById('lp-prompt');
   if (prompt) prompt.textContent = mode === 'install'
-    ? 'Available on multiple stores — choose one to install'
+    ? 'Available on multiple stores, choose one to install'
     : 'Available on multiple stores';
   renderLpList();
   document.getElementById('launcher-pick-backdrop').classList.remove('hidden');
@@ -1291,7 +1291,7 @@ window.api.onGameLaunchProgress?.(p => {
   if (p.done) {
     if (_sleepSetupSeen) {
       document.getElementById('sleep-bar').style.width = '100%';
-      document.getElementById('sleep-progress-msg').textContent = p.phase === 'running' ? 'Ready — starting the game…' : '';
+      document.getElementById('sleep-progress-msg').textContent = p.phase === 'running' ? 'Ready, starting the game…' : '';
       setTimeout(() => { wrap.style.display = 'none'; }, 2500);
     }
     _sleepSetupSeen = false;
@@ -1304,7 +1304,7 @@ window.api.onGameLaunchProgress?.(p => {
   document.getElementById('sleep-progress-msg').textContent = p.message || '';
 });
 
-function wakeUpCrema() {
+function wakeUpCouch() {
   playSound(sfxSelect);
   document.body.style.backgroundColor = 'var(--bg)';
   document.getElementById('sleep-screen').classList.add('hidden');
@@ -1329,7 +1329,7 @@ function pollGamepad() {
       const st = gp.buttons[9]?.pressed; const sel = gp.buttons[8]?.pressed; const l1 = gp.buttons[4]?.pressed; const r1 = gp.buttons[5]?.pressed; const l3 = gp.buttons[10]?.pressed; const r3 = gp.buttons[11]?.pressed;
       let comboMatched = false; const method = audioCfg.wakeMethod || "START + SELECT";
       if (method.includes("L1 + R1 + START + SELECT")) { comboMatched = l1 && r1 && st && sel; } else if (method.includes("L3 + R3")) { comboMatched = l3 && r3; } else { comboMatched = st && sel; }
-      if (comboMatched) { if (method.includes("HOLD 2 SEC")) { wakeHoldFrames++; if (wakeHoldFrames >= 120) { wakeHoldFrames = 0; wakeUpCrema(); } } else { wakeHoldFrames = 0; wakeUpCrema(); } } else { wakeHoldFrames = 0; }
+      if (comboMatched) { if (method.includes("HOLD 2 SEC")) { wakeHoldFrames++; if (wakeHoldFrames >= 120) { wakeHoldFrames = 0; wakeUpCouch(); } } else { wakeHoldFrames = 0; wakeUpCouch(); } } else { wakeHoldFrames = 0; }
     }
     requestAnimationFrame(pollGamepad); return;
   }
@@ -1387,8 +1387,8 @@ window.addEventListener('keydown', (e) => {
     keysHeld.add(e.key);
     if (e.key === 'Tab') e.preventDefault();
     if (gameState === 'GAME_RUNNING') {
-      if (e.key === 'Escape' || e.key === 'Backspace') { wakeUpCrema(); return; }
-      if (keysHeld.has(',') && keysHeld.has('.')) { wakeUpCrema(); return; }
+      if (e.key === 'Escape' || e.key === 'Backspace') { wakeUpCouch(); return; }
+      if (keysHeld.has(',') && keysHeld.has('.')) { wakeUpCouch(); return; }
       return;
     }
     setInputMethod(true);
@@ -1464,7 +1464,7 @@ function handleInput(action) {
     if (action === 'DOWN') { currentGameIndex = (currentGameIndex + 1) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'UP') { currentGameIndex = (currentGameIndex - 1 + filteredGames.length) % filteredGames.length; playSound(sfxNav); updateGameSelection(); } else if (action === 'L1' || action === 'R1') { jumpPages(action); } else if (action === 'L2') { currentGameIndex = 0; playSound(sfxNav); updateGameSelection(); } else if (action === 'R2') { currentGameIndex = Math.max(0, filteredGames.length - 1); playSound(sfxNav); updateGameSelection(); } else if (action === 'LEFT') { currentCategoryIndex = (currentCategoryIndex - 1 + categories.length) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'RIGHT') { currentCategoryIndex = (currentCategoryIndex + 1) % categories.length; playSound(sfxNav); transitionToMain(); } else if (action === 'BACK') { playSound(sfxBack); if (_homeOrigin) { transitionToHome(); } else { transitionToStart(); } } else if (action === 'START') { openOverlay("MAIN_MENU"); } else if (action === 'SELECT_BTN') { openOverlay("GAME_MENU"); } else if (action === 'Y_BUTTON') { openOSK('SEARCH', t('html.osk_search_title'), searchQuery); }
     else if (action === 'X_BUTTON') {
       // Swaps the trailer and the screenshots. ⚠️ Phase 4: with no trailer this used to open
-      // a YouTube search and download one — fetching media is the Manager's job now, so the
+      // a YouTube search and download one, fetching media is the Manager's job now, so the
       // button simply has nothing to swap.
       if (gameHasTrailer) { playSound(sfxSelect); mediaSwapped = !mediaSwapped; const md = document.getElementById('media-container'), mn = document.getElementById('mini-dock'), v = document.getElementById('video-player'), s = document.getElementById('screenshot-player'), wp = !v.paused; if (mediaSwapped) { md.appendChild(s); mn.appendChild(v); } else { md.appendChild(v); mn.appendChild(s); } if (wp) v.play().catch(e=>{}); }
     }
@@ -1476,7 +1476,7 @@ function handleInput(action) {
         if (!isInstalled) {
           tryInstall(g, () => {
             const stL = (g.Store || '').toLowerCase();
-            if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(g); }
+            if (stL.includes('gog') || stL.includes('epic')) { showInstallerConfirm(g); }
             else if (stL.includes('steam') && g.SteamAppID && String(g.SteamAppID) !== 'None') { showSteamInstallConfirm(g); }
             else { tryLaunch(g); }
           });
@@ -1508,7 +1508,7 @@ function handleInput(action) {
       return;
     }
     if (action === 'BACK') { playSound(sfxBack); if (_homeOrigin) { transitionToHome(); } else { closeGalleryGamepage(); } }
-    else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
+    else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCouchAchievementsOverlay(); } }
     else if (action === 'START') { openOverlay("MAIN_MENU"); }
     else if (action === 'SELECT_BTN') { if (galleryCurrentGame) { filteredGames = galleryGames; currentGameIndex = galleryIndex; openOverlay("GAME_MENU"); } }
     else if (action === 'L1') { galleryGamepageNavigate(-1); }
@@ -1533,25 +1533,25 @@ function handleInput(action) {
       else if (action === 'DOWN') { const s = document.getElementById('ggp-scroll'); if (s) s.scrollBy({ top: 150, behavior: 'smooth' }); }
     }
   }
-  else if (gameState === 'CREMA_FGP') {
+  else if (gameState === 'Couch_FGP') {
     if (action === 'LEFT')         { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx - 1); }
     else if (action === 'RIGHT')   { playSound(sfxNav); _cfgpFocusBtn(_cfgpBtnIdx + 1); }
     else if (action === 'ACCEPT')  { _cfgpActivateBtn(); }
-    else if (action === 'L1')      { galleryGamepageNavigate(-1); openCremaFlatGamepage(galleryCurrentGame); }
-    else if (action === 'R1')      { galleryGamepageNavigate(1);  openCremaFlatGamepage(galleryCurrentGame); }
-    else if (action === 'BACK')    { playSound(sfxBack); closeCremaFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
-    else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCremaAchievementsOverlay(); } }
+    else if (action === 'L1')      { galleryGamepageNavigate(-1); openCouchFlatGamepage(galleryCurrentGame); }
+    else if (action === 'R1')      { galleryGamepageNavigate(1);  openCouchFlatGamepage(galleryCurrentGame); }
+    else if (action === 'BACK')    { playSound(sfxBack); closeCouchFlatGamepage(); if (_homeOrigin) { transitionToHome(); } else { document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); } }
+    else if (action === 'Y_BUTTON') { if (_cAchAll.length) { playSound(sfxSelect); openCouchAchievementsOverlay(); } }
     else if (action === 'X_BUTTON') { openCfgpDescOverlay(); }
     else if (action === 'SELECT_BTN') { if (_cfgpGame) { const gi = galleryGames.findIndex(g => String(g.id) === String(_cfgpGame.id)); if (gi >= 0) { filteredGames = galleryGames; currentGameIndex = gi; } else { filteredGames = [_cfgpGame]; currentGameIndex = 0; } openOverlay("GAME_MENU"); } }
     else if (action === 'START')   { openOverlay('MAIN_MENU'); }
   }
   else if (gameState === 'OSK') { handleOSKInput(action); }
-  else if (gameState === 'GRINDER_CONFIRM') {
-    if (action === 'ACCEPT') { if (_gcBlocked) { playSound(sfxBack); return; } triggerGrinderInstall(); }
-    else if (action === 'BACK') { playSound(sfxBack); hideGrinderConfirm(); }
-    else if (action === 'Y_BUTTON') { hideGrinderConfirm(); openOSK('INSTALL_DIR', 'Install Directory', _grinderInstallDir); }
+  else if (gameState === 'Installer_CONFIRM') {
+    if (action === 'ACCEPT') { if (_gcBlocked) { playSound(sfxBack); return; } triggerInstallerInstall(); }
+    else if (action === 'BACK') { playSound(sfxBack); hideInstallerConfirm(); }
+    else if (action === 'Y_BUTTON') { hideInstallerConfirm(); openOSK('INSTALL_DIR', 'Install Directory', _installerInstallDir); }
   }
-  // Any button dismisses the launch-failure notice — it is read-only, and a state missing from
+  // Any button dismisses the launch-failure notice. It is read-only, and a state missing from
   // this router is indistinguishable from the whole app freezing.
   else if (gameState === 'LAUNCH_FAIL') { hideLaunchFailure(); }
   else if (gameState === 'LAUNCHER_PICK') {
@@ -1561,8 +1561,8 @@ function handleInput(action) {
       playSound(sfxSelect);
       const chosen = _lpList[_lpIndex]; const g = _lpGame; hideLauncherPicker();
       if (chosen.installed === false) {
-        // Uninstalled store — route to its installer rather than a dead launch.
-        if (chosen.store === 'gog' || chosen.store === 'epic') showGrinderConfirm(g);
+        // Uninstalled store, route to its installer rather than a dead launch.
+        if (chosen.store === 'gog' || chosen.store === 'epic') showInstallerConfirm(g);
         else if (chosen.store === 'steam' && g.SteamAppID && String(g.SteamAppID) !== 'None') showSteamInstallConfirm(g);
         else enterSleepMode({ ...g, LaunchCommand: chosen.cmd });
       } else {
@@ -1571,15 +1571,15 @@ function handleInput(action) {
     }
     else if (action === 'BACK') { playSound(sfxBack); hideLauncherPicker(); }
   }
-  else if (gameState === 'GRINDER_PROGRESS') {
-    if (action === 'BACK') { window.api.grinderCancelHeadless(); hideGrinderProgress(); }
+  else if (gameState === 'Installer_PROGRESS') {
+    if (action === 'BACK') { window.api.installerCancelHeadless(); hideInstallerProgress(); }
   }
   else if (gameState === 'ACH_OVERLAY') {
-    if (action === 'BACK') { playSound(sfxBack); closeCremaAchievementsOverlay(); }
+    if (action === 'BACK') { playSound(sfxBack); closeCouchAchievementsOverlay(); }
     else if (action === 'L1' || action === 'LEFT')  { playSound(sfxNav); cAchCycleFilter(-1); }
     else if (action === 'R1' || action === 'RIGHT') { playSound(sfxNav); cAchCycleFilter(1); }
-    else if (action === 'UP')   { const g = document.getElementById('crema-ach-grid'); if (g) g.scrollBy({ top: -150, behavior: 'smooth' }); }
-    else if (action === 'DOWN') { const g = document.getElementById('crema-ach-grid'); if (g) g.scrollBy({ top:  150, behavior: 'smooth' }); }
+    else if (action === 'UP')   { const g = document.getElementById('couch-ach-grid'); if (g) g.scrollBy({ top: -150, behavior: 'smooth' }); }
+    else if (action === 'DOWN') { const g = document.getElementById('couch-ach-grid'); if (g) g.scrollBy({ top:  150, behavior: 'smooth' }); }
     else if ((action === 'L2' || action === 'L3') && Object.keys(_cAchStores).length > 1) { playSound(sfxNav); cAchSwitchStore(-1); }
     else if ((action === 'R2' || action === 'R3') && Object.keys(_cAchStores).length > 1) { playSound(sfxNav); cAchSwitchStore(1); }
   }
@@ -1591,7 +1591,7 @@ function handleInput(action) {
     else if (action === 'DOWN')  { document.getElementById('cfgpd-text').scrollBy({ top: 140, behavior: 'smooth' }); }
   }
   else if (gameState === 'JUKEBOX' || gameState === 'JUKEBOX_OVERLAY') { handleJukeboxInput(action); }
-  // NOTE: every overlay-menu gameState must be listed here or it receives no input at all —
+  // NOTE: every overlay-menu gameState must be listed here or it receives no input at all,
   // the overlay draws, then d-pad/A/B do nothing and there is no way back out.
   else if (['OVERLAY', 'THEME_CATS', 'THEMES', 'FONTS', 'MUSIC_STYLE', 'GAMEPAD_MENU', 'WAKE_METHOD_MENU', 'START_SCREEN_MENU', 'LANGUAGE_MENU', 'BROWSE_MODE_MENU', 'GAMEPAGE_STYLE_MENU', 'GENRE_MENU', 'PLAYLIST_ASSIGN'].includes(gameState)) {
     if (action === 'DOWN') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, 1); playSound(sfxNav); updateOverlaySelection(); } else if (action === 'UP') { currentOverlayIndex = nextOverlayIndex(currentOverlayIndex, -1); playSound(sfxNav); updateOverlaySelection(); }
@@ -1599,7 +1599,7 @@ function handleInput(action) {
       if (gameState === 'THEMES') openThemeCategoryMenu(); else if (gameState === 'THEME_CATS') openOverlay("MAIN_MENU"); else if (gameState === 'FONTS') openOverlay("MAIN_MENU"); else if (gameState === 'MUSIC_STYLE') openSoundOverlay(); else if (gameState === 'GAMEPAD_MENU' || gameState === 'WAKE_METHOD_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'START_SCREEN_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'LANGUAGE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'GENRE_MENU') openOverlay("MAIN_MENU"); else if (gameState === 'PLAYLIST_ASSIGN') { if (_plAssignReturn) { document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = _plAssignReturn; _plAssignReturn = null; setBlur(false); } else openOverlay("GAME_MENU"); }
       else if (gameState === 'BROWSE_MODE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
       else if (gameState === 'GAMEPAGE_STYLE_MENU') { document.getElementById('overlay-backdrop').classList.add('hidden'); openOverlay("MAIN_MENU"); }
-      else if (currentOverlayType === 'CONFIRM_QUIT' || currentOverlayType === 'ABOUT_CREMA') { openOverlay("MAIN_MENU"); }
+      else if (currentOverlayType === 'CONFIRM_QUIT' || currentOverlayType === 'ABOUT_Couch') { openOverlay("MAIN_MENU"); }
       else if (currentOverlayType === 'HISTORY_MENU' || currentOverlayType === 'HISTORY_CLEARED') { openOverlay("MAIN_MENU"); }
       else closeOverlay();
     }
@@ -1640,7 +1640,7 @@ function handleOSKInput(action) {
     else if (oskMode === 'NEW_PLAYLIST' || oskMode === 'NEW_PLAYLIST_ADD' || oskMode === 'JB_SEARCH' || oskMode === 'RENAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); gameState = 'JUKEBOX'; }
     else if (oskMode === 'NEW_GAME_PLAYLIST') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); if (_newPlFromGallery) { _newPlFromGallery = false; document.getElementById('cfgp-screen').classList.add('hidden'); document.getElementById('ggp-screen').classList.add('hidden'); document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; setBlur(false); } else { renderPlaylistAssignMenu(); } }
     else if (oskMode === 'GALLERY_SEARCH') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; }
-    else if (oskMode === 'INSTALL_DIR') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); showGrinderConfirm(_grinderConfirmGame); }
+    else if (oskMode === 'INSTALL_DIR') { playSound(sfxBack); document.getElementById('osk-backdrop').classList.add('hidden'); showInstallerConfirm(_installerConfirmGame); }
   }
   else if (action === 'Y_BUTTON') {
     if (oskMode === 'SEARCH') { searchQuery = ""; applyLiveFilters(false); }
@@ -1655,7 +1655,7 @@ function handleOSKInput(action) {
     else if (key === 'DONE') {
       if (oskMode === 'GALLERY_SEARCH') { galleryQuery = targetStr; applyGalleryFilter(); renderGalleryGrid(); document.getElementById('osk-backdrop').classList.add('hidden'); setBlur(false); gameState = 'GALLERY'; return; }
       if (oskMode === 'SEARCH') { closeOSK(); return; }
-      else if (oskMode === 'INSTALL_DIR') { _grinderInstallDir = targetStr || _grinderInstallDir; document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('gc-dir').textContent = _grinderInstallDir; showGrinderConfirm(_grinderConfirmGame); return; }
+      else if (oskMode === 'INSTALL_DIR') { _installerInstallDir = targetStr || _installerInstallDir; document.getElementById('osk-backdrop').classList.add('hidden'); document.getElementById('gc-dir').textContent = _installerInstallDir; showInstallerConfirm(_installerConfirmGame); return; }
       else if (oskMode === 'NEW_GAME_PLAYLIST') {
         document.getElementById('osk-backdrop').classList.add('hidden');
         const nm = String(targetStr).trim();
@@ -1729,22 +1729,22 @@ function handleOSKInput(action) {
   }
 }
 
-// Steam installs go through the desktop Steam client — warn before leaving the couch UI.
+// Steam installs go through the desktop Steam client, warn before leaving the couch UI.
 let _steamInstallGame = null;
 function showSteamInstallConfirm(game) {
   _steamInstallGame = game;
-  if (['START', 'HOME', 'MAIN', 'GALLERY', 'GALLERY_GAMEPAGE', 'CREMA_FGP'].includes(gameState)) previousGameState = gameState;
+  if (['START', 'HOME', 'MAIN', 'GALLERY', 'GALLERY_GAMEPAGE', 'Couch_FGP'].includes(gameState)) previousGameState = gameState;
   gameState = 'OVERLAY'; currentOverlayType = 'STEAM_INSTALL_CONFIRM'; setBlur(true); playSound(sfxSelect);
-  renderGenericOverlay('INSTALL VIA STEAM', ['§Steam will open on your desktop to install this game.', 'CONTINUE — OPEN STEAM', t('common.close_menu')]);
+  renderGenericOverlay('INSTALL VIA STEAM', ['§Steam will open on your desktop to install this game.', 'CONTINUE, OPEN STEAM', t('common.close_menu')]);
 }
 
 // Gallery sort (ported from the Manager's sort dropdown; same six modes).
-const CREMA_SORTS = [['A — Z','alpha'],['Last Played','played'],['Favourites First','favs'],['Want to Play First','want'],['Recently Added','added'],['Scraped First','scraped']];
-function sortCremaGallery(games) {
+const Couch_SORTS = [['A, Z','alpha'],['Last Played','played'],['Favourites First','favs'],['Want to Play First','want'],['Recently Added','added'],['Scraped First','scraped']];
+function sortCouchGallery(games) {
   const byTitle = (a, b) => String(a.Game || '').localeCompare(String(b.Game || ''), undefined, { sensitivity: 'base' });
   const scraped = g => !!(g.CoverArt || g.Description);
   const arr = games.slice();
-  switch (_cremaGallerySort) {
+  switch (_couchGallerySort) {
     case 'played':  return arr.sort((a, b) => (b.LastPlayed || 0) - (a.LastPlayed || 0) || byTitle(a, b));
     case 'favs':    return arr.sort((a, b) => (b.FAV === 'YES' ? 1 : 0) - (a.FAV === 'YES' ? 1 : 0) || byTitle(a, b));
     case 'want':    return arr.sort((a, b) => (b.WANT_TO_PLAY === 'YES' ? 1 : 0) - (a.WANT_TO_PLAY === 'YES' ? 1 : 0) || byTitle(a, b));
@@ -1756,7 +1756,7 @@ function sortCremaGallery(games) {
 function openGallerySortMenu() {
   previousGameState = 'GALLERY';
   gameState = 'OVERLAY'; currentOverlayType = 'GALLERY_SORT_MENU'; setBlur(true); playSound(sfxSelect);
-  const items = CREMA_SORTS.map(([label, key]) => (key === _cremaGallerySort ? '★ ' + label : label));
+  const items = Couch_SORTS.map(([label, key]) => (key === _couchGallerySort ? '★ ' + label : label));
   items.push(t('common.close_menu'));
   renderGenericOverlay('SORT GALLERY', items);
 }
@@ -1775,7 +1775,7 @@ function openGalleryPlaylistsMenu() {
 }
 
 function pico8HiddenFor(g, catName) {
-  if (!_cremaHidePico8 || catName === 'PICO-8') return false;
+  if (!_couchHidePico8 || catName === 'PICO-8') return false;
   return (g.Store ? String(g.Store).toLowerCase() : '').includes('pico');
 }
 
@@ -1785,8 +1785,8 @@ function applyLiveFilters(preserveIndex = false) {
 
   let baseFiltered = allGames.filter(g => {
     const store = g.Store ? String(g.Store).toLowerCase() : ""; const title = g.Game ? String(g.Game).toLowerCase() : ""; let matchCat = false;
-    if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OPENBOR") matchCat = store.includes("openbor"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
-    if (!matchCat) return false; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
+    if (isPlaylistCat(catName)) matchCat = playlistCatMatch(g, catName); else if (catName === "ALL GAMES") matchCat = true; else if (catName === "INSTALLED") { const isManual = !g.InstallerGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); matchCat = isManual ? !!g.LaunchCommand : g.Installed == 1; } else if (catName === "STEAM") matchCat = store.includes("steam"); else if (catName === "GOG") matchCat = store.includes("gog"); else if (catName === "EPIC") matchCat = store.includes("epic"); else if (catName === "FLATPAK") matchCat = store.includes("flatpak"); else if (catName === "ITCH") matchCat = store.includes("itch"); else if (catName === "PICO-8") matchCat = store.includes("pico"); else if (catName === "OPENBOR") matchCat = store.includes("openbor"); else if (catName === "OTHERS") matchCat = store.includes("others"); else if (catName === "PHYSICAL") matchCat = store.includes("physical"); else if (catName === "EMULATION") matchCat = store.includes("emulation"); else if (catName === "APPS") matchCat = store.includes("apps"); else if (catName === "FAVS") matchCat = g.FAV === 'YES'; else if (catName === "WANT TO PLAY") matchCat = g.WANT_TO_PLAY === 'YES'; else if (catName === "BACKLOG") matchCat = isBacklog(g); else if (catName === "PLAYED") matchCat = isPlayed(g);
+    if (!matchCat) return false; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_couchHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (q !== "" && !title.includes(q)) return false; return true;
   });
 
     let recentGames = [];
@@ -1821,8 +1821,8 @@ async function refreshDatabase() {
   allGames = res.games || [];
   await loadGamePlaylists();
   await loadGenreCategories();
-  // Stay in sync if The Manager changed its theme while CREMA is open (no reflow when unchanged).
-  if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') { try { const mapped = mapManagerThemeToCrema(await window.api.getSetting('cngm_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
+  // Stay in sync if The Manager changed its theme while Couch is open (no reflow when unchanged).
+  if ((audioCfg.themeSource || 'CUSTOM') === 'MANAGER') { try { const mapped = mapManagerThemeToCouch(await window.api.getSetting('clarity_theme')); if (mapped && mapped !== activeTheme) applyTheme(mapped); } catch (e) {} }
   // Follow a font change made on the desktop, but only while set to follow The Manager.
   if ((audioCfg.fontSource || 'MANAGER') === 'MANAGER') {
     try { const f = await window.api.getSetting('ui_font'); const next = (f && UI_FONTS.includes(f)) ? f : 'Poppins';
@@ -1848,7 +1848,7 @@ async function refreshDatabase() {
     }
   }
   // `categories` is dynamic now (playlists / Recently Imported), so if a refresh
-  // changed the set while we're on the start screen, rebuild it — otherwise the
+  // changed the set while we're on the start screen, rebuild it, otherwise the
   // carousel/list DOM desyncs from the category count.
   if (gameState === 'START') refreshStartScreen();
 }
@@ -1876,7 +1876,7 @@ function renderGenericOverlay(title, items, hintText = "") {
     if (isOverlaySection(item)) { div.className = 'overlay-section'; div.innerText = item.slice(1); }
     else {
       div.className = 'overlay-item'; div.innerText = item; div.id = `overlay-${i}`;
-      // In the font picker, show each face in itself — you pick a font by looking at it.
+      // In the font picker, show each face in itself, you pick a font by looking at it.
       if (gameState === 'FONTS') {
         const fam = UI_FONTS.find(f => fontLabel(f) === String(item).replace('★ ', ''));
         if (fam) div.style.fontFamily = `'${fam}', sans-serif`;
@@ -1914,7 +1914,7 @@ function openPico8Menu() {
   gameState = 'OVERLAY';
   currentOverlayType = 'PICO8_MENU';
   playSound(sfxSelect);
-  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _cremaHidePico8) ? '★ ' + o : o);
+  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _couchHidePico8) ? '★ ' + o : o);
   mapped.push(t('common.back_to_menu'));
   renderGenericOverlay('PICO-8 GAMES', mapped);
 }
@@ -1924,35 +1924,35 @@ function openFreeGamesMenu() {
   gameState = 'OVERLAY';
   currentOverlayType = 'FREE_MENU';
   playSound(sfxSelect);
-  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _cremaHideFree) ? '★ ' + o : o);
+  const mapped = ['SHOWN', 'HIDDEN'].map(o => ((o === 'HIDDEN') === _couchHideFree) ? '★ ' + o : o);
   mapped.push(t('common.back_to_menu'));
   renderGenericOverlay('FREE-TO-PLAY GAMES', mapped);
 }
 
 async function openOverlay(type) {
-  if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') { previousGameState = gameState; }
+  if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'Couch_FGP') { previousGameState = gameState; }
   gameState = 'OVERLAY'; currentOverlayType = type; setBlur(true);
 
   if (type === "MAIN_MENU") { renderGenericOverlay(t('menu.system'), [`§${t('section.audio')}`, t('menu.jukebox_mode'), t('menu.sound_settings'), `§${t('section.appearance')}`, t('menu.color_scheme'), 'INTERFACE FONT', 'HOME SCREEN', t('menu.start_screen'), t('browse.mode'), 'GAMEPAGE STYLE', t('menu.screensaver'), `§${t('section.controls')}`, t('menu.keybindings'), t('menu.gamepad_icons'), t('menu.wake_method'), `§${t('section.library')}`, 'FILTER BY GENRE', t('menu.history'), 'PICO-8 GAMES', 'FREE-TO-PLAY GAMES', `§${t('section.system')}`, t('menu.about'), t('menu.quit'), t('common.close_menu')]); }
   else if (type === "GAME_MENU") {
     // ⚠️ Phase 4: this menu holds opinions about a game, not maintenance of it. Downloading
     // and deleting trailers, renaming, scraping, typing a launch command and uninstalling all
-    // moved to the Manager — they edit the library, and this is the face you use from a sofa.
+    // moved to the Manager, they edit the library, and this is the face you use from a sofa.
     const game = filteredGames[currentGameIndex];
     const favStr = game.FAV === "YES" ? t('game_menu.remove_fav') : t('game_menu.add_fav'); const wantStr = game.WANT_TO_PLAY === "YES" ? t('game_menu.remove_want') : t('game_menu.add_want'); const playedStr = game.kb_played == 1 ? 'UNMARK PLAYED' : 'MARK AS PLAYED';
     const storeL = (game.Store || '').toLowerCase();
-    const isGrinderStore = ((storeL.includes('gog') || storeL.includes('epic')) && game.app_id) || !!game.GrinderGameId;
+    const isInstallerStore = ((storeL.includes('gog') || storeL.includes('epic')) && game.app_id) || !!game.InstallerGameId;
     const isInstalled = game.Installed == null || game.Installed == 1;
     // Install stays: getting a game you own onto the machine is what you came here to do.
     // Uninstall does not: it is management, and doing it by accident from a gamepad is the
     // failure that matters.
-    const grinderItems = (isGrinderStore && !isInstalled) ? ['§GRINDER', 'INSTALL VIA GRINDER'] : [];
+    const installerItems = (isInstallerStore && !isInstalled) ? ['§Installer', 'INSTALL VIA Installer'] : [];
     const gogId = _cGogAppId(game); const steamRaw = game.SteamAppID ? String(game.SteamAppID).replace(/\.0+$/, '') : null;
     let hasAchievements = false;
     if (gogId) { const r = await window.api.getGameAchievements(gogId); if (r.ok && r.achievements.length) hasAchievements = true; }
     if (!hasAchievements && steamRaw) { const r = await window.api.getGameAchievements(`steam_${steamRaw}`); if (r.ok && r.achievements.length) hasAchievements = true; }
     const achItems = hasAchievements ? ['§ACHIEVEMENTS', 'VIEW ACHIEVEMENTS'] : [];
-    renderGenericOverlay(t('menu.game_options'), [favStr, wantStr, playedStr, 'ADD TO PLAYLIST', ...achItems, ...grinderItems, t('common.close_menu')]);
+    renderGenericOverlay(t('menu.game_options'), [favStr, wantStr, playedStr, 'ADD TO PLAYLIST', ...achItems, ...installerItems, t('common.close_menu')]);
   }
 }
 
@@ -1961,7 +1961,7 @@ function updateOverlaySelection() {
   const el = document.getElementById(`overlay-${currentOverlayIndex}`);
   if (el) { el.classList.add('selected'); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
 }
-function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'CREMA_FGP') setBlur(false); }
+function closeOverlay() { playSound(sfxBack); document.getElementById('overlay-backdrop').classList.add('hidden'); gameState = previousGameState; if (gameState === 'START' || gameState === 'HOME' || gameState === 'MAIN' || gameState === 'GALLERY' || gameState === 'GALLERY_GAMEPAGE' || gameState === 'Couch_FGP') setBlur(false); }
 
 function executeOverlayAction() {
   playSound(sfxSelect); const action = overlayItems[currentOverlayIndex];
@@ -1999,7 +1999,7 @@ function executeOverlayAction() {
     return;
   }
 
-  if (currentOverlayType === 'ABOUT_CREMA') {
+  if (currentOverlayType === 'ABOUT_Couch') {
     openOverlay("MAIN_MENU");
     return;
   }
@@ -2018,7 +2018,7 @@ function executeOverlayAction() {
       let raw = action.replace('★ ', '');
       let val = isNaN(parseInt(raw.split(' ')[0], 10)) ? 0 : parseInt(raw.split(' ')[0], 10);
       recentGamesCount = val;
-      window.api.setSetting('crema_recent_count', val);
+      window.api.setSetting('couch_recent_count', val);
       applyLiveFilters();
       openHistoryMenu();
     }
@@ -2037,8 +2037,8 @@ function executeOverlayAction() {
 
   if (currentOverlayType === 'PICO8_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
-    _cremaHidePico8 = (String(action).replace('★ ', '') === 'HIDDEN');
-    window.api.setSetting('crema_hide_pico8', _cremaHidePico8 ? '1' : '');
+    _couchHidePico8 = (String(action).replace('★ ', '') === 'HIDDEN');
+    window.api.setSetting('couch_hide_pico8', _couchHidePico8 ? '1' : '');
     applyLiveFilters();
     openPico8Menu();
     return;
@@ -2046,8 +2046,8 @@ function executeOverlayAction() {
 
   if (currentOverlayType === 'FREE_MENU') {
     if (action === t('common.back_to_menu')) { openOverlay("MAIN_MENU"); return; }
-    _cremaHideFree = (String(action).replace('★ ', '') === 'HIDDEN');
-    window.api.setSetting('crema_hide_free', _cremaHideFree ? '1' : '');
+    _couchHideFree = (String(action).replace('★ ', '') === 'HIDDEN');
+    window.api.setSetting('couch_hide_free', _couchHideFree ? '1' : '');
     applyLiveFilters();
     applyGalleryFilter();
     openFreeGamesMenu();
@@ -2057,10 +2057,10 @@ function executeOverlayAction() {
   if (currentOverlayType === 'GALLERY_SORT_MENU') {
     if (action === t('common.close_menu')) { closeOverlay(); return; }
     const label = String(action).replace('★ ', '');
-    const hit = CREMA_SORTS.find(([l]) => l === label);
+    const hit = Couch_SORTS.find(([l]) => l === label);
     if (hit) {
-      _cremaGallerySort = hit[1];
-      window.api.setSetting('crema_gallery_sort', _cremaGallerySort);
+      _couchGallerySort = hit[1];
+      window.api.setSetting('couch_gallery_sort', _couchGallerySort);
       galleryIndex = 0;
       applyGalleryFilter();
       renderGalleryGrid();
@@ -2072,7 +2072,7 @@ function executeOverlayAction() {
   if (currentOverlayType === 'GALLERY_PL_MENU') {
     if (action === t('common.close_menu')) { closeOverlay(); return; }
     if (action === '+ NEW PLAYLIST') {
-      _plAssignGame = null;             // creating from the gallery — nothing to auto-assign
+      _plAssignGame = null;             // creating from the gallery, nothing to auto-assign
       _newPlFromGallery = true;
       document.getElementById('overlay-backdrop').classList.add('hidden');
       openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', '');
@@ -2086,7 +2086,7 @@ function executeOverlayAction() {
   }
 
   if (currentOverlayType === 'STEAM_INSTALL_CONFIRM') {
-    if (action === 'CONTINUE — OPEN STEAM') {
+    if (action === 'CONTINUE, OPEN STEAM') {
       const g = _steamInstallGame;
       const appid = g && g.SteamAppID ? String(g.SteamAppID).replace(/\.0+$/, '') : '';
       if (appid) window.api.openInstallUrl('steam://install/' + appid);
@@ -2117,15 +2117,15 @@ function executeOverlayAction() {
     else if (action === t('game_menu.add_want') || action === t('game_menu.remove_want')) { const val = action === t('game_menu.add_want') ? "YES" : "NO"; filteredGames[currentGameIndex].WANT_TO_PLAY = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'WANT_TO_PLAY', value: val}); refreshDatabase(); closeOverlay(); }
     else if (action === 'MARK AS PLAYED' || action === 'UNMARK PLAYED') { const val = action === 'MARK AS PLAYED' ? 1 : 0; filteredGames[currentGameIndex].kb_played = val; window.api.saveDbField({game: filteredGames[currentGameIndex].Game, field: 'kb_played', value: val}); refreshDatabase(); closeOverlay(); }
     else if (action === 'ADD TO PLAYLIST') { openPlaylistAssignMenu(); }
-    else if (action === 'INSTALL VIA GRINDER') { closeOverlay(); const _ig = filteredGames[currentGameIndex]; tryInstall(_ig, () => { const _stL = (_ig.Store || '').toLowerCase(); if (_ig.GrinderGameId && !_stL.includes('gog') && !_stL.includes('epic')) { window.api.openGrinderGui(_ig.Game); } else { showGrinderConfirm(_ig); } }); }
+    else if (action === 'INSTALL VIA Installer') { closeOverlay(); const _ig = filteredGames[currentGameIndex]; tryInstall(_ig, () => { const _stL = (_ig.Store || '').toLowerCase(); if (_ig.InstallerGameId && !_stL.includes('gog') && !_stL.includes('epic')) { window.api.openInstallerGui(_ig.Game); } else { showInstallerConfirm(_ig); } }); }
     else if (action === 'VIEW ACHIEVEMENTS') {
       const game = filteredGames[currentGameIndex];
       document.getElementById('overlay-backdrop').classList.add('hidden');
       gameState = previousGameState;
       setBlur(false);
       galleryCurrentGame = game;
-      loadCremaAchievements(game).then(() => {
-        if (_cAchAll.length) openCremaAchievementsOverlay();
+      loadCouchAchievements(game).then(() => {
+        if (_cAchAll.length) openCouchAchievementsOverlay();
       });
     }
     else if (action === t('menu.sound_settings')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openSoundOverlay(); }
@@ -2145,7 +2145,7 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
     else if (action === 'HOME SCREEN') { document.getElementById('overlay-backdrop').classList.add('hidden'); openHomeMenu(); }
     else if (action === t('menu.language')) { document.getElementById('overlay-backdrop').classList.add('hidden'); openLanguageMenu(); }
     else if (action === t('menu.about')) {
-      currentOverlayType = 'ABOUT_CREMA';
+      currentOverlayType = 'ABOUT_Couch';
       renderGenericOverlay(t('about.title'), [t('common.back_to_menu')], t('about.content'));
     }
     else if (action === t('common.close_menu')) closeOverlay();
@@ -2220,9 +2220,9 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
       document.getElementById('overlay-backdrop').classList.add('hidden');
       setBlur(false);
       // Live-apply: if a gamepage was open behind the menu, swap it to the new style now.
-      if (previousGameState === 'GALLERY_GAMEPAGE' || previousGameState === 'CREMA_FGP') {
-        const g = (previousGameState === 'CREMA_FGP' ? _cfgpGame : galleryCurrentGame) || galleryCurrentGame || _cfgpGame;
-        if (previousGameState === 'CREMA_FGP') { closeCremaFlatGamepage(); }
+      if (previousGameState === 'GALLERY_GAMEPAGE' || previousGameState === 'Couch_FGP') {
+        const g = (previousGameState === 'Couch_FGP' ? _cfgpGame : galleryCurrentGame) || galleryCurrentGame || _cfgpGame;
+        if (previousGameState === 'Couch_FGP') { closeCouchFlatGamepage(); }
         else { document.getElementById('ggp-screen').classList.add('hidden'); clearGalleryMedia(); }
         if (g) { openSmartGamepage(g); return; }
         document.getElementById('gallery-screen').classList.remove('hidden'); gameState = 'GALLERY'; renderFooters(); return;
@@ -2236,7 +2236,7 @@ else if (action === t('menu.history')) { document.getElementById('overlay-backdr
       openOverlay("GAME_MENU"); return;
     }
     if (action === '+ NEW PLAYLIST') { _newPlFromGallery = false; document.getElementById('overlay-backdrop').classList.add('hidden'); openOSK('NEW_GAME_PLAYLIST', 'NEW PLAYLIST NAME', ''); return; }
-    // The first gamePlaylists.length items map 1:1 to gamePlaylists — toggle by index
+    // The first gamePlaylists.length items map 1:1 to gamePlaylists, toggle by index
     // rather than parsing the (★-prefixed) label.
     if (currentOverlayIndex < gamePlaylists.length && _plAssignGame) {
       const pl = gamePlaylists[currentOverlayIndex];
@@ -2282,7 +2282,7 @@ function openKeybindingsOverlay() {
   }
   const kb = document.getElementById('gb-keyboard');
   if (kb) {
-    kb.innerHTML = `<strong>[ENTER] / [SPACE]</strong> - ${t('keybindings.kb_select')}<br><strong>[ESC] / [BKSP]</strong> - ${t('keybindings.kb_back')}<br><strong>[ARROWS]</strong> - ${t('keybindings.kb_navigate')}<br><strong>[PG UP] / [PG DN]</strong> - ${t('keybindings.kb_page')}<br><strong>[ , ] / [ . ]</strong> - ${t('keybindings.kb_prev_next')}<br><strong>[TAB]</strong> - ${t('keybindings.kb_options')}<br><strong>[M]</strong> - ${t('keybindings.kb_menu')}<br><strong>[X]</strong> - ${t('keybindings.kb_media')}<br><strong>[Y]</strong> - ${t('keybindings.kb_search')}`;
+    kb.innerHTML = `<strong>[ENTER] / [SPACE]</strong> - ${t('keybindings.kb_select')}<br><strong>[ESC] / [BKSP]</strong> - ${t('keybindings.kb_back')}<br><strong>[ARROWS]</strong> - ${t('keybindings.kb_navigate')}<br><strong>[PG UP] / [PG DN]</strong> - ${t('keybindings.kb_page')}<br><strong>[, ] / [ . ]</strong> - ${t('keybindings.kb_prev_next')}<br><strong>[TAB]</strong> - ${t('keybindings.kb_options')}<br><strong>[M]</strong> - ${t('keybindings.kb_menu')}<br><strong>[X]</strong> - ${t('keybindings.kb_media')}<br><strong>[Y]</strong> - ${t('keybindings.kb_search')}`;
   }
   bd.classList.remove('hidden');
 }
@@ -2341,7 +2341,7 @@ function openGenreFilterMenu() {
   renderGenericOverlay('FILTER BY GENRE', items);
 }
 
-// Map a chosen menu row back to its slug — labels carry a star and a count.
+// Map a chosen menu row back to its slug, labels carry a star and a count.
 function _genreSlugFromMenuItem(item) {
   const clean = String(item).replace('★ ', '').replace(/\s*\(\d+\)\s*$/, '').trim();
   return genreCats.find(g => g.label === clean)?.slug || null;
@@ -2358,7 +2358,7 @@ function applyGenreFilter(slug) {
   refreshGenreTag();
 }
 
-// The headers are painted on view transitions, and changing the filter is not one —
+// The headers are painted on view transitions, and changing the filter is not one,
 // without this the badge would not appear until the next category change.
 function refreshGenreTag() {
   const tag = document.getElementById('gallery-genre-tag');
@@ -2377,7 +2377,7 @@ function refreshGenreTag() {
 
 function openThemeCategoryMenu() { gameState = 'THEME_CATS'; const follow = (audioCfg.themeSource === 'MANAGER' ? '★ ' : '') + FOLLOW_MANAGER_LABEL; let cats = [follow, '§BY CATEGORY', ...Object.keys(THEME_CATEGORIES)]; cats.push(t('common.back_to_menu')); renderGenericOverlay("THEME CATEGORIES", cats); }
 function openThemeMenu(category) { gameState = 'THEMES'; activeThemeCategory = category; let themes = THEME_CATEGORIES[category].map(th => th === activeTheme ? "★ " + th : th); themes.push(t('common.back')); renderGenericOverlay(category.toUpperCase(), themes); }
-// Interface Font — same shape as the theme picker: "follow The Manager" on top, then the faces.
+// Interface Font, same shape as the theme picker: "follow The Manager" on top, then the faces.
 // The starred row is whichever is actually in force, so the current font is always visible.
 function openFontMenu() {
   gameState = 'FONTS';
@@ -2419,7 +2419,7 @@ function closeSoundOverlay() { playSound(sfxBack); document.getElementById('soun
 
 
 function getMediaForCategory(catName) {
-  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_cremaHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OPENBOR") return s.includes("openbor"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
+  const filtered = allGames.filter(g => { const s = g.Store ? String(g.Store).toLowerCase() : ''; if (!genreFilterMatch(g)) return false; if (g.Hidden == 1) return false; if (_couchHideFree && g.FreeToPlay == 1) return false; if (pico8HiddenFor(g, catName)) return false; if (isPlaylistCat(catName)) return playlistCatMatch(g, catName); if (catName === "ALL GAMES") return true; if (catName === "INSTALLED") { const isManual = !g.InstallerGameId && (s.includes("others") || s.includes("emulation") || s.includes("physical") || s.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; } if (catName === "STEAM") return s.includes("steam"); if (catName === "GOG") return s.includes("gog"); if (catName === "EPIC") return s.includes("epic"); if (catName === "FLATPAK") return s.includes("flatpak"); if (catName === "ITCH") return s.includes("itch"); if (catName === "PICO-8") return s.includes("pico"); if (catName === "OPENBOR") return s.includes("openbor"); if (catName === "OTHERS") return s.includes("others"); if (catName === "PHYSICAL") return s.includes("physical"); if (catName === "EMULATION") return s.includes("emulation"); if (catName === "APPS") return s.includes("apps"); if (catName === "FAVS") return g.FAV === 'YES'; if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES'; if (catName === "BACKLOG") return isBacklog(g); if (catName === "PLAYED") return isPlayed(g); return true; });
   let media = [];
   filtered.forEach(g => { if (g.Screenshot && String(g.Screenshot).trim()) media.push(...String(g.Screenshot).split('|').filter(s => s.trim())); });
   if (media.length < 3) filtered.forEach(g => { if (g.CoverArt && String(g.CoverArt).trim()) media.push(String(g.CoverArt)); });
@@ -2437,7 +2437,7 @@ function updateHeroMosaic(catName) { fillMosaicIn(catName, 'hero-icon', 'hero-mo
 function transitionToStart() {
   gameState = 'START'; clearMediaLoaders();
   clearGalleryMedia();
-  _homeOrigin = false;   // user is browsing the library proper now — B follows normal flow
+  _homeOrigin = false;   // user is browsing the library proper now, B follows normal flow
   document.getElementById('splash-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.add('hidden');
@@ -2746,7 +2746,7 @@ function formatJbTime(sec) {
  * the element that is actually producing sound.
  *
  * ⚠️ createMediaElementSource can be called ONCE per element, and it REROUTES that
- * element's audio through the graph — forget to connect to the destination and the music
+ * element's audio through the graph, forget to connect to the destination and the music
  * goes silent. Both are why the node is created lazily, kept in a module-level handle, and
  * always wired source → analyser → destination.
  *
@@ -2764,7 +2764,7 @@ function _jbEnsureAnalyser() {
         _jbAudioCtx = new Ctx();
         _jbSourceNode = _jbAudioCtx.createMediaElementSource(bgmAudio);
         _jbAnalyser = _jbAudioCtx.createAnalyser();
-        _jbAnalyser.fftSize = 128;              // 64 bins — plenty at TV distance
+        _jbAnalyser.fftSize = 128;              // 64 bins, plenty at TV distance
         _jbAnalyser.smoothingTimeConstant = 0.78;
         _jbSourceNode.connect(_jbAnalyser);
         _jbAnalyser.connect(_jbAudioCtx.destination);   // ⚠️ or the music stops
@@ -3102,7 +3102,7 @@ function toggleJbFullscreen() {
   if (!fsView) {
     fsView = document.createElement('div');
     fsView.id = 'jb-fs-view';
-    // ⚠️ Phase 4 W4: the same Cliamp identity as the jukebox behind it — flat ground,
+    // ⚠️ Phase 4 W4: the same Cliamp identity as the jukebox behind it, flat ground,
     // monospace, box-drawing rules, a real spectrum. The three blurred "xmb-wave" gradients
     // it replaces were a PS3 pastiche sitting inside a terminal-styled player.
     fsView.style.cssText = "position: absolute; top:0; left:0; width:100%; height:100%; box-sizing: border-box; z-index: 50; display: flex; flex-direction: column; justify-content: center; background: var(--bg); padding: clamp(28px, 5vw, 90px); font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;";
@@ -3112,8 +3112,8 @@ function toggleJbFullscreen() {
     <div style="display: flex; align-items: center; gap: clamp(24px, 3vw, 56px); width: 100%; box-sizing: border-box; min-width: 0;">
       <img id="jb-fs-cover" src="" style="width: clamp(180px, 20vw, 340px); aspect-ratio: 1; border: 1px solid var(--border_solid); background: rgba(0,0,0,0.5); object-fit: cover; flex: none;">
       <div style="flex: 1; min-width: 0;">
-        <div id="jb-fs-title" style="font-size: clamp(30px, 4vw, 68px); font-weight: 700; color: var(--text_main); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
-        <div id="jb-fs-artist" style="font-size: clamp(16px, 1.8vw, 32px); color: var(--accent); letter-spacing: 0.08em; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+        <div id="jb-fs-title" style="font-size: clamp(30px, 4vw, 68px); font-weight: 700; color: var(--text_main); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
+        <div id="jb-fs-artist" style="font-size: clamp(16px, 1.8vw, 32px); color: var(--accent); letter-spacing: 0.08em; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
 
         <div style="height: 1px; background: var(--text_dim); opacity: 0.25; margin: clamp(18px, 3vh, 44px) 0 clamp(12px, 2vh, 26px);"></div>
 
@@ -3369,7 +3369,7 @@ function matchCatForGallery(g, catName) {
   if (catName === "EMULATION") return store.includes("emulation");
   if (catName === "APPS") return store.includes("apps");
   if (catName === "OPENBOR") return store.includes("openbor"); if (catName === "OTHERS") return store.includes("others");
-  if (catName === "INSTALLED") { const isManual = !g.GrinderGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; }
+  if (catName === "INSTALLED") { const isManual = !g.InstallerGameId && (store.includes("others") || store.includes("emulation") || store.includes("physical") || store.includes("apps")); return isManual ? !!g.LaunchCommand : g.Installed == 1; }
   if (catName === "FAVS") return g.FAV === 'YES';
   if (catName === "WANT TO PLAY") return g.WANT_TO_PLAY === 'YES';
   if (catName === "BACKLOG") return isBacklog(g);
@@ -3384,7 +3384,7 @@ function applyGalleryFilter() {
     if (!matchCatForGallery(g, catName)) return false;
     if (!genreFilterMatch(g)) return false;
     if (g.Hidden == 1) return false;
-    if (_cremaHideFree && g.FreeToPlay == 1) return false;
+    if (_couchHideFree && g.FreeToPlay == 1) return false;
     if (pico8HiddenFor(g, catName)) return false;
     if (q) {
       const title = String(g.Game || '').toLowerCase();
@@ -3399,9 +3399,9 @@ function applyGalleryFilter() {
     return true;
   });
 
-  if (_cremaGallerySort !== 'alpha') {
+  if (_couchGallerySort !== 'alpha') {
     galleryNumRecent = 0;
-    galleryGames = sortCremaGallery(base);
+    galleryGames = sortCouchGallery(base);
     if (galleryIndex >= galleryGames.length) galleryIndex = Math.max(0, galleryGames.length - 1);
     return;
   }
@@ -3516,7 +3516,7 @@ function updateGallerySelection(animate = true) {
 
   if (scroller) {
     if (inRecentSection || atVeryTopNoRecent) {
-      // Navigated to the recent section or top — scroll smoothly to reveal section header
+      // Navigated to the recent section or top, scroll smoothly to reveal section header
       if (animate) scroller.scrollTo({ top: 0, behavior: 'smooth' });
       else scroller.scrollTop = 0;
     } else {
@@ -3536,7 +3536,7 @@ function updateGallerySelection(animate = true) {
   if (game) {
     updateGalleryBg(game);
   } else {
-    // Empty category — clear every hero element so no stale image lingers
+    // Empty category, clear every hero element so no stale image lingers
     const heroImg = document.getElementById('gallery-hero-img');
     if (heroImg) { heroImg.src = ''; heroImg.style.display = 'none'; }
     const heroLogo = document.getElementById('gallery-hero-logo');
@@ -3607,7 +3607,7 @@ function navigateGallery(dir) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// GOG ACHIEVEMENTS (CREMA)
+// GOG ACHIEVEMENTS (Couch)
 // ══════════════════════════════════════════════════════════════════════════
 
 let _cAchAll  = [];
@@ -3628,11 +3628,11 @@ function _cRelDate(iso) {
 }
 
 function _cGogAppId(game) {
-  const m = (game.LaunchCommand || '').match(/grinder:\/\/launch\/gog\/(\d+)/i);
+  const m = (game.LaunchCommand || '').match(/installer:\/\/launch\/gog\/(\d+)/i);
   return m ? m[1] : null;
 }
 
-async function loadCremaAchievements(game) {
+async function loadCouchAchievements(game) {
   const container = document.getElementById('ggp-ach-container');
   container.innerHTML = '';
   _cAchAll = [];
@@ -3668,7 +3668,7 @@ function _cRenderAchBox(container, label, achievements, showLabel) {
   const box = document.createElement('div');
   box.className = 'stat-box';
   box.style.cssText = 'cursor:pointer; flex-direction:column; align-items:center; gap:8px; padding:14px 10px;';
-  box.onclick = () => { _cAchCurrentLabel = label; _cAchAll = _cAchStores[label]; openCremaAchievementsOverlay(); };
+  box.onclick = () => { _cAchCurrentLabel = label; _cAchAll = _cAchStores[label]; openCouchAchievementsOverlay(); };
 
   box.innerHTML = `
     <div style="position:relative; width:60px; height:60px; flex-shrink:0;">
@@ -3690,7 +3690,7 @@ function _cRenderAchBox(container, label, achievements, showLabel) {
   container.appendChild(box);
 }
 
-function openCremaAchievementsOverlay() {
+function openCouchAchievementsOverlay() {
   if (!_cAchAll.length) return;
   previousGameState = gameState;
   gameState = 'ACH_OVERLAY';
@@ -3699,37 +3699,37 @@ function openCremaAchievementsOverlay() {
   const overlay = document.getElementById('ach-overlay');
   const game    = galleryCurrentGame;
   const isMulti = Object.keys(_cAchStores).length > 1;
-  document.getElementById('crema-ach-game-title').textContent =
-    isMulti ? `${game?.Game || ''} — ${_cAchCurrentLabel}` : (game?.Game || '');
+  document.getElementById('couch-ach-game-title').textContent =
+    isMulti ? `${game?.Game || ''}, ${_cAchCurrentLabel}` : (game?.Game || '');
   _cAchUpdateHint();
 
   const total    = _cAchAll.length;
   const unlocked = _cAchAll.filter(a => a.date_unlocked).length;
   const pct      = total ? Math.round(unlocked / total * 100) : 0;
-  document.getElementById('crema-ach-ring-big').setAttribute('stroke-dasharray', `${pct} 100`);
-  document.getElementById('crema-ach-ring-pct').textContent   = `${pct}%`;
-  document.getElementById('crema-ach-ring-count').textContent = `${unlocked}/${total}`;
+  document.getElementById('couch-ach-ring-big').setAttribute('stroke-dasharray', `${pct} 100`);
+  document.getElementById('couch-ach-ring-pct').textContent   = `${pct}%`;
+  document.getElementById('couch-ach-ring-count').textContent = `${unlocked}/${total}`;
 
   _cAchFilter = 'all';
-  document.querySelectorAll('.crema-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
+  document.querySelectorAll('.couch-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
   _cRenderGrid();
   overlay.classList.remove('hidden');
 }
-window.openCremaAchievementsOverlay = openCremaAchievementsOverlay;
+window.openCouchAchievementsOverlay = openCouchAchievementsOverlay;
 
 function cAchSetFilter(f, btn) {
   _cAchFilter = f;
-  document.querySelectorAll('.crema-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  document.querySelectorAll('.couch-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   _cRenderGrid();
 }
 window.cAchSetFilter = cAchSetFilter;
 
-function closeCremaAchievementsOverlay() {
+function closeCouchAchievementsOverlay() {
   document.getElementById('ach-overlay').classList.add('hidden');
   gameState = previousGameState;
   setBlur(false);
 }
-window.closeCremaAchievementsOverlay = closeCremaAchievementsOverlay;
+window.closeCouchAchievementsOverlay = closeCouchAchievementsOverlay;
 
 function _cAchUpdateHint() {
   const hintEl = document.getElementById('ach-nav-hint');
@@ -3752,21 +3752,21 @@ function cAchSwitchStore(dir) {
   _cAchCurrentLabel = storeLabels[(idx + dir + storeLabels.length) % storeLabels.length];
   _cAchAll = _cAchStores[_cAchCurrentLabel];
   const game = galleryCurrentGame;
-  document.getElementById('crema-ach-game-title').textContent = `${game?.Game || ''} — ${_cAchCurrentLabel}`;
+  document.getElementById('couch-ach-game-title').textContent = `${game?.Game || ''}, ${_cAchCurrentLabel}`;
   const total    = _cAchAll.length;
   const unlocked = _cAchAll.filter(a => a.date_unlocked).length;
   const pct      = total ? Math.round(unlocked / total * 100) : 0;
-  document.getElementById('crema-ach-ring-big').setAttribute('stroke-dasharray', `${pct} 100`);
-  document.getElementById('crema-ach-ring-pct').textContent   = `${pct}%`;
-  document.getElementById('crema-ach-ring-count').textContent = `${unlocked}/${total}`;
+  document.getElementById('couch-ach-ring-big').setAttribute('stroke-dasharray', `${pct} 100`);
+  document.getElementById('couch-ach-ring-pct').textContent   = `${pct}%`;
+  document.getElementById('couch-ach-ring-count').textContent = `${unlocked}/${total}`;
   _cAchFilter = 'all';
-  document.querySelectorAll('.crema-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
+  document.querySelectorAll('.couch-ach-tab').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
   _cRenderGrid();
 }
 
 function _cRenderGrid() {
-  const grid  = document.getElementById('crema-ach-grid');
-  const empty = document.getElementById('crema-ach-empty');
+  const grid  = document.getElementById('couch-ach-grid');
+  const empty = document.getElementById('couch-ach-empty');
   grid.innerHTML = '';
 
   const list = _cAchAll.filter(a =>
@@ -3781,7 +3781,7 @@ function _cRenderGrid() {
   for (const a of list) {
     const unlocked = !!a.date_unlocked;
     const card = document.createElement('div');
-    card.className = 'crema-ach-card' + (unlocked ? ' unlocked' : '');
+    card.className = 'couch-ach-card' + (unlocked ? ' unlocked' : '');
 
     const iconUrl = unlocked ? a.image_unlocked : a.image_locked;
     if (iconUrl) {
@@ -3828,7 +3828,7 @@ function _cRenderGrid() {
 }
 
 document.getElementById('ach-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('ach-overlay')) closeCremaAchievementsOverlay();
+  if (e.target === document.getElementById('ach-overlay')) closeCouchAchievementsOverlay();
 });
 
 function cAchCycleFilter(dir) {
@@ -3865,7 +3865,7 @@ function closeGalleryGamepage() {
   ggpSlideshowOpen = false;
   clearGalleryMedia();
   // Re-render the grid so changes made on the gamepage (install→play, fav/want/played,
-  // playlist membership) are reflected immediately — keep the user on the same game.
+  // playlist membership) are reflected immediately, keep the user on the same game.
   const keepId = galleryCurrentGame ? galleryCurrentGame.id : null;
   applyGalleryFilter();
   if (keepId != null) {
@@ -3892,7 +3892,7 @@ function galleryGamepageNavigate(delta) {
 }
 
 function updateGalleryGamepageContent(game) {
-  // Hero image — natural proportions, no Ken Burns
+  // Hero image, natural proportions, no Ken Burns
   const heroSrc = game.HeroArt ? convertSafePath(game.HeroArt)
     : game.Screenshot ? convertSafePath(String(game.Screenshot).split('|')[0])
     : game.CoverArt ? convertSafePath(game.CoverArt) : '';
@@ -3928,7 +3928,7 @@ function updateGalleryGamepageContent(game) {
   const oldBadge = document.getElementById('ggp-store-badge');
   if (oldBadge) oldBadge.style.display = 'none';
 
-  // Store/category logo — top-left corner of the hero
+  // Store/category logo, top-left corner of the hero
   const cornerL = document.getElementById('ggp-corner-logo');
   if (cornerL) {
     const lg = getGalleryStoreLogo((game.Store || '').split(',')[0]);
@@ -3991,7 +3991,7 @@ function updateGalleryGamepageContent(game) {
   ggpBuildButtonList();
   ggpUpdateButtonFocus();
 
-  // Stats — vertical list
+  // Stats, vertical list
   const statsEl = document.getElementById('ggp-stats-row');
   if (statsEl) {
     const stats = [
@@ -4026,7 +4026,7 @@ function updateGalleryGamepageContent(game) {
     fullEl.style.display = 'none';
     const noDesc = !localDesc || !localDesc.trim();
     fallbackEl.innerText = noDesc
-      ? (heroSrc ? t('empty.no_desc') : 'This game has no artwork or metadata scraped yet.\n\nPress SELECT → SCRAPING ENGINE to download images and information automatically. Or use Cafe Neurotico Game Manager (the desktop app) to have more detailed, in-depth editing tools.')
+      ? (heroSrc ? t('empty.no_desc') : 'This game has no artwork or metadata scraped yet.\n\nPress SELECT → SCRAPING ENGINE to download images and information automatically. Or use Clarity Game Manager (the desktop app) to have more detailed, in-depth editing tools.')
       : '';
     fallbackEl.style.display = noDesc ? 'block' : 'none';
   }
@@ -4056,9 +4056,9 @@ function updateGalleryGamepageContent(game) {
     });
   }
 
-  loadCremaAchievements(game);
+  loadCouchAchievements(game);
 
-  // Screenshots banner — Ken Burns cycling like CNGM
+  // Screenshots banner, Ken Burns cycling like Clarity
   galleryScreenshots = game.Screenshot ? String(game.Screenshot).split('|').filter(s => s.trim()) : [];
   galleryScreenIndex = 0;
   const ssBanner = document.getElementById('ggp-ss-banner');
@@ -4174,14 +4174,14 @@ function ggpActivateButton() {
       previousGameState = 'GALLERY_GAMEPAGE';
       currentOverlayType = 'NEEDS_MANAGER';
       renderGenericOverlay('SET THIS UP IN THE MANAGER', ['OK'],
-        'This game has no launch command yet. Open Cafe Neurotico on your desk and add it there — ' +
-        'CREMA plays what the Manager has set up.');
+        'This game has no launch command yet. Open Clarity on your desk and add it there, ' +
+        'Couch plays what the Manager has set up.');
     } else if (playBtnEl?.dataset?.installMode === '1') {
       tryInstall(game, () => {
         const stL = (game.Store || '').toLowerCase();
-        if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) {
-          window.api.openGrinderGui(game.Game);
-        } else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+        if (game.InstallerGameId && !stL.includes('gog') && !stL.includes('epic')) {
+          window.api.openInstallerGui(game.Game);
+        } else if (stL.includes('gog') || stL.includes('epic')) { showInstallerConfirm(game); }
         else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
       });
     } else if (game.LaunchCommand) { tryLaunch(game); }
@@ -4256,7 +4256,7 @@ function ggpCloseSlideshow() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// CREMA FLAT GAMEPAGE
+// Couch FLAT GAMEPAGE
 // ══════════════════════════════════════════════════════════════════════════
 
 let _cfgpGame   = null;
@@ -4311,7 +4311,7 @@ function openCfgpDescOverlay() {
   playSound(sfxSelect);
   gameState = 'CFGP_DESC';
   document.getElementById('cfgpd-title').textContent = game.Game || '';
-  // Short description first, then the full Steam HTML — exactly like the classic gamepage.
+  // Short description first, then the full Steam HTML, exactly like the classic gamepage.
   const txt = document.getElementById('cfgpd-text');
   txt.innerHTML = '';
   if (desc) { const d = document.createElement('div'); d.className = 'cfgpd-short'; d.textContent = desc; txt.appendChild(d); }
@@ -4334,12 +4334,12 @@ function _cfgpdShow() {
 function closeCfgpDescOverlay() {
   playSound(sfxBack);
   document.getElementById('cfgp-desc-overlay').classList.add('hidden');
-  gameState = 'CREMA_FGP';
+  gameState = 'Couch_FGP';
 }
 
-async function openCremaFlatGamepage(game) {
+async function openCouchFlatGamepage(game) {
   _cfgpGame = game;
-  gameState = 'CREMA_FGP';
+  gameState = 'Couch_FGP';
 
   document.getElementById('ggp-screen').classList.add('hidden');
   document.getElementById('gallery-screen').classList.add('hidden');
@@ -4348,7 +4348,7 @@ async function openCremaFlatGamepage(game) {
   // Store tag + title
   document.getElementById('cfgp-store-tag').textContent =
     (game.Store || '').split(',')[0].trim().toUpperCase();
-  // Store/category logo — bottom-right corner
+  // Store/category logo, bottom-right corner
   const _cCorner = document.getElementById('cfgp-corner-logo');
   if (_cCorner) {
     const lg = getGalleryStoreLogo((game.Store || '').split(',')[0]);
@@ -4370,7 +4370,7 @@ async function openCremaFlatGamepage(game) {
   if (game.METACRITIC) chips.push(['METACRITIC', game.METACRITIC]);
   if (game.ProtonTier) chips.push(['PROTONDB', String(game.ProtonTier).toUpperCase()]);
   meta.innerHTML = chips.map(([l, v]) => `<div class="cfgp-chip"><div class="cl">${_che(l)}</div><div class="cv">${_che(String(v))}</div></div>`).join('');
-  // Similar games — single dim line under the description
+  // Similar games, single dim line under the description
   const simEl = document.getElementById('cfgp-similar');
   if (simEl) {
     const sim = (game.SimilarGames || '').trim();
@@ -4380,8 +4380,8 @@ async function openCremaFlatGamepage(game) {
   // Achievements: load (fills _cAchAll; the hidden classic container render is harmless),
   // then append the chip with the mapped view-all glyph. Y opens the overlay from here.
   galleryCurrentGame = game;   // the ach overlay titles itself from galleryCurrentGame
-  loadCremaAchievements(game).then(() => {
-    if (gameState !== 'CREMA_FGP' || _cfgpGame !== game || !_cAchAll.length) return;
+  loadCouchAchievements(game).then(() => {
+    if (gameState !== 'Couch_FGP' || _cfgpGame !== game || !_cAchAll.length) return;
     document.getElementById('cfgp-ach-chip')?.remove();
     const unlocked = _cAchAll.filter(a => a.date_unlocked).length;
     const chip = document.createElement('div');
@@ -4437,7 +4437,7 @@ async function openCremaFlatGamepage(game) {
   // Fav / Want buttons
   _cfgpUpdateBadges(game);
 
-  // Play / Install button — same logic as the classic gamepage
+  // Play / Install button, same logic as the classic gamepage
   const playBtn = document.getElementById('cfgp-btn-play');
   const _pHasCmd = game.LaunchCommand && String(game.LaunchCommand).trim();
   const _pInst2 = game.Installed == null || game.Installed == 1;
@@ -4468,7 +4468,7 @@ async function openCremaFlatGamepage(game) {
   renderFooters();
 }
 
-function closeCremaFlatGamepage() {
+function closeCouchFlatGamepage() {
   _cfgpStopKenBurns();
   const video = document.getElementById('cfgp-video');
   video.pause(); video.src = ''; video.style.display = 'none';
@@ -4506,7 +4506,7 @@ function _cfgpActivateBtn() {
   playSound(sfxSelect);
 
   if (id === 'cfgp-btn-back') {
-    closeCremaFlatGamepage();
+    closeCouchFlatGamepage();
     document.getElementById('gallery-screen').classList.remove('hidden');
     gameState = 'GALLERY';
     renderFooters();
@@ -4519,7 +4519,7 @@ function _cfgpActivateBtn() {
     window.api.saveDbField({ game: game.Game, field: 'WANT_TO_PLAY', value: game.WANT_TO_PLAY });
     _cfgpUpdateBadges(game);
   } else if (id === 'cfgp-btn-playlist') {
-    _plAssignReturn = 'CREMA_FGP';
+    _plAssignReturn = 'Couch_FGP';
     openPlaylistAssignMenu(game);
   } else if (id === 'cfgp-btn-steam') {
     const appid = String(game.SteamAppID || '').replace(/\.0+$/, '');
@@ -4535,23 +4535,23 @@ function _cfgpActivateBtn() {
   } else if (id === 'cfgp-btn-play') {
     const mode = btn.dataset.installMode;
     if (mode === 'add_cmd') {
-      previousGameState = 'CREMA_FGP';
+      previousGameState = 'Couch_FGP';
       currentOverlayType = 'NEEDS_MANAGER';
       renderGenericOverlay('SET THIS UP IN THE MANAGER', ['OK'],
-        'This game has no launch command yet. Open Cafe Neurotico on your desk and add it there — ' +
-        'CREMA plays what the Manager has set up.');
+        'This game has no launch command yet. Open Clarity on your desk and add it there, ' +
+        'Couch plays what the Manager has set up.');
     } else if (mode === '1') {
       tryInstall(game, () => {
         const stL = (game.Store || '').toLowerCase();
-        if (game.GrinderGameId && !stL.includes('gog') && !stL.includes('epic')) { window.api.openGrinderGui(game.Game); }
-        else if (stL.includes('gog') || stL.includes('epic')) { showGrinderConfirm(game); }
+        if (game.InstallerGameId && !stL.includes('gog') && !stL.includes('epic')) { window.api.openInstallerGui(game.Game); }
+        else if (stL.includes('gog') || stL.includes('epic')) { showInstallerConfirm(game); }
         else if (stL.includes('steam') && game.SteamAppID && String(game.SteamAppID) !== 'None') { showSteamInstallConfirm(game); }
       });
     } else if (game.LaunchCommand) { tryLaunch(game); }
   }
 }
 
-// Keyboard/gamepad handler for CREMA_FGP state — wired into the existing input handler
+// Keyboard/gamepad handler for Couch_FGP state, wired into the existing input handler
 // ══════════════════════════════════════════════════════════════════════════
 // BROWSE MODE MENU
 // ══════════════════════════════════════════════════════════════════════════
@@ -4586,20 +4586,20 @@ function openGamepageStyleMenu() {
 
 function openSmartGamepage(game) {
   if ((audioCfg.gamepageStyle || 'CLASSIC') === 'IMMERSIVE') {
-    openCremaFlatGamepage(game);
+    openCouchFlatGamepage(game);
   } else {
     openGalleryGamepage(game);
   }
 }
 
-// ── GRINDER headless install/uninstall ────────────────────────────────────────
+// ── Installer headless install/uninstall ────────────────────────────────────────
 
 function _gpStep(id, state) { // state: 'idle' | 'active' | 'done' | 'error'
     const el = document.getElementById(id); if (!el) return;
     el.className = 'gp-step' + (state === 'active' ? ' gp-active' : state === 'done' ? ' gp-done' : state === 'error' ? ' gp-error' : '');
 }
 
-function _setGrinderProgressStep(step, isUninstall) {
+function _setInstallerProgressStep(step, isUninstall) {
     const allInstall = ['auth','downloading','installing','redist'];
     const allUninstall = ['uninstalling'];
     const all = isUninstall ? allUninstall : allInstall;
@@ -4623,34 +4623,34 @@ function _gcPaintActions() {
         : `<span style="color:var(--accent)">[ A ]</span> CONFIRM &nbsp;&nbsp; <span style="color:var(--text_sec)">[ Y ]</span> CHANGE DIR &nbsp;&nbsp; <span style="color:var(--text_dim)">[ B ]</span> CANCEL`;
 }
 
-function showGrinderConfirm(game) {
-    _grinderConfirmGame = game;
-    if (!_grinderInstallDir) _grinderInstallDir = '~/Games/CafeNeurotico';
+function showInstallerConfirm(game) {
+    _installerConfirmGame = game;
+    if (!_installerInstallDir) _installerInstallDir = '~/Games/Clarity';
     document.getElementById('gc-action-title').textContent = 'INSTALL GAME';
     document.getElementById('gc-game-title').textContent = game.Game;
-    document.getElementById('gc-dir').textContent = _grinderInstallDir;
-    // Download/disk size + free space (shared GRINDER logic)
-    const _gid = game.GrinderGameId || '';
+    document.getElementById('gc-dir').textContent = _installerInstallDir;
+    // Download/disk size + free space (shared Installer logic)
+    const _gid = game.InstallerGameId || '';
     const _fmtB = b => b == null ? '?' : (b >= 1024**3 ? (b/1024**3).toFixed(1)+' GB' : (b/1024**2).toFixed(0)+' MB');
     const _sz = document.getElementById('gc-sizeinfo'); if (_sz) _sz.textContent = 'Checking size & space…';
     _gcBlocked = null;
     Promise.all([
         window.api.getInstallSize(_gid).catch(() => null),
-        window.api.getDiskSpace(_grinderInstallDir).catch(() => null),
+        window.api.getDiskSpace(_installerInstallDir).catch(() => null),
         window.api.storeAuthStatus().catch(() => null),
     ]).then(([info, free, auth]) => {
         if (!_sz) return;
 
         // ⚠️ The size comes back null far more often because the store is signed out than
-        // because anything is broken — and "Size info unavailable" told you neither. Say which
-        // it is, and where it is fixed. CREMA never offers the login itself.
+        // because anything is broken, and "Size info unavailable" told you neither. Say which
+        // it is, and where it is fixed. Couch never offers the login itself.
         if (!info) {
             const store = (game.Store || '').toLowerCase().includes('epic') ? 'Epic' : 'GOG';
             const signedOut = auth && auth.engine && !(store === 'Epic' ? auth.epic : auth.gog);
             if (signedOut) {
                 _gcBlocked = `Signed out of ${store}`;
                 _sz.innerHTML = `<span style="color:#ef9a9a;">You are signed out of ${store}.</span>` +
-                    `<br><span style="color:var(--text_dim);">Open Cafe Neurotico on your desk to sign in, then come back.</span>`;
+                    `<br><span style="color:var(--text_dim);">Open Clarity on your desk to sign in, then come back.</span>`;
                 _gcPaintActions();
                 return;
             }
@@ -4668,7 +4668,7 @@ function showGrinderConfirm(game) {
             // install ran until the disk filled. If it cannot fit, it does not start.
             if (need && free < need) {
                 _gcBlocked = 'Not enough space';
-                _sz.innerHTML = `${parts.join('   ·   ')}<br><span style="color:#ef9a9a;">Only ${_fmtB(free)} free — this needs ${_fmtB(need)}.</span>` +
+                _sz.innerHTML = `${parts.join('   ·   ')}<br><span style="color:#ef9a9a;">Only ${_fmtB(free)} free. This needs ${_fmtB(need)}.</span>` +
                     `<br><span style="color:var(--text_dim);">Press [ Y ] to install somewhere else.</span>`;
                 _gcPaintActions();
                 return;
@@ -4678,16 +4678,16 @@ function showGrinderConfirm(game) {
         _sz.textContent = parts.join('   ·   ');
         _gcPaintActions();
     });
-    document.getElementById('grinder-confirm-backdrop').classList.remove('hidden');
-    _grinderConfirmActive = true;
-    previousGameState = gameState; gameState = 'GRINDER_CONFIRM';
-    // Fetch GRINDER's saved default dir and update if different
-    try { window.api.grinderGetDefaultInstallDir().then(dir => { if (dir) { _grinderInstallDir = dir; document.getElementById('gc-dir').textContent = dir; } }).catch(() => {}); } catch(e) {}
+    document.getElementById('installer-confirm-backdrop').classList.remove('hidden');
+    _installerConfirmActive = true;
+    previousGameState = gameState; gameState = 'Installer_CONFIRM';
+    // Fetch Installer's saved default dir and update if different
+    try { window.api.installerGetDefaultInstallDir().then(dir => { if (dir) { _installerInstallDir = dir; document.getElementById('gc-dir').textContent = dir; } }).catch(() => {}); } catch(e) {}
 }
 
-function hideGrinderConfirm() {
-    document.getElementById('grinder-confirm-backdrop').classList.add('hidden');
-    _grinderConfirmActive = false; _grinderConfirmGame = null;
+function hideInstallerConfirm() {
+    document.getElementById('installer-confirm-backdrop').classList.add('hidden');
+    _installerConfirmActive = false; _installerConfirmGame = null;
     gameState = previousGameState;
 }
 
@@ -4703,8 +4703,8 @@ function showLaunchFailure(info) {
     document.getElementById('lf-game-title').textContent = info.title || '';
     document.getElementById('lf-message').textContent    = info.message || 'The game could not be started.';
     document.getElementById('lf-hint').textContent = isProton
-        ? 'Windows games need Proton, a compatibility layer. Open Cafe Neurotico on the desktop — it can install GE-Proton for you in one click.'
-        : 'Open Cafe Neurotico on the desktop for details, or try "Play with Log" there to see what happened.';
+        ? 'Windows games need Proton, a compatibility layer. Open Clarity on the desktop. It can install GE-Proton for you in one click.'
+        : 'Open Clarity on the desktop for details, or try "Play with Log" there to see what happened.';
     // Exiting sleep/"now playing" mode can also set gameState, so remember where we came from
     // only the first time this opens.
     if (gameState !== 'LAUNCH_FAIL') _launchFailPrevState = gameState;
@@ -4721,8 +4721,8 @@ function hideLaunchFailure() {
 }
 window.api.onGameLaunchFailed?.(info => showLaunchFailure(info || {}));
 
-function showGrinderProgress(isUninstall) {
-    const game = _grinderConfirmGame;
+function showInstallerProgress(isUninstall) {
+    const game = _installerConfirmGame;
     document.getElementById('gp-action-title').textContent = isUninstall ? 'UNINSTALLING' : 'INSTALLING';
     document.getElementById('gp-game-title').textContent = game?.Game || '';
     document.getElementById('gp-bar').style.width = '0%';
@@ -4733,21 +4733,21 @@ function showGrinderProgress(isUninstall) {
     if (!isUninstall) ['auth','downloading','installing','redist'].forEach(s => _gpStep(`gp-step-${s}`, 'idle'));
     else _gpStep('gp-step-uninstalling', 'idle');
     document.getElementById('gp-cancel-hint').style.display = '';
-    document.getElementById('grinder-progress-backdrop').classList.remove('hidden');
-    _grinderProgressActive = true;
-    previousGameState = gameState; gameState = 'GRINDER_PROGRESS';
-    _grinderProgressInterval = setInterval(pollGrinderProgress.bind(null, isUninstall), 1200);
+    document.getElementById('installer-progress-backdrop').classList.remove('hidden');
+    _installerProgressActive = true;
+    previousGameState = gameState; gameState = 'Installer_PROGRESS';
+    _installerProgressInterval = setInterval(pollInstallerProgress.bind(null, isUninstall), 1200);
 }
 
-function hideGrinderProgress() {
-    document.getElementById('grinder-progress-backdrop').classList.add('hidden');
-    clearInterval(_grinderProgressInterval); _grinderProgressInterval = null;
-    _grinderProgressActive = false; _grinderConfirmGame = null;
+function hideInstallerProgress() {
+    document.getElementById('installer-progress-backdrop').classList.add('hidden');
+    clearInterval(_installerProgressInterval); _installerProgressInterval = null;
+    _installerProgressActive = false; _installerConfirmGame = null;
     gameState = previousGameState;
 }
 
 // Percent over elapsed time. ⚠️ Deliberately crude: the engine reports no rate, and a
-// download's speed is not steady enough for a precise figure to stay true — so this rounds
+// download's speed is not steady enough for a precise figure to stay true, so this rounds
 // hard and disappears entirely until there is enough progress to mean anything.
 function _installEta(percent) {
     if (!_gpStarted || !percent || percent < 3 || percent >= 100) return '';
@@ -4758,10 +4758,10 @@ function _installEta(percent) {
     return (remaining / 3600).toFixed(1) + ' h left';
 }
 
-async function pollGrinderProgress(isUninstall) {
-    const p = await window.api.grinderGetProgress();
+async function pollInstallerProgress(isUninstall) {
+    const p = await window.api.installerGetProgress();
     if (!p) return;
-    _setGrinderProgressStep(p.step, isUninstall);
+    _setInstallerProgressStep(p.step, isUninstall);
     const pct = p.percent || 0;
     document.getElementById('gp-bar').style.width = pct + '%';
     // The engine's message already carries "1.2 GiB / 4.5 GiB" while downloading; the percent
@@ -4769,22 +4769,22 @@ async function pollGrinderProgress(isUninstall) {
     const eta = _installEta(pct);
     const big = pct > 0 && !p.done ? `<span style="font-size:22px; font-weight:900; color:var(--accent);">${Math.round(pct)}%</span>  ` : '';
     const tail = eta ? `<span style="color:var(--text_dim);"> · ${eta}</span>` : '';
-    document.getElementById('gp-message').innerHTML = big + escHtmlCrema(p.message || '') + tail;
+    document.getElementById('gp-message').innerHTML = big + escHtmlCouch(p.message || '') + tail;
     if (p.done) {
-        clearInterval(_grinderProgressInterval); _grinderProgressInterval = null;
+        clearInterval(_installerProgressInterval); _installerProgressInterval = null;
         _gpStarted = 0;
         const hint = document.getElementById('gp-cancel-hint');
         if (p.step === 'done') {
             hint.style.display = 'none';
             document.getElementById('gp-bar').style.width = '100%';
-            window.api.syncGrinderInstalled().catch(() => {}).finally(() => {
-                hideGrinderProgress(); refreshDatabase();
+            window.api.syncInstallerInstalled().catch(() => {}).finally(() => {
+                hideInstallerProgress(); refreshDatabase();
             });
         } else {
             // ⚠️ Anything that is not 'done' is a failure, and it used to leave the error on
-            // screen with the only hint hidden — no percentage, no cause, no way out stated.
+            // screen with the only hint hidden, no percentage, no cause, no way out stated.
             document.getElementById('gp-message').innerHTML =
-                escHtmlCrema(p.message || 'The install stopped.') +
+                escHtmlCouch(p.message || 'The install stopped.') +
                 '<br><span style="color:var(--text_dim);">Nothing was installed. Press [ B ] to close, or set it up from the Manager on your desk.</span>';
             hint.style.display = '';
             hint.innerHTML = '<span style="color:var(--text_dim)">[ B ]</span> CLOSE';
@@ -4793,60 +4793,60 @@ async function pollGrinderProgress(isUninstall) {
 }
 
 // A store's error text goes into innerHTML, and it can contain anything the store said.
-function escHtmlCrema(v) {
+function escHtmlCouch(v) {
     return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // Every way an install can fail ends here, saying what happened and what to do about it.
-// ⚠️ There is no "open GRINDER" any more — GRINDER lost its window in Phase 2B — so an
+// ⚠️ There is no "open Installer" any more, Installer lost its window in Phase 2B, so an
 // instruction to open it is one the user cannot follow.
 function showInstallFailure(game, headline, detail) {
-    hideGrinderConfirm();
-    _grinderConfirmGame = game;
+    hideInstallerConfirm();
+    _installerConfirmGame = game;
     document.getElementById('gp-action-title').textContent = headline;
     document.getElementById('gp-game-title').textContent = game?.Game || '';
     document.getElementById('gp-message').innerHTML = detail;
     document.getElementById('gp-bar').style.width = '0%';
     document.getElementById('gp-cancel-hint').style.display = '';
-    document.getElementById('grinder-progress-backdrop').classList.remove('hidden');
-    _grinderProgressActive = true;
-    previousGameState = gameState; gameState = 'GRINDER_PROGRESS';
+    document.getElementById('installer-progress-backdrop').classList.remove('hidden');
+    _installerProgressActive = true;
+    previousGameState = gameState; gameState = 'Installer_PROGRESS';
 }
 
-async function triggerGrinderInstall() {
-    const game = _grinderConfirmGame; if (!game) return;
+async function triggerInstallerInstall() {
+    const game = _installerConfirmGame; if (!game) return;
     const storeL = (game.Store || '').toLowerCase();
     const store = storeL.includes('gog') ? 'gog' : 'epic';
 
-    // app_id may be missing for older/imported rows — extract it from the LaunchCommand
+    // app_id may be missing for older/imported rows, extract it from the LaunchCommand
     let appId = game.app_id;
     if (!appId && game.LaunchCommand) {
-        const m = game.LaunchCommand.match(/grinder:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
+        const m = game.LaunchCommand.match(/installer:\/\/launch\/(?:gog|epic)\/([^\s"]+)/i);
         if (m) appId = m[1];
     }
 
     if (!appId) {
         showInstallFailure(game, 'CANNOT INSTALL THIS ONE',
             'This game has no store id recorded, so there is nothing to download.<br>' +
-            '<span style="color:var(--text_dim);">Open Cafe Neurotico on your desk and install it from there.</span>');
+            '<span style="color:var(--text_dim);">Open Clarity on your desk and install it from there.</span>');
         return;
     }
 
-    hideGrinderConfirm();
-    const result = await window.api.grinderHeadlessInstall(store, appId, 'windows', _grinderInstallDir);
+    hideInstallerConfirm();
+    const result = await window.api.installerHeadlessInstall(store, appId, 'windows', _installerInstallDir);
     if (!result.ok) {
         showInstallFailure(game, 'INSTALL DID NOT START',
-            escHtmlCrema(result.error || 'GRINDER refused the request.') +
+            escHtmlCouch(result.error || 'Installer refused the request.') +
             '<br><span style="color:var(--text_dim);">Nothing was downloaded. Try again, or set it up from the Manager on your desk.</span>');
         return;
     }
     _gpStarted = Date.now(); _gpLastPct = 0;
-    showGrinderProgress(false);
+    showInstallerProgress(false);
 }
 
 
 // ── GPU IDLE SUSPEND ──────────────────────────────────────────────────────────
-// Freeze all CSS animations + videos when CREMA is hidden or unfocused (e.g. while a
+// Freeze all CSS animations + videos when Couch is hidden or unfocused (e.g. while a
 // launched game is in the foreground, or when backgrounded) so the Ken Burns / screensaver
 // compositor stops burning GPU. The gamepad poll keeps running (it must, to detect the
 // wake combo while a game is focused); Chromium throttles it automatically when truly hidden.

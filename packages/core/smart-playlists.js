@@ -1,6 +1,6 @@
 'use strict';
 /*
- * @cafeneurotico/core — playlists that fill themselves.
+ * @clarity/core, playlists that fill themselves.
  *
  * A playlist is normally a hand-picked list of games in playlist_games. A *smart*
  * playlist instead stores a rule and computes its members on read, so "CRPGs" stays
@@ -9,7 +9,7 @@
  * One table, one optional column: playlists.rule holds JSON, and its absence means the
  * playlist is an ordinary manual one. Nothing about existing playlists changes.
  *
- * Rule shape — every present key must match (AND), values within a key are alternatives (OR):
+ * Rule shape, every present key must match (AND), values within a key are alternatives (OR):
  *   { genres: ['crpg','arpg'], stores: ['gog'], installed: true, fav: true, want: true }
  */
 
@@ -37,7 +37,7 @@ function parseRule(raw) {
 
 function isSmart(playlistRow) { return !!parseRule(playlistRow && playlistRow.rule); }
 
-// Build the SELECT for a rule. Returns { sql, params } or null when the rule is empty —
+// Build the SELECT for a rule. Returns { sql, params } or null when the rule is empty,
 // an empty rule must never silently resolve to "the whole library".
 function ruleQuery(rule) {
     const r = parseRule(rule);
@@ -54,11 +54,11 @@ function ruleQuery(rule) {
         params.push(...r.stores.map(s => `%${String(s).toLowerCase()}%`));
     }
     // Manual-category games (physical/emulation/apps/others) have no install flag to
-    // trust — for them "installed" means "has something to launch", matching how every
+    // trust, for them "installed" means "has something to launch", matching how every
     // other view in the suite decides it.
     if (r.installed) {
         where.push(
-            "(CASE WHEN g.GrinderGameId IS NULL AND (LOWER(IFNULL(g.Store,'')) LIKE '%others%' OR LOWER(IFNULL(g.Store,'')) LIKE '%emulation%' " +
+            "(CASE WHEN g.InstallerGameId IS NULL AND (LOWER(IFNULL(g.Store,'')) LIKE '%others%' OR LOWER(IFNULL(g.Store,'')) LIKE '%emulation%' " +
             "OR LOWER(IFNULL(g.Store,'')) LIKE '%physical%' OR LOWER(IFNULL(g.Store,'')) LIKE '%apps%') " +
             "THEN IFNULL(g.LaunchCommand,'') <> '' ELSE g.Installed = 1 END)"
         );
@@ -88,7 +88,7 @@ function playlistGames(db, playlistId) {
     } catch { return []; }
 }
 
-// How many games a rule currently matches — for the live preview while creating one,
+// How many games a rule currently matches, for the live preview while creating one,
 // and for the counts beside each playlist.
 function ruleCount(db, rule) {
     const q = ruleQuery(rule);
